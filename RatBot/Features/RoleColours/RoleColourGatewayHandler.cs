@@ -2,12 +2,11 @@ using RatBot.Gateway;
 
 namespace RatBot.Features.RoleColours;
 
-public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, RoleColourReconciler colours, ILogger logger) : IDiscordGatewayHandler
+public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, RoleColourReconciler colours) : IDiscordGatewayHandler
 {
     public Task InitializeAsync(CancellationToken ct)
     {
         discordClient.GuildMemberUpdated += HandleMemberUpdatedAsync;
-        discordClient.GuildMembersDownloaded += CheckGuildAsync;
         discordClient.UserJoined += HandleMemberJoinedAsync;
         return Task.CompletedTask;
     }
@@ -15,7 +14,6 @@ public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, 
     public void Unsubscribe()
     {
         discordClient.GuildMemberUpdated -= HandleMemberUpdatedAsync;
-        discordClient.GuildMembersDownloaded -= CheckGuildAsync;
         discordClient.UserJoined -= HandleMemberJoinedAsync;
     }
 
@@ -28,11 +26,4 @@ public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, 
     }
 
     private Task HandleMemberJoinedAsync(SocketGuildUser member) => colours.ReconcileUserRolesAsync(member.Guild, member.Id, CancellationToken.None);
-
-    private async Task CheckGuildAsync(SocketGuild guild)
-    {
-        int incomplete = await colours.ReconcileGuildAsync(guild, CancellationToken.None);
-        if (incomplete > 0)
-            logger.Warning("Startup role colour check incomplete for guild {GuildId}: {Incomplete} update(s)", guild.Id, incomplete);
-    }
 }
