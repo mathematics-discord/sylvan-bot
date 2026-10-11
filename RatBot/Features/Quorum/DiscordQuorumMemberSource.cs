@@ -31,7 +31,7 @@ public sealed class DiscordQuorumMemberSource(DiscordSocketClient client, Discor
                 .ForContext("GuildId", scope.GuildId)
                 .ForContext("ChannelId", scope.ChannelId)
                 .ForContext("ConfiguredRoleCount", roleIds.Count)
-                .Warning(ex, "Failed to ensure quorum member index is ready.");
+                .Warning(ex, "Failed to ensure quorum member index is ready");
 
             return QuorumErrors.MemberDataUnavailable;
         }

@@ -16,7 +16,7 @@ public sealed class EmojiAnalyticsWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.Information("Emoji analytics background worker started.");
+        _logger.Information("Emoji analytics background worker started");
         try
         {
             while (await buffer.Reader.WaitToReadAsync(stoppingToken))
@@ -28,7 +28,7 @@ public sealed class EmojiAnalyticsWorker(
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            _logger.Information("Emoji analytics background worker is stopping.");
+            _logger.Information("Emoji analytics background worker is stopping");
         }
     }
 
@@ -62,7 +62,7 @@ public sealed class EmojiAnalyticsWorker(
                     .ToArray();
                 ulong[] trackedEmojiIds = guild.Emotes.Select(emote => emote.Id).ToArray();
                 await store.RecordBatchAsync(guildBatch.Key, increments, trackedEmojiIds, ct);
-                _logger.Debug("Processed {Count} emoji usage increments for guild {GuildId}.", guildBatch.Count(), guildBatch.Key);
+                _logger.Debug("Processed {Count} emoji usage increments for guild {GuildId}", guildBatch.Count(), guildBatch.Key);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -70,7 +70,7 @@ public sealed class EmojiAnalyticsWorker(
             }
             catch (Exception ex)
             {
-                _logger.Warning(ex, "Failed to process emoji analytics batch for guild {GuildId}; discarding this guild's batch.", guildBatch.Key);
+                _logger.Warning(ex, "Failed to process emoji analytics batch for guild {GuildId}; discarding this guild's batch", guildBatch.Key);
             }
         }
 

@@ -299,7 +299,7 @@ public sealed class MetaProposalService(BotDbContext db, ILogger logger)
         db.MetaProposalStates.Add(create.Value);
         await db.SaveChangesAsync(ct);
 
-        _logger.Information("Tracked meta suggestion thread {SuggestionThreadChannelId} in guild {GuildId}.", suggestionThreadChannelId, guildId);
+        _logger.Information("Tracked meta suggestion thread {SuggestionThreadChannelId} in guild {GuildId}", suggestionThreadChannelId, guildId);
     }
 
     public async Task<ErrorOr<MetaProposalState>> VetoAsync(

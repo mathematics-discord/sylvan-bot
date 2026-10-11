@@ -162,15 +162,15 @@ public sealed class DiscordInteractionHandler(
         }
         catch (HttpException ex) when (ex.DiscordCode == (DiscordErrorCode)10062)
         {
-            interactionLogger.Warning(ex, "Unknown interaction while responding to unmet precondition.");
+            interactionLogger.Warning(ex, "Unknown interaction while responding to unmet precondition");
         }
         catch (HttpException ex) when (ex.DiscordCode == (DiscordErrorCode)40060)
         {
-            interactionLogger.Information(ex, "Interaction was already acknowledged while responding to unmet precondition.");
+            interactionLogger.Information(ex, "Interaction was already acknowledged while responding to unmet precondition");
         }
         catch (Exception ex)
         {
-            interactionLogger.Warning(ex, "Failed to send unmet precondition response.");
+            interactionLogger.Warning(ex, "Failed to send unmet precondition response");
         }
     }
 
@@ -179,7 +179,7 @@ public sealed class DiscordInteractionHandler(
         Assembly interactionsAssembly = typeof(HelloModule).Assembly;
         await interactionService.AddModulesAsync(interactionsAssembly, services);
 
-        _logger.Information("Registered {InteractionModuleCount} interaction modules.", interactionService.Modules.Count);
+        _logger.Information("Registered {InteractionModuleCount} interaction modules", interactionService.Modules.Count);
 
         LogRegisteredInteractionCommands();
 
@@ -315,7 +315,7 @@ public sealed class DiscordInteractionHandler(
                 .ForContext("diag_stage", "dispatch")
                 .ForContext("diag_outcome", "unknown_interaction")
                 .ForContext("outcome", "unknown_interaction")
-                .Warning(ex, "Unknown interaction received by dispatch pipeline.");
+                .Warning(ex, "Unknown interaction received by dispatch pipeline");
         }
         catch (HttpException ex) when (ex.DiscordCode == (DiscordErrorCode)40060)
         {
@@ -326,7 +326,7 @@ public sealed class DiscordInteractionHandler(
                 .ForContext("diag_stage", "dispatch")
                 .ForContext("diag_outcome", "already_acknowledged")
                 .ForContext("outcome", "already_acknowledged")
-                .Information(ex, "Interaction was already acknowledged.");
+                .Information(ex, "Interaction was already acknowledged");
         }
         catch (Exception ex)
         {
@@ -337,7 +337,7 @@ public sealed class DiscordInteractionHandler(
                 .ForContext("diag_stage", "dispatch")
                 .ForContext("diag_outcome", "failed")
                 .ForContext("outcome", "failed")
-                .Error(ex, "Unhandled exception executing interaction.");
+                .Error(ex, "Unhandled exception executing interaction");
 
             try
             {
@@ -353,7 +353,7 @@ public sealed class DiscordInteractionHandler(
                     .ForContext("diag_stage", "error_response")
                     .ForContext("diag_outcome", "failed")
                     .ForContext("outcome", "failed")
-                    .Warning(followupEx, "Failed to send interaction error response.");
+                    .Warning(followupEx, "Failed to send interaction error response");
             }
         }
         finally
@@ -529,19 +529,19 @@ public sealed class DiscordInteractionHandler(
             if (_options.DevelopmentCommandRegistrationGuildIds.Length == 0)
             {
                 await interactionService.RegisterCommandsGloballyAsync();
-                _logger.Information("Slash commands registered globally.");
+                _logger.Information("Slash commands registered globally");
                 return;
             }
 
             foreach (ulong guildId in _options.DevelopmentCommandRegistrationGuildIds.Distinct())
             {
                 await interactionService.RegisterCommandsToGuildAsync(guildId);
-                _logger.Information("Slash commands registered to development guild {GuildId}.", guildId);
+                _logger.Information("Slash commands registered to development guild {GuildId}", guildId);
             }
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "Failed to register slash commands.");
+            _logger.Error(ex, "Failed to register slash commands");
         }
     }
 

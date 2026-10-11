@@ -47,7 +47,7 @@ public sealed class MetaSuggestionSettingsService(BotDbContext db, ILogger logge
 
         await _db.SaveChangesAsync(ct);
 
-        _logger.Information("Meta proposal settings updated for guild {GuildId}.", guildId);
+        _logger.Information("Meta proposal settings updated for guild {GuildId}", guildId);
 
         return Result.Success;
     }

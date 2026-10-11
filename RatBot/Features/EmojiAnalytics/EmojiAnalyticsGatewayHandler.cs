@@ -63,7 +63,7 @@ public sealed class EmojiAnalyticsGatewayHandler(
         }
         catch (RegexMatchTimeoutException ex)
         {
-            _logger.Warning(ex, "Emoji parsing timed out for a message in guild {GuildId}.", guildChannel.GuildId);
+            _logger.Warning(ex, "Emoji parsing timed out for a message in guild {GuildId}", guildChannel.GuildId);
             return;
         }
 
@@ -73,7 +73,7 @@ public sealed class EmojiAnalyticsGatewayHandler(
                 await buffer.Writer.WriteAsync(increment);
         }
 
-        _logger.Debug("Queued {Count} message emoji increments for guild {GuildId}.", increments.Length, guildChannel.GuildId);
+        _logger.Debug("Queued {Count} message emoji increments for guild {GuildId}", increments.Length, guildChannel.GuildId);
     }
 
     private async Task HandleReactionAddedAsync(
@@ -123,7 +123,7 @@ public sealed class EmojiAnalyticsGatewayHandler(
     {
         _ = message;
         ulong? guildId = channel.HasValue && channel.Value is IGuildChannel guildChannel ? guildChannel.GuildId : null;
-        _logger.ForContext("ReactionEventType", "cleared_all").ForContext("GuildId", guildId).Information("Discord reaction event recorded.");
+        _logger.ForContext("ReactionEventType", "cleared_all").ForContext("GuildId", guildId).Information("Discord reaction event recorded");
         return Task.CompletedTask;
     }
 
@@ -145,6 +145,6 @@ public sealed class EmojiAnalyticsGatewayHandler(
             .ForContext("EmojiName", emote.Name)
             .ForContext("EmojiId", emojiId)
             .ForContext("IsCustomEmoji", emojiId.HasValue)
-            .Debug("Discord reaction event recorded.");
+            .Debug("Discord reaction event recorded");
     }
 }

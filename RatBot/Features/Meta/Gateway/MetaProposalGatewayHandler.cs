@@ -40,7 +40,7 @@ public sealed class MetaProposalGatewayHandler(
 
             if (!clearResult.IsError)
                 _logger.Information(
-                    "Cleared deleted meta proposal poll message {PollMessageId} for state {StateId} in guild {GuildId}.",
+                    "Cleared deleted meta proposal poll message {PollMessageId} for state {StateId} in guild {GuildId}",
                     message.Id,
                     clearResult.Value.Id,
                     guildId
@@ -48,7 +48,7 @@ public sealed class MetaProposalGatewayHandler(
         }
         catch (Exception ex)
         {
-            _logger.Warning(ex, "Failed to handle meta proposal poll deletion event in guild {GuildId}.", guildId);
+            _logger.Warning(ex, "Failed to handle meta proposal poll deletion event in guild {GuildId}", guildId);
         }
     }
 
@@ -83,7 +83,7 @@ public sealed class MetaProposalGatewayHandler(
             await pollResolver.ResolveFinalizedPollAsync(service, stateResult.Value, pollMessage, CancellationToken.None);
 
             _logger.Information(
-                "Resolved manually finalized meta proposal poll {PollMessageId} for state {StateId} in guild {GuildId}.",
+                "Resolved manually finalized meta proposal poll {PollMessageId} for state {StateId} in guild {GuildId}",
                 pollMessage.Id,
                 stateResult.Value.Id,
                 guildId
@@ -91,7 +91,7 @@ public sealed class MetaProposalGatewayHandler(
         }
         catch (Exception ex)
         {
-            _logger.Warning(ex, "Failed to handle manually finalized meta proposal poll update in guild {GuildId}.", guildId);
+            _logger.Warning(ex, "Failed to handle manually finalized meta proposal poll update in guild {GuildId}", guildId);
         }
     }
 
@@ -115,7 +115,7 @@ public sealed class MetaProposalGatewayHandler(
 
             if (ownerId == 0)
             {
-                _logger.Warning("Ignoring meta suggestion thread {ThreadId} because owner id was unavailable.", thread.Id);
+                _logger.Warning("Ignoring meta suggestion thread {ThreadId} because owner id was unavailable", thread.Id);
 
                 return;
             }
@@ -124,7 +124,7 @@ public sealed class MetaProposalGatewayHandler(
         }
         catch (Exception ex)
         {
-            _logger.Warning(ex, "Failed to handle meta suggestion thread creation event.");
+            _logger.Warning(ex, "Failed to handle meta suggestion thread creation event");
         }
     }
 
@@ -141,7 +141,7 @@ public sealed class MetaProposalGatewayHandler(
         }
         catch (Exception ex)
         {
-            _logger.Warning(ex, "Failed to handle meta suggestion thread deletion event.");
+            _logger.Warning(ex, "Failed to handle meta suggestion thread deletion event");
         }
     }
 

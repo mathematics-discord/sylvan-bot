@@ -115,7 +115,7 @@ public sealed class MetaProposalPollResolver(MetaProposalDiscordWorkflow workflo
             }
             catch (Exception ex)
             {
-                _logger.Debug(ex, "Could not request finalization for meta proposal poll {PollMessageId}.", pollMessage.Id);
+                _logger.Debug(ex, "Could not request finalization for meta proposal poll {PollMessageId}", pollMessage.Id);
             }
 
             await service.RecordPollFinalizationRetryAsync(state.Id, ct);

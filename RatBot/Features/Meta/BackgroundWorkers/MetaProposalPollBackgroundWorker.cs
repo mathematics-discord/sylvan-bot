@@ -11,7 +11,7 @@ public sealed class MetaProposalPollBackgroundWorker(IServiceScopeFactory scopeF
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.Information("Meta proposal poll background worker started.");
+        _logger.Information("Meta proposal poll background worker started");
 
         while (!stoppingToken.IsCancellationRequested)
             try
@@ -21,11 +21,11 @@ public sealed class MetaProposalPollBackgroundWorker(IServiceScopeFactory scopeF
             }
             catch (OperationCanceledException)
             {
-                _logger.Information("Meta proposal poll background worker is stopping.");
+                _logger.Information("Meta proposal poll background worker is stopping");
             }
             catch (Exception ex)
             {
-                _logger.Warning(ex, "Meta proposal poll background worker encountered an error.");
+                _logger.Warning(ex, "Meta proposal poll background worker encountered an error");
                 await Task.Delay(PollInterval, stoppingToken);
             }
     }

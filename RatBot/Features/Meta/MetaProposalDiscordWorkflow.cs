@@ -127,7 +127,7 @@ public sealed class MetaProposalDiscordWorkflow(DiscordSocketClient client, ILog
             }
             catch (Exception ex)
             {
-                _logger.Debug(ex, "Could not delete previous meta publication error message {MessageId}.", previousMessageId);
+                _logger.Debug(ex, "Could not delete previous meta publication error message {MessageId}", previousMessageId);
             }
 
         string content = pingCabinet ? $"<@&{settings.CabinetRoleId}> Proposal publication failed repeatedly." : "Proposal publication failed.";

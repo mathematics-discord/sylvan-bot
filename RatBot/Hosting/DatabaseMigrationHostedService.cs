@@ -17,9 +17,9 @@ public sealed class DatabaseMigrationHostedService(IServiceScopeFactory scopeFac
         if (pendingMigrations.Count == 0)
             return;
 
-        _logger.Information("Applying {PendingMigrationCount} pending database migration(s).", pendingMigrations.Count);
+        _logger.Information("Applying {PendingMigrationCount} pending database migration(s)", pendingMigrations.Count);
         await dbContext.Database.MigrateAsync(cancellationToken);
-        _logger.Information("Database migrations applied successfully.");
+        _logger.Information("Database migrations applied successfully");
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
