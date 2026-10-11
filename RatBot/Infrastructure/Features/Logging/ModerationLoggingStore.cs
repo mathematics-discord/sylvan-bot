@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using RatBot.Domain.Features.Logging;
 using RatBot.Infrastructure.Data;
 
@@ -36,16 +36,18 @@ public sealed class ModerationLoggingStore(IDbContextFactory<BotDbContext> dbCon
         return ExcludeChannelResult.Excluded;
     }
 
-    public async Task<ObservedMessage?> FindObservedMessageAsync(ulong guildId, ulong originalMessageId,
+    public async Task<Option<ObservedMessage>> FindObservedMessageAsync(ulong guildId, ulong originalMessageId,
         CancellationToken ct)
     {
         await using BotDbContext db = await dbContextFactory.CreateDbContextAsync(ct);
 
-        return await db
-            .ObservedMessages.AsNoTracking()
+        ObservedMessage? observed = await db.ObservedMessages
+            .AsNoTracking()
             .SingleOrDefaultAsync(
                 message => message.GuildId == guildId && message.OriginalMessageId == originalMessageId, ct)
             .ConfigureAwait(false);
+
+        return observed is null ? new None() : new Some<ObservedMessage>(observed);
     }
 
     public async Task<IReadOnlyDictionary<ulong, ObservedMessage>> FindObservedMessagesAsync(

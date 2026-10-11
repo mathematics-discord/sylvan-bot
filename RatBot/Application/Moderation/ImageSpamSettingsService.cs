@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using RatBot.Domain.Moderation;
 using RatBot.Infrastructure.Data;
 
@@ -16,7 +16,7 @@ public sealed class ImageSpamSettingsService(
             RequiredAttachmentCount = settings.RequiredAttachmentCount,
         };
 
-    public async Task<ImageBurstSpamDetectorOptions?> GetCurrentAsync(ulong guildId, CancellationToken ct)
+    public async Task<Option<ImageBurstSpamDetectorOptions>> GetCurrentAsync(ulong guildId, CancellationToken ct)
     {
         ImageSpamSettings? settings = await dbContext.ImageSpamSettings
             .AsNoTracking()
@@ -26,13 +26,13 @@ public sealed class ImageSpamSettingsService(
         if (settings is not { IsEnabled: true })
         {
             detectorSettings.Remove(guildId);
-            return null;
+            return new None();
         }
 
         ImageBurstSpamDetectorOptions options = ToOptions(settings);
         detectorSettings.Update(guildId, options);
 
-        return options;
+        return new Some<ImageBurstSpamDetectorOptions>(options);
     }
 
     public async Task LoadEnabledSettingsAsync(CancellationToken ct)

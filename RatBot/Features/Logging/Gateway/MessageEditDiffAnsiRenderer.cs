@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using RatBot.Application.Features.Logging;
 
 namespace RatBot.Features.Logging.Gateway;
@@ -30,9 +30,9 @@ internal static class MessageEditDiffAnsiRenderer
     {
         foreach (MessageEditDiffSegment segment in segments)
         {
-            string? color = GetColor(segment.Kind);
+            Option<string> colorResult = GetColor(segment.Kind);
 
-            if (color is null)
+            if (colorResult.Value is not Some<string>(var color))
             {
                 builder.Append(segment.Text);
                 continue;
@@ -44,13 +44,13 @@ internal static class MessageEditDiffAnsiRenderer
         }
     }
 
-    private static string? GetColor(MessageEditDiffSegmentKind kind)
+    private static Option<string> GetColor(MessageEditDiffSegmentKind kind)
     {
         return kind switch
         {
-            MessageEditDiffSegmentKind.Removed => Red,
-            MessageEditDiffSegmentKind.Added => Green,
-            _ => null
+            MessageEditDiffSegmentKind.Removed => new Some<string>(Red),
+            MessageEditDiffSegmentKind.Added => new Some<string>(Green),
+            _ => new None()
         };
     }
 }

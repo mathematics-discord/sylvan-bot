@@ -1,3 +1,4 @@
+﻿using RatBot.Domain.Common;
 using System.Net;
 using RatBot.Features.Logging.Gateway;
 using Serilog.Core;
@@ -11,70 +12,147 @@ public sealed class AttachmentEvidenceDownloaderTests
     [Test]
     public async Task TryDownloadAsync_WhenBodyIsExactLimit_ReturnsBytes()
     {
+        // Arrange
         byte[] body = [1, 2, 3, 4];
 
-        byte[]? result = await DownloadAsync(body, body.Length, body.Length);
+        // Act
+        Option<byte[]> result = await DownloadAsync(body, body.Length, body.Length);
 
-        result.ShouldBe(body);
+        // Assert
+        result.Value.ShouldBeOfType<Some<byte[]>>().Value.ShouldBe(body);
     }
 
     [Test]
-    public async Task TryDownloadAsync_WhenDeclaredContentLengthExceedsLimit_ReturnsNull()
+    public async Task TryDownloadAsync_DeclaredContentLengthExceedsLimit_ReturnsNone()
     {
+        // Arrange
         byte[] body = [1, 2, 3, 4];
 
-        byte[]? result = await DownloadAsync(body, body.Length, body.Length - 1);
+        // Act
+        Option<byte[]> result = await DownloadAsync(body, body.Length, body.Length - 1);
 
-        result.ShouldBeNull();
+        // Assert
+        result.Value.ShouldBeOfType<None>();
     }
 
     [Test]
     public async Task TryDownloadAsync_WhenContentLengthIsMissing_StillEnforcesActualLimit()
     {
+        // Arrange
         byte[] body = [1, 2, 3, 4, 5];
 
-        byte[]? result = await DownloadAsync(body, null, 4);
+        // Act
+        Option<byte[]> result = await DownloadAsync(body, null, 4);
 
-        result.ShouldBeNull();
+        // Assert
+        result.Value.ShouldBeOfType<None>();
     }
 
     [Test]
     public async Task TryDownloadAsync_WhenContentLengthIsMisleading_StillEnforcesActualLimit()
     {
+        // Arrange
         byte[] body = [1, 2, 3, 4, 5];
 
-        byte[]? result = await DownloadAsync(body, 1, 4);
+        // Act
+        Option<byte[]> result = await DownloadAsync(body, 1, 4);
 
-        result.ShouldBeNull();
+        // Assert
+        result.Value.ShouldBeOfType<None>();
     }
 
     [Test]
     public async Task ReadLimitedAsync_WhenBodyExceedsLimit_ReadsOnlyLimitPlusOneBytes()
     {
-        CountingStream stream = new CountingStream([1, 2, 3, 4, 5, 6, 7]);
+        // Arrange
+        await using CountingStream stream = new CountingStream([1, 2, 3, 4, 5, 6, 7]);
 
-        byte[]? result = await AttachmentEvidenceDownloader.ReadLimitedAsync(stream, 3, CancellationToken.None);
+        // Act
+        Option<byte[]> result = await AttachmentEvidenceDownloader.ReadLimitedAsync(stream, 3, CancellationToken.None);
 
-        result.ShouldBeNull();
+        // Assert
+        result.Value.ShouldBeOfType<None>();
         stream.BytesRead.ShouldBe(4);
     }
 
-    private static async Task<byte[]?> DownloadAsync(byte[] body, long? declaredLength, long maxBytes)
+    [Test]
+    public async Task TryDownloadAsync_EmptyBody_ReturnsSomeEmptyBytes()
+    {
+        // Arrange
+        byte[] body = [];
+
+        // Act
+        Option<byte[]> result = await DownloadAsync(body, declaredLength: 0, maxBytes: 0);
+
+        // Assert
+        result.Value.ShouldBeOfType<Some<byte[]>>().Value.ShouldBeEmpty();
+    }
+
+    [Test]
+    public async Task TryDownloadAsync_UnsuccessfulResponse_ReturnsNone()
+    {
+        // Arrange
+        using HttpClient httpClient = new HttpClient(
+            new StaticResponseHandler([], declaredLength: 0, status: HttpStatusCode.NotFound));
+
+        // Act
+        Option<byte[]> result = await AttachmentEvidenceDownloader.TryDownloadAsync(
+            httpClient,
+            "https://example.invalid/attachment",
+            maxBytes: 4,
+            Logger.None,
+            CancellationToken.None);
+
+        // Assert
+        result.Value.ShouldBeOfType<None>();
+    }
+
+    [Test]
+    public async Task TryDownloadAsync_CancelledRequest_PropagatesCancellation()
+    {
+        // Arrange
+        using HttpClient httpClient = new HttpClient(new StaticResponseHandler([1], declaredLength: 1));
+        using CancellationTokenSource cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        // Act
+        OperationCanceledException exception = await Should.ThrowAsync<OperationCanceledException>(() =>
+            AttachmentEvidenceDownloader.TryDownloadAsync(
+                httpClient,
+                "https://example.invalid/attachment",
+                maxBytes: 4,
+                Logger.None,
+                cancellation.Token));
+
+        // Assert
+        exception.CancellationToken.IsCancellationRequested.ShouldBeTrue();
+    }
+
+    private static async Task<Option<byte[]>> DownloadAsync(byte[] body, long? declaredLength, long maxBytes)
     {
         using HttpClient httpClient = new HttpClient(new StaticResponseHandler(body, declaredLength));
 
         httpClient.BaseAddress = new Uri("https://example.invalid");
 
-        return await AttachmentEvidenceDownloader.TryDownloadAsync(httpClient, "/attachment", maxBytes, Logger.None,
-            CancellationToken.None);
+        return await AttachmentEvidenceDownloader
+            .TryDownloadAsync(
+                httpClient: httpClient,
+                url: "/attachment",
+                maxBytes: maxBytes,
+                logger: Logger.None,
+                ct: CancellationToken.None)
+            .ConfigureAwait(false);
     }
 
-    private sealed class StaticResponseHandler(byte[] body, long? declaredLength) : HttpMessageHandler
+    private sealed class StaticResponseHandler(
+        byte[] body,
+        long? declaredLength,
+        HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
-            HttpResponseMessage response = new HttpResponseMessage(HttpStatusCode.OK)
+            HttpResponseMessage response = new HttpResponseMessage(status)
                 { Content = new StaticLengthContent(body, declaredLength) };
 
             return Task.FromResult(response);

@@ -1,4 +1,4 @@
-using RatBot.Application.Moderation;
+﻿using RatBot.Application.Moderation;
 using RatBot.Configuration;
 
 namespace RatBot.Gateway;
@@ -62,14 +62,14 @@ public sealed class ImageBurstSpamGatewayHandler(
     {
         try
         {
-            ImageBurstMessage? qualifyingMessage = TryCreateQualifyingMessage(message);
+            Option<ImageBurstMessage> qualifyingResult = TryCreateQualifyingMessage(message);
 
-            if (qualifyingMessage is null)
+            if (qualifyingResult.Value is not Some<ImageBurstMessage>(var qualifyingMessage))
                 return;
 
-            ImageBurstDetection? detection = detector.Observe(qualifyingMessage);
+            Option<ImageBurstDetection> detectionResult = detector.Observe(qualifyingMessage);
 
-            if (detection is null)
+            if (detectionResult.Value is not Some<ImageBurstDetection>(var detection))
                 return;
 
             await HandleDetectionAsync(detection).ConfigureAwait(false);
@@ -92,35 +92,36 @@ public sealed class ImageBurstSpamGatewayHandler(
         discordClient.MessageReceived += HandleMessageReceivedAsync;
     }
 
-    private ImageBurstMessage? TryCreateQualifyingMessage(SocketMessage message)
+    private Option<ImageBurstMessage> TryCreateQualifyingMessage(SocketMessage message)
     {
         if (message is not SocketUserMessage userMessage)
-            return null;
+            return new None();
 
         if (userMessage.Source != MessageSource.User)
-            return null;
+            return new None();
 
         if (userMessage.Author.IsBot || userMessage.Author.IsWebhook)
-            return null;
+            return new None();
 
         if (userMessage.Channel is not SocketTextChannel channel)
-            return null;
+            return new None();
 
         if (userMessage.Author is not SocketGuildUser guildUser)
-            return null;
+            return new None();
 
         if (!detectorSettings.TryGet(channel.Guild.Id, out ImageBurstSpamDetectorOptions currentSettings))
-            return null;
+            return new None();
 
         if (userMessage.Attachments.Count < currentSettings.RequiredAttachmentCount)
-            return null;
+            return new None();
 
         if (IsExempt(guildUser))
-            return null;
+            return new None();
 
         ImageBurstAttachment[] attachments =
             userMessage.Attachments.Select(x => new ImageBurstAttachment(x.Url)).ToArray();
 
-        return new ImageBurstMessage(channel.Guild.Id, guildUser.Id, channel.Id, userMessage.Timestamp, attachments);
+        return new Some<ImageBurstMessage>(
+            new ImageBurstMessage(channel.Guild.Id, guildUser.Id, channel.Id, userMessage.Timestamp, attachments));
     }
 }

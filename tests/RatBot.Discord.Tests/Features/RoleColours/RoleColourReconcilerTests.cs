@@ -1,3 +1,4 @@
+﻿using RatBot.Domain.Common;
 using System.Collections.Immutable;
 using Discord;
 using Discord.WebSocket;
@@ -122,34 +123,34 @@ public sealed class RoleColourReconcilerTests
     }
 
     [Test]
-    public async Task ChangingColour()
+    public async Task TrySetUserColourAsync_EligibleColour_ReturnsSomeAndUpdatesManagedRoles()
     {
         // Arrange
         _memberRoles.Add(OutsideColour);
 
         // Act
-        ErrorOr<ulong?> result = await EquipAsync(Red);
+        ErrorOr<Option<ulong>> result = await EquipAsync(Red);
 
         // Assert
         result.IsError.ShouldBeFalse();
-        result.Value.ShouldBe(Red);
+        result.Value.Value.ShouldBeOfType<Some<ulong>>().Value.ShouldBe(Red);
         _memberRoles.ShouldBe([SourceA, Uncoloured, Red, OutsideColour], true);
         _changes.ShouldBe(["remove:20", "add:21"]);
     }
 
     [Test]
-    public async Task RemovingColour()
+    public async Task TrySetUserColourAsync_Reset_ReturnsNoneAndPreservesUnmanagedRoles()
     {
         // Arrange
         _memberRoles.Add(OutsideColour);
 
         // Act
-        ErrorOr<ulong?> result = await EquipAsync(null);
+        ErrorOr<Option<ulong>> result = await EquipAsync(null);
         await CheckMemberAsync();
 
         // Assert
         result.IsError.ShouldBeFalse();
-        result.Value.ShouldBeNull();
+        result.Value.Value.ShouldBeOfType<None>();
         _memberRoles.ShouldBe([SourceA, Uncoloured, OutsideColour], true);
         _changes.ShouldBe(["remove:20"]);
     }
@@ -161,7 +162,7 @@ public sealed class RoleColourReconcilerTests
         _memberRoles.Add(OutsideColour);
 
         // Act
-        ErrorOr<ulong?> result = await EquipAsync(OutsideColour);
+        ErrorOr<Option<ulong>> result = await EquipAsync(OutsideColour);
 
         // Assert
         result.IsError.ShouldBeTrue();
@@ -256,7 +257,7 @@ public sealed class RoleColourReconcilerTests
             .Returns(_ => Task.FromException(new TimeoutException()));
 
         // Act
-        ErrorOr<ulong?> result = await EquipAsync(Red);
+        ErrorOr<Option<ulong>> result = await EquipAsync(Red);
 
         // Assert
         result.IsError.ShouldBeTrue();
@@ -275,8 +276,8 @@ public sealed class RoleColourReconcilerTests
         _memberRoles.Add(SourceB);
 
         // Act
-        ErrorOr<ulong?> selection = await EquipAsync(Red);
-        ErrorOr<ulong?> removal = await EquipAsync(null);
+        ErrorOr<Option<ulong>> selection = await EquipAsync(Red);
+        ErrorOr<Option<ulong>> removal = await EquipAsync(null);
 
         // Assert
         selection.IsError.ShouldBeFalse();
@@ -294,7 +295,7 @@ public sealed class RoleColourReconcilerTests
         await db.SaveChangesAsync();
 
         // Act
-        ErrorOr<ulong?> result = await EquipAsync(OutsideColour);
+        ErrorOr<Option<ulong>> result = await EquipAsync(OutsideColour);
         await CheckMemberAsync();
 
         // Assert
@@ -360,12 +361,12 @@ public sealed class RoleColourReconcilerTests
         db.RoleColourOptions.Add(RoleColourOption.Create(2, SourceA, Red).Value);
         await db.SaveChangesAsync();
 
-        Task<ErrorOr<ulong?>> firstChange = EquipAsync(Red);
+        Task<ErrorOr<Option<ulong>>> firstChange = EquipAsync(Red);
         await removalStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         try
         {
-            ErrorOr<ulong?> otherResult = await _colours
+            ErrorOr<Option<ulong>> otherResult = await _colours
                 .TrySetUserColourAsync(otherGuild, MemberId, Red, CancellationToken.None)
                 .WaitAsync(TimeSpan.FromSeconds(5));
 
@@ -401,13 +402,13 @@ public sealed class RoleColourReconcilerTests
 
         using CancellationTokenSource cancellation = new CancellationTokenSource();
 
-        Task<ErrorOr<ulong?>> firstChange = EquipAsync(Red);
+        Task<ErrorOr<Option<ulong>>> firstChange = EquipAsync(Red);
         await removalStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellation.Token);
 
-        Task<ErrorOr<ulong?>> waitingEquip = _colours.TrySetUserColourAsync(_guild, MemberId, Blue, cancellation.Token);
+        Task<ErrorOr<Option<ulong>>> waitingEquip = _colours.TrySetUserColourAsync(_guild, MemberId, Blue, cancellation.Token);
 
-        Task<ErrorOr<ulong?>> waitingCheck = _colours.ReconcileUserRolesAsync(_guild, MemberId, cancellation.Token);
-        Task<ErrorOr<ulong?>> nextChange = EquipAsync(Blue);
+        Task<ErrorOr<Option<ulong>>> waitingCheck = _colours.ReconcileUserRolesAsync(_guild, MemberId, cancellation.Token);
+        Task<ErrorOr<Option<ulong>>> nextChange = EquipAsync(Blue);
 
         try
         {
@@ -441,7 +442,7 @@ public sealed class RoleColourReconcilerTests
         if (automaticCheck)
             _memberRoles.Add(Red);
 
-        ErrorOr<ulong?> result = automaticCheck ? await CheckMemberAsync() : await EquipAsync(Red);
+        ErrorOr<Option<ulong>> result = automaticCheck ? await CheckMemberAsync() : await EquipAsync(Red);
 
         result.IsError.ShouldBeTrue();
         result.FirstError.Description.ShouldContain("Discord roles changed");
@@ -456,7 +457,7 @@ public sealed class RoleColourReconcilerTests
         if (automaticCheck)
             _memberRoles.Add(Red);
 
-        ErrorOr<ulong?> result = automaticCheck ? await CheckMemberAsync() : await EquipAsync(Red);
+        ErrorOr<Option<ulong>> result = automaticCheck ? await CheckMemberAsync() : await EquipAsync(Red);
 
         result.IsError.ShouldBeTrue();
         result.FirstError.Description.ShouldContain("Discord roles changed");
@@ -480,7 +481,7 @@ public sealed class RoleColourReconcilerTests
                 return Task.CompletedTask;
             });
 
-        ErrorOr<ulong?> result = await EquipAsync(Red);
+        ErrorOr<Option<ulong>> result = await EquipAsync(Red);
 
         result.IsError.ShouldBe(extraColour);
         if (extraColour)
@@ -501,31 +502,34 @@ public sealed class RoleColourReconcilerTests
                 return Task.CompletedTask;
             });
 
-        ErrorOr<ulong?> result = await EquipAsync(null);
+        ErrorOr<Option<ulong>> result = await EquipAsync(null);
 
         result.IsError.ShouldBeTrue();
         _memberRoles.ShouldContain(OutsideColour);
     }
 
     [Test]
-    public async Task FinalSourceLossPreservesUnrelatedColours()
+    public async Task ReconcileUserRolesAsync_FinalSourceLost_ReturnsNoneAndPreservesUnmanagedRoles()
     {
+        // Arrange
         _memberRoles.Remove(SourceA);
         _memberRoles.UnionWith([Red, OutsideColour]);
 
-        ErrorOr<ulong?> result = await CheckMemberAsync([SourceA, Uncoloured, Blue]);
+        // Act
+        ErrorOr<Option<ulong>> result = await CheckMemberAsync([SourceA, Uncoloured, Blue]);
 
+        // Assert
         result.IsError.ShouldBeFalse();
-        result.Value.ShouldBeNull();
+        result.Value.Value.ShouldBeOfType<None>();
         _memberRoles.ShouldBe([Uncoloured, OutsideColour], true);
     }
 
-    private Task<ErrorOr<ulong?>> EquipAsync(ulong? colour)
+    private Task<ErrorOr<Option<ulong>>> EquipAsync(ulong? colour)
     {
         return _colours.TrySetUserColourAsync(_guild, MemberId, colour, CancellationToken.None);
     }
 
-    private Task<ErrorOr<ulong?>> CheckMemberAsync(IReadOnlyCollection<ulong>? before = null)
+    private Task<ErrorOr<Option<ulong>>> CheckMemberAsync(IReadOnlyCollection<ulong>? before = null)
     {
         return _colours.ReconcileUserRolesAsync(_guild, MemberId, CancellationToken.None, before);
     }

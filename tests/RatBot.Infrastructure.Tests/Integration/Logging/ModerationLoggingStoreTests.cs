@@ -1,4 +1,5 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using RatBot.Domain.Common;
 using RatBot.Domain.Features.Logging;
 using RatBot.Infrastructure.Data;
 using RatBot.Infrastructure.Features.Logging;
@@ -12,6 +13,34 @@ public sealed class ModerationLoggingStoreTests
     public async Task SetUp()
     {
         await PostgresDatabaseFixture.ResetAsync().ConfigureAwait(false);
+    }
+
+    [Test]
+    public async Task FindObservedMessageAsync_MissingMessage_ReturnsNone()
+    {
+        // Arrange
+        ModerationLoggingStore store = CreateStore();
+
+        // Act
+        Option<ObservedMessage> result = await store.FindObservedMessageAsync(1, 10, CancellationToken.None);
+
+        // Assert
+        result.Value.ShouldBeOfType<None>();
+    }
+
+    [Test]
+    public async Task FindObservedMessageAsync_MessageExistsOnlyInAnotherGuild_ReturnsNone()
+    {
+        // Arrange
+        ModerationLoggingStore store = CreateStore();
+        await store.ObserveMessageAsync(
+            new ObservedMessage(10, 2, 3, 4, DateTimeOffset.UtcNow), CancellationToken.None);
+
+        // Act
+        Option<ObservedMessage> result = await store.FindObservedMessageAsync(1, 10, CancellationToken.None);
+
+        // Assert
+        result.Value.ShouldBeOfType<None>();
     }
 
     [Test]
@@ -109,16 +138,19 @@ public sealed class ModerationLoggingStoreTests
     }
 
     [Test]
-    public async Task ObserveMessageAsync_PersistsMetadataOnly_AndSupportsDeleteAttribution()
+    public async Task FindObservedMessageAsync_ObservedMessage_ReturnsStoredMetadata()
     {
+        // Arrange
         DateTimeOffset observedAt = DateTimeOffset.UtcNow;
         ModerationLoggingStore store = CreateStore();
 
         await store.ObserveMessageAsync(new ObservedMessage(10, 1, 2, 3, observedAt), CancellationToken.None);
 
-        ObservedMessage? observed = await store.FindObservedMessageAsync(1, 10, CancellationToken.None);
+        // Act
+        Option<ObservedMessage> observedResult = await store.FindObservedMessageAsync(1, 10, CancellationToken.None);
 
-        observed.ShouldNotBeNull();
+        // Assert
+        ObservedMessage observed = observedResult.Value.ShouldBeOfType<Some<ObservedMessage>>().Value;
         observed.OriginalMessageId.ShouldBe(10UL);
         observed.GuildId.ShouldBe(1UL);
         observed.ChannelId.ShouldBe(2UL);
@@ -208,8 +240,9 @@ public sealed class ModerationLoggingStoreTests
     }
 
     [Test]
-    public async Task ObservedMessagesAndLogEntries_AreIsolatedByGuild()
+    public async Task FindObservedMessageAsync_SharedMessageId_ReturnsRequestedGuildMetadata()
     {
+        // Arrange
         await using BotDbContext db = PostgresDatabaseFixture.CreateDbContext();
         ModerationLoggingStore store = CreateStore();
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -219,14 +252,16 @@ public sealed class ModerationLoggingStoreTests
         await store.RecordLogEntriesAsync(
             new[] { new MessageLogEntry(1, 10, 99, now), new MessageLogEntry(2, 10, 99, now) }, CancellationToken.None);
 
-        ObservedMessage? firstGuild = await store.FindObservedMessageAsync(1, 10, CancellationToken.None);
-        ObservedMessage? secondGuild = await store.FindObservedMessageAsync(2, 10, CancellationToken.None);
+        // Act
+        Option<ObservedMessage> firstGuildResult = await store.FindObservedMessageAsync(1, 10, CancellationToken.None);
+        Option<ObservedMessage> secondGuildResult = await store.FindObservedMessageAsync(2, 10, CancellationToken.None);
         IReadOnlyDictionary<ulong, ObservedMessage> firstGuildBatch = await store
             .FindObservedMessagesAsync(1, new[] { 10UL }, CancellationToken.None)
             .ConfigureAwait(false);
 
-        firstGuild.ShouldNotBeNull();
-        secondGuild.ShouldNotBeNull();
+        // Assert
+        ObservedMessage firstGuild = firstGuildResult.Value.ShouldBeOfType<Some<ObservedMessage>>().Value;
+        ObservedMessage secondGuild = secondGuildResult.Value.ShouldBeOfType<Some<ObservedMessage>>().Value;
         firstGuild.ChannelId.ShouldBe(2UL);
         secondGuild.ChannelId.ShouldBe(4UL);
         firstGuildBatch.Single().Value.GuildId.ShouldBe(1UL);

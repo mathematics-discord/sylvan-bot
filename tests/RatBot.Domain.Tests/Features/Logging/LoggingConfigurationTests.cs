@@ -1,3 +1,4 @@
+﻿using RatBot.Domain.Common;
 using RatBot.Domain.Features.Logging;
 using Shouldly;
 
@@ -6,34 +7,46 @@ namespace RatBot.Domain.Tests.Features.Logging;
 [TestFixture]
 public sealed class LoggingConfigurationTests
 {
-    [Test]
-    public void GetDestinationChannelId_WhenOnlyDeleteChannelConfigured_RoutesAllEventsThere()
+    [TestCase(10UL, null, LoggingEventKind.Delete, 10UL)]
+    [TestCase(10UL, null, LoggingEventKind.BulkDelete, 10UL)]
+    [TestCase(10UL, null, LoggingEventKind.Edit, 10UL)]
+    [TestCase(null, 20UL, LoggingEventKind.Delete, 20UL)]
+    [TestCase(null, 20UL, LoggingEventKind.BulkDelete, 20UL)]
+    [TestCase(null, 20UL, LoggingEventKind.Edit, 20UL)]
+    [TestCase(10UL, 20UL, LoggingEventKind.Delete, 10UL)]
+    [TestCase(10UL, 20UL, LoggingEventKind.BulkDelete, 10UL)]
+    [TestCase(10UL, 20UL, LoggingEventKind.Edit, 20UL)]
+    public void GetDestinationChannelId_ConfiguredChannels_ReturnsPreferredOrFallbackChannel(
+        ulong? deleteChannelId, ulong? editChannelId, LoggingEventKind eventKind, ulong expectedChannelId)
     {
-        LoggingConfiguration configuration = new LoggingConfiguration(1, true, 10, null, TimeSpan.FromMinutes(15));
+        // Arrange
+        LoggingConfiguration configuration = new LoggingConfiguration(
+            guildId: 1,
+            enabled: true,
+            deleteLogChannelId: deleteChannelId,
+            editLogChannelId: editChannelId,
+            evidenceRetentionPeriod: TimeSpan.FromMinutes(15));
 
-        configuration.GetDestinationChannelId(LoggingEventKind.Delete).ShouldBe(10UL);
-        configuration.GetDestinationChannelId(LoggingEventKind.BulkDelete).ShouldBe(10UL);
-        configuration.GetDestinationChannelId(LoggingEventKind.Edit).ShouldBe(10UL);
+        // Act
+        Option<ulong> result = configuration.GetDestinationChannelId(eventKind);
+
+        // Assert
+        result.Value.ShouldBeOfType<Some<ulong>>().Value.ShouldBe(expectedChannelId);
     }
 
-    [Test]
-    public void GetDestinationChannelId_WhenOnlyEditChannelConfigured_RoutesAllEventsThere()
+    [TestCase(LoggingEventKind.Delete)]
+    [TestCase(LoggingEventKind.BulkDelete)]
+    [TestCase(LoggingEventKind.Edit)]
+    public void GetDestinationChannelId_NoChannelsConfigured_ReturnsNone(LoggingEventKind eventKind)
     {
-        LoggingConfiguration configuration = new LoggingConfiguration(1, true, null, 20, TimeSpan.FromMinutes(15));
+        // Arrange
+        LoggingConfiguration configuration = LoggingConfiguration.Disabled(1);
 
-        configuration.GetDestinationChannelId(LoggingEventKind.Delete).ShouldBe(20UL);
-        configuration.GetDestinationChannelId(LoggingEventKind.BulkDelete).ShouldBe(20UL);
-        configuration.GetDestinationChannelId(LoggingEventKind.Edit).ShouldBe(20UL);
-    }
+        // Act
+        Option<ulong> result = configuration.GetDestinationChannelId(eventKind);
 
-    [Test]
-    public void GetDestinationChannelId_WhenBothChannelsConfigured_RoutesEditsSeparatelyFromDeletes()
-    {
-        LoggingConfiguration configuration = new LoggingConfiguration(1, true, 10, 20, TimeSpan.FromMinutes(15));
-
-        configuration.GetDestinationChannelId(LoggingEventKind.Delete).ShouldBe(10UL);
-        configuration.GetDestinationChannelId(LoggingEventKind.BulkDelete).ShouldBe(10UL);
-        configuration.GetDestinationChannelId(LoggingEventKind.Edit).ShouldBe(20UL);
+        // Assert
+        result.Value.ShouldBeOfType<None>();
     }
 
     [Test]

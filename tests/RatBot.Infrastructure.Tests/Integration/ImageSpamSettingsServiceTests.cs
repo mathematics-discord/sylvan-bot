@@ -1,6 +1,7 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using RatBot.Application.Moderation;
+using RatBot.Domain.Common;
 using RatBot.Domain.Moderation;
 using RatBot.Infrastructure.Data;
 
@@ -84,29 +85,22 @@ public sealed class ImageSpamSettingsServiceTests
         ImageSpamSettingsService service = new ImageSpamSettingsService(db, detectorSettings);
 
         // Act
-        ImageBurstSpamDetectorOptions? result = await service.GetCurrentAsync(1, CancellationToken.None);
+        Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(1, CancellationToken.None);
 
         // Assert
-        result.ShouldNotBeNull();
-        (result.DistinctChannelThreshold, result.RequiredAttachmentCount, result.Window).ShouldBe((6, 3, 90));
+        ImageBurstSpamDetectorOptions current = result.Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+        current.DistinctChannelThreshold.ShouldBe(6);
+        current.RequiredAttachmentCount.ShouldBe(3);
+        current.Window.ShouldBe(90);
         detectorSettings.TryGet(1, out ImageBurstSpamDetectorOptions published).ShouldBeTrue();
-        published.ShouldBe(result);
+        published.ShouldBe(current);
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public async Task GetCurrentAsync_AbsentOrDisabledSettings_RemovesOnlyRequestedGuildConfiguration(
-        bool hasDisabledRow)
+    [Test]
+    public async Task GetCurrentAsync_AbsentSettings_ReturnsNoneAndRemovesOnlyRequestedGuildConfiguration()
     {
         // Arrange
         await using BotDbContext db = PostgresDatabaseFixture.CreateDbContext();
-        if (hasDisabledRow)
-        {
-            ImageSpamSettings settings = ImageSpamSettings.CreateDefault(1);
-            settings.Disable();
-            db.ImageSpamSettings.Add(settings);
-            await db.SaveChangesAsync();
-        }
 
         ImageBurstSpamDetectorSettings detectorSettings = new ImageBurstSpamDetectorSettings();
         ImageBurstSpamDetectorOptions otherGuildOptions = new ImageBurstSpamDetectorOptions { Window = 90 };
@@ -115,10 +109,36 @@ public sealed class ImageSpamSettingsServiceTests
         ImageSpamSettingsService service = new ImageSpamSettingsService(db, detectorSettings);
 
         // Act
-        ImageBurstSpamDetectorOptions? result = await service.GetCurrentAsync(1, CancellationToken.None);
+        Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(1, CancellationToken.None);
 
         // Assert
-        result.ShouldBeNull();
+        result.Value.ShouldBeOfType<None>();
+        detectorSettings.TryGet(1, out _).ShouldBeFalse();
+        detectorSettings.TryGet(2, out ImageBurstSpamDetectorOptions otherGuild).ShouldBeTrue();
+        otherGuild.ShouldBe(otherGuildOptions);
+    }
+
+    [Test]
+    public async Task GetCurrentAsync_DisabledSettings_ReturnsNoneAndRemovesOnlyRequestedGuildConfiguration()
+    {
+        // Arrange
+        await using BotDbContext db = PostgresDatabaseFixture.CreateDbContext();
+        ImageSpamSettings settings = ImageSpamSettings.CreateDefault(1);
+        settings.Disable();
+        db.ImageSpamSettings.Add(settings);
+        await db.SaveChangesAsync();
+
+        ImageBurstSpamDetectorSettings detectorSettings = new ImageBurstSpamDetectorSettings();
+        ImageBurstSpamDetectorOptions otherGuildOptions = new ImageBurstSpamDetectorOptions { Window = 90 };
+        detectorSettings.Update(1, new ImageBurstSpamDetectorOptions());
+        detectorSettings.Update(2, otherGuildOptions);
+        ImageSpamSettingsService service = new ImageSpamSettingsService(db, detectorSettings);
+
+        // Act
+        Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(1, CancellationToken.None);
+
+        // Assert
+        result.Value.ShouldBeOfType<None>();
         detectorSettings.TryGet(1, out _).ShouldBeFalse();
         detectorSettings.TryGet(2, out ImageBurstSpamDetectorOptions otherGuild).ShouldBeTrue();
         otherGuild.ShouldBe(otherGuildOptions);

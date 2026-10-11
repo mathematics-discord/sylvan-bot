@@ -1,4 +1,4 @@
-namespace RatBot.Features.RoleColours;
+﻿namespace RatBot.Features.RoleColours;
 
 public sealed class ColourModule(RoleColourReconciler colours) : InteractionModuleBase<IInteractionContext>
 {
@@ -88,7 +88,7 @@ public sealed class ColourModule(RoleColourReconciler colours) : InteractionModu
     {
         await DeferAsync(true);
 
-        ErrorOr<ulong?> result =
+        ErrorOr<Option<ulong>> result =
             await colours.TrySetUserColourAsync(Context.Guild, Context.User.Id, selected, CancellationToken.None);
 
         await FollowupAsync(ResultMessage(result), ephemeral: true);
@@ -97,13 +97,13 @@ public sealed class ColourModule(RoleColourReconciler colours) : InteractionModu
             await component.ModifyOriginalResponseAsync(message => message.Components = new ComponentBuilder().Build());
     }
 
-    private static string ResultMessage(ErrorOr<ulong?> result)
+    private static string ResultMessage(ErrorOr<Option<ulong>> result)
     {
         if (result.IsError)
             return result.FirstError.Description;
 
-        if (result.Value.HasValue)
-            return $"You are now wearing <@&{result.Value.Value}>.";
+        if (result.Value.Value is Some<ulong>(var colourId))
+            return $"You are now wearing <@&{colourId}>.";
 
         return "Your display colour has been removed.";
     }

@@ -1,4 +1,4 @@
-using RatBot.Features.Meta.Commands;
+﻿using RatBot.Features.Meta.Commands;
 
 namespace RatBot.Features.Meta;
 
@@ -85,20 +85,21 @@ public sealed class MetaProposalDiscordWorkflow(DiscordSocketClient client, ILog
         return ErrorOrFactory.From(message);
     }
 
-    public async Task<IUserMessage?> GetPollMessageAsync(MetaProposalState state, CancellationToken ct = default)
+    public async Task<Option<IUserMessage>> GetPollMessageAsync(MetaProposalState state, CancellationToken ct = default)
     {
-        _ = ct;
+        ct.ThrowIfCancellationRequested();
 
         if (state.PollMessageId is null)
-            return null;
+            return new None();
 
         IChannel? channel = client.GetChannel(state.SuggestionThreadChannelId);
 
         if (channel is not IThreadChannel thread)
-            return null;
+            return new None();
 
-        IMessage? message = await thread.GetMessageAsync(state.PollMessageId.Value);
-        return message as IUserMessage;
+        IMessage? message = await thread.GetMessageAsync(
+            state.PollMessageId.Value, options: new RequestOptions { CancelToken = ct });
+        return message is IUserMessage userMessage ? new Some<IUserMessage>(userMessage) : new None();
     }
 
     public async Task LockArchiveThreadAsync(ulong threadChannelId)

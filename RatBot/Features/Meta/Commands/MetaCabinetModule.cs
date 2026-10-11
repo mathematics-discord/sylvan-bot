@@ -1,4 +1,4 @@
-#pragma warning disable MA0048
+﻿#pragma warning disable MA0048
 using RatBot.Commands;
 using RatBot.Infrastructure.Features.Meta;
 
@@ -50,9 +50,9 @@ public sealed class MetaCabinetModule(MetaProposalService metaProposalService, M
             return;
         }
 
-        IUserMessage? pollMessage = await workflow.GetPollMessageAsync(state);
+        Option<IUserMessage> pollResult = await workflow.GetPollMessageAsync(state);
 
-        if (pollMessage?.Poll is null)
+        if (pollResult.Value is not Some<IUserMessage>(var pollMessage) || pollMessage.Poll is null)
         {
             await RespondAsync("The poll message could not be found or does not contain a poll.", ephemeral: true);
             return;

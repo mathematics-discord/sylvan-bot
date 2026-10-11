@@ -1,4 +1,4 @@
-using RatBot.Application.Moderation;
+﻿using RatBot.Application.Moderation;
 
 namespace RatBot.Commands.Spam;
 
@@ -52,15 +52,21 @@ public sealed class SpamModule(ImageSpamSettingsService settingsService) : Slash
             return;
         }
 
-        ImageBurstSpamDetectorOptions? settings =
+        Option<ImageBurstSpamDetectorOptions> settingsResult =
             numberOfChannels is null && attachmentCount is null && burstDuration is null
-                ? await settingsService.GetCurrentAsync(Context.Guild.Id, CancellationToken.None).ConfigureAwait(false)
-                : await settingsService
-                    .UpsertAsync(Context.Guild.Id, numberOfChannels, attachmentCount, burstDuration,
-                        CancellationToken.None)
-                    .ConfigureAwait(false);
+                ? await settingsService.GetCurrentAsync(Context.Guild.Id, CancellationToken.None)
+                    .ConfigureAwait(false)
+                : new Some<ImageBurstSpamDetectorOptions>(
+                    await settingsService
+                        .UpsertAsync(
+                            Context.Guild.Id,
+                            numberOfChannels,
+                            attachmentCount,
+                            burstDuration,
+                            CancellationToken.None)
+                        .ConfigureAwait(false));
 
-        if (settings is null)
+        if (settingsResult.Value is not Some<ImageBurstSpamDetectorOptions>(var settings))
         {
             await RespondAsync("Image spam detection is not configured for this guild.", ephemeral: true)
                 .ConfigureAwait(false);

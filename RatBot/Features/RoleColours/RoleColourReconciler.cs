@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using RatBot.Infrastructure.Data;
 
@@ -17,9 +17,11 @@ public sealed class RoleColourReconciler(
 
     public async Task<ImmutableArray<IRole>> ListEligibleColoursAsync(IGuild guild, ulong userId, CancellationToken ct)
     {
-        IGuildUser? member = await ReadMemberAsync(guild, userId, new RequestOptions { CancelToken = ct });
+        Option<IGuildUser> memberResult = await ReadMemberAsync(guild, userId, new RequestOptions { CancelToken = ct });
 
-        return member is null ? [] : EligibleColours(guild, member.RoleIds, await ReadMappingsAsync(guild.Id, ct));
+        return memberResult.Value is Some<IGuildUser>(var member)
+            ? EligibleColours(guild, member.RoleIds, await ReadMappingsAsync(guild.Id, ct))
+            : [];
     }
 
     internal static ErrorOr<Success> ValidateMapping(IGuild guild, ulong sourceId, ulong colourId)
@@ -74,7 +76,7 @@ public sealed class RoleColourReconciler(
         return mappings.Where(o => HoldsSource(guildId, roles, o.SourceRoleId));
     }
 
-    public async Task<ErrorOr<ulong?>> TrySetUserColourAsync(IGuild guild,
+    public async Task<ErrorOr<Option<ulong>>> TrySetUserColourAsync(IGuild guild,
         ulong userId,
         ulong? colourId,
         CancellationToken ct)
@@ -104,15 +106,15 @@ public sealed class RoleColourReconciler(
         }
     }
 
-    private async Task<ErrorOr<ulong?>> SetUserColourAsync(IGuild guild,
+    private async Task<ErrorOr<Option<ulong>>> SetUserColourAsync(IGuild guild,
         ulong userId,
         ulong? colourId,
         CancellationToken ct)
     {
         RequestOptions request = new RequestOptions { CancelToken = ct };
-        IGuildUser? member = await ReadMemberAsync(guild, userId, request);
+        Option<IGuildUser> memberResult = await ReadMemberAsync(guild, userId, request);
 
-        if (member is null)
+        if (memberResult.Value is not Some<IGuildUser>(var member))
             return Error.NotFound(description: "The member is no longer in this guild.");
 
         ImmutableArray<RoleColourOption> mappings = await ReadMappingsAsync(guild.Id, ct);
@@ -137,9 +139,9 @@ public sealed class RoleColourReconciler(
         if (addColour)
             await member.AddRoleAsync(colourId!.Value, request);
 
-        IGuildUser? actual = await ReadMemberAsync(guild, userId, request);
+        Option<IGuildUser> actualResult = await ReadMemberAsync(guild, userId, request);
 
-        if (actual is null)
+        if (actualResult.Value is not Some<IGuildUser>(var actual))
             return RolesChangedError();
 
         HashSet<ulong> actualColours = ManagedDisplayRoles(actual.RoleIds, mappings);
@@ -157,7 +159,7 @@ public sealed class RoleColourReconciler(
         return SoleColour(actualColours);
     }
 
-    public async Task<ErrorOr<ulong?>> ReconcileUserRolesAsync(
+    public async Task<ErrorOr<Option<ulong>>> ReconcileUserRolesAsync(
         IGuild guild,
         ulong userId,
         CancellationToken ct,
@@ -190,7 +192,7 @@ public sealed class RoleColourReconciler(
         }
     }
 
-    private async Task<ErrorOr<ulong?>> ProcessRoleColourReconciliation(
+    private async Task<ErrorOr<Option<ulong>>> ProcessRoleColourReconciliation(
         IGuild guild,
         ulong userId,
         IReadOnlyCollection<ulong>? previousRoleIds,
@@ -199,9 +201,9 @@ public sealed class RoleColourReconciler(
     )
     {
         RequestOptions request = new RequestOptions { CancelToken = ct };
-        IGuildUser? member = await ReadMemberAsync(guild, userId, request);
+        Option<IGuildUser> memberResult = await ReadMemberAsync(guild, userId, request);
 
-        if (member is null)
+        if (memberResult.Value is not Some<IGuildUser>(var member))
             return Error.NotFound(description: "The member is no longer in this guild.");
 
         ImmutableArray<RoleColourOption> mappings = await ReadMappingsAsync(guild.Id, ct);
@@ -211,10 +213,10 @@ public sealed class RoleColourReconciler(
 
         if (HeldGrants(guild.Id, member.RoleIds, mappings).Any())
         {
-            ulong? currentColour = SoleColour(worn);
+            Option<ulong> currentColour = SoleColour(worn);
             ImmutableArray<IRole> eligible = EligibleColours(guild, member.RoleIds, mappings);
 
-            if (eligible.Any(role => role.Id == currentColour))
+            if (currentColour.Value is Some<ulong>(var colour) && eligible.Any(role => role.Id == colour))
                 return currentColour;
 
             remove = worn;
@@ -231,9 +233,9 @@ public sealed class RoleColourReconciler(
             return SoleColour(worn);
 
         await RemoveColoursAsync(member, remove, request);
-        IGuildUser? actual = await ReadMemberAsync(guild, userId, request);
+        Option<IGuildUser> actualResult = await ReadMemberAsync(guild, userId, request);
 
-        if (actual is null)
+        if (actualResult.Value is not Some<IGuildUser>(var actual))
             return RolesChangedError();
 
         HashSet<ulong> actualColours = ManagedDisplayRoles(actual.RoleIds, mappings.Concat(old));
@@ -277,7 +279,7 @@ public sealed class RoleColourReconciler(
                 if (!participates && !participated)
                     continue;
 
-                ErrorOr<ulong?> result = await ReconcileUserRolesAsync(guild, member.Id, ct, member.RoleIds, old);
+                ErrorOr<Option<ulong>> result = await ReconcileUserRolesAsync(guild, member.Id, ct, member.RoleIds, old);
 
                 if (result.IsError)
                     incomplete++;
@@ -309,9 +311,9 @@ public sealed class RoleColourReconciler(
             await member.RemoveRoleAsync(roleId, request);
     }
 
-    private static ulong? SoleColour(HashSet<ulong> colours)
+    private static Option<ulong> SoleColour(HashSet<ulong> colours)
     {
-        return colours.Count == 1 ? colours.Single() : null;
+        return colours.Count == 1 ? new Some<ulong>(colours.Single()) : new None();
     }
 
     private static Error RolesChangedError()
@@ -320,11 +322,13 @@ public sealed class RoleColourReconciler(
             description: "Discord roles changed during the update. Please check your roles and try again.");
     }
 
-    private async Task<IGuildUser?> ReadMemberAsync(IGuild guild, ulong userId, RequestOptions request)
+    private async Task<Option<IGuildUser>> ReadMemberAsync(IGuild guild, ulong userId, RequestOptions request)
     {
-        return guild is SocketGuild
+        IGuildUser? member = guild is SocketGuild
             ? await discordClient.Rest.GetGuildUserAsync(guild.Id, userId, request)
             : await guild.GetUserAsync(userId, CacheMode.AllowDownload, request);
+
+        return member is null ? new None() : new Some<IGuildUser>(member);
     }
 
     private static HashSet<ulong> ManagedDisplayRoles(IReadOnlyCollection<ulong> roles,

@@ -1,4 +1,4 @@
-using RatBot.Infrastructure.Features.Meta;
+﻿using RatBot.Infrastructure.Features.Meta;
 
 namespace RatBot.Features.Meta.BackgroundWorkers;
 
@@ -30,9 +30,9 @@ public sealed class MetaProposalPollResolver(MetaProposalDiscordWorkflow workflo
     public async Task ResolveExpiredPollAsync(MetaProposalService service, MetaProposalState state,
         CancellationToken ct)
     {
-        IUserMessage? pollMessage = await workflow.GetPollMessageAsync(state, ct);
+        Option<IUserMessage> pollResult = await workflow.GetPollMessageAsync(state, ct);
 
-        if (pollMessage is null)
+        if (pollResult.Value is not Some<IUserMessage>(var pollMessage))
         {
             await service.ClearDeletedPollAsync(state.Id, ct);
             return;

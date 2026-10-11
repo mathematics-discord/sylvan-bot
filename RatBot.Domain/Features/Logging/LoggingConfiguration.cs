@@ -1,21 +1,24 @@
+﻿using RatBot.Domain.Common;
+
 namespace RatBot.Domain.Features.Logging;
 
 public sealed class LoggingConfiguration
 {
     public static readonly TimeSpan DefaultEvidenceRetentionPeriod = TimeSpan.FromMinutes(15);
 
-    private LoggingConfiguration()
-    {
-    }
-
-    public LoggingConfiguration(ulong guildId, bool enabled, ulong? deleteLogChannelId, ulong? editLogChannelId,
+    public LoggingConfiguration(
+        ulong guildId,
+        bool enabled,
+        ulong? deleteLogChannelId,
+        ulong? editLogChannelId,
         TimeSpan evidenceRetentionPeriod)
     {
         if (guildId == 0)
             throw new ArgumentOutOfRangeException(nameof(guildId), "Guild id is required.");
 
         if (evidenceRetentionPeriod <= TimeSpan.Zero)
-            throw new ArgumentOutOfRangeException(nameof(evidenceRetentionPeriod),
+            throw new ArgumentOutOfRangeException(
+                nameof(evidenceRetentionPeriod),
                 "Evidence retention period must be positive.");
 
         if (enabled && deleteLogChannelId is null && editLogChannelId is null)
@@ -34,24 +37,29 @@ public sealed class LoggingConfiguration
     public ulong? EditLogChannelId { get; }
     public TimeSpan EvidenceRetentionPeriod { get; }
 
-    public static LoggingConfiguration Disabled(ulong guildId)
-    {
-        return new LoggingConfiguration(guildId, false, null, null, DefaultEvidenceRetentionPeriod);
-    }
+    public static LoggingConfiguration Disabled(ulong guildId) =>
+        new LoggingConfiguration(
+            guildId: guildId,
+            enabled: false,
+            deleteLogChannelId: null,
+            editLogChannelId: null,
+            evidenceRetentionPeriod: DefaultEvidenceRetentionPeriod);
 
-    public bool AllowsLogging(bool channelIsExcluded)
-    {
-        return Enabled && !channelIsExcluded;
-    }
+    public bool AllowsLogging(bool channelIsExcluded) => Enabled && !channelIsExcluded;
 
-    public ulong? GetDestinationChannelId(LoggingEventKind eventKind)
+    public Option<ulong> GetDestinationChannelId(LoggingEventKind eventKind)
     {
-        return eventKind is LoggingEventKind.Edit
+        ulong? channelId = eventKind is LoggingEventKind.Edit
             ? EditLogChannelId ?? DeleteLogChannelId
             : DeleteLogChannelId ?? EditLogChannelId;
+
+        return channelId is { } value ? new Some<ulong>(value) : new None();
     }
 
-    public LoggingConfiguration WithUpdate(bool? enabled, ulong? deleteLogChannelId, ulong? editLogChannelId,
+    public LoggingConfiguration WithUpdate(
+        bool? enabled,
+        ulong? deleteLogChannelId,
+        ulong? editLogChannelId,
         TimeSpan? evidenceRetentionPeriod)
     {
         return new LoggingConfiguration(

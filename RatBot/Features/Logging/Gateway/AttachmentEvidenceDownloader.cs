@@ -1,34 +1,42 @@
-namespace RatBot.Features.Logging.Gateway;
+﻿namespace RatBot.Features.Logging.Gateway;
 
 internal static class AttachmentEvidenceDownloader
 {
-    public static async Task<byte[]?> TryDownloadAsync(HttpClient httpClient, string url, long maxBytes, ILogger logger,
+    public static async Task<Option<byte[]>> TryDownloadAsync(
+        HttpClient httpClient, string url, long maxBytes, ILogger logger,
         CancellationToken ct)
     {
         try
         {
             using HttpResponseMessage response = await httpClient
-                .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct)
+                .ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
-                return null;
+                return new None();
 
             long? contentLength = response.Content.Headers.ContentLength;
 
             if (contentLength > maxBytes)
-                return null;
+                return new None();
 
-            await using Stream stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
-            return await ReadLimitedAsync(stream, maxBytes, ct).ConfigureAwait(false);
+            await using Stream stream = await response.Content.ReadAsStreamAsync(ct)
+                .ConfigureAwait(false);
+            return await ReadLimitedAsync(stream, maxBytes, ct)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             logger.Debug(ex, "Failed to download moderation logging attachment evidence");
-            return null;
+            return new None();
         }
     }
 
-    internal static async Task<byte[]?> ReadLimitedAsync(Stream stream, long maxBytes, CancellationToken ct)
+    internal static async Task<Option<byte[]>> ReadLimitedAsync(Stream stream, long maxBytes, CancellationToken ct)
     {
         if (maxBytes < 0)
             throw new ArgumentOutOfRangeException(nameof(maxBytes), "Maximum attachment bytes must not be negative.");
@@ -48,13 +56,13 @@ internal static class AttachmentEvidenceDownloader
             int bytesRead = await stream.ReadAsync(readBuffer.AsMemory(0, bytesToRead), ct).ConfigureAwait(false);
 
             if (bytesRead == 0)
-                return buffer.ToArray();
+                return new Some<byte[]>(buffer.ToArray());
 
             await buffer.WriteAsync(readBuffer.AsMemory(0, bytesRead), ct);
 
             bytesRemaining -= bytesRead;
         }
 
-        return buffer.Length > maxBytes ? null : buffer.ToArray();
+        return buffer.Length > maxBytes ? new None() : new Some<byte[]>(buffer.ToArray());
     }
 }

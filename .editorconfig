@@ -15,6 +15,13 @@ ij_smart_tabs = false
 ij_visual_guides = 
 ij_wrap_on_typing = false
 
+# ReSharper properties
+resharper_arguments_literal = named
+resharper_csharp_wrap_after_declaration_lpar = true
+resharper_csharp_wrap_parameters_style = chop_if_long
+resharper_method_or_operator_body = expression_body
+resharper_wrap_after_lambda_and_anonymous_function_declaration_lpar = false
+
 [*.css]
 ij_css_align_closing_brace_with_properties = false
 ij_css_blank_lines_around_nested_selector = 1
@@ -738,6 +745,10 @@ ij_yaml_spaces_within_brackets = true
 
 
 [*.cs]
-dotnet_diagnostic.RCS1123.severity = none
+dotnet_diagnostic.rcs1123.severity = none
 
-dotnet_diagnostic.MA0007.severity = warning
+dotnet_diagnostic.ma0007.severity = warning
+
+dotnet_diagnostic.rcs1261.severity = error
+
+dotnet_diagnostic.ma0076.severity = none

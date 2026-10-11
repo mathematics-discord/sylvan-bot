@@ -1,4 +1,4 @@
-using DotNetEnv;
+﻿using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -9,7 +9,7 @@ namespace RatBot.Infrastructure.Data;
 /// </summary>
 public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<BotDbContext>
 {
-    private static string? BuildFromDiscrete(IConfiguration c)
+    private static Option<string> BuildFromDiscrete(IConfiguration c)
     {
         string? host = c["DB:Host"] ?? c["Database:Host"] ?? Environment.GetEnvironmentVariable("DB__HOST");
         string? port = c["DB:Port"] ?? c["Database:Port"] ?? Environment.GetEnvironmentVariable("DB__PORT");
@@ -19,11 +19,12 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
 
         if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(db) || string.IsNullOrWhiteSpace(user) ||
             string.IsNullOrWhiteSpace(pwd))
-            return null;
+            return new None();
 
         string resolvedPort = string.IsNullOrWhiteSpace(port) ? "5432" : port;
 
-        return $"Host={host};Port={resolvedPort};Database={db};Username={user};Password={pwd};SSL Mode=Prefer";
+        return new Some<string>(
+            $"Host={host};Port={resolvedPort};Database={db};Username={user};Password={pwd};SSL Mode=Prefer");
     }
 
     /// <summary>
@@ -40,8 +41,11 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
         string? connectionString =
             configurationRoot.GetConnectionString("BotDb")
             ?? configurationRoot["DB:ConnectionString"]
-            ?? Environment.GetEnvironmentVariable("DB__CONNECTION_STRING")
-            ?? BuildFromDiscrete(configurationRoot);
+            ?? Environment.GetEnvironmentVariable("DB__CONNECTION_STRING");
+
+        if (connectionString is null &&
+            BuildFromDiscrete(configurationRoot).Value is Some<string>(var discreteConnectionString))
+            connectionString = discreteConnectionString;
 
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new InvalidOperationException(

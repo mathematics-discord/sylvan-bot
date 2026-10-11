@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace RatBot.Application.Moderation;
 
@@ -35,7 +35,7 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
             buffer.Dequeue();
     }
 
-    public ImageBurstDetection? Observe(ImageBurstMessage message)
+    public Option<ImageBurstDetection> Observe(ImageBurstMessage message)
     {
         ImageBurstBufferKey key = new ImageBurstBufferKey(message.GuildId, message.UserId);
         DateTimeOffset now = timeProvider.GetUtcNow();
@@ -44,11 +44,11 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
         {
             PruneExpiredLocks(now);
 
-            if (_handlingLocks.TryGetValue(key, out DateTimeOffset lockedUntil) && lockedUntil > now)
-                return null;
+            bool isLocked = _handlingLocks.TryGetValue(key, out DateTimeOffset lockedUntil) && lockedUntil > now;
+            bool optionsUnavailable = !settings.TryGet(message.GuildId, out ImageBurstSpamDetectorOptions options);
 
-            if (!settings.TryGet(message.GuildId, out ImageBurstSpamDetectorOptions options))
-                return null;
+            if (isLocked || optionsUnavailable)
+                return new None();
 
             Queue<ImageBurstMessage> buffer = GetBuffer(key);
 
@@ -58,11 +58,16 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
             ulong[] channelIds = buffer.Select(x => x.ChannelId).Distinct().Order().ToArray();
 
             if (channelIds.Length < options.DistinctChannelThreshold)
-                return null;
+                return new None();
 
             _handlingLocks[key] = now + options.HandlingLockDuration;
 
-            return new ImageBurstDetection(message.GuildId, message.UserId, buffer.ToArray(), channelIds);
+            return new Some<ImageBurstDetection>(
+                new ImageBurstDetection(
+                    GuildId: message.GuildId,
+                    UserId: message.UserId,
+                    Messages: buffer.ToArray(),
+                    ChannelIds: channelIds));
         }
     }
 
