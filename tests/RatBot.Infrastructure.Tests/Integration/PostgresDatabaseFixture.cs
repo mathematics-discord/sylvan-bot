@@ -46,7 +46,6 @@ public sealed class PostgresDatabaseFixture
             await db.MetaSuggestionSettings.ExecuteDeleteAsync().ConfigureAwait(false);
             await db.RoleColourOptions.ExecuteDeleteAsync().ConfigureAwait(false);
             await db.ImageSpamSettings.ExecuteDeleteAsync().ConfigureAwait(false);
-            await db.AutobannedUsers.ExecuteDeleteAsync().ConfigureAwait(false);
             await db.EmojiUsageCounts.ExecuteDeleteAsync().ConfigureAwait(false);
         }
     }

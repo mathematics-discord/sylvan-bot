@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using RatBot.Application.Moderation;
 using RatBot.Configuration;
 using RatBot.Features.EmojiAnalytics;
 using RatBot.Features.Logging.Gateway;
@@ -14,8 +15,9 @@ namespace RatBot.Discord.Tests;
 public sealed class DependencyInjectionTests
 {
     [Test]
-    public async Task RealServiceGraph_HasNoCaptiveScopedDependencies()
+    public async Task BuildServiceProvider_RealServiceGraph_HasNoCaptiveScopedDependencies()
     {
+        // Arrange
         IConfiguration configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(
                 new Dictionary<string, string?>(StringComparer.Ordinal)
@@ -32,17 +34,20 @@ public sealed class DependencyInjectionTests
         services.AddSingleton<ILogger>(new LoggerConfiguration().CreateLogger());
         services.AddRatBot(configuration);
 
+        // Act
         await using ServiceProvider provider = services.BuildServiceProvider(
             new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true }
         );
 
         IDiscordGatewayHandler[] gatewayHandlers = provider.GetServices<IDiscordGatewayHandler>().ToArray();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        ImageSpamSettingsService settingsService = scope.ServiceProvider.GetRequiredService<ImageSpamSettingsService>();
 
-        gatewayHandlers.ShouldContain(handler => handler is AutobanGatewayHandler);
+        // Assert
+        settingsService.ShouldNotBeNull();
         gatewayHandlers.ShouldContain(handler => handler is ModerationLoggingGatewayHandler);
         gatewayHandlers.ShouldContain(handler => handler is RoleColourGatewayHandler);
         gatewayHandlers.ShouldContain(handler => handler is EmojiAnalyticsGatewayHandler);
-        provider.GetRequiredService<AutobanGatewayHandler>().ShouldNotBeNull();
         provider.GetRequiredService<ModerationLoggingGatewayHandler>().ShouldNotBeNull();
     }
 

@@ -1,8 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using RatBot.Application.Moderation;
+using RatBot.Domain.Moderation;
 using RatBot.Features.EmojiAnalytics;
 using RatBot.Features.RoleColours;
 using RatBot.Infrastructure.Data;
-using RatBot.Infrastructure.Stores;
 
 namespace RatBot.Infrastructure.Tests.Integration;
 
@@ -39,16 +40,34 @@ public sealed class MultiGuildPersistenceTests
     }
 
     [Test]
-    public async Task ImageSpamSettings_ArePerGuild()
+    public async Task UpsertAsync_DifferentGuilds_KeepsPersistedAndPublishedSettingsSeparate()
     {
+        // Arrange
         await using BotDbContext db = PostgresDatabaseFixture.CreateDbContext();
-        ImageSpamSettingsStore imageStore = new ImageSpamSettingsStore(db);
+        ImageSpamSettings guildA = ImageSpamSettings.CreateDefault(1);
+        db.ImageSpamSettings.Add(guildA);
+        await db.SaveChangesAsync();
+        ImageBurstSpamDetectorSettings detectorSettings = new ImageBurstSpamDetectorSettings();
+        detectorSettings.Update(1, new ImageBurstSpamDetectorOptions());
+        ImageSpamSettingsService service = new ImageSpamSettingsService(db, detectorSettings);
 
-        await imageStore.UpsertAsync(1, 4, 2, 45, CancellationToken.None);
-        await imageStore.UpsertAsync(2, 2, 5, 60, CancellationToken.None);
+        // Act
+        await service.UpsertAsync(2, 2, 5, 60, CancellationToken.None);
 
-        (await imageStore.GetAsync(1, CancellationToken.None))!.RequiredChannelCount.ShouldBe(4);
-        (await imageStore.GetAsync(2, CancellationToken.None))!.RequiredAttachmentCount.ShouldBe(5);
+        // Assert
+        await using BotDbContext readback = PostgresDatabaseFixture.CreateDbContext();
+        ImageSpamSettings persistedA = await readback.ImageSpamSettings.SingleAsync(x => x.GuildId == 1);
+        ImageSpamSettings persistedB = await readback.ImageSpamSettings.SingleAsync(x => x.GuildId == 2);
+        (persistedA.RequiredChannelCount, persistedA.RequiredAttachmentCount, persistedA.BurstDurationSeconds)
+            .ShouldBe((4, 2, 45));
+        (persistedB.RequiredChannelCount, persistedB.RequiredAttachmentCount, persistedB.BurstDurationSeconds)
+            .ShouldBe((2, 5, 60));
+        detectorSettings.TryGet(1, out ImageBurstSpamDetectorOptions publishedA).ShouldBeTrue();
+        detectorSettings.TryGet(2, out ImageBurstSpamDetectorOptions publishedB).ShouldBeTrue();
+        (publishedA.DistinctChannelThreshold, publishedA.RequiredAttachmentCount, publishedA.Window)
+            .ShouldBe((4, 2, 45));
+        (publishedB.DistinctChannelThreshold, publishedB.RequiredAttachmentCount, publishedB.Window)
+            .ShouldBe((2, 5, 60));
     }
 
     [Test]

@@ -11,8 +11,6 @@ namespace RatBot.Infrastructure.Data;
 /// </summary>
 public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbContext(options)
 {
-    public DbSet<AutobannedUser> AutobannedUsers => Set<AutobannedUser>();
-
     public DbSet<EmojiUsageCount> EmojiUsageCounts => Set<EmojiUsageCount>();
     public DbSet<ImageSpamSettings> ImageSpamSettings => Set<ImageSpamSettings>();
     public DbSet<LoggingConfiguration> LoggingConfigurations => Set<LoggingConfiguration>();

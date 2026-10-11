@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using RatBot.Application.Common.Forums;
@@ -19,16 +20,14 @@ using RatBot.Forum;
 using RatBot.Gateway;
 using RatBot.Handlers;
 using RatBot.Hosting;
-using RatBot.Infrastructure;
 using RatBot.Infrastructure.Data;
 using RatBot.Infrastructure.Features.Logging;
 using RatBot.Infrastructure.Features.Meta;
 using RatBot.Infrastructure.Features.Quorum.Persistence;
-using RatBot.Infrastructure.Persistence.Repositories;
-using RatBot.Infrastructure.Stores;
 
 namespace RatBot;
 
+[SuppressMessage("Design", "MA0051:Method is too long")]
 public static class DependencyInjection
 {
     extension(IServiceCollection services)
@@ -50,7 +49,6 @@ public static class DependencyInjection
                     sp.GetRequiredService<ImageBurstSpamDetectorSettings>()));
 
             services.AddScoped<ImageSpamSettingsService>();
-            services.AddScoped<IModerationService, ModerationService>();
             services.AddScoped<QuorumOperations>();
         }
 
@@ -60,8 +58,6 @@ public static class DependencyInjection
 
             services.AddDbContextFactory<BotDbContext>(options => options.UseNpgsql(connectionString));
 
-            services.AddScoped<IAutobannedUserRepository, AutobannedUserRepository>();
-            services.AddScoped<IImageSpamSettingsStore, ImageSpamSettingsStore>();
             services.AddScoped<IQuorumConfigurationStore>(_ => new QuorumConfigurationStore(connectionString));
             services.AddSingleton<ModerationLoggingStore>();
             services.AddScoped<MetaProposalService>();
@@ -113,26 +109,22 @@ public static class DependencyInjection
                     {
                         AlwaysDownloadUsers = true,
                         MessageCacheSize = options.MessageCacheSize,
-                        GatewayIntents =
-                            GatewayIntents.Guilds
-                            | GatewayIntents.GuildMembers
-                            | GatewayIntents.GuildMessages
-                            | GatewayIntents.GuildMessageReactions
-                            | GatewayIntents.GuildMessagePolls
-                            | GatewayIntents.MessageContent
+                        GatewayIntents = GatewayIntents.Guilds
+                                         | GatewayIntents.GuildMembers
+                                         | GatewayIntents.GuildMessages
+                                         | GatewayIntents.GuildMessageReactions
+                                         | GatewayIntents.GuildMessagePolls
+                                         | GatewayIntents.MessageContent,
                     }
                 );
             });
 
             services.AddSingleton(sp => new InteractionService(
-                sp.GetRequiredService<DiscordSocketClient>(),
-                new InteractionServiceConfig { AutoServiceScopes = true }
-            ));
+                discordProvider: sp.GetRequiredService<DiscordSocketClient>(),
+                config: new InteractionServiceConfig { AutoServiceScopes = true }));
 
             services.AddSingleton<DiscordInteractionHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordInteractionHandler>());
-            services.AddSingleton<AutobanGatewayHandler>();
-            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<AutobanGatewayHandler>());
             services.AddSingleton(sp =>
                 new MessageEvidenceCache(sp.GetRequiredService<IOptions<LoggingOptions>>().Value
                     .ToEvidenceCacheSettings()));
@@ -154,7 +146,7 @@ public static class DependencyInjection
                     {
                         SingleReader = true,
                         SingleWriter = false,
-                        AllowSynchronousContinuations = false
+                        AllowSynchronousContinuations = false,
                     }
                 )
             );

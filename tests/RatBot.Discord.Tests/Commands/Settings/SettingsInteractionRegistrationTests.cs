@@ -2,11 +2,12 @@ using System.Reflection;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RatBot.Application.Moderation;
 using RatBot.Commands.Settings;
 using RatBot.Commands.Spam;
-using RatBot.Domain.Moderation;
+using RatBot.Infrastructure.Data;
 using Shouldly;
 
 namespace RatBot.Discord.Tests.Commands.Settings;
@@ -30,14 +31,15 @@ public sealed class SettingsInteractionRegistrationTests
     }
 
     [Test]
-    public async Task ImageSpamConfigAsync_CanBeRegisteredByInteractionService()
+    public async Task AddModuleAsync_SpamModule_PreservesImageSpamCommandContract()
     {
         // Arrange
-        DiscordSocketClient client = new DiscordSocketClient();
-        InteractionService interactionService = new InteractionService(client);
-        ServiceProvider services = new ServiceCollection()
+        await using DiscordSocketClient client = new DiscordSocketClient();
+        using InteractionService interactionService = new InteractionService(client);
+        await using ServiceProvider services = new ServiceCollection()
             .AddSingleton<ImageBurstSpamDetectorSettings>()
-            .AddSingleton<IImageSpamSettingsStore, FakeImageSpamSettingsStore>()
+            .AddDbContext<BotDbContext>(options =>
+                options.UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused"))
             .AddScoped<ImageSpamSettingsService>()
             .BuildServiceProvider();
 
@@ -116,29 +118,5 @@ public sealed class SettingsInteractionRegistrationTests
         // Assert
         group.Name.ShouldBe("meta");
         group.Description.ShouldBe("Meta configuration.");
-    }
-
-    private sealed class FakeImageSpamSettingsStore : IImageSpamSettingsStore
-    {
-        public Task<ImageSpamSettings?> GetAsync(ulong guildId, CancellationToken ct)
-        {
-            return Task.FromResult<ImageSpamSettings?>(null);
-        }
-
-        public Task<IReadOnlyList<ImageSpamSettings>> ListEnabledAsync(CancellationToken ct)
-        {
-            return Task.FromResult<IReadOnlyList<ImageSpamSettings>>([]);
-        }
-
-        public Task<ImageSpamSettings> UpsertAsync(
-            ulong guildId,
-            int? requiredChannelCount,
-            int? requiredAttachmentCount,
-            int? burstDurationSeconds,
-            CancellationToken ct
-        )
-        {
-            return Task.FromResult(ImageSpamSettings.CreateDefault(guildId));
-        }
     }
 }

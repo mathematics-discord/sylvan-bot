@@ -248,31 +248,6 @@ namespace RatBot.Infrastructure.Migrations
                     b.ToTable("MetaSuggestionSettings", (string)null);
                 });
 
-            modelBuilder.Entity("RatBot.Domain.Moderation.AutobannedUser", b =>
-                {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("BannedUser")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("Moderator")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTimeOffset>("RegisteredAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("GuildId", "BannedUser");
-
-                    b.HasIndex("BannedUser");
-
-                    b.HasIndex("GuildId");
-
-                    b.HasIndex("Moderator");
-
-                    b.ToTable("AutobannedUsers", (string)null);
-                });
-
             modelBuilder.Entity("RatBot.Domain.Moderation.ImageSpamSettings", b =>
                 {
                     b.Property<long>("GuildId")
