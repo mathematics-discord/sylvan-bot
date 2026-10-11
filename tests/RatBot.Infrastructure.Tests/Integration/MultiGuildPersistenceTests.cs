@@ -18,34 +18,16 @@ public sealed class MultiGuildPersistenceTests
         await using BotDbContext db = PostgresDatabaseFixture.CreateDbContext();
         RoleColourOperations operations = new RoleColourOperations(db);
 
-        RoleColourOption guildA = (await operations.AddMappingAsync(1, "red", "Red", 10, 20, CancellationToken.None)).Value;
-        RoleColourOption guildB = (await operations.AddMappingAsync(2, "red", "Red", 10, 20, CancellationToken.None)).Value;
+        RoleColourOption guildA = (await operations.UpsertMappingAsync(1, null, 10, 20, CancellationToken.None)).Value.Option;
+        RoleColourOption guildB = (await operations.UpsertMappingAsync(2, null, 10, 20, CancellationToken.None)).Value.Option;
 
-        await operations.SelectOptionAsync(1, 100, guildA.OptionId, new ulong[] { 10 }, CancellationToken.None);
-        await operations.SelectOptionAsync(2, 100, guildB.OptionId, new ulong[] { 10 }, CancellationToken.None);
+        (await operations.ListConfiguredOptionsAsync(1, CancellationToken.None)).Single().OptionId.ShouldBe(guildA.OptionId);
+        (await operations.ListConfiguredOptionsAsync(2, CancellationToken.None)).Single().OptionId.ShouldBe(guildB.OptionId);
 
-        (await operations.ListConfiguredOptionsAsync(1, true, CancellationToken.None)).Single().OptionId.ShouldBe(guildA.OptionId);
-        (await operations.ListConfiguredOptionsAsync(2, true, CancellationToken.None)).Single().OptionId.ShouldBe(guildB.OptionId);
+        (await operations.DeleteMappingAsync(1, guildA.OptionId, CancellationToken.None)).IsError.ShouldBeFalse();
 
-        (await operations.DeleteMappingAsync(1, "red", CancellationToken.None)).IsError.ShouldBeFalse();
-
-        (await operations.ListConfiguredOptionsAsync(1, true, CancellationToken.None)).ShouldBeEmpty();
-        (await operations.ListConfiguredOptionsAsync(2, true, CancellationToken.None)).Single().OptionId.ShouldBe(guildB.OptionId);
-
-        MemberColourPreference guildBPreference = await db.MemberColourPreferences.SingleAsync(x => x.GuildId == 2 && x.UserId == 100);
-        guildBPreference.SelectedOptionId.ShouldBe(guildB.OptionId);
-    }
-
-    [Test]
-    public async Task RoleColourPreference_CannotSelectOptionFromAnotherGuild()
-    {
-        await using BotDbContext db = PostgresDatabaseFixture.CreateDbContext();
-        RoleColourOption guildB = RoleColourOption.Create(2, "blue", "Blue", 11, 21).Value;
-        db.RoleColourOptions.Add(guildB);
-        db.MemberColourPreferences.Add(MemberColourPreference.CreateForOption(1, 100, guildB.OptionId));
-
-        DbUpdateException exception = await Should.ThrowAsync<DbUpdateException>(() => db.SaveChangesAsync());
-        exception.Message.ShouldNotBeNullOrWhiteSpace();
+        (await operations.ListConfiguredOptionsAsync(1, CancellationToken.None)).ShouldBeEmpty();
+        (await operations.ListConfiguredOptionsAsync(2, CancellationToken.None)).Single().OptionId.ShouldBe(guildB.OptionId);
     }
 
     [Test]

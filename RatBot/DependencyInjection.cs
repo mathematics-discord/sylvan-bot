@@ -162,7 +162,6 @@ public static class DependencyInjection
             services.AddSingleton<RoleColourReconciler>();
             services.AddSingleton<RoleColourGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<RoleColourGatewayHandler>());
-            services.AddHostedService<RoleColourReconciliationWorker>();
 
             services.AddHostedService<MetaProposalPollBackgroundWorker>();
             services.AddHostedService<LoggingMetadataCleanupBackgroundWorker>();
