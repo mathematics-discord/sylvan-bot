@@ -117,7 +117,7 @@ public sealed class RoleColourReconciler(
                 return Error.Validation(description: "That colour is no longer available to you.");
         }
 
-        HashSet<ulong> worn = ColouredRoles(guild, member);
+        HashSet<ulong> worn = ManagedDisplayRoles(member.RoleIds, mappings);
         HashSet<ulong> remove = worn.Where(id => id != colourId).ToHashSet();
         bool addColour = colourId.HasValue && !worn.Contains(colourId.Value);
 
@@ -134,7 +134,7 @@ public sealed class RoleColourReconciler(
         if (actual is null)
             return RolesChangedError();
 
-        HashSet<ulong> actualColours = ColouredRoles(guild, actual);
+        HashSet<ulong> actualColours = ManagedDisplayRoles(actual.RoleIds, mappings);
 
         if (colourId.HasValue)
         {
@@ -197,7 +197,8 @@ public sealed class RoleColourReconciler(
             return Error.NotFound(description: "The member is no longer in this guild.");
 
         ImmutableArray<RoleColourOption> mappings = await ReadMappingsAsync(guild.Id, ct);
-        HashSet<ulong> worn = ColouredRoles(guild, member);
+        ImmutableArray<RoleColourOption> old = previousMappings.IsDefault ? mappings : previousMappings;
+        HashSet<ulong> worn = ManagedDisplayRoles(member.RoleIds, mappings.Concat(old));
         HashSet<ulong> remove;
 
         if (HeldGrants(guild.Id, member.RoleIds, mappings).Any())
@@ -213,8 +214,6 @@ public sealed class RoleColourReconciler(
         else
         {
             IReadOnlyCollection<ulong> before = previousRoleIds ?? member.RoleIds;
-            ImmutableArray<RoleColourOption> old = previousMappings.IsDefault ? mappings : previousMappings;
-
             HashSet<ulong> previousColours = HeldGrants(guild.Id, before, old).Select(o => o.DisplayRoleId).ToHashSet();
 
             remove = [.. worn.Intersect(previousColours)];
@@ -229,7 +228,7 @@ public sealed class RoleColourReconciler(
         if (actual is null)
             return RolesChangedError();
 
-        HashSet<ulong> actualColours = ColouredRoles(guild, actual);
+        HashSet<ulong> actualColours = ManagedDisplayRoles(actual.RoleIds, mappings.Concat(old));
 
         if (actualColours.Overlaps(remove))
             return RolesChangedError();
@@ -312,7 +311,9 @@ public sealed class RoleColourReconciler(
             ? await discordClient.Rest.GetGuildUserAsync(guild.Id, userId, request)
             : await guild.GetUserAsync(userId, CacheMode.AllowDownload, request);
 
-    private static HashSet<ulong> ColouredRoles(IGuild guild, IGuildUser member) =>
-        member.RoleIds.Where(id => guild.GetRole(id)?.Colors.PrimaryColor is { } colour && colour != Color.Default)
-            .ToHashSet();
+    private static HashSet<ulong> ManagedDisplayRoles(IReadOnlyCollection<ulong> roles, IEnumerable<RoleColourOption> mappings)
+    {
+        HashSet<ulong> displayRoleIds = mappings.Select(mapping => mapping.DisplayRoleId).ToHashSet();
+        return roles.Where(displayRoleIds.Contains).ToHashSet();
+    }
 }

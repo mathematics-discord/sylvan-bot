@@ -127,10 +127,8 @@ public sealed class RoleColourReconcilerTests
         // Assert
         result.IsError.ShouldBeFalse();
         result.Value.ShouldBe(Red);
-        _memberRoles.ShouldBe([SourceA, Uncoloured, Red], ignoreOrder: true);
-        string[] changes = [.. _changes];
-        changes.Take(2).ShouldBe(["remove:20", "remove:22"], ignoreOrder: true);
-        changes[^1].ShouldBe("add:21");
+        _memberRoles.ShouldBe([SourceA, Uncoloured, Red, OutsideColour], ignoreOrder: true);
+        _changes.ShouldBe(["remove:20", "add:21"]);
     }
 
     [Test]
@@ -146,8 +144,8 @@ public sealed class RoleColourReconcilerTests
         // Assert
         result.IsError.ShouldBeFalse();
         result.Value.ShouldBeNull();
-        _memberRoles.ShouldBe([SourceA, Uncoloured], ignoreOrder: true);
-        _changes.ShouldBe(["remove:20", "remove:22"], ignoreOrder: true);
+        _memberRoles.ShouldBe([SourceA, Uncoloured, OutsideColour], ignoreOrder: true);
+        _changes.ShouldBe(["remove:20"]);
     }
 
     [Test]
@@ -225,8 +223,8 @@ public sealed class RoleColourReconcilerTests
         await CheckMemberAsync();
 
         // Assert
-        _memberRoles.ShouldBe([SourceA, Uncoloured], ignoreOrder: true);
-        _changes.ShouldBe(["remove:20", "remove:21", "remove:22"], ignoreOrder: true);
+        _memberRoles.ShouldBe([SourceA, Uncoloured, OutsideColour], ignoreOrder: true);
+        _changes.ShouldBe(["remove:20", "remove:21"], ignoreOrder: true);
     }
 
     [Test]
@@ -452,24 +450,27 @@ public sealed class RoleColourReconcilerTests
 
     [TestCase(false)]
     [TestCase(true)]
-    public async Task EquipmentEndsWithAnUnexpectedColour(bool extraColour)
+    public async Task EquipmentOnlyChecksManagedColours(bool extraColour)
     {
         _member
             .AddRoleAsync(Red, Arg.Any<RequestOptions>())
             .Returns(_ =>
             {
                 _memberRoles.Add(OutsideColour);
+                _memberRoles.Add(Red);
 
                 if (extraColour)
-                    _memberRoles.Add(Red);
+                    _memberRoles.Add(Blue);
 
                 return Task.CompletedTask;
             });
 
         ErrorOr<ulong?> result = await EquipAsync(Red);
 
-        result.IsError.ShouldBeTrue();
-        result.FirstError.Description.ShouldContain("Discord roles changed");
+        result.IsError.ShouldBe(extraColour);
+        if (extraColour)
+            result.FirstError.Description.ShouldContain("Discord roles changed");
+        _memberRoles.ShouldContain(OutsideColour);
     }
 
     [Test]
@@ -481,12 +482,14 @@ public sealed class RoleColourReconcilerTests
             {
                 _memberRoles.Remove(Blue);
                 _memberRoles.Add(OutsideColour);
+                _memberRoles.Add(Red);
                 return Task.CompletedTask;
             });
 
         ErrorOr<ulong?> result = await EquipAsync(null);
 
         result.IsError.ShouldBeTrue();
+        _memberRoles.ShouldContain(OutsideColour);
     }
 
     [Test]
@@ -498,7 +501,7 @@ public sealed class RoleColourReconcilerTests
         ErrorOr<ulong?> result = await CheckMemberAsync([SourceA, Uncoloured, Blue]);
 
         result.IsError.ShouldBeFalse();
-        result.Value.ShouldBe(OutsideColour);
+        result.Value.ShouldBeNull();
         _memberRoles.ShouldBe([Uncoloured, OutsideColour], ignoreOrder: true);
     }
 
