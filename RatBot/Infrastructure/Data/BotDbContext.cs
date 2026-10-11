@@ -17,7 +17,6 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<ImageSpamSettings> ImageSpamSettings => Set<ImageSpamSettings>();
     public DbSet<LoggingConfiguration> LoggingConfigurations => Set<LoggingConfiguration>();
     public DbSet<LoggingExcludedChannel> LoggingExcludedChannels => Set<LoggingExcludedChannel>();
-    public DbSet<MemberColourPreference> MemberColourPreferences => Set<MemberColourPreference>();
     public DbSet<MessageLogEntry> MessageLogEntries => Set<MessageLogEntry>();
     public DbSet<MetaProposalState> MetaProposalStates => Set<MetaProposalState>();
     public DbSet<MetaSuggestionSettings> MetaSuggestionSettings => Set<MetaSuggestionSettings>();

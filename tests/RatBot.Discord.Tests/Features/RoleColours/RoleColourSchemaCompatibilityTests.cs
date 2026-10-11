@@ -11,20 +11,23 @@ namespace RatBot.Discord.Tests.Features.RoleColours;
 public sealed class RoleColourSchemaCompatibilityTests
 {
     [Test]
-    public void RelocatedEntities_PreserveTheLatestMigrationSchema()
+    public void MigrationMatchesCurrentModel()
     {
+        // Arrange
         using BotDbContext db = new BotDbContext(
             new DbContextOptionsBuilder<BotDbContext>().UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused").Options
         );
 
         IMigrationsAssembly migrations = db.GetService<IMigrationsAssembly>();
 
+        // Act
         Migration latestMigration = migrations.CreateMigration(migrations.Migrations.Last().Value, db.Database.ProviderName!);
 
         IModel migrationModel = db.GetService<IModelRuntimeInitializer>().Initialize(latestMigration.TargetModel, designTime: true);
 
         IModel currentModel = db.GetService<IDesignTimeModel>().Model;
 
+        // Assert
         db.GetService<IMigrationsModelDiffer>()
             .GetDifferences(migrationModel.GetRelationalModel(), currentModel.GetRelationalModel())
             .ShouldBeEmpty();

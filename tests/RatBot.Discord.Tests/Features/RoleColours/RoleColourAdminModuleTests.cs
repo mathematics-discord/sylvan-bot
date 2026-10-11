@@ -10,9 +10,12 @@ namespace RatBot.Discord.Tests.Features.RoleColours;
 public sealed class RoleColourAdminModuleTests
 {
     [Test]
-    public void RoleColourAdminModule_HasExpectedCommandMetadata()
+    public void AdminCommands()
     {
+        // Arrange
         Type moduleType = typeof(RoleColourAdminModule);
+
+        // Act
         GroupAttribute group = moduleType.GetCustomAttribute<GroupAttribute>() ?? throw new InvalidOperationException("Expected group attribute.");
         DefaultMemberPermissionsAttribute permissions =
             moduleType.GetCustomAttribute<DefaultMemberPermissionsAttribute>()
@@ -24,8 +27,9 @@ public sealed class RoleColourAdminModuleTests
             .Select(attribute => attribute!.Name)
             .ToArray();
 
+        // Assert
         group.Name.ShouldBe("colour-admin");
-        commandNames.ShouldBe(["add", "upsert", "delete", "list", "sync"], ignoreOrder: true);
+        commandNames.ShouldBe(["upsert", "delete", "list", "sync"], ignoreOrder: true);
         permissions.Permissions.ShouldBe(GuildPermission.Administrator);
     }
 }

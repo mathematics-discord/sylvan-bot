@@ -321,42 +321,13 @@ namespace RatBot.Infrastructure.Migrations
                     b.ToTable("EmojiUsageCounts", (string)null);
                 });
 
-            modelBuilder.Entity("RatBot.Features.RoleColours.MemberColourPreference", b =>
-                {
-                    b.Property<Guid>("PreferenceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("Kind")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("SelectedOptionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<long>("UserId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("PreferenceId");
-
-                    b.HasIndex("GuildId", "SelectedOptionId");
-
-                    b.HasIndex("GuildId", "UserId")
-                        .IsUnique();
-
-                    b.ToTable("MemberColourPreferences", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_MemberColourPreferences_ConfiguredOption_SelectedOption_NotNull", "(\"Kind\" <> 1) OR (\"SelectedOptionId\" IS NOT NULL)");
-
-                            t.HasCheckConstraint("CK_MemberColourPreferences_NoColour_SelectedOption_Null", "(\"Kind\" <> 2) OR (\"SelectedOptionId\" IS NULL)");
-                        });
-                });
-
             modelBuilder.Entity("RatBot.Features.RoleColours.RoleColourOption", b =>
                 {
-                    b.Property<Guid>("OptionId")
-                        .HasColumnType("uuid");
+                    b.Property<long>("OptionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("OptionId"));
 
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -367,24 +338,6 @@ namespace RatBot.Infrastructure.Migrations
                     b.Property<long>("GuildId")
                         .HasColumnType("bigint");
 
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Key")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("Label")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("NormalisedKey")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
                     b.Property<long>("SourceRoleId")
                         .HasColumnType("bigint");
 
@@ -393,35 +346,13 @@ namespace RatBot.Infrastructure.Migrations
 
                     b.HasKey("OptionId");
 
-                    b.HasIndex("GuildId", "DisplayRoleId")
-                        .IsUnique();
-
-                    b.HasIndex("GuildId", "NormalisedKey")
-                        .IsUnique();
-
-                    b.HasIndex("GuildId", "SourceRoleId")
-                        .IsUnique();
-
                     b.HasIndex("GuildId", "SourceRoleId", "DisplayRoleId")
                         .IsUnique();
 
                     b.ToTable("RoleColourOptions", null, t =>
                         {
                             t.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\"");
-
-                            t.HasCheckConstraint("CK_RoleColourOptions_Key_NotBlank", "length(btrim(\"Key\")) > 0");
-
-                            t.HasCheckConstraint("CK_RoleColourOptions_Label_NotBlank", "length(btrim(\"Label\")) > 0");
                         });
-                });
-
-            modelBuilder.Entity("RatBot.Features.RoleColours.MemberColourPreference", b =>
-                {
-                    b.HasOne("RatBot.Features.RoleColours.RoleColourOption", null)
-                        .WithMany()
-                        .HasForeignKey("GuildId", "SelectedOptionId")
-                        .HasPrincipalKey("GuildId", "OptionId")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 #pragma warning restore 612, 618
         }

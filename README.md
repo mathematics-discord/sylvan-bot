@@ -41,6 +41,14 @@ docker compose --env-file .env logs db
 
 PostgreSQL only uses `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` when its data volume is first created. If you change those settings after initial startup, either change them inside PostgreSQL or intentionally recreate the local volume with `docker compose down --volumes`.
 
+## Role colours
+
+Administrators can use `/colour-admin upsert source display` to create a grant from an existing uncoloured source role to an existing coloured role. It returns a numeric mapping ID. Pass `id` to `upsert` to update that mapping, or to `/colour-admin delete` to remove it; `/colour-admin list` shows the IDs. Sources and colours can each occur in several grants; the exact guild/source/colour combination is unique. An `@everyone` source applies implicitly to every member.
+
+Members can use `/colour` to select and immediately equip one colour from the distinct union granted by their held sources, or press the red Reset button to wear none. Discord's current roles are the equipped state; choices are not persisted or restored. Switching removes other coloured roles before adding the selection, including colours outside configured grants, and preserves uncoloured roles. A failed removal stops the switch.
+
+Member-role events, startup member downloads, mapping edits and `/colour-admin sync` check the same rules. A sole eligible colour is kept; loss of its last grant removes it. Gaining access equips nothing. Participating members wearing several colours lose all of them. Members without configured sources are otherwise outside automatic enforcement. Invalid mappings are unavailable independently. Mapping edits recheck former participants in the current process and report incomplete checks; there is no periodic worker or persistent cleanup queue. Discord's server setup controls role presentation.
+
 ## Optional: Observability
 
 The project includes an optional observability stack (Grafana, Loki, OpenTelemetry) for monitoring and logging.

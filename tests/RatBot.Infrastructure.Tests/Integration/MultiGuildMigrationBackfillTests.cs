@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using RatBot.Features.RoleColours;
 using RatBot.Infrastructure.Data;
 
 namespace RatBot.Infrastructure.Tests.Integration;
@@ -73,13 +72,13 @@ public sealed class MultiGuildMigrationBackfillTests
             (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"EmojiUsageCounts\"").SingleAsync()).ShouldBe(1);
             (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM message_log_entries").SingleAsync()).ShouldBe(1);
 
-            await Should.ThrowAsync<DbUpdateException>(async () =>
-            {
-                db.MemberColourPreferences.Add(
-                    MemberColourPreference.CreateForOption(2, 100, new RoleColourOption.Id(Guid.Parse("11111111-1111-1111-1111-111111111111")))
-                );
-                await db.SaveChangesAsync();
-            });
+            (
+                await db
+                    .Database.SqlQueryRaw<int>(
+                        "SELECT COUNT(*)::integer AS \"Value\" FROM information_schema.tables WHERE table_name = 'MemberColourPreferences'"
+                    )
+                    .SingleAsync()
+            ).ShouldBe(0);
         }
         finally
         {
