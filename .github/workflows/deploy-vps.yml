@@ -1,181 +1,111 @@
 name: Deploy RatBot to VPS
 
 on:
-  push:
-    branches:
-      - master
   workflow_dispatch:
     inputs:
       target:
-        description: "Deployment target"
+        description: Deployment target
         required: true
         type: choice
         options:
-          - shared
           - production
+          - production-image
+      release_type:
+        description: Production version bump (choose custom to enter a version)
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - custom
+      version:
+        description: Exact major.minor.patch version when release type is custom
+        required: false
+        type: string
       image_tag:
-        description: "Image tag or full image ref. Required for production."
+        description: Existing image tag or full image ref for production-image
         required: false
         type: string
 
 permissions:
   contents: read
-  packages: write
+
+concurrency:
+  group: deploy-ratbot
+  cancel-in-progress: false
 
 jobs:
-  prepare:
+  release:
+    if: inputs.target == 'production'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
-      build_image: ${{ steps.resolve.outputs.build_image }}
-      deploy: ${{ steps.resolve.outputs.deploy }}
-      image_ref: ${{ steps.resolve.outputs.image_ref }}
-      image_repo: ${{ steps.resolve.outputs.image_repo }}
-      targets: ${{ steps.resolve.outputs.targets }}
-      source_sha: ${{ steps.resolve.outputs.source_sha }}
-      reason: ${{ steps.resolve.outputs.reason }}
+      version: ${{ steps.publish.outputs.version }}
+      source_sha: ${{ steps.publish.outputs.source_sha }}
+      before_sha: ${{ steps.publish.outputs.before_sha }}
     steps:
-      - name: Resolve deployment plan
-        id: resolve
-        shell: bash
+      - name: Require master
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-          GITHUB_SHA_VALUE: ${{ github.sha }}
-          GITHUB_REPOSITORY_VALUE: ${{ github.repository }}
-          INPUT_TARGET: ${{ github.event.inputs.target || '' }}
-          INPUT_IMAGE_TAG: ${{ github.event.inputs.image_tag || '' }}
+          GITHUB_REF_VALUE: ${{ github.ref }}
         run: |
-          set -euo pipefail
-
-          image_repo="ghcr.io/${GITHUB_REPOSITORY_VALUE,,}"
-
-          build_image="false"
-          deploy="false"
-          image_ref=""
-          source_sha=""
-          targets="[]"
-          reason=""
-
-          if [[ "$EVENT_NAME" == "push" ]]; then
-            if [[ "$GITHUB_REF_NAME" == "master" ]]; then
-              build_image="true"
-              deploy="true"
-              source_sha="$GITHUB_SHA_VALUE"
-              image_ref="${image_repo}:sha-${source_sha}"
-              targets="$(jq -cn --arg image_ref "$image_ref" '[
-                {
-                  target: "production",
-                  environment_name: "production",
-                  project: "production",
-                  remote_dir: "/opt/ratbot/production",
-                  image_ref: $image_ref
-                }
-              ]')"
-              reason="Build image and auto deploy production after pushes to master."
-            else
-              reason="Branch is not mapped to auto deployment."
-            fi
-          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            case "$INPUT_TARGET" in
-              shared)
-                deploy="true"
-                targets="$(jq -cn '[
-                  {
-                    target: "shared",
-                    environment_name: "shared",
-                    project: "shared",
-                    remote_dir: "/opt/ratbot/shared",
-                    image_ref: ""
-                  }
-                ]')"
-                reason="Manual shared deployment."
-                ;;
-              production)
-                deploy="true"
-
-                if [[ -z "$INPUT_IMAGE_TAG" ]]; then
-                  deploy="false"
-                  reason="Production deployment requires an explicit image_tag or full image ref."
-                elif [[ "$INPUT_IMAGE_TAG" == *"/"* ]]; then
-                  image_ref="$INPUT_IMAGE_TAG"
-                else
-                  image_ref="${image_repo}:${INPUT_IMAGE_TAG}"
-                fi
-
-                if [[ "$deploy" == "true" ]]; then
-                  targets="$(jq -cn --arg image_ref "$image_ref" '[
-                    {
-                      target: "production",
-                      environment_name: "production",
-                      project: "ratbot-production",
-                      remote_dir: "/opt/ratbot/production",
-                      image_ref: $image_ref
-                    }
-                  ]')"
-                  reason="Manual production deployment."
-                fi
-                ;;
-              *)
-                reason="Invalid manual target."
-                ;;
-            esac
-          else
-            reason="Unsupported event type."
+          if [[ "$GITHUB_REF_VALUE" != 'refs/heads/master' ]]; then
+            echo 'Production releases must be dispatched from master.' >&2
+            exit 1
           fi
 
-          {
-            echo "build_image=$build_image"
-            echo "deploy=$deploy"
-            echo "image_ref=$image_ref"
-            echo "image_repo=$image_repo"
-            echo "source_sha=$source_sha"
-            echo "targets=$targets"
-            echo "reason=$reason"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Summarize resolved plan
-        shell: bash
-        env:
-          BUILD_IMAGE: ${{ steps.resolve.outputs.build_image }}
-          DEPLOY: ${{ steps.resolve.outputs.deploy }}
-          IMAGE_REF: ${{ steps.resolve.outputs.image_ref }}
-          TARGETS: ${{ steps.resolve.outputs.targets }}
-          REASON: ${{ steps.resolve.outputs.reason }}
-        run: |
-          {
-            echo "### Deployment Plan"
-            echo "- Build image: \`${BUILD_IMAGE}\`"
-            echo "- Deploy: \`${DEPLOY}\`"
-            echo "- Image ref: \`${IMAGE_REF}\`"
-            echo "- Targets: \`${TARGETS}\`"
-            echo "- Reason: ${REASON}"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  build-and-push:
-    needs: prepare
-    if: needs.prepare.outputs.build_image == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
+      - name: Check out master
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.prepare.outputs.source_sha }}
+          ref: master
+          fetch-depth: 0
 
-      - name: Derive image tags
-        id: tags
+      - name: Install Changie 1.26.0
         shell: bash
-        env:
-          IMAGE_REPO: ${{ needs.prepare.outputs.image_repo }}
-          SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
         run: |
           set -euo pipefail
+          curl --fail --location --silent --show-error \
+            https://github.com/miniscruff/changie/releases/download/v1.26.0/changie_1.26.0_linux_amd64.tar.gz \
+            -o "$RUNNER_TEMP/changie.tar.gz"
+          tar -xzf "$RUNNER_TEMP/changie.tar.gz" -C "$RUNNER_TEMP" changie
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
+      - name: Batch and publish release
+        id: publish
+        shell: bash
+        env:
+          RELEASE_TYPE: ${{ inputs.release_type }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          before_sha="$(git rev-parse HEAD)"
+          bash scripts/prepare-release.sh "$RELEASE_TYPE" "$REQUESTED_VERSION"
+          version="$(python3 -c 'import json; print(json.load(open("version.json", encoding="utf-8"))["version"])')"
+          git add .changes CHANGELOG.md version.json
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "Release v${version}"
+          git push origin HEAD:master
           {
-            echo "tags<<EOF"
-            echo "${IMAGE_REPO}:sha-${SOURCE_SHA}"
-            echo "${IMAGE_REPO}:master"
-            echo "EOF"
+            echo "before_sha=$before_sha"
+            echo "source_sha=$(git rev-parse HEAD)"
+            echo "version=$version"
           } >> "$GITHUB_OUTPUT"
+
+  build-and-push:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.source_sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -195,38 +125,24 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ${{ steps.tags.outputs.tags }}
+          tags: |
+            ghcr.io/${{ github.repository }}:sha-${{ needs.release.outputs.source_sha }}
+            ghcr.io/${{ github.repository }}:v${{ needs.release.outputs.version }}
+            ghcr.io/${{ github.repository }}:master
 
-      - name: Summarize image
-        shell: bash
-        env:
-          IMAGE_REF: ${{ needs.prepare.outputs.image_ref }}
-        run: |
-          {
-            echo "### Image"
-            echo "- Published image: \`${IMAGE_REF}\`"
-            echo "- Moving tag: \`master\`"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  deploy:
+  deploy-production:
     needs:
-      - prepare
+      - release
       - build-and-push
-    if: always() && needs.prepare.outputs.deploy == 'true' && (needs.prepare.outputs.build_image != 'true' || needs.build-and-push.result == 'success')
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.prepare.outputs.targets) }}
-    environment: ${{ matrix.environment_name }}
-    concurrency:
-      group: deploy-${{ matrix.target }}
-      cancel-in-progress: false
+    environment: production
     steps:
-      - name: Check out repository
+      - name: Check out release commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.source_sha }}
 
-      - name: Run remote deploy
+      - name: Deploy production
         shell: bash
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -234,59 +150,74 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
-          TARGET: ${{ matrix.target }}
-          PROJECT: ${{ matrix.project }}
-          REMOTE_DIR: ${{ matrix.remote_dir }}
-          IMAGE_REF: ${{ matrix.image_ref }}
+          IMAGE_REF: ghcr.io/${{ github.repository }}:sha-${{ needs.release.outputs.source_sha }}
         run: |
-          set -euo pipefail
-          chmod +x ./scripts/deploy-vps-stack.sh
-
-          args=(
-            --stack "$TARGET"
-            --project "$PROJECT"
-            --remote-dir "$REMOTE_DIR"
-          )
-
-          if [[ -n "${IMAGE_REF}" ]]; then
-            args+=(--image-ref "$IMAGE_REF")
-          fi
-
-          ./scripts/deploy-vps-stack.sh "${args[@]}"
-
-      - name: Summarize deployment
-        shell: bash
-        env:
-          TARGET: ${{ matrix.target }}
-          PROJECT: ${{ matrix.project }}
-          REMOTE_DIR: ${{ matrix.remote_dir }}
-          IMAGE_REF: ${{ matrix.image_ref }}
-        run: |
-          {
-            echo "### Deployment Result"
-            echo "- Target: \`${TARGET}\`"
-            echo "- Project: \`${PROJECT}\`"
-            echo "- Remote dir: \`${REMOTE_DIR}\`"
-            echo "- Image ref: \`${IMAGE_REF}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          bash scripts/deploy-vps-stack.sh \
+            --project production \
+            --remote-dir /opt/ratbot/production \
+            --image-ref "$IMAGE_REF"
 
   announce-release:
-    needs: deploy
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.deploy.result == 'success'
+    needs:
+      - release
+      - deploy-production
     runs-on: ubuntu-latest
     steps:
-      - name: Check out deployed commit and push history
+      - name: Check out release commit and history
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.release.outputs.source_sha }}
           fetch-depth: 0
 
-      - name: Announce newly deployed release
+      - name: Announce deployed release
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_REF: ${{ github.ref }}
-          DEPLOY_RESULT: ${{ needs.deploy.result }}
-          PUSH_BEFORE: ${{ github.event.before }}
-          PUSH_AFTER: ${{ github.sha }}
+          DEPLOY_RESULT: ${{ needs.deploy-production.result }}
+          RELEASE_BEFORE: ${{ needs.release.outputs.before_sha }}
+          RELEASE_AFTER: ${{ needs.release.outputs.source_sha }}
           DISCORD_RELEASE_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
         run: python3 scripts/announce-release.py
+
+  deploy-production-image:
+    if: inputs.target == 'production-image'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Resolve existing image
+        id: image
+        shell: bash
+        env:
+          INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
+          GITHUB_REPOSITORY_VALUE: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$INPUT_IMAGE_TAG" ]]; then
+            echo 'An image tag or full image ref is required for production-image.' >&2
+            exit 1
+          fi
+          image_repo="ghcr.io/${GITHUB_REPOSITORY_VALUE,,}"
+          if [[ "$INPUT_IMAGE_TAG" == */* ]]; then
+            image_ref="$INPUT_IMAGE_TAG"
+          else
+            image_ref="${image_repo}:$INPUT_IMAGE_TAG"
+          fi
+          echo "image_ref=$image_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy existing image
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+        run: |
+          bash scripts/deploy-vps-stack.sh \
+            --project production \
+            --remote-dir /opt/ratbot/production \
+            --image-ref "$IMAGE_REF"

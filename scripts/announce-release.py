@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Announce committed release notes after a successful production push deployment."""
+"""Announce committed release notes after a successful manual production deployment."""
 
 import json
 import os
@@ -15,8 +15,6 @@ from urllib.request import Request, urlopen
 
 SEMVER = r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
 VERSION = re.compile(rf"{SEMVER}\Z")
-# .changie.yaml: changesDir=.changes, versionFileFormat='v{{.VersionNoPrefix}}.md'.
-PUBLISHED_BATCH = re.compile(rf"\.changes/v{SEMVER}\.md\Z")
 USER_AGENT = "DiscordBot (https://github.com/ratgirl-laboratories/sylvan-bot, 1.0)"
 COMPONENT_NAMES = ("General", "Administration", "Moderation")
 KIND_NAMES = ("Security", "Added", "Changed", "Fixed", "Deprecated", "Removed")
@@ -28,11 +26,11 @@ def git(*args):
     return subprocess.check_output(["git", *args], stderr=subprocess.DEVNULL).decode("utf-8")
 
 
-def release_from_push(before, after):
+def release_from_commits(before, after):
     if not re.fullmatch(r"[0-9a-f]{40}", before) or before == "0" * 40:
-        return None, "Push has no usable before commit."
+        return None, "Release has no usable before commit."
     if not re.fullmatch(r"[0-9a-f]{40}", after):
-        raise ValueError("Push has no valid after commit.")
+        raise ValueError("Release has no valid after commit.")
     if subprocess.run(["git", "cat-file", "-e", f"{before}^{{commit}}"],
                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode:
         return None, "Before commit is unavailable; release status cannot be verified."
@@ -44,18 +42,16 @@ def release_from_push(before, after):
         old = json.loads(git("show", f"{before}:version.json"))["version"]
         new = json.loads(git("show", f"{after}:version.json"))["version"]
     except (subprocess.CalledProcessError, KeyError, json.JSONDecodeError):
-        return None, "Version metadata is unavailable in the push range."
+        return None, "Version metadata is unavailable in the release range."
     if not VERSION.fullmatch(old) or not VERSION.fullmatch(new):
         raise ValueError("version.json contains a non-release version.")
     if tuple(map(int, new.split("."))) <= tuple(map(int, old.split("."))):
-        before_files = git("ls-tree", "-r", "--name-only", before, "--", ".changes")
-        if any(PUBLISHED_BATCH.fullmatch(path) for path in before_files.splitlines()):
-            return None, "version.json did not advance."
+        return None, "version.json did not advance."
 
     note_path = f".changes/v{new}.md"
     added = git("diff", "--name-status", "--diff-filter=A", before, after, "--", note_path)
     if added.strip() != f"A\t{note_path}":
-        return None, f"Release notes for v{new} were not newly added in this push."
+        return None, f"Release notes for v{new} were not newly added in this release."
     notes = git("show", f"{after}:{note_path}")
     if not notes.strip():
         raise ValueError(f"Committed release notes for v{new} are empty.")
@@ -294,14 +290,14 @@ def summary(text):
 
 
 def main():
-    if (os.environ.get("GITHUB_EVENT_NAME") != "push"
+    if (os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
             or os.environ.get("GITHUB_REF") != "refs/heads/master"
             or os.environ.get("DEPLOY_RESULT") != "success"):
-        summary("Skipped: this was not a successful production push deployment.")
+        summary("Skipped: this was not a successful manual production deployment.")
         return
 
-    release, reason = release_from_push(os.environ.get("PUSH_BEFORE", ""),
-                                        os.environ.get("PUSH_AFTER", ""))
+    release, reason = release_from_commits(os.environ.get("RELEASE_BEFORE", ""),
+                                           os.environ.get("RELEASE_AFTER", ""))
     if release is None:
         summary(f"Skipped: {reason}")
         return

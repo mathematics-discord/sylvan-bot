@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-stack=""
 project=""
 remote_dir=""
 image_ref=""
@@ -9,7 +8,7 @@ image_ref=""
 usage() {
   cat <<'EOF'
 Usage:
-  deploy-vps-stack.sh --stack <shared|production> --project <name> --remote-dir <path> [--image-ref <ref>]
+  deploy-vps-stack.sh --project <name> --remote-dir <path> [--image-ref <ref>]
 
 Behavior:
   - Syncs non-secret compose/config assets from the repository to the VPS
@@ -20,9 +19,8 @@ EOF
 }
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-local_compose=""
-local_env_example=""
-local_sync_dir=""
+local_compose="$repo_root/docker-compose.production.yml"
+local_env_example="$repo_root/env/production.env.example"
 
 upload_file() {
   local src="$1"
@@ -38,10 +36,6 @@ upload_file() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --stack)
-      stack="${2:-}"
-      shift 2
-      ;;
     --project)
       project="${2:-}"
       shift 2
@@ -66,27 +60,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$stack" || -z "$project" || -z "$remote_dir" ]]; then
+if [[ -z "$project" || -z "$remote_dir" ]]; then
   echo "Missing required arguments." >&2
   usage
   exit 1
 fi
-
-if [[ "$stack" != "shared" && "$stack" != "production" ]]; then
-  echo "Invalid --stack value: $stack" >&2
-  exit 1
-fi
-
-case "$stack" in
-  production)
-    local_compose="$repo_root/docker-compose.production.yml"
-    local_env_example="$repo_root/env/production.env.example"
-    ;;
-  staging)
-    local_compose="$repo_root/docker-compose.staging.yml"
-    local_env_example="$repo_root/env/staging.env.example"
-    ;;
-esac
 
 if [[ ! -f "$local_compose" ]]; then
   echo "Local compose file not found: $local_compose" >&2
@@ -141,13 +119,8 @@ REMOTE_PREP_EOF
 upload_file "$local_compose" "${remote_tmp_dir}/compose.yaml"
 upload_file "$local_env_example" "${remote_tmp_dir}/.env.example"
 
-if [[ -n "$local_sync_dir" ]]; then
-  tar -C "$repo_root" -cf - "$(basename "$local_sync_dir")" | \
-    ssh "${ssh_opts[@]}" "${vps_user}@${VPS_HOST}" "mkdir -p '$remote_tmp_dir' && tar -C '$remote_tmp_dir' -xf -"
-fi
-
 ssh "${ssh_opts[@]}" "${vps_user}@${VPS_HOST}" \
-  "STACK='$stack' PROJECT='$project' REMOTE_DIR='$remote_dir' IMAGE_REF='$image_ref_remote' bash -s" <<'REMOTE_EOF'
+  "PROJECT='$project' REMOTE_DIR='$remote_dir' IMAGE_REF='$image_ref_remote' bash -s" <<'REMOTE_EOF'
 set -euo pipefail
 
 if [[ ! -d "$REMOTE_DIR" ]]; then
@@ -156,13 +129,6 @@ if [[ ! -d "$REMOTE_DIR" ]]; then
 fi
 
 cd "$REMOTE_DIR"
-
-if [[ -d .sync-tmp/docker ]]; then
-  rm -rf docker
-  mv .sync-tmp/docker ./docker
-  find docker -type d -exec chmod 2775 {} +
-  find docker -type f -exec chmod 0664 {} +
-fi
 
 mv .sync-tmp/compose.yaml ./compose.yaml
 mv .sync-tmp/.env.example ./.env.example
