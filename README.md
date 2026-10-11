@@ -16,7 +16,7 @@ A Discord bot built with .NET 10.0 and Discord.Net, featuring a modular architec
 cp env/local.env.example .env
 ```
 
-Set `DISCORD__TOKEN` and `DISCORD__GUILDID` in `.env`.
+Set `DISCORD__TOKEN` in `.env`. The bot registers commands in every guild it joins.
 
 ### 2. Start PostgreSQL
 
@@ -40,6 +40,40 @@ docker compose --env-file .env logs db
 ```
 
 PostgreSQL only uses `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` when its data volume is first created. If you change those settings after initial startup, either change them inside PostgreSQL or intentionally recreate the local volume with `docker compose down --volumes`.
+
+## Command registration and cleanup
+
+When Discord reports the bot ready, RatBot replaces its complete command set in every guild it belongs to. It also registers the same definitions when added to a new guild. This updates renamed commands, parameters, and subcommands and removes deleted commands in each guild. The bot never registers commands globally. Discord keeps global and guild registrations separately, so an old global registration survives until explicitly cleared.
+
+The following maintenance commands use Discord's REST API and require `DISCORD__TOKEN` in the **process environment** for the application you intend to inspect. They do not load `.env`, start the bot, or connect to PostgreSQL. Run them from this repository after setting that variable. In PowerShell, you can set it without putting the token in shell history:
+
+```powershell
+$secret = Read-Host "Bot token" -AsSecureString
+$env:DISCORD__TOKEN = [System.Net.NetworkCredential]::new("", $secret).Password
+```
+
+Supply the production bot token to inspect the production application; check the authenticated bot name and ID in the output.
+
+```powershell
+$guildId = Read-Host "Production guild ID"
+dotnet run --project RatBot --no-launch-profile -- commands inspect global
+dotnet run --project RatBot --no-launch-profile -- commands inspect guild $guildId
+dotnet run --project RatBot --no-launch-profile -- commands clear global
+dotnet run --project RatBot --no-launch-profile -- commands inspect global
+dotnet run --project RatBot --no-launch-profile -- commands inspect guild $guildId
+```
+
+Use `commands clear global` to retire any global commands previously registered by this application. To clear an abandoned guild scope, inspect its ID and then invoke `commands clear guild` with that ID:
+
+```powershell
+$abandonedGuildId = Read-Host "Abandoned guild ID"
+dotnet run --project RatBot --no-launch-profile -- commands inspect guild $abandonedGuildId
+dotnet run --project RatBot --no-launch-profile -- commands clear guild $abandonedGuildId
+```
+
+You can supply multiple explicit guild IDs to `commands clear guild`. A clear removes **all application commands in that selected scope**, including user and message context-menu commands. It exits nonzero if authentication, inspection, or any requested cleanup fails. Do not clear a guild where the running bot should keep its commands.
+
+Start the updated bot before clearing old global commands, so an older process cannot register them again on reconnect. For local development, run `dotnet run --project RatBot --launch-profile RatBot.Local`; production registration happens when the updated bot starts after deployment. Confirm guild registration in the bot log, inspect both scopes, clear the old global scope, then inspect both again. A Discord client may still display a cached command menu until it reloads; the bot cannot force an immediate refresh of every client.
 
 ## Role colours
 

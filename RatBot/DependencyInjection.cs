@@ -74,10 +74,6 @@ public static class DependencyInjection
                 .AddOptions<DiscordOptions>()
                 .Bind(configuration.GetSection(DiscordOptions.SectionName))
                 .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "Discord token is required.")
-                .Validate(
-                    options => options.DevelopmentCommandRegistrationGuildIds.All(guildId => guildId != 0),
-                    "Development command registration guild ids must be non-zero."
-                )
                 .Validate(options => options.MessageCacheSize >= 1000, "Discord message cache size must be at least 1000.")
                 .ValidateOnStart();
 

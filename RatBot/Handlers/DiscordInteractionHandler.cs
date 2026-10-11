@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Reflection;
 using Discord.Net;
 using RatBot.Commands.Hello;
-using RatBot.Configuration;
 using RatBot.Gateway;
 using RatBot.Logging;
 using IResult = Discord.Interactions.IResult;
@@ -14,7 +13,6 @@ public sealed class DiscordInteractionHandler(
     DiscordSocketClient discordClient,
     InteractionService interactionService,
     IServiceProvider services,
-    IOptions<DiscordOptions> options,
     IConfiguration configuration,
     ILogger logger
 ) : IDiscordGatewayHandler
@@ -22,8 +20,6 @@ public sealed class DiscordInteractionHandler(
     private const string DiagEventName = "interaction_diagnostics";
     private readonly ConcurrentDictionary<ulong, Stopwatch> _interactionStopwatches = [];
     private readonly ILogger _logger = logger.ForContext<DiscordInteractionHandler>();
-
-    private readonly DiscordOptions _options = options.Value;
 
     private readonly string _serviceInstanceId = configuration["OTEL:Resource:ServiceInstanceId"] ?? Environment.MachineName;
 
@@ -185,6 +181,7 @@ public sealed class DiscordInteractionHandler(
 
         discordClient.InteractionCreated += HandleInteractionAsync;
         discordClient.Ready += RegisterCommandsAsync;
+        discordClient.JoinedGuild += RegisterCommandsToGuildAsync;
         interactionService.InteractionExecuted += HandleInteractionExecutedAsync;
     }
 
@@ -192,6 +189,7 @@ public sealed class DiscordInteractionHandler(
     {
         discordClient.InteractionCreated -= HandleInteractionAsync;
         discordClient.Ready -= RegisterCommandsAsync;
+        discordClient.JoinedGuild -= RegisterCommandsToGuildAsync;
         interactionService.InteractionExecuted -= HandleInteractionExecutedAsync;
     }
 
@@ -524,24 +522,22 @@ public sealed class DiscordInteractionHandler(
 
     private async Task RegisterCommandsAsync()
     {
+        _logger.Information("Registering application commands in {GuildCount} guilds", discordClient.Guilds.Count);
+
+        foreach (SocketGuild guild in discordClient.Guilds)
+            await RegisterCommandsToGuildAsync(guild);
+    }
+
+    private async Task RegisterCommandsToGuildAsync(SocketGuild guild)
+    {
         try
         {
-            if (_options.DevelopmentCommandRegistrationGuildIds.Length == 0)
-            {
-                await interactionService.RegisterCommandsGloballyAsync();
-                _logger.Information("Slash commands registered globally");
-                return;
-            }
-
-            foreach (ulong guildId in _options.DevelopmentCommandRegistrationGuildIds.Distinct())
-            {
-                await interactionService.RegisterCommandsToGuildAsync(guildId);
-                _logger.Information("Slash commands registered to development guild {GuildId}", guildId);
-            }
+            await interactionService.RegisterCommandsToGuildAsync(guild.Id, deleteMissing: true);
+            _logger.Information("Application commands registered to guild {GuildId}", guild.Id);
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "Failed to register slash commands");
+            _logger.Error(ex, "Failed to register application commands to guild {GuildId}", guild.Id);
         }
     }
 

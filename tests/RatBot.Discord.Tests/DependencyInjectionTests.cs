@@ -55,8 +55,6 @@ public sealed class DependencyInjectionTests
                 {
                     ["Discord:Token"] = "inert-test-token",
                     ["Discord:MessageCacheSize"] = "1000",
-                    ["Discord:DevelopmentCommandRegistrationGuildIds:0"] = "10",
-                    ["Discord:DevelopmentCommandRegistrationGuildIds:1"] = "20",
                 }
             )
             .Build();
@@ -66,7 +64,8 @@ public sealed class DependencyInjectionTests
         using ServiceProvider provider = services.BuildServiceProvider();
         DiscordOptions options = provider.GetRequiredService<IOptions<DiscordOptions>>().Value;
 
-        options.DevelopmentCommandRegistrationGuildIds.ShouldBe([10UL, 20UL]);
+        options.Token.ShouldBe("inert-test-token");
+        typeof(DiscordOptions).GetProperty("CommandRegistrationGuildIds").ShouldBeNull();
         typeof(DiscordOptions).GetProperty("GuildId").ShouldBeNull();
     }
 }

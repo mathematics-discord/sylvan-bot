@@ -7,13 +7,15 @@ namespace RatBot;
 
 public static class Program
 {
-    public static async Task Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
+        if (args is ["commands", ..])
+            return await CommandRegistrationTool.RunAsync(args[1..]);
+
         Env.TraversePath().Load();
         EnableSerilogSelfDiagnostics();
 
-        using IHost host = Microsoft
-            .Extensions.Hosting.Host.CreateDefaultBuilder(args)
+        using IHost host = Host.CreateDefaultBuilder(args)
             .ConfigureAppConfiguration((_, configurationBuilder) => configurationBuilder.AddEnvironmentVariables())
             .UseSerilog((ctx, _, loggerConfiguration) => ConfigureSerilog(ctx.Configuration, loggerConfiguration))
             .ConfigureServices((ctx, services) => services.AddRatBot(ctx.Configuration))
@@ -22,6 +24,7 @@ public static class Program
         LogOpenTelemetryStartupConfiguration(host.Services.GetRequiredService<IConfiguration>());
         Log.Information("OpenTelemetry logging pipeline startup test event");
         await host.RunAsync();
+        return 0;
     }
 
     private static void ConfigureOpenTelemetryLogs(IConfiguration config, LoggerConfiguration loggerConfiguration)
@@ -73,7 +76,7 @@ public static class Program
                 restrictedToMinimumLevel: LogEventLevel.Debug,
                 outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff'Z'} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}"
             )
-            .WriteTo.File("logs/verbose-.log", LogEventLevel.Verbose, rollingInterval: RollingInterval.Day)
+            .WriteTo.File("logs/verbose-.log", rollingInterval: RollingInterval.Day)
             .WriteTo.File("logs/debug-.log", LogEventLevel.Debug, rollingInterval: RollingInterval.Day)
             .WriteTo.File("logs/info-.log", LogEventLevel.Information, rollingInterval: RollingInterval.Day)
             .WriteTo.File("logs/warning-.log", LogEventLevel.Warning, rollingInterval: RollingInterval.Day)
