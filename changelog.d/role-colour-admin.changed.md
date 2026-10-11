@@ -1,1 +1,0 @@
-**Administrators:** `/colour-admin upsert` replaces `/colour-admin add` for creating grants from source roles to colour roles. Use the numeric `id` shown by `/colour-admin list` to update or delete a grant. A source role can grant several colours, several sources can grant the same colour, and `@everyone` can be a source.

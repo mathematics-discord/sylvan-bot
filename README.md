@@ -107,6 +107,23 @@ Grafana will be accessible at `http://localhost:3000` (Default: `admin`/`admin`)
 
 ## Development
 
+### Release notes and deployment announcements
+
+Release notes are manually curated with [Changie 1.26.0](https://github.com/miniscruff/changie/releases/tag/v1.26.0), independently of commit messages. Install that version's [Windows ZIP or Linux tarball](https://github.com/miniscruff/changie/releases/tag/v1.26.0), extract `changie` (or `changie.exe`), put it on your `PATH`, and verify with `changie --version`. Changie is a local release tool; it is not part of the bot or production image.
+
+From the repository root, create each entry with `changie new`. Choose Security, Removed, Deprecated, Added, Changed, or Fixed. The YAML fragments live in `.changes/unreleased/`. Preview the pending changelog with `changie merge --dry-run --include-unreleased "## Unreleased"`; preview a proposed batch with `changie batch 0.5.0 --dry-run` (substitute your intended version). Neither preview consumes fragments or updates `version.json`.
+
+To prepare a release, choose an explicit version newer than `version.json` and run `bash scripts/prepare-release.sh 0.5.0` from the repository root (substitute that version). The command batches pending entries into `.changes/v0.5.0.md`, regenerates `CHANGELOG.md`, and updates only the `version` setting in `version.json`. It leaves all changes local. Review `git diff`, `git status`, the version file, and the full changelog; edit curated notes if needed, then rerun `changie merge --include-unreleased "## Unreleased"` to reflect release-note edits in `CHANGELOG.md`. Commit the reviewed files on a review branch, bring that commit onto `master` by your normal review process, and push `master` yourself:
+
+```bash
+git add .changes CHANGELOG.md version.json
+git commit -m "Prepare v0.5.0"
+# Once the reviewed release commit is on local master:
+git push origin master
+```
+
+Set the repository Actions secret `DISCORD_RELEASE_WEBHOOK_URL` to a Discord webhook URL to enable announcements. After a successful automatic production deployment of a push to `master`, the workflow compares the push's before and after commits. It posts only if `version.json` advanced and `.changes/v<version>.md` was newly added in that push. It reads those committed notes at the deployed commit, so CI does not regenerate release notes. Manual and shared deployments, failed production deployments, ordinary pushes, and this migration do not announce. Without the secret, the workflow records a skip in its summary and deployment still succeeds. Rerunning a successful announcement job, or retrying after some messages were delivered, can repeat messages.
+
 ### Project Structure
 
 - `RatBot`: Executable, Discord integration, features, and shared persistence.

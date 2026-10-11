@@ -269,3 +269,24 @@ jobs:
             echo "- Remote dir: \`${REMOTE_DIR}\`"
             echo "- Image ref: \`${IMAGE_REF}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  announce-release:
+    needs: deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out deployed commit and push history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Announce newly deployed release
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF: ${{ github.ref }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+          DISCORD_RELEASE_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
+        run: python3 scripts/announce-release.py
