@@ -31,13 +31,4 @@
     <ItemGroup>
         <ProjectReference Include="..\RatBot.Domain\RatBot.Domain.csproj"/>
     </ItemGroup>
-    <ItemGroup>
-        <Folder Include="Features\Joy\BackgroundWorkers\"/>
-        <Folder Include="Features\Joy\Commands\"/>
-    </ItemGroup>
-    <ItemGroup>
-        <None Update="Features\Logging\Gateway\birb-images.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </None>
-    </ItemGroup>
 </Project>

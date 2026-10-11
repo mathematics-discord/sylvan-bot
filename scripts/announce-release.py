@@ -13,7 +13,10 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 
-VERSION = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z")
+SEMVER = r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+VERSION = re.compile(rf"{SEMVER}\Z")
+# .changie.yaml: changesDir=.changes, versionFileFormat='v{{.VersionNoPrefix}}.md'.
+PUBLISHED_BATCH = re.compile(rf"\.changes/v{SEMVER}\.md\Z")
 
 
 def git(*args):
@@ -40,7 +43,9 @@ def release_from_push(before, after):
     if not VERSION.fullmatch(old) or not VERSION.fullmatch(new):
         raise ValueError("version.json contains a non-release version.")
     if tuple(map(int, new.split("."))) <= tuple(map(int, old.split("."))):
-        return None, "version.json did not advance."
+        before_files = git("ls-tree", "-r", "--name-only", before, "--", ".changes")
+        if any(PUBLISHED_BATCH.fullmatch(path) for path in before_files.splitlines()):
+            return None, "version.json did not advance."
 
     note_path = f".changes/v{new}.md"
     added = git("diff", "--name-status", "--diff-filter=A", before, after, "--", note_path)
