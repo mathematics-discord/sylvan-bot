@@ -1,18 +1,35 @@
-using RatBot.Application.Features.EmojiYoink;
+using System.Text.RegularExpressions;
+using static System.Text.RegularExpressions.RegexOptions;
 
 namespace RatBot.Features.EmojiYoink;
 
-public static class CustomEmojiMentionParser
+public static partial class CustomEmojiMentionParser
 {
-    public static ErrorOr<YoinkEmojiSource> Parse(string input)
+    [GeneratedRegex(@"<a?:[^<>\s:]+:[0-9]+>", options: Compiled)]
+    private static partial Regex MentionPatternn { get; }
+
+    public static ErrorOr<Emote> ParseStrict(string input)
     {
         string candidate = input.Trim();
 
-        if (!Emote.TryParse(candidate, out Emote? emote) || emote.Id == 0 || !string.Equals(candidate, emote.ToString(), StringComparison.Ordinal))
-        {
-            return EmojiYoinkErrors.InvalidCustomEmoji;
-        }
+        return ParseMention(candidate, EmojiYoinkErrors.InvalidCustomEmoji);
+    }
 
-        return new YoinkEmojiSource(emote.Id, emote.Name, emote.Animated);
+    public static ErrorOr<Emote> ParseMessage(string content)
+    {
+        MatchCollection matches = MentionPatternn.Matches(content);
+
+        if (matches.Count != 1)
+            return EmojiYoinkErrors.InvalidMessageEmoji;
+
+        return ParseMention(matches[0].Value, EmojiYoinkErrors.InvalidMessageEmoji);
+    }
+
+    private static ErrorOr<Emote> ParseMention(string candidate, Error error)
+    {
+        if (!Emote.TryParse(candidate, out Emote? emote) || emote.Id == 0 || !string.Equals(candidate, emote.ToString(), StringComparison.Ordinal))
+            return error;
+
+        return emote;
     }
 }

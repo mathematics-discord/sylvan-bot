@@ -1,0 +1,1 @@
+**Administrators:** The “Yoink emoji” message command now accepts a single custom server emoji anywhere in the selected message, including among surrounding text, and rejects messages with multiple custom emojis.

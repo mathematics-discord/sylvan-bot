@@ -1,4 +1,4 @@
-namespace RatBot.Application.Features.EmojiYoink;
+namespace RatBot.Features.EmojiYoink;
 
 public static class EmojiYoinkErrors
 {
@@ -7,6 +7,9 @@ public static class EmojiYoinkErrors
     public static Error InvalidCustomEmoji =>
         Error.Validation("EmojiYoink.InvalidCustomEmoji", "Provide exactly one custom server emoji, such as <:rat:123456789012345678>.");
 
+    public static Error InvalidMessageEmoji =>
+        Error.Validation("EmojiYoink.InvalidMessageEmoji", "The message must contain exactly one custom server emoji.");
+
     public static Error InvalidDestinationName =>
         Error.Validation(
             "EmojiYoink.InvalidDestinationName",
@@ -14,8 +17,6 @@ public static class EmojiYoinkErrors
         );
 
     public static Error SourceAlreadyInGuild => Error.Conflict("EmojiYoink.SourceAlreadyInGuild", "That emoji already belongs to this server.");
-
-    public static Error GuildUnavailable => Error.NotFound("EmojiYoink.GuildUnavailable", "The server is unavailable. Please try again.");
 
     public static Error SourceUnavailable => Error.NotFound("EmojiYoink.SourceUnavailable", "Discord could not find that emoji image.");
 

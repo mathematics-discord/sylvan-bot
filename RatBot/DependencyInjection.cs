@@ -1,7 +1,6 @@
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using RatBot.Application.Common.Forums;
-using RatBot.Application.Features.EmojiYoink;
 using RatBot.Application.Features.Logging;
 using RatBot.Application.Features.Quorum;
 using RatBot.Application.Moderation;
@@ -50,7 +49,6 @@ public static class DependencyInjection
 
             services.AddScoped<ImageSpamSettingsService>();
             services.AddScoped<IModerationService, ModerationService>();
-            services.AddScoped<EmojiYoinkOperations>();
             services.AddScoped<QuorumOperations>();
         }
 
@@ -128,7 +126,7 @@ public static class DependencyInjection
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<AutobanGatewayHandler>());
             services.AddSingleton(sp => new MessageEvidenceCache(sp.GetRequiredService<IOptions<LoggingOptions>>().Value.ToEvidenceCacheSettings()));
             services.AddSingleton<HttpClient>();
-            services.AddSingleton<IGuildEmojiImporter, DiscordGuildEmojiImporter>();
+            services.AddSingleton<DiscordGuildEmojiImporter>();
             services.AddSingleton<ModerationLoggingGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ModerationLoggingGatewayHandler>());
             services.AddSingleton<ImageBurstSpamGatewayHandler>();

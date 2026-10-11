@@ -1,55 +1,101 @@
 using System.Net;
 using Discord.Net;
-using RatBot.Application.Features.EmojiYoink;
 
 namespace RatBot.Features.EmojiYoink;
 
-public sealed class DiscordGuildEmojiImporter(DiscordSocketClient client, HttpClient httpClient) : IGuildEmojiImporter
+public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger logger)
 {
     private const int MaximumEmojiBytes = 256 * 1024;
+    private readonly ILogger _logger = logger.ForContext<DiscordGuildEmojiImporter>();
 
-    public async Task<ErrorOr<CreatedGuildEmoji>> ImportAsync(
-        ulong guildId,
-        ulong moderatorUserId,
-        EmojiName destinationName,
-        YoinkEmojiSource source,
-        CancellationToken ct
-    )
+    public async Task<ErrorOr<GuildEmote>> ImportAsync(IGuild guild, IUser moderator, Emote source, CancellationToken ct)
     {
-        SocketGuild? guild = client.GetGuild(guildId);
+        ErrorOr<string> nameResult = EmojiName.Normalize(source.Name);
 
-        if (guild is null)
-            return EmojiYoinkErrors.GuildUnavailable;
+        if (nameResult.IsError)
+            return nameResult.Errors;
+
+        string destinationName = nameResult.Value;
+        _logger.Debug(
+            "Importing emoji in guild {GuildId} for moderator {ModeratorUserId} ({ModeratorUsername}) from source {SourceEmojiId} "
+                + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}",
+            guild.Id,
+            moderator.Id,
+            moderator.Username,
+            source.Id,
+            source.Name,
+            destinationName,
+            source.Animated
+        );
 
         ErrorOr<MemoryStream> downloadResult = await DownloadAsync(source, ct).ConfigureAwait(false);
 
         if (downloadResult.IsError)
+        {
+            LogFailure(guild, moderator, source, destinationName, downloadResult.Errors);
             return downloadResult.Errors;
+        }
 
         using MemoryStream imageStream = downloadResult.Value;
         using Image image = new Image(imageStream);
         RequestOptions options = new RequestOptions
         {
             CancelToken = ct,
-            AuditLogReason = $"Emoji yoink by moderator {moderatorUserId}; source emoji {source.EmojiId}",
+            AuditLogReason = $"Emoji yoink by moderator {moderator.Id}; source emoji {source.Id}",
         };
 
+        ErrorOr<GuildEmote> result;
         try
         {
-            GuildEmote created = await guild.CreateEmoteAsync(destinationName.Value, image, options: options).ConfigureAwait(false);
-
-            return new CreatedGuildEmoji(created.Id, created.Name, created.Animated);
+            result = await guild.CreateEmoteAsync(destinationName, image, options: options).ConfigureAwait(false);
         }
         catch (HttpException exception)
         {
-            return MapDiscordFailure(exception);
+            result = MapDiscordFailure(exception);
         }
+
+        if (result.IsError)
+        {
+            LogFailure(guild, moderator, source, destinationName, result.Errors);
+            return result.Errors;
+        }
+
+        GuildEmote created = result.Value;
+        _logger.Information(
+            "Moderator {ModeratorUsername} ({ModeratorUserId}) added emoji {EmojiName} ({CreatedEmojiId}) to guild {GuildId} "
+                + "from source {SourceEmojiId}; animated={IsAnimated}",
+            moderator.Username,
+            moderator.Id,
+            created.Name,
+            created.Id,
+            guild.Id,
+            source.Id,
+            created.Animated
+        );
+
+        return created;
     }
 
-    private async Task<ErrorOr<MemoryStream>> DownloadAsync(YoinkEmojiSource source, CancellationToken ct)
+    private void LogFailure(IGuild guild, IUser moderator, Emote source, string destinationName, List<Error> errors)
     {
-        string animatedQuery = source.IsAnimated ? "?animated=true" : string.Empty;
-        Uri cdnUri = new Uri($"https://cdn.discordapp.com/emojis/{source.EmojiId}.webp{animatedQuery}");
+        _logger.Warning(
+            "Emoji import failed in guild {GuildId} for moderator {ModeratorUserId} ({ModeratorUsername}) from source {SourceEmojiId} "
+                + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}; error codes={ErrorCodes}",
+            guild.Id,
+            moderator.Id,
+            moderator.Username,
+            source.Id,
+            source.Name,
+            destinationName,
+            source.Animated,
+            errors.Select(error => error.Code).ToArray()
+        );
+    }
+
+    private async Task<ErrorOr<MemoryStream>> DownloadAsync(Emote source, CancellationToken ct)
+    {
+        string animatedQuery = source.Animated ? "?animated=true" : string.Empty;
+        Uri cdnUri = new Uri($"https://cdn.discordapp.com/emojis/{source.Id}.webp{animatedQuery}");
         MemoryStream? imageStream = null;
 
         try

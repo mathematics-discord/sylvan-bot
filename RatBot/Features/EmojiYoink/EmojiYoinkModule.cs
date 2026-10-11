@@ -1,18 +1,17 @@
-using RatBot.Application.Features.EmojiYoink;
 using RatBot.Commands;
 
-namespace RatBot.Features.EmojiYoink.Commands;
+namespace RatBot.Features.EmojiYoink;
 
 [DefaultMemberPermissions(GuildPermission.ManageEmojisAndStickers)]
 [RequireUserPermission(GuildPermission.ManageEmojisAndStickers)]
 [RequireBotPermission(GuildPermission.CreateGuildExpressions)]
 [CommandContextType(InteractionContextType.Guild)]
-public sealed class EmojiYoinkModule(EmojiYoinkOperations operations) : SlashCommandBase
+public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : SlashCommandBase
 {
     [SlashCommand("yoink", "Copy a custom emoji into this server.")]
     public async Task YoinkAsync([Summary("emoji", "The custom emoji to copy.")] string emoji)
     {
-        ErrorOr<YoinkEmojiSource> sourceResult = CustomEmojiMentionParser.Parse(emoji);
+        ErrorOr<Emote> sourceResult = CustomEmojiMentionParser.ParseStrict(emoji);
 
         await ExecuteAsync(sourceResult, rejectLocalSource: false).ConfigureAwait(false);
     }
@@ -20,12 +19,12 @@ public sealed class EmojiYoinkModule(EmojiYoinkOperations operations) : SlashCom
     [MessageCommand("Yoink emoji")]
     public async Task YoinkMessageAsync(IMessage message)
     {
-        ErrorOr<YoinkEmojiSource> sourceResult = CustomEmojiMentionParser.Parse(message.Content);
+        ErrorOr<Emote> sourceResult = CustomEmojiMentionParser.ParseMessage(message.Content);
 
         await ExecuteAsync(sourceResult, rejectLocalSource: true).ConfigureAwait(false);
     }
 
-    private async Task ExecuteAsync(ErrorOr<YoinkEmojiSource> sourceResult, bool rejectLocalSource)
+    private async Task ExecuteAsync(ErrorOr<Emote> sourceResult, bool rejectLocalSource)
     {
         SocketGuild? guild = Context.Guild;
 
@@ -41,9 +40,9 @@ public sealed class EmojiYoinkModule(EmojiYoinkOperations operations) : SlashCom
             return;
         }
 
-        YoinkEmojiSource source = sourceResult.Value;
+        Emote source = sourceResult.Value;
 
-        if (rejectLocalSource && guild.Emotes.Any(emote => emote.Id == source.EmojiId))
+        if (rejectLocalSource && guild.Emotes.Any(emote => emote.Id == source.Id))
         {
             await RespondAsync(EmojiYoinkErrors.SourceAlreadyInGuild.Description).ConfigureAwait(false);
             return;
@@ -51,17 +50,10 @@ public sealed class EmojiYoinkModule(EmojiYoinkOperations operations) : SlashCom
 
         await DeferAsync().ConfigureAwait(false);
 
-        ErrorOr<CreatedGuildEmoji> result = await operations
-            .YoinkAsync(new YoinkEmojiCommand(guild.Id, Context.User.Id, Context.User.Username, source), CancellationToken.None)
-            .ConfigureAwait(false);
+        ErrorOr<GuildEmote> result = await importer.ImportAsync(guild, Context.User, source, CancellationToken.None).ConfigureAwait(false);
 
         await result.SwitchFirstAsync(
-            async created =>
-            {
-                string prefix = created.IsAnimated ? "a" : string.Empty;
-
-                await FollowupAsync($"Added emoji <{prefix}:{created.Name}:{created.EmojiId}>.").ConfigureAwait(false);
-            },
+            async created => await FollowupAsync($"Added emoji {created}.").ConfigureAwait(false),
             async error => await FollowupAsync(error.Description).ConfigureAwait(false)
         );
     }
