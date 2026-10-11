@@ -1,0 +1,1 @@
+**Administrators:** `/colour-admin upsert` now creates a source-role to colour-role grant, or updates an existing grant when given its numeric `id`. `/colour-admin list` shows those IDs, and `/colour-admin delete` accepts an ID instead of a name. A source role can grant several colours, and several source roles can grant the same colour.
