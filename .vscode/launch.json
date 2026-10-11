@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "RatBot Local with database",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${workspaceFolder}/RatBot/RatBot.csproj",
+            "preLaunchTask": "Start local database"
+        }
+    ]
+}

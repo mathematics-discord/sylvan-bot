@@ -6,6 +6,15 @@
         <InformationalVersion>0.0.1-1+Branch.master.Sha.78e787255041c4c618916f4791fcd3d7045e6f60</InformationalVersion>
         <Version>0.0.1-1</Version>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(Configuration)' == 'Debug'">
+        <!-- Run the database check on each IDE build, even when compilation is up to date. -->
+        <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+    </PropertyGroup>
+    <Target Name="StartLocalDatabase" BeforeTargets="Build"
+            Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(Configuration)' == 'Debug' and '$(DesignTimeBuild)' != 'true'">
+        <Exec Command="docker compose --env-file .env -f docker-compose.yml up -d --wait db"
+              WorkingDirectory="$(MSBuildProjectDirectory)/.." />
+    </Target>
     <ItemGroup>
         <PackageReference Include="Dapper"/>
         <PackageReference Include="DiffPlex"/>

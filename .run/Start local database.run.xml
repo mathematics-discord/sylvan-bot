@@ -1,0 +1,9 @@
+﻿<component name="ProjectRunConfigurationManager">
+    <configuration default="false" name="Start local database" type="ShConfigurationType">
+        <option name="SCRIPT_TEXT" value="docker compose --env-file .env -f docker-compose.yml up -d --wait db" />
+        <option name="SCRIPT_WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+        <option name="EXECUTE_IN_TERMINAL" value="false" />
+        <option name="EXECUTE_SCRIPT_FILE" value="false" />
+        <method v="2" />
+    </configuration>
+</component>
