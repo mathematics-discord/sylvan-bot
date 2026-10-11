@@ -18,6 +18,10 @@ VERSION = re.compile(rf"{SEMVER}\Z")
 # .changie.yaml: changesDir=.changes, versionFileFormat='v{{.VersionNoPrefix}}.md'.
 PUBLISHED_BATCH = re.compile(rf"\.changes/v{SEMVER}\.md\Z")
 USER_AGENT = "DiscordBot (https://github.com/ratgirl-laboratories/sylvan-bot, 1.0)"
+COMPONENT_NAMES = ("General", "Administration", "Moderation")
+KIND_NAMES = ("Security", "Added", "Changed", "Fixed", "Deprecated", "Removed")
+MAX_TEXT_UNITS = 4000
+MAX_COMPONENTS = 40
 
 
 def git(*args):
@@ -63,62 +67,182 @@ def length(text):
     return len(text.encode("utf-16-le")) // 2
 
 
-def split_notes(version, notes):
-    title = f"**RatBot v{version}**\n\n"
-    if length(title + notes) <= 2000:
-        return [title + notes]
+def parse_sections(version, notes):
+    lines = notes.replace("\r\n", "\n").splitlines()
+    first = lines[0].lstrip("\ufeff") if lines else ""
+    heading = re.fullmatch(rf"(#{{1,2}}) v{re.escape(version)}(?: - \d{{4}}-\d{{2}}-\d{{2}})?", first)
+    if not heading:
+        raise ValueError("Committed release notes have no matching release heading.")
 
-    # Reserve room for the longest possible part label before splitting.
-    digits = len(str(len(notes)))
-    largest_title = f"**RatBot v{version} (part {'9' * digits}/{'9' * digits})**\n\n"
-    budget = 2000 - length(largest_title)
-    if budget <= 0:
-        raise ValueError("Release version leaves no room for Discord message content.")
-    parts = []
-    while notes:
-        used = 0
-        end = 0
-        for character in notes:
-            size = length(character)
-            if used + size > budget:
-                break
-            used += size
-            end += 1
-        if end == len(notes):
-            cut = end
-        else:
-            paragraph = notes.rfind("\n\n", 0, end)
-            line = notes.rfind("\n", 0, end)
-            cut = paragraph + 2 if paragraph + 2 >= end // 2 else 0
-            if not cut and line + 1 >= end // 2:
-                cut = line + 1
-            if not cut:
-                cut = end
-        parts.append(notes[:cut])
-        notes = notes[cut:]
+    component_level = len(heading.group(1)) + 1
+    kind_level = component_level + 1
+    sections = []
+    section = None
+    kind = None
+    entry_lines = []
+    embedded_list = False
 
-    messages = [f"**RatBot v{version} (part {i}/{len(parts)})**\n\n{part}"
-                for i, part in enumerate(parts, 1)]
-    if any(length(message) > 2000 for message in messages):
-        raise ValueError("A Discord message exceeded 2,000 characters.")
-    return messages
+    def finish_entry():
+        nonlocal entry_lines, embedded_list
+        while entry_lines and not entry_lines[-1].strip():
+            entry_lines.pop()
+        if entry_lines:
+            kind["entries"].append("\n".join(entry_lines))
+        entry_lines = []
+        embedded_list = False
+
+    for line in lines[1:]:
+        if line in (f"{'#' * component_level} {name}" for name in COMPONENT_NAMES):
+            finish_entry()
+            section = {"name": line[component_level + 1:], "kinds": []}
+            sections.append(section)
+            kind = None
+        elif line in (f"{'#' * kind_level} {name}" for name in KIND_NAMES):
+            finish_entry()
+            if section is None:
+                raise ValueError("Release kind appears before a component.")
+            kind = {"name": line[kind_level + 1:], "entries": []}
+            section["kinds"].append(kind)
+        elif line.startswith("- "):
+            if (entry_lines and entry_lines[-1].strip()
+                    and (embedded_list or (len(entry_lines) > 1 and not entry_lines[-1].startswith("- ")))):
+                entry_lines.append(line)
+                embedded_list = True
+                continue
+            finish_entry()
+            if kind is None:
+                raise ValueError("Release entry appears before a kind.")
+            entry_lines = [line]
+        elif entry_lines:
+            entry_lines.append(line)
+        elif line.strip():
+            raise ValueError("Committed release notes contain text outside a component.")
+
+    finish_entry()
+    for section in sections:
+        section["kinds"] = [kind for kind in section["kinds"] if kind["entries"]]
+    return [section for section in sections if section["kinds"]]
 
 
-def webhook_with_wait(url):
+def section_text(section):
+    lines = [f"## {section['name']}"]
+    for kind in section["kinds"]:
+        lines.append(f"### {kind['name']}")
+        lines.extend(kind["entries"])
+    return "\n".join(lines)
+
+
+def take_prefix(text, budget):
+    used = 0
+    end = 0
+    for character in text:
+        size = length(character)
+        if used + size > budget:
+            break
+        used += size
+        end += 1
+    if not end:
+        raise ValueError("Release entry cannot fit in a Discord Text Display.")
+    if end < len(text):
+        boundary = max(text.rfind("\n", 0, end) + 1, text.rfind(" ", 0, end) + 1)
+        if boundary and boundary >= end // 2:
+            end = boundary
+    return text[:end], text[end:]
+
+
+def section_chunks(section, limit):
+    header = f"## {section['name']}"
+    chunks = []
+    current = header
+    last_kind = None
+    for kind in section["kinds"]:
+        for entry in kind["entries"]:
+            addition = (f"\n### {kind['name']}" if last_kind != kind["name"] else "") + f"\n{entry}"
+            if length(current + addition) <= limit:
+                current += addition
+                last_kind = kind["name"]
+                continue
+            if current != header:
+                chunks.append(current)
+            current = f"{header}\n### {kind['name']}"
+            last_kind = kind["name"]
+            if length(current + f"\n{entry}") <= limit:
+                current += f"\n{entry}"
+                continue
+
+            # Only an individual entry too large for a fresh section is divided.
+            body = entry[2:]
+            while True:
+                budget = limit - length(current + "\n- ")
+                piece, body = take_prefix(body, budget) if body else ("", "")
+                current += "\n- " + piece
+                if not body:
+                    break
+                chunks.append(current)
+                current = f"{header}\n### {kind['name']}"
+    if current != header:
+        chunks.append(current)
+    return chunks
+
+
+def container_message(version, chunks, part=None, total=None):
+    title = f"# v{version}" if part is None else f"# v{version} (part {part}/{total})"
+    children = [{"type": 10, "content": title}]
+    for chunk in chunks:
+        children.append({"type": 14, "divider": False, "spacing": 1})
+        children.append({"type": 10, "content": chunk})
+    return {"flags": 32768, "components": [{"type": 17, "components": children}],
+            "allowed_mentions": {"parse": []}}
+
+
+def build_messages(version, notes):
+    sections = parse_sections(version, notes)
+    chunks = [section_text(section) for section in sections]
+    title = f"# v{version}"
+    if (length(title) + sum(map(length, chunks)) <= MAX_TEXT_UNITS
+            and 2 + 2 * len(chunks) <= MAX_COMPONENTS):
+        return [container_message(version, chunks)]
+
+    # A part label must fit even before the final number of messages is known.
+    digits = len(str(max(1, length(notes))))
+    largest_title = f"# v{version} (part {'9' * digits}/{'9' * digits})"
+    limit = MAX_TEXT_UNITS - length(largest_title)
+    if limit <= length("## General\n### Changed\n- "):
+        raise ValueError("Release version leaves no room for Discord components.")
+
+    chunks = [chunk for section in sections for chunk in section_chunks(section, limit)]
+    groups = []
+    current = []
+    used = length(largest_title)
+    for chunk in chunks:
+        if current and (used + length(chunk) > MAX_TEXT_UNITS
+                        or 2 + 2 * (len(current) + 1) > MAX_COMPONENTS):
+            groups.append(current)
+            current = []
+            used = length(largest_title)
+        current.append(chunk)
+        used += length(chunk)
+    if current:
+        groups.append(current)
+    return [container_message(version, group, number, len(groups))
+            for number, group in enumerate(groups, 1)]
+
+
+def webhook_with_options(url):
     parsed = urlsplit(url)
-    query = [(key, value) for key, value in parse_qsl(parsed.query) if key != "wait"]
-    query.append(("wait", "true"))
+    query = [(key, value) for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+             if key not in ("wait", "with_components")]
+    query.extend((("wait", "true"), ("with_components", "true")))
     return urlunsplit(parsed._replace(query=urlencode(query)))
 
 
 def post(url, messages):
     try:
-        endpoint = webhook_with_wait(url)
+        endpoint = webhook_with_options(url)
     except ValueError:
         raise RuntimeError("Invalid Discord webhook URL configuration.") from None
-    for number, content in enumerate(messages, 1):
-        payload = json.dumps({"content": content, "allowed_mentions": {"parse": []}},
-                             ensure_ascii=False).encode("utf-8")
+    for number, message in enumerate(messages, 1):
+        payload = json.dumps(message, ensure_ascii=False).encode("utf-8")
         for attempt in range(4):
             request = Request(endpoint, payload,
                               {"Content-Type": "application/json; charset=utf-8",
@@ -188,7 +312,7 @@ def main():
         summary(f"Skipped v{version}: DISCORD_RELEASE_WEBHOOK_URL Actions secret is absent.")
         return
 
-    messages = split_notes(version, notes)
+    messages = build_messages(version, notes)
     post(webhook, messages)
     summary(f"Posted v{version} to Discord in {len(messages)} message(s).")
 
