@@ -5,8 +5,8 @@ namespace RatBot.Features.EmojiYoink;
 
 public static partial class CustomEmojiMentionParser
 {
-    [GeneratedRegex(@"<a?:[^<>\s:]+:[0-9]+>", options: Compiled)]
-    private static partial Regex MentionPatternn { get; }
+    [GeneratedRegex(@"<a?:[^<>\s:]+:[0-9]+>", options: Compiled, matchTimeoutMilliseconds: 500)]
+    private static partial Regex MentionPattern { get; }
 
     public static ErrorOr<Emote> ParseStrict(string input)
     {
@@ -17,7 +17,7 @@ public static partial class CustomEmojiMentionParser
 
     public static ErrorOr<Emote> ParseMessage(string content)
     {
-        MatchCollection matches = MentionPatternn.Matches(content);
+        MatchCollection matches = MentionPattern.Matches(content);
 
         if (matches.Count != 1)
             return EmojiYoinkErrors.InvalidMessageEmoji;
@@ -27,7 +27,9 @@ public static partial class CustomEmojiMentionParser
 
     private static ErrorOr<Emote> ParseMention(string candidate, Error error)
     {
-        if (!Emote.TryParse(candidate, out Emote? emote) || emote.Id == 0 || !string.Equals(candidate, emote.ToString(), StringComparison.Ordinal))
+        if (!Emote.TryParse(candidate, out Emote? emote)
+            || emote.Id == 0
+            || !string.Equals(candidate, emote.ToString(), StringComparison.Ordinal))
             return error;
 
         return emote;
