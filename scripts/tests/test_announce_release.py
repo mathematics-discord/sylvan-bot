@@ -122,6 +122,8 @@ class ReleaseAnnouncementTests(unittest.TestCase):
         self.assertEqual(len(requests), len(messages))
         for request, message in zip(requests, messages):
             self.assertIn("wait=true", request.full_url)
+            self.assertEqual(request.get_header("User-agent"), announcement.USER_AGENT)
+            self.assertEqual(request.get_header("Content-type"), "application/json; charset=utf-8")
             payload = json.loads(request.data)
             self.assertEqual(payload, {"content": message, "allowed_mentions": {"parse": []}})
 

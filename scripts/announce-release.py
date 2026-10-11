@@ -17,6 +17,7 @@ SEMVER = r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
 VERSION = re.compile(rf"{SEMVER}\Z")
 # .changie.yaml: changesDir=.changes, versionFileFormat='v{{.VersionNoPrefix}}.md'.
 PUBLISHED_BATCH = re.compile(rf"\.changes/v{SEMVER}\.md\Z")
+USER_AGENT = "DiscordBot (https://github.com/ratgirl-laboratories/sylvan-bot, 1.0)"
 
 
 def git(*args):
@@ -120,7 +121,8 @@ def post(url, messages):
                              ensure_ascii=False).encode("utf-8")
         for attempt in range(4):
             request = Request(endpoint, payload,
-                              {"Content-Type": "application/json; charset=utf-8"}, method="POST")
+                              {"Content-Type": "application/json; charset=utf-8",
+                               "User-Agent": USER_AGENT}, method="POST")
             try:
                 with urlopen(request, timeout=20) as response:
                     receipt = json.load(response)
