@@ -48,7 +48,7 @@ public sealed class ImageBurstSpamGatewayHandler(
 
         await guild.AddBanAsync(detection.UserId, _options.ImageBurstSpamHistoryPruneDays, reason).ConfigureAwait(false);
 
-        _logger.Warning("Banned user {UserId} for image-burst spam across {ChannelCount} channels.", detection.UserId, detection.ChannelIds.Count);
+        _logger.Warning("Banned user {UserId} for image-burst spam across {ChannelCount} channels", detection.UserId, detection.ChannelIds.Count);
     }
 
     private async Task HandleMessageReceivedAsync(SocketMessage message)
@@ -69,7 +69,7 @@ public sealed class ImageBurstSpamGatewayHandler(
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "Failed processing image-burst spam detection for message {MessageId}.", message.Id);
+            _logger.Error(ex, "Failed processing image-burst spam detection for message {MessageId}", message.Id);
         }
     }
 

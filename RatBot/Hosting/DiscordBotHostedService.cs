@@ -89,16 +89,16 @@ public sealed class DiscordBotHostedService : IHostedService
 
     private Task OnConnectedAsync()
     {
-        _logger.Information("Gateway connected.");
+        _logger.Information("Gateway connected");
         return Task.CompletedTask;
     }
 
     private Task OnDisconnectedAsync(Exception? exception)
     {
         if (exception is null)
-            _logger.Warning("Gateway disconnected.");
+            _logger.Warning("Gateway disconnected");
         else
-            _logger.Warning(exception, "Gateway disconnected with error.");
+            _logger.Warning(exception, "Gateway disconnected with error");
 
         return Task.CompletedTask;
     }

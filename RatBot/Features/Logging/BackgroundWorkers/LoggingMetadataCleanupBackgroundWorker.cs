@@ -27,11 +27,11 @@ public sealed class LoggingMetadataCleanupBackgroundWorker(IServiceScopeFactory 
         }
         catch (OperationCanceledException)
         {
-            _logger.Information("Logging metadata cleanup background worker is stopping.");
+            _logger.Information("Logging metadata cleanup background worker is stopping");
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "Logging metadata cleanup background worker encountered an error.");
+            _logger.Error(ex, "Logging metadata cleanup background worker encountered an error");
         }
     }
 
@@ -47,7 +47,7 @@ public sealed class LoggingMetadataCleanupBackgroundWorker(IServiceScopeFactory 
         }
         catch (Exception ex)
         {
-            _logger.Warning(ex, "Logging metadata cleanup failed; the next scheduled cleanup will retry.");
+            _logger.Warning(ex, "Logging metadata cleanup failed; the next scheduled cleanup will retry");
         }
     }
 

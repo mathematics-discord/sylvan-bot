@@ -26,7 +26,7 @@ public sealed class BirbBackgroundWorker(DiscordSocketClient discordClient, ILog
         }
         catch (OperationCanceledException)
         {
-            _logger.Information("background worker is stopping.");
+            _logger.Information("background worker is stopping");
         }
     }
 
@@ -96,7 +96,7 @@ public sealed class BirbBackgroundWorker(DiscordSocketClient discordClient, ILog
         }
         catch (Exception ex)
         {
-            _logger.Warning(ex, "post cycle failed.");
+            _logger.Warning(ex, "post cycle failed");
         }
 
         if (message is null)
@@ -112,7 +112,7 @@ public sealed class BirbBackgroundWorker(DiscordSocketClient discordClient, ILog
         }
         catch (Exception ex)
         {
-            _logger.Warning(ex, "failed to delete {MessageId}.", message.Id);
+            _logger.Warning(ex, "failed to delete {MessageId}", message.Id);
         }
 
         return true;
@@ -124,7 +124,7 @@ public sealed class BirbBackgroundWorker(DiscordSocketClient discordClient, ILog
         {
             if (discordClient.GetChannel(ChannelId) is not IMessageChannel channel)
             {
-                _logger.Warning("channel {ChannelId} is unavailable.", ChannelId);
+                _logger.Warning("channel {ChannelId} is unavailable", ChannelId);
                 continue;
             }
 

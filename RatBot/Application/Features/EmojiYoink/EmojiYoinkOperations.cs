@@ -15,7 +15,7 @@ public sealed class EmojiYoinkOperations(IGuildEmojiImporter importer, ILogger l
 
         _logger.Debug(
             "Importing emoji in guild {GuildId} for moderator {ModeratorUserId} ({ModeratorUsername}) from source {SourceEmojiId} "
-                + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}.",
+                + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}",
             command.GuildId,
             command.ModeratorUserId,
             command.ModeratorUsername,
@@ -33,7 +33,7 @@ public sealed class EmojiYoinkOperations(IGuildEmojiImporter importer, ILogger l
         {
             _logger.Warning(
                 "Emoji import failed in guild {GuildId} for moderator {ModeratorUserId} ({ModeratorUsername}) from source {SourceEmojiId} "
-                    + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}; error codes={ErrorCodes}.",
+                    + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}; error codes={ErrorCodes}",
                 command.GuildId,
                 command.ModeratorUserId,
                 command.ModeratorUsername,
@@ -51,7 +51,7 @@ public sealed class EmojiYoinkOperations(IGuildEmojiImporter importer, ILogger l
 
         _logger.Information(
             "Moderator {ModeratorUsername} ({ModeratorUserId}) added emoji {EmojiName} ({CreatedEmojiId}) to guild {GuildId} "
-                + "from source {SourceEmojiId}; animated={IsAnimated}.",
+                + "from source {SourceEmojiId}; animated={IsAnimated}",
             command.ModeratorUsername,
             command.ModeratorUserId,
             created.Name,

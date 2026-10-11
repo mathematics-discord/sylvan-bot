@@ -21,7 +21,7 @@ internal static class AttachmentEvidenceDownloader
         }
         catch (Exception ex)
         {
-            logger.Debug(ex, "Failed to download moderation logging attachment evidence.");
+            logger.Debug(ex, "Failed to download moderation logging attachment evidence");
             return null;
         }
     }

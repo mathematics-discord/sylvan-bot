@@ -20,7 +20,7 @@ public static class Program
             .Build();
 
         LogOpenTelemetryStartupConfiguration(host.Services.GetRequiredService<IConfiguration>());
-        Log.Information("OpenTelemetry logging pipeline startup test event.");
+        Log.Information("OpenTelemetry logging pipeline startup test event");
         await host.RunAsync();
     }
 
@@ -90,7 +90,7 @@ public static class Program
 
         if (string.IsNullOrWhiteSpace(endpoint))
         {
-            Log.Warning("OpenTelemetry sink is disabled because OTEL:Logs:Endpoint is not configured.");
+            Log.Warning("OpenTelemetry sink is disabled because OTEL:Logs:Endpoint is not configured");
             return;
         }
 

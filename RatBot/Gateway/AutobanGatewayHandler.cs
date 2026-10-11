@@ -35,11 +35,11 @@ public sealed class AutobanGatewayHandler(DiscordSocketClient discordClient, ISe
 
             await user.Guild.AddBanAsync(user.Id, 0, reason);
 
-            _logger.Information("Banned autobanned user {UserId} immediately after joining guild {GuildId}.", userId, guildId);
+            _logger.Information("Banned autobanned user {UserId} immediately after joining guild {GuildId}", userId, guildId);
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "Failed processing autoban join check for user {UserId} in guild {GuildId}.", userId, guildId);
+            _logger.Error(ex, "Failed processing autoban join check for user {UserId} in guild {GuildId}", userId, guildId);
         }
     }
 

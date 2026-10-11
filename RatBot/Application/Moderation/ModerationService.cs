@@ -20,7 +20,7 @@ public sealed class ModerationService(IAutobannedUserRepository autobannedUsers,
 
         await autobannedUsers.AddAsync(autobannedUser, ct);
 
-        _logger.Information("Registered user {BannedUserId} for autoban in guild {GuildId} by moderator {ModeratorId}.", userId, guildId, modId);
+        _logger.Information("Registered user {BannedUserId} for autoban in guild {GuildId} by moderator {ModeratorId}", userId, guildId, modId);
 
         return autobannedUser;
     }

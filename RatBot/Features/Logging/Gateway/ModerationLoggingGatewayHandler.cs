@@ -68,7 +68,7 @@ public sealed class ModerationLoggingGatewayHandler(
         }
         catch (Exception ex)
         {
-            _logger.Warning(ex, "Failed to observe message {MessageId} for moderation logging.", userMessage.Id);
+            _logger.Warning(ex, "Failed to observe message {MessageId} for moderation logging", userMessage.Id);
         }
     }
 
@@ -129,7 +129,7 @@ public sealed class ModerationLoggingGatewayHandler(
         catch (Exception ex)
         {
             _ = cachedMessage;
-            _logger.Warning(ex, "Failed to log message edit for {MessageId}.", updatedMessage.Id);
+            _logger.Warning(ex, "Failed to log message edit for {MessageId}", updatedMessage.Id);
         }
     }
 
@@ -205,7 +205,7 @@ public sealed class ModerationLoggingGatewayHandler(
         }
         catch (Exception ex)
         {
-            _logger.Warning(ex, "Failed to log message deletion for {MessageId}.", message.Id);
+            _logger.Warning(ex, "Failed to log message deletion for {MessageId}", message.Id);
         }
     }
 
@@ -271,7 +271,7 @@ public sealed class ModerationLoggingGatewayHandler(
         }
         catch (Exception ex)
         {
-            _logger.Warning(ex, "Failed to log bulk message deletion in channel {ChannelId}.", channelValue.Id);
+            _logger.Warning(ex, "Failed to log bulk message deletion in channel {ChannelId}", channelValue.Id);
         }
     }
 
@@ -405,7 +405,7 @@ public sealed class ModerationLoggingGatewayHandler(
         {
             logger.Warning(
                 ex,
-                "Failed to send attachment evidence for delete log for message {MessageId} in channel {ChannelId}. Retrying without attachment evidence.",
+                "Failed to send attachment evidence for delete log for message {MessageId} in channel {ChannelId}. Retrying without attachment evidence",
                 messageId,
                 channelId
             );
@@ -593,7 +593,7 @@ public sealed class ModerationLoggingGatewayHandler(
         }
         catch (Exception ex)
         {
-            _logger.Debug(ex, "Failed to fetch preceding message for deleted message {MessageId}.", deletedMessageId);
+            _logger.Debug(ex, "Failed to fetch preceding message for deleted message {MessageId}", deletedMessageId);
             return null;
         }
     }

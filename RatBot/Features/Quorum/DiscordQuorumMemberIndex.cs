@@ -30,7 +30,7 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
             _logger
                 .ForContext("GuildId", guild.Id)
                 .ForContext("RoleCount", missingRoleIds.Count)
-                .Information("Warming quorum member index for configured voter roles.");
+                .Information("Warming quorum member index for configured voter roles");
 
             if (guild.HasAllMembers)
             {
@@ -53,7 +53,7 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
             _logger
                 .ForContext("GuildId", guild.Id)
                 .ForContext("RoleCount", missingRoleIds.Count)
-                .Information("Quorum member index warmed for configured voter roles.");
+                .Information("Quorum member index warmed for configured voter roles");
         }
         finally
         {
@@ -143,7 +143,7 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
         }
         catch (Exception ex)
         {
-            _logger.ForContext("GuildId", after.Guild.Id).Warning(ex, "Failed to update quorum member index after member update.");
+            _logger.ForContext("GuildId", after.Guild.Id).Warning(ex, "Failed to update quorum member index after member update");
         }
 
         return Task.CompletedTask;
@@ -157,7 +157,7 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
         }
         catch (Exception ex)
         {
-            _logger.ForContext("GuildId", role.Guild.Id).Warning(ex, "Failed to update quorum member index after role deletion.");
+            _logger.ForContext("GuildId", role.Guild.Id).Warning(ex, "Failed to update quorum member index after role deletion");
         }
 
         return Task.CompletedTask;
@@ -171,7 +171,7 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
         }
         catch (Exception ex)
         {
-            _logger.ForContext("GuildId", user.Guild.Id).Warning(ex, "Failed to update quorum member index after member joined.");
+            _logger.ForContext("GuildId", user.Guild.Id).Warning(ex, "Failed to update quorum member index after member joined");
         }
 
         return Task.CompletedTask;
@@ -185,7 +185,7 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
         }
         catch (Exception ex)
         {
-            _logger.ForContext("GuildId", guild.Id).Warning(ex, "Failed to update quorum member index after member left.");
+            _logger.ForContext("GuildId", guild.Id).Warning(ex, "Failed to update quorum member index after member left");
         }
 
         return Task.CompletedTask;
