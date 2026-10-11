@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using Discord.Net;
 
 namespace RatBot.Features.EmojiYoink;
@@ -37,7 +37,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
             return downloadResult.Errors;
         }
 
-        using MemoryStream imageStream = downloadResult.Value;
+        await using MemoryStream imageStream = downloadResult.Value;
         using Image image = new Image(imageStream);
         RequestOptions options = new RequestOptions
         {

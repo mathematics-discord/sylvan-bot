@@ -2,6 +2,12 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.2 - 2026-10-11
+## General
+### Added
+- WE .NET 11 NOW. UNION TYPE `Option<T>` IS NOW MANDATORY.
+### Removed
+- Removed Grafana, Loki, and OpenTelemetry. This was... not being used.
 # v0.1.1 - 2026-10-11
 
 ## General

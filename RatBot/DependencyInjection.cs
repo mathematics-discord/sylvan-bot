@@ -1,7 +1,6 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
-using RatBot.Application.Common.Forums;
 using RatBot.Application.Features.Logging;
 using RatBot.Application.Features.Quorum;
 using RatBot.Application.Moderation;
@@ -11,18 +10,13 @@ using RatBot.Features.EmojiYoink;
 using RatBot.Features.Logging;
 using RatBot.Features.Logging.BackgroundWorkers;
 using RatBot.Features.Logging.Gateway;
-using RatBot.Features.Meta;
-using RatBot.Features.Meta.BackgroundWorkers;
-using RatBot.Features.Meta.Gateway;
 using RatBot.Features.Quorum;
 using RatBot.Features.RoleColours;
-using RatBot.Forum;
 using RatBot.Gateway;
 using RatBot.Handlers;
 using RatBot.Hosting;
 using RatBot.Infrastructure.Data;
 using RatBot.Infrastructure.Features.Logging;
-using RatBot.Infrastructure.Features.Meta;
 using RatBot.Infrastructure.Features.Quorum.Persistence;
 
 namespace RatBot;
@@ -60,8 +54,6 @@ public static class DependencyInjection
 
             services.AddScoped<IQuorumConfigurationStore>(_ => new QuorumConfigurationStore(connectionString));
             services.AddSingleton<ModerationLoggingStore>();
-            services.AddScoped<MetaProposalService>();
-            services.AddScoped<MetaSuggestionSettingsService>();
         }
 
         private void AddDiscordAdapter(IConfiguration configuration)
@@ -113,7 +105,6 @@ public static class DependencyInjection
                                          | GatewayIntents.GuildMembers
                                          | GatewayIntents.GuildMessages
                                          | GatewayIntents.GuildMessageReactions
-                                         | GatewayIntents.GuildMessagePolls
                                          | GatewayIntents.MessageContent,
                     }
                 );
@@ -135,9 +126,6 @@ public static class DependencyInjection
                 sp.GetRequiredService<ModerationLoggingGatewayHandler>());
             services.AddSingleton<ImageBurstSpamGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ImageBurstSpamGatewayHandler>());
-            services.AddSingleton<MetaProposalPollResolver>();
-            services.AddSingleton<MetaProposalGatewayHandler>();
-            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<MetaProposalGatewayHandler>());
 
             services.AddHostedService<DiscordBotHostedService>();
             services.AddSingleton(
@@ -161,15 +149,11 @@ public static class DependencyInjection
             services.AddSingleton<RoleColourGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<RoleColourGatewayHandler>());
 
-            services.AddHostedService<MetaProposalPollBackgroundWorker>();
             services.AddHostedService<LoggingMetadataCleanupBackgroundWorker>();
 
             services.AddSingleton<DiscordQuorumMemberIndex>();
             services.AddSingleton<IQuorumMemberSource, DiscordQuorumMemberSource>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordQuorumMemberIndex>());
-
-            services.AddSingleton<IForumThreadClient, ForumThreadClient>();
-            services.AddSingleton<MetaProposalDiscordWorkflow>();
         }
     }
 }

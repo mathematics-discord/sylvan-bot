@@ -1,11 +1,9 @@
-using System.Reflection;
-using Discord;
+﻿using System.Reflection;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RatBot.Application.Moderation;
-using RatBot.Commands.Settings;
 using RatBot.Commands.Spam;
 using RatBot.Infrastructure.Data;
 using Shouldly;
@@ -15,21 +13,6 @@ namespace RatBot.Discord.Tests.Commands.Settings;
 [TestFixture]
 public sealed class SettingsInteractionRegistrationTests
 {
-    private static void AssertMetaCommand(string methodName, string commandName, Type parameterType)
-    {
-        MethodInfo method =
-            typeof(SettingsModule.MetaSettingsModule).GetMethod(methodName) ??
-            throw new InvalidOperationException($"Expected {methodName} method.");
-
-        method.GetParameters().Single().ParameterType.ShouldBe(parameterType);
-
-        SlashCommandAttribute slashCommand =
-            method.GetCustomAttribute<SlashCommandAttribute>() ??
-            throw new InvalidOperationException("Expected slash command attribute.");
-
-        slashCommand.Name.ShouldBe(commandName);
-    }
-
     [Test]
     public async Task AddModuleAsync_SpamModule_PreservesImageSpamCommandContract()
     {
@@ -88,35 +71,4 @@ public sealed class SettingsInteractionRegistrationTests
             .ShouldBe([true, true, true]);
     }
 
-    [Test]
-    public void MetaSettingsCommands_HaveExpectedParameters()
-    {
-        AssertMetaCommand(nameof(SettingsModule.MetaSettingsModule.SetSuggestionsForumChannelAsync), "suggestions",
-            typeof(IForumChannel));
-
-        AssertMetaCommand(nameof(SettingsModule.MetaSettingsModule.SetProposalsForumChannelAsync), "proposals",
-            typeof(IForumChannel));
-
-        AssertMetaCommand(nameof(SettingsModule.MetaSettingsModule.SetCabinetRoleAsync), "cabinet", typeof(IRole));
-
-        AssertMetaCommand(nameof(SettingsModule.MetaSettingsModule.SetCabinetChairRoleAsync), "chair", typeof(IRole));
-
-        AssertMetaCommand(nameof(SettingsModule.MetaSettingsModule.SetCommitteeRoleAsync), "committee", typeof(IRole));
-    }
-
-    [Test]
-    public void MetaSettingsModule_HasExpectedGroupMetadata()
-    {
-        // Arrange
-        Type moduleType = typeof(SettingsModule.MetaSettingsModule);
-
-        // Act
-        GroupAttribute group =
-            moduleType.GetCustomAttribute<GroupAttribute>() ??
-            throw new InvalidOperationException("Expected meta group attribute.");
-
-        // Assert
-        group.Name.ShouldBe("meta");
-        group.Description.ShouldBe("Meta configuration.");
-    }
 }

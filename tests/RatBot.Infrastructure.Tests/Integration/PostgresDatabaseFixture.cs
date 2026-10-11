@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using RatBot.Infrastructure.Data;
@@ -42,8 +42,6 @@ public sealed class PostgresDatabaseFixture
             await db.Database.ExecuteSqlRawAsync("DELETE FROM logging_excluded_channels").ConfigureAwait(false);
             await db.Database.ExecuteSqlRawAsync("DELETE FROM logging_configurations").ConfigureAwait(false);
             await db.Database.ExecuteSqlRawAsync("DELETE FROM quorum_configurations").ConfigureAwait(false);
-            await db.MetaProposalStates.ExecuteDeleteAsync().ConfigureAwait(false);
-            await db.MetaSuggestionSettings.ExecuteDeleteAsync().ConfigureAwait(false);
             await db.RoleColourOptions.ExecuteDeleteAsync().ConfigureAwait(false);
             await db.ImageSpamSettings.ExecuteDeleteAsync().ConfigureAwait(false);
             await db.EmojiUsageCounts.ExecuteDeleteAsync().ConfigureAwait(false);

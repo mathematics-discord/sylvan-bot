@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using RatBot.Domain.Features.Logging;
 using RatBot.Domain.Moderation;
 using RatBot.Features.EmojiAnalytics;
@@ -16,8 +16,6 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<LoggingConfiguration> LoggingConfigurations => Set<LoggingConfiguration>();
     public DbSet<LoggingExcludedChannel> LoggingExcludedChannels => Set<LoggingExcludedChannel>();
     public DbSet<MessageLogEntry> MessageLogEntries => Set<MessageLogEntry>();
-    public DbSet<MetaProposalState> MetaProposalStates => Set<MetaProposalState>();
-    public DbSet<MetaSuggestionSettings> MetaSuggestionSettings => Set<MetaSuggestionSettings>();
     public DbSet<ObservedMessage> ObservedMessages => Set<ObservedMessage>();
     public DbSet<RoleColourOption> RoleColourOptions => Set<RoleColourOption>();
 

@@ -1,4 +1,0 @@
-component: General
-kind: Removed
-body: Removed Grafana, Loki, and OpenTelemetry log export. Console and daily file logging remain, with production logfiles persisted on the host across container replacements.
-time: 2026-10-11T21:00:00+01:00

@@ -1,5 +1,6 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using RatBot.Features.EmojiAnalytics;
 using RatBot.Infrastructure.Data;
 
 namespace RatBot.Infrastructure.Tests.Integration;
@@ -9,6 +10,65 @@ public sealed class MultiGuildMigrationBackfillTests
 {
     private const string ExpandMigration = "20260717001600_ExpandMultiGuildOwnership";
     private const ulong LegacyGuildId = 123456789012345678;
+
+    [Test]
+    public async Task RemoveMeta_PopulatedTables_RemovesMetaAndPreservesEmojiUsage()
+    {
+        // Arrange
+        string databaseName = await CreateDatabaseAsync()
+            .ConfigureAwait(false);
+
+        try
+        {
+            await using BotDbContext db = CreateDbContext(databaseName);
+            await db.Database.MigrateAsync("20261011203313_RemoveAutoban")
+                .ConfigureAwait(false);
+            await db.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO "MetaSuggestionSettings"
+                    ("GuildId", "CabinetChairRoleId", "CabinetRoleId", "CommitteeRoleId",
+                     "ProposalsForumChannelId", "SuggestionsForumChannelId")
+                VALUES (1, 2, 3, 4, 5, 6);
+
+                INSERT INTO "MetaProposalStates"
+                    ("Id", "GuildId", "OriginalThreadAuthorUserId", "SuggestionThreadChannelId",
+                     "SuggestionsForumChannelId", "Status", "TrackedAtUtc", "FailedPollAttempts",
+                     "PollFinalizationRetries", "PublicationRetryFailures")
+                VALUES ('11111111-1111-1111-1111-111111111111', 1, 7, 8, 6, 'Tracked', now(), 0, 0, 0);
+
+                INSERT INTO "EmojiUsageCounts" ("GuildId", "EmojiId", "MessageUsageCount", "ReactionUsageCount")
+                VALUES (1, 500, 7, 9);
+                """)
+                .ConfigureAwait(false);
+
+            // Act
+            await db.Database.MigrateAsync()
+                .ConfigureAwait(false);
+
+            // Assert
+            int remainingMetaTables = await db.Database.SqlQueryRaw<int>(
+                    """
+                    SELECT COUNT(*)::integer AS "Value" FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN ('MetaProposalStates', 'MetaSuggestionSettings')
+                    """)
+                .SingleAsync()
+                .ConfigureAwait(false);
+            remainingMetaTables.ShouldBe(0);
+
+            EmojiUsageCount persisted = await db.EmojiUsageCounts
+                .AsNoTracking()
+                .SingleAsync(row => row.GuildId == 1 && row.EmojiId == 500)
+                .ConfigureAwait(false);
+            persisted.MessageUsageCount.ShouldBe(7);
+            persisted.ReactionUsageCount.ShouldBe(9);
+        }
+        finally
+        {
+            await DropDatabaseAsync(databaseName)
+                .ConfigureAwait(false);
+        }
+    }
 
     [Test]
     public async Task BackfillScript_PreservesLegacyRowsAndAllowsContractMigration()
