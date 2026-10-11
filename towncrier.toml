@@ -4,7 +4,7 @@ directory = "changelog.d"
 filename = "CHANGELOG.md"
 start_string = "<!-- towncrier release notes start -->\n"
 title_format = "## {version} - {project_date}"
-issue_format = "#{issue}"
+issue_format = ""
 wrap = false
 
 [[tool.towncrier.type]]
