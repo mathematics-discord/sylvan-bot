@@ -11,7 +11,6 @@
     <Folder Name="/ops/cicd/">
         <File Path=".github/workflows/deploy-vps.yml" />
         <File Path="scripts/deploy-vps-stack.sh" />
-        <File Path="ops/github-actions-deploy.md" />
     </Folder>
     <Folder Name="/build/">
         <File Path="Directory.Build.props" />
