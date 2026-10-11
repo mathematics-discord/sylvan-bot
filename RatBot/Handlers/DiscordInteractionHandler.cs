@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
 using Discord.Net;
@@ -13,16 +13,13 @@ public sealed class DiscordInteractionHandler(
     DiscordSocketClient discordClient,
     InteractionService interactionService,
     IServiceProvider services,
-    IConfiguration configuration,
-    ILogger logger
-) : IDiscordGatewayHandler
+    ILogger logger) : IDiscordGatewayHandler
 {
     private const string DiagEventName = "interaction_diagnostics";
     private readonly ConcurrentDictionary<ulong, Stopwatch> _interactionStopwatches = [];
     private readonly ILogger _logger = logger.ForContext<DiscordInteractionHandler>();
 
-    private readonly string _serviceInstanceId =
-        configuration["OTEL:Resource:ServiceInstanceId"] ?? Environment.MachineName;
+    private readonly string _serviceInstanceId = Environment.MachineName;
 
     private static IEnumerable<ModuleInfo> EnumerateModules(IEnumerable<ModuleInfo> modules)
     {

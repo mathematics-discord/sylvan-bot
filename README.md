@@ -1,6 +1,6 @@
 # RatBot
 
-A Discord bot built with .NET 11.0 and C# 15, using Discord.Net and optional observability.
+A Discord bot built with .NET 11.0 and C# 15, using Discord.Net with console and daily file logging.
 
 ## Prerequisites
 
@@ -83,27 +83,17 @@ Members can use `/colour` to select and immediately equip one colour from the di
 
 Member-role events, startup member downloads, mapping edits and `/colour-admin sync` check the same rules. A sole eligible colour is kept; loss of its last grant removes it. Gaining access equips nothing. Participating members wearing several colours lose all of them. Members without configured sources are otherwise outside automatic enforcement. Invalid mappings are unavailable independently. Mapping edits recheck former participants in the current process and report incomplete checks; there is no periodic worker or persistent cleanup queue. Discord's server setup controls role presentation.
 
-## Optional: Observability
+## Logs
 
-The project includes an optional observability stack (Grafana, Loki, OpenTelemetry) for monitoring and logging.
+The bot writes to the console and to daily rolling files in `logs/` relative to its working directory. The files are `verbose-YYYYMMDD.log`, `debug-YYYYMMDD.log`, `info-YYYYMMDD.log`, `warning-YYYYMMDD.log`, and `error-YYYYMMDD.log`. Each includes its named severity and all higher severities; EF Core messages start at Warning. Each file series retains the latest 31 files.
 
-### Configuration
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `OTEL__Logs__Endpoint` | OpenTelemetry Collector endpoint | (Disabled if empty) |
-| `GRAFANA__ADMIN__USER` | Grafana admin username | `admin` |
-| `GRAFANA__ADMIN__PASSWORD` | Grafana admin password | `admin` |
-
-To enable logs export, set `OTEL__Logs__Endpoint` to `http://localhost:4317` (if running bot locally) or `http://otel-collector:4317` (if running bot in docker).
-
-### Start Observability Stack
+For local runs, look in the bot process's working directory. Production mounts `./logs` beside its Compose file into `/app/logs`, so logs survive container replacement. On the VPS, that directory is `/opt/ratbot/production/logs`.
 
 ```bash
-docker compose --env-file .env up loki grafana otel-collector -d
+tail -F /opt/ratbot/production/logs/info-$(date +%Y%m%d).log
 ```
 
-Grafana will be accessible at `http://localhost:3000` (Default: `admin`/`admin`).
+See [interaction logging](docs/interaction-logging.md) for correlation fields and logfile locations.
 
 ## Development
 

@@ -1,108 +1,46 @@
 # GitHub Actions Deploy Notes
 
-## Workflows
+## Production workflow
 
-- `.github/workflows/ci-tests.yml`
-    - Runs restore, build, and tests on `ubuntu-latest`
-    - Uses the runner Docker daemon for Testcontainers-based integration tests
-    - Triggered on pull requests targeting `master`, pushes to `master`, and manual dispatch
+`.github/workflows/deploy-vps.yml` is manually dispatched from GitHub Actions. It serializes deployments with the `deploy-ratbot` concurrency group.
 
-- `.github/workflows/deploy-vps.yml`
-    - Builds and pushes the bot container image from `Dockerfile` after `CI Tests` succeeds on `master`
-    - Publishes tags:
-        - immutable: `sha-<full_commit_sha>`
-        - branch: `master`
-    - Auto deploys `production` with the same immutable `sha-<full_commit_sha>` image
-    - Manual dispatch supports:
-        - `shared`
-        - `production`
-    - Uses explicit Compose project names:
-        - `ratbot-shared`
-        - `ratbot-production`
-    - Prevents overlap with per-target concurrency groups
-    - Runs automatic production deploy jobs independently, so one failed target does not cancel the other
+- `target=production`: dispatch from `master`, choose a release type (or a custom version), batch the Changie release, and build/publish the bot image. Tags include `sha-<commit>`, `v<version>`, and `master`. Deploy the immutable SHA image, then announce the successful release.
+- `target=production-image`: supply an existing image tag or full image reference to deploy that image without creating a release.
 
-## PR Merge Protection
+The helper uses Compose project `production` in `/opt/ratbot/production`. It uploads `compose.yaml` and `.env.example`, preserves the server-side `.env`, and runs Compose pull/up. PostgreSQL and the bot are the only services; no shared telemetry stack is required.
 
-To prevent merges to `master` when tests fail, configure a branch protection rule or repository ruleset in GitHub:
+## Required GitHub secrets
 
-- Target branch: `master`
-- Require status checks to pass before merging
-- Required check: `Build and test` from `.github/workflows/ci-tests.yml`
-- Require branches to be up to date before merging, if you want every PR tested against the latest `master`
+- `VPS_HOST`: SSH hostname or address.
+- `VPS_PORT`: optional SSH port, default `22`.
+- `VPS_USER`: optional SSH user, default `deploy`.
+- `VPS_SSH_PRIVATE_KEY`: deployment SSH key.
+- `VPS_SSH_KNOWN_HOSTS`: pinned SSH host keys, recommended.
+- `DISCORD_RELEASE_WEBHOOK_URL`: webhook used to announce a successful production release.
 
-## Required GitHub Secrets and Variables
+Production deployment jobs use the GitHub `production` environment and its configured protection rules. GitHub supplies `GITHUB_TOKEN` for repository/package operations.
 
-Recommended names:
+## VPS setup and persistent logs
 
-- Secret: `VPS_SSH_PRIVATE_KEY`
-    - Private key for CI/CD SSH access
-    - Key should match `/home/deploy/.ssh/authorized_keys` on VPS
-- Secret: `VPS_SSH_KNOWN_HOSTS` (recommended)
-    - Output of `ssh-keyscan -H <host>` for strict host key pinning
-- Secret: `VPS_HOST`
-    - VPS hostname or IP
-- Secret: `VPS_PORT` (optional)
-    - SSH port, defaults to `22` when empty
-- Secret: `VPS_USER` (optional)
-    - Defaults to `deploy` when empty
+The deployment user needs SSH access, Docker/Compose access, and write access to `/opt/ratbot/production`. Create its server-side `.env` from `env/production.env.example` with real credentials; the workflow does not upload secrets.
 
-You can store these at repository scope, or per GitHub Environment (`shared`, `production`) for stronger
-isolation/approval controls.
+Authenticate the deployment user to GHCR using `docker login ghcr.io` and a token with `read:packages` if the image is private. The workflow does not send registry credentials to the VPS.
 
-If the GitHub `production` environment has required reviewers, automatic production deployment from `master` will pause
-until that protection rule is changed or approved.
-
-## VPS-side Prerequisites
-
-- Directories must already exist on the VPS:
-    - `/opt/ratbot/shared`
-    - `/opt/ratbot/production`
-- The deploy helper syncs non-secret compose/config assets from the repository to the VPS before running Docker Compose.
-- The workflow still does not create or upload real `.env` files.
-- Each stack directory must therefore already contain a valid server-side `.env` file before deployment can succeed.
-- `deploy` user must:
-    - Be allowed to SSH
-    - Be able to run Docker/Compose (typically via `docker` group)
-- Docker Compose plugin must be installed on the VPS.
-
-## GHCR Pull Authentication Model
-
-The deploy workflow does not send GHCR credentials from GitHub Actions to the VPS.  
-Expected model: the VPS `deploy` user is already authenticated for pulls.
-
-One-time setup on VPS (as `deploy`):
+The bot mounts `/opt/ratbot/production/logs` into `/app/logs`. Daily logfiles survive container replacement. Keep this directory writable by the container process. When adding the mount to an existing installation, stop only the bot and copy its `/app/logs` contents out before recreating it, then verify new entries appear in the host directory.
 
 ```bash
-docker login ghcr.io
+cd /opt/ratbot/production
+docker compose -p production -f compose.yaml --env-file .env ps
+tail -F logs/info-$(date +%Y%m%d).log
 ```
 
-This stores credentials for future `docker compose pull`.
+PostgreSQL data remains in `ratbot_production_postgres_data`.
 
-For private images, use a GitHub token/PAT with `read:packages` scope for that login.
+## Image tracking and rollback
 
-## Manual Deploy Usage
-
-Use **Actions -> Deploy RatBot to VPS -> Run workflow**:
-
-- `target=shared`: deploy shared stack only
-- `target=production`: deploy production bot stack
-    - Requires `image_tag`
-- `image_tag` for production:
-    - Tag only: `sha-<commit_sha>`
-    - Or full image ref: `ghcr.io/<owner>/<repo>:sha-<commit_sha>`
-
-Automatic production flow:
-
-- Let `CI Tests` pass on a `master` push
-- The deployment workflow builds and publishes the immutable `sha-<commit_sha>` image
-- The deployment workflow applies that exact image to production
-
-For bot stacks, the deployment helper also writes the deployed `RATBOT_IMAGE` back to the server-side `.env` so later
-manual
-`docker compose` runs do not drift to an older moving tag.
-
-The deployment helper writes a simple rollback state on the VPS per stack:
+After deployment, the helper persists `RATBOT_IMAGE` in the server-side `.env` and records:
 
 - `.deploy-state/current-image.txt`
 - `.deploy-state/previous-image.txt`
+
+Use `target=production-image` with the desired existing immutable image reference for a rollback. Retain the current Compose log mount when rolling back an image.

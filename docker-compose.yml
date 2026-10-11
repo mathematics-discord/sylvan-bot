@@ -18,59 +18,10 @@ services:
     networks:
       - bot-network
 
-  loki:
-    image: grafana/loki:3.0.0
-    restart: unless-stopped
-    command: [ "-config.file=/etc/loki/config.yaml" ]
-    volumes:
-      - ./docker/loki/config.yaml:/etc/loki/config.yaml:ro
-      - loki_data:/loki
-    networks:
-      - bot-network
-      - observability
-
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.99.0
-    restart: unless-stopped
-    command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
-    volumes:
-      - ./docker/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
-    depends_on:
-      loki:
-        condition: service_started
-    networks:
-      - bot-network
-      - observability
-
-  grafana:
-    image: grafana/grafana:11.0.0
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:3000:3000"
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA__ADMIN__USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA__ADMIN__PASSWORD:-admin}
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
-    depends_on:
-      loki:
-        condition: service_started
-    networks:
-      - bot-network
-      - observability
-
 volumes:
   postgres_data:
     name: ratbot_postgres_data
-  loki_data:
-    name: ratbot_loki_data
-  grafana_data:
-    name: ratbot_grafana_data
 
 networks:
   bot-network:
     name: ratbot_network
-  observability:
-    name: ratbot_observability

@@ -32,50 +32,6 @@ Log Discord IDs, command names, outcomes, counts, timings, and status values by 
 
 Do not log message content, modal content, free-form option text, usernames, channel names, or role names unless a future change explicitly opts in for a narrow reason.
 
-## Loki Labels
+## File Logs
 
-The collector promotes low-cardinality fields to Loki labels:
-
-- `service_name`, `service_instance_id`, `environment`, `level`
-- `instrumentation_scope_name`
-- `log_area`, `event_kind`, `component`, `outcome`
-- `interaction_type`, `command_group`, `command_name`
-
-High-cardinality IDs stay as structured attributes, not labels:
-
-- `interaction_id`
-- `user_id`
-- `guild_id`
-- `channel_id`
-
-## Example Queries
-
-All failed interaction events for a command:
-
-```logql
-{log_area="interaction", command_name="spam image-spam-config", outcome="failed"}
-```
-
-All command invocations:
-
-```logql
-{log_area="interaction", event_kind="interaction.command_invoked"}
-```
-
-One interaction by ID:
-
-```logql
-{log_area="interaction"} |= "interaction_id=1234567890"
-```
-
-Slow completed executions:
-
-```logql
-{log_area="interaction", event_kind="interaction.execution_completed"} | total_ms > 1000
-```
-
-One user's interaction history:
-
-```logql
-{log_area="interaction"} |= "user_id=1234567890"
-```
+Daily rolling text files are written to `logs/` relative to the bot's working directory. Production keeps them in `/opt/ratbot/production/logs` through a bind mount. `info-YYYYMMDD.log` includes Information, Warning, Error, and Fatal events; `error-YYYYMMDD.log` includes Error and Fatal events.

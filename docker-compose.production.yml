@@ -31,16 +31,13 @@ services:
       DB__DATABASE: ${DB__DATABASE}
       DB__USER: ${DB__USER}
       DB__PASSWORD: ${DB__PASSWORD}
-      OTEL__LOGS__ENDPOINT: http://otel-collector:4317
-      OTEL__LOGS__PROTOCOL: ${OTEL__LOGS__PROTOCOL:-grpc}
-      OTEL__RESOURCE__SERVICE_NAME: ${OTEL__RESOURCE__SERVICE_NAME:-ratbot-production}
-      OTEL__RESOURCE__ENVIRONMENT: ${OTEL__RESOURCE__ENVIRONMENT:-production}
+    volumes:
+      - ./logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - app_internal
-      - observability
 
 volumes:
   postgres_data:
@@ -49,6 +46,3 @@ volumes:
 networks:
   app_internal:
     name: ratbot_production_internal
-  observability:
-    external: true
-    name: ratbot_observability
