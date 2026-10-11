@@ -10,7 +10,10 @@ namespace RatBot.Infrastructure.Tests.Integration;
 public sealed class MetaProposalMultiGuildIsolationTests
 {
     [SetUp]
-    public async Task SetUp() => await PostgresDatabaseFixture.ResetAsync();
+    public async Task SetUp()
+    {
+        await PostgresDatabaseFixture.ResetAsync();
+    }
 
     [Test]
     public async Task TrackSuggestionThreadAsync_AllowsSameThreadShapedIdInDifferentGuilds()
@@ -21,7 +24,9 @@ public sealed class MetaProposalMultiGuildIsolationTests
         await service.TrackSuggestionThreadAsync(1, 10, 100, 1000, DateTimeOffset.UtcNow, CancellationToken.None);
         await service.TrackSuggestionThreadAsync(2, 10, 200, 2000, DateTimeOffset.UtcNow, CancellationToken.None);
 
-        int trackedCount = await db.MetaProposalStates.CountAsync(state => state.SuggestionThreadChannelId == 10, CancellationToken.None);
+        int trackedCount =
+            await db.MetaProposalStates.CountAsync(state => state.SuggestionThreadChannelId == 10,
+                CancellationToken.None);
 
         trackedCount.ShouldBe(2);
     }
@@ -70,11 +75,14 @@ public sealed class MetaProposalMultiGuildIsolationTests
         guildTwoPoll.IsError.ShouldBeFalse();
         guildTwoPoll.Value.GuildId.ShouldBe((ulong)2);
 
-        ErrorOr<MetaProposalState> clearGuildTwo = await service.ClearDeletedPollByMessageAsync(2, 900, CancellationToken.None);
+        ErrorOr<MetaProposalState> clearGuildTwo =
+            await service.ClearDeletedPollByMessageAsync(2, 900, CancellationToken.None);
         clearGuildTwo.IsError.ShouldBeFalse();
 
-        MetaProposalState guildOne = await db.MetaProposalStates.SingleAsync(state => state.GuildId == 1, CancellationToken.None);
-        MetaProposalState guildTwo = await db.MetaProposalStates.SingleAsync(state => state.GuildId == 2, CancellationToken.None);
+        MetaProposalState guildOne =
+            await db.MetaProposalStates.SingleAsync(state => state.GuildId == 1, CancellationToken.None);
+        MetaProposalState guildTwo =
+            await db.MetaProposalStates.SingleAsync(state => state.GuildId == 2, CancellationToken.None);
 
         guildOne.PollMessageId.ShouldBe((ulong)900);
         guildTwo.PollMessageId.ShouldBeNull();

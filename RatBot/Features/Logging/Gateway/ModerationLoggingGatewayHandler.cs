@@ -45,12 +45,14 @@ public sealed class ModerationLoggingGatewayHandler(
 
         try
         {
-            LoggingConfiguration configuration = await loggingStore.GetConfigurationAsync(guildId, CancellationToken.None).ConfigureAwait(false);
+            LoggingConfiguration configuration =
+                await loggingStore.GetConfigurationAsync(guildId, CancellationToken.None).ConfigureAwait(false);
 
             if (!configuration.Enabled)
                 return;
 
-            bool isExcluded = await IsExcludedAsync(guildId, userMessage.Channel, CancellationToken.None).ConfigureAwait(false);
+            bool isExcluded = await IsExcludedAsync(guildId, userMessage.Channel, CancellationToken.None)
+                .ConfigureAwait(false);
 
             if (isExcluded)
                 return;
@@ -63,7 +65,8 @@ public sealed class ModerationLoggingGatewayHandler(
                 )
                 .ConfigureAwait(false);
 
-            MessageEvidence evidence = await CreateEvidenceAsync(guildId, userMessage, now, CancellationToken.None).ConfigureAwait(false);
+            MessageEvidence evidence = await CreateEvidenceAsync(guildId, userMessage, now, CancellationToken.None)
+                .ConfigureAwait(false);
             evidenceCache.Put(evidence, now, configuration.EvidenceRetentionPeriod);
         }
         catch (Exception ex)
@@ -86,7 +89,8 @@ public sealed class ModerationLoggingGatewayHandler(
 
         try
         {
-            LoggingConfiguration configuration = await loggingStore.GetConfigurationAsync(guildId, CancellationToken.None).ConfigureAwait(false);
+            LoggingConfiguration configuration =
+                await loggingStore.GetConfigurationAsync(guildId, CancellationToken.None).ConfigureAwait(false);
 
             if (!configuration.Enabled)
                 return;
@@ -98,9 +102,11 @@ public sealed class ModerationLoggingGatewayHandler(
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
             bool hasBefore = evidenceCache.TryGet(guildId, userMessage.Id, now, out MessageEvidence before);
-            MessageEvidence after = await CreateEvidenceAsync(guildId, userMessage, now, CancellationToken.None).ConfigureAwait(false);
+            MessageEvidence after = await CreateEvidenceAsync(guildId, userMessage, now, CancellationToken.None)
+                .ConfigureAwait(false);
 
-            bool hasPreviousContent = TryGetPreviousContent(cachedMessage, before, hasBefore, out string? beforeContent);
+            bool hasPreviousContent =
+                TryGetPreviousContent(cachedMessage, before, hasBefore, out string? beforeContent);
 
             if (!hasPreviousContent || !string.Equals(beforeContent, after.Content, StringComparison.Ordinal))
             {
@@ -112,16 +118,21 @@ public sealed class ModerationLoggingGatewayHandler(
                     after.Content
                 );
 
-                IUserMessage? logMessage = await SendCompactLogAsync(configuration, LoggingEventKind.Edit, compactLog).ConfigureAwait(false);
+                IUserMessage? logMessage = await SendCompactLogAsync(configuration, LoggingEventKind.Edit, compactLog)
+                    .ConfigureAwait(false);
 
                 if (logMessage is not null)
                     await loggingStore
-                        .RecordLogEntriesAsync(new[] { new MessageLogEntry(guildId, userMessage.Id, logMessage.Id, now) }, CancellationToken.None)
+                        .RecordLogEntriesAsync(
+                            new[] { new MessageLogEntry(guildId, userMessage.Id, logMessage.Id, now) },
+                            CancellationToken.None)
                         .ConfigureAwait(false);
             }
 
             await loggingStore
-                .ObserveMessageAsync(new ObservedMessage(userMessage.Id, guildId, channel.Id, userMessage.Author.Id, now), CancellationToken.None)
+                .ObserveMessageAsync(
+                    new ObservedMessage(userMessage.Id, guildId, channel.Id, userMessage.Author.Id, now),
+                    CancellationToken.None)
                 .ConfigureAwait(false);
 
             evidenceCache.Put(after, now, configuration.EvidenceRetentionPeriod);
@@ -133,7 +144,8 @@ public sealed class ModerationLoggingGatewayHandler(
         }
     }
 
-    private async Task HandleMessageDeletedAsync(Cacheable<IMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel)
+    private async Task HandleMessageDeletedAsync(Cacheable<IMessage, ulong> message,
+        Cacheable<IMessageChannel, ulong> channel)
     {
         IMessageChannel? channelValue = channel.HasValue ? channel.Value : null;
 
@@ -142,12 +154,14 @@ public sealed class ModerationLoggingGatewayHandler(
 
         try
         {
-            LoggingConfiguration configuration = await loggingStore.GetConfigurationAsync(guildId, CancellationToken.None).ConfigureAwait(false);
+            LoggingConfiguration configuration =
+                await loggingStore.GetConfigurationAsync(guildId, CancellationToken.None).ConfigureAwait(false);
 
             if (!configuration.Enabled)
                 return;
 
-            bool isExcluded = await IsExcludedAsync(guildId, channelValue, CancellationToken.None).ConfigureAwait(false);
+            bool isExcluded =
+                await IsExcludedAsync(guildId, channelValue, CancellationToken.None).ConfigureAwait(false);
 
             if (isExcluded)
                 return;
@@ -162,7 +176,8 @@ public sealed class ModerationLoggingGatewayHandler(
             ObservedMessage? observed = await loggingStore
                 .FindObservedMessageAsync(guildId, message.Id, CancellationToken.None)
                 .ConfigureAwait(false);
-            bool hasEvidence = evidenceCache.TryGet(guildId, message.Id, now, out MessageEvidence evidence) && evidence.AuthorId != 0;
+            bool hasEvidence = evidenceCache.TryGet(guildId, message.Id, now, out MessageEvidence evidence) &&
+                               evidence.AuthorId != 0;
 
             if (observed is null && !hasEvidence)
             {
@@ -171,7 +186,8 @@ public sealed class ModerationLoggingGatewayHandler(
             }
 
             ulong authorId = observed?.AuthorId ?? evidence.AuthorId;
-            string? precedingMessageJumpUrl = await TryGetPrecedingMessageJumpUrlAsync(channelValue, message.Id).ConfigureAwait(false);
+            string? precedingMessageJumpUrl =
+                await TryGetPrecedingMessageJumpUrlAsync(channelValue, message.Id).ConfigureAwait(false);
             try
             {
                 ModerationLogComponents.ModerationLogMessage compactLog = ModerationLogComponents.BuildDeleteLog(
@@ -195,7 +211,8 @@ public sealed class ModerationLoggingGatewayHandler(
 
                 if (logMessage is not null)
                     await loggingStore
-                        .RecordLogEntriesAsync(new[] { new MessageLogEntry(guildId, message.Id, logMessage.Id, now) }, CancellationToken.None)
+                        .RecordLogEntriesAsync(new[] { new MessageLogEntry(guildId, message.Id, logMessage.Id, now) },
+                            CancellationToken.None)
                         .ConfigureAwait(false);
             }
             finally
@@ -221,12 +238,14 @@ public sealed class ModerationLoggingGatewayHandler(
 
         try
         {
-            LoggingConfiguration configuration = await loggingStore.GetConfigurationAsync(guildId, CancellationToken.None).ConfigureAwait(false);
+            LoggingConfiguration configuration =
+                await loggingStore.GetConfigurationAsync(guildId, CancellationToken.None).ConfigureAwait(false);
 
             if (!configuration.Enabled)
                 return;
 
-            bool isExcluded = await IsExcludedAsync(guildId, channelValue, CancellationToken.None).ConfigureAwait(false);
+            bool isExcluded =
+                await IsExcludedAsync(guildId, channelValue, CancellationToken.None).ConfigureAwait(false);
 
             if (isExcluded)
                 return;
@@ -238,7 +257,8 @@ public sealed class ModerationLoggingGatewayHandler(
                 .ConfigureAwait(false);
 
             IReadOnlyDictionary<ulong, MessageEvidence> evidence = evidenceCache.GetMany(guildId, messageIds, now);
-            ImmutableArray<ulong> qualifyingMessageIds = GetQualifyingBulkDeletedMessageIds(messageIds, messages, observed, evidence);
+            ImmutableArray<ulong> qualifyingMessageIds =
+                GetQualifyingBulkDeletedMessageIds(messageIds, messages, observed, evidence);
 
             if (qualifyingMessageIds.Length == 0)
             {
@@ -247,13 +267,15 @@ public sealed class ModerationLoggingGatewayHandler(
             }
 
             HashSet<ulong> qualifyingMessageIdSet = qualifyingMessageIds.ToHashSet();
-            Dictionary<ulong, ObservedMessage> qualifyingObserved = FilterObservedMessages(observed, qualifyingMessageIdSet);
+            Dictionary<ulong, ObservedMessage> qualifyingObserved =
+                FilterObservedMessages(observed, qualifyingMessageIdSet);
             Dictionary<ulong, MessageEvidence> qualifyingEvidence = FilterEvidence(evidence, qualifyingMessageIdSet);
 
             IUserMessage? logMessage = await SendLogAsync(
                     configuration,
                     LoggingEventKind.BulkDelete,
-                    BuildBulkDeleteText(channelValue.Id, qualifyingMessageIds, qualifyingObserved, qualifyingEvidence, now),
+                    BuildBulkDeleteText(channelValue.Id, qualifyingMessageIds, qualifyingObserved, qualifyingEvidence,
+                        now),
                     FlattenAttachments(qualifyingEvidence.Values)
                 )
                 .ConfigureAwait(false);
@@ -275,16 +297,19 @@ public sealed class ModerationLoggingGatewayHandler(
         }
     }
 
-    private async Task<MessageEvidence> CreateEvidenceAsync(ulong guildId, SocketUserMessage message, DateTimeOffset now, CancellationToken ct)
+    private async Task<MessageEvidence> CreateEvidenceAsync(ulong guildId, SocketUserMessage message,
+        DateTimeOffset now, CancellationToken ct)
     {
-        ImmutableArray<CachedAttachmentEvidence>.Builder attachments = ImmutableArray.CreateBuilder<CachedAttachmentEvidence>();
+        ImmutableArray<CachedAttachmentEvidence>.Builder attachments =
+            ImmutableArray.CreateBuilder<CachedAttachmentEvidence>();
 
         foreach (Attachment attachment in message.Attachments.Take(_options.MaxAttachmentCountPerMessage))
         {
             byte[]? bytes = await TryDownloadAttachmentAsync(attachment.Url, ct).ConfigureAwait(false);
 
             if (bytes is not null)
-                attachments.Add(new CachedAttachmentEvidence(attachments.Count + 1, bytes, attachment.ContentType ?? "application/octet-stream"));
+                attachments.Add(new CachedAttachmentEvidence(attachments.Count + 1, bytes,
+                    attachment.ContentType ?? "application/octet-stream"));
         }
 
         return new MessageEvidence(
@@ -298,8 +323,11 @@ public sealed class ModerationLoggingGatewayHandler(
         );
     }
 
-    private Task<byte[]?> TryDownloadAttachmentAsync(string url, CancellationToken ct) =>
-        AttachmentEvidenceDownloader.TryDownloadAsync(httpClient, url, _options.MaxAttachmentBytesPerAttachment, _logger, ct);
+    private Task<byte[]?> TryDownloadAttachmentAsync(string url, CancellationToken ct)
+    {
+        return AttachmentEvidenceDownloader.TryDownloadAsync(httpClient, url, _options.MaxAttachmentBytesPerAttachment,
+            _logger, ct);
+    }
 
     private async Task<bool> IsExcludedAsync(ulong guildId, IChannel channel, CancellationToken ct)
     {
@@ -323,7 +351,8 @@ public sealed class ModerationLoggingGatewayHandler(
     {
         ulong? destinationChannelId = configuration.GetDestinationChannelId(eventKind);
 
-        if (destinationChannelId is null || discordClient.GetChannel(destinationChannelId.Value) is not IMessageChannel logChannel)
+        if (destinationChannelId is null ||
+            discordClient.GetChannel(destinationChannelId.Value) is not IMessageChannel logChannel)
             return null;
 
         if (attachments.Count == 0)
@@ -358,7 +387,8 @@ public sealed class ModerationLoggingGatewayHandler(
     {
         ulong? destinationChannelId = configuration.GetDestinationChannelId(eventKind);
 
-        if (destinationChannelId is null || discordClient.GetChannel(destinationChannelId.Value) is not IMessageChannel logChannel)
+        if (destinationChannelId is null ||
+            discordClient.GetChannel(destinationChannelId.Value) is not IMessageChannel logChannel)
             return null;
 
         return await SendCompactLogAsync(logChannel, message).ConfigureAwait(false);
@@ -376,10 +406,12 @@ public sealed class ModerationLoggingGatewayHandler(
     {
         ulong? destinationChannelId = configuration.GetDestinationChannelId(LoggingEventKind.Delete);
 
-        if (destinationChannelId is null || discordClient.GetChannel(destinationChannelId.Value) is not IMessageChannel logChannel)
+        if (destinationChannelId is null ||
+            discordClient.GetChannel(destinationChannelId.Value) is not IMessageChannel logChannel)
             return null;
 
-        return await SendDeleteLogAsync(logChannel, messageId, channelId, authorId, precedingMessageJumpUrl, content, message, _logger)
+        return await SendDeleteLogAsync(logChannel, messageId, channelId, authorId, precedingMessageJumpUrl, content,
+                message, _logger)
             .ConfigureAwait(false);
     }
 
@@ -422,11 +454,13 @@ public sealed class ModerationLoggingGatewayHandler(
         }
     }
 
-    internal static async Task<IUserMessage?> SendCompactLogAsync(IMessageChannel logChannel, ModerationLogComponents.ModerationLogMessage message)
+    internal static async Task<IUserMessage?> SendCompactLogAsync(IMessageChannel logChannel,
+        ModerationLogComponents.ModerationLogMessage message)
     {
         if (message.Attachments.Length == 0)
             return await logChannel
-                .SendMessageAsync(components: message.Components, allowedMentions: NoMentions, flags: CompactLogMessageFlags)
+                .SendMessageAsync(components: message.Components, allowedMentions: NoMentions,
+                    flags: CompactLogMessageFlags)
                 .ConfigureAwait(false);
 
         Queue<FileAttachment> files = new Queue<FileAttachment>();
@@ -442,7 +476,8 @@ public sealed class ModerationLoggingGatewayHandler(
             }
 
             return await logChannel
-                .SendFilesAsync(files, components: message.Components, allowedMentions: NoMentions, flags: CompactLogMessageFlags)
+                .SendFilesAsync(files, components: message.Components, allowedMentions: NoMentions,
+                    flags: CompactLogMessageFlags)
                 .ConfigureAwait(false);
         }
         finally
@@ -464,7 +499,8 @@ public sealed class ModerationLoggingGatewayHandler(
         int evidenceCount = messageIds.Count(evidence.ContainsKey);
         string details = BuildBulkDeleteDetails(messageIds, observed, evidence);
 
-        return $"Bulk delete in <#{channelId}> at {ModerationLogComponents.FormatTimestamp(deletedAtUtc)}. Messages: {messageIds.Length}. "
+        return
+            $"Bulk delete in <#{channelId}> at {ModerationLogComponents.FormatTimestamp(deletedAtUtc)}. Messages: {messageIds.Length}. "
             + $"Attributed: {attributedCount}. Cached evidence: {evidenceCount}.\n"
             + details;
     }
@@ -483,7 +519,8 @@ public sealed class ModerationLoggingGatewayHandler(
                 ? $"author <@{observedMessage.AuthorId}> (`{observedMessage.AuthorId}`)"
                 : "author unknown";
             string content =
-                evidence.TryGetValue(messageId, out MessageEvidence? messageEvidence) && messageEvidence.Content is not null
+                evidence.TryGetValue(messageId, out MessageEvidence? messageEvidence) &&
+                messageEvidence.Content is not null
                     ? $" content: {SingleLineSnippet(messageEvidence.Content)}"
                     : string.Empty;
 
@@ -496,8 +533,10 @@ public sealed class ModerationLoggingGatewayHandler(
         return string.Join('\n', lines);
     }
 
-    private static ImmutableArray<CachedAttachmentEvidence> FlattenAttachments(IEnumerable<MessageEvidence> evidence) =>
-        evidence.SelectMany(item => item.Attachments).Take(10).ToImmutableArray();
+    private static ImmutableArray<CachedAttachmentEvidence> FlattenAttachments(IEnumerable<MessageEvidence> evidence)
+    {
+        return evidence.SelectMany(item => item.Attachments).Take(10).ToImmutableArray();
+    }
 
     private static ImmutableArray<ulong> GetLoggingScopeIds(IChannel channel)
     {
@@ -526,8 +565,10 @@ public sealed class ModerationLoggingGatewayHandler(
             ids.Add(categoryId);
     }
 
-    private static bool HasQualifyingEvidence(ulong messageId, IReadOnlyDictionary<ulong, MessageEvidence> evidence) =>
-        evidence.TryGetValue(messageId, out MessageEvidence? messageEvidence) && messageEvidence.AuthorId != 0;
+    private static bool HasQualifyingEvidence(ulong messageId, IReadOnlyDictionary<ulong, MessageEvidence> evidence)
+    {
+        return evidence.TryGetValue(messageId, out MessageEvidence? messageEvidence) && messageEvidence.AuthorId != 0;
+    }
 
     private static bool IsQualifyingBulkDeletedMessage(
         ulong messageId,
@@ -549,19 +590,30 @@ public sealed class ModerationLoggingGatewayHandler(
         IReadOnlyCollection<Cacheable<IMessage, ulong>> messages,
         IReadOnlyDictionary<ulong, ObservedMessage> observed,
         IReadOnlyDictionary<ulong, MessageEvidence> evidence
-    ) => messageIds.Where(messageId => IsQualifyingBulkDeletedMessage(messageId, messages, observed, evidence)).ToImmutableArray();
+    )
+    {
+        return messageIds.Where(messageId => IsQualifyingBulkDeletedMessage(messageId, messages, observed, evidence))
+            .ToImmutableArray();
+    }
 
     private static Dictionary<ulong, ObservedMessage> FilterObservedMessages(
         IReadOnlyDictionary<ulong, ObservedMessage> observed,
         HashSet<ulong> messageIds
-    ) => observed.Where(pair => messageIds.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
+    )
+    {
+        return observed.Where(pair => messageIds.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
+    }
 
     private static Dictionary<ulong, MessageEvidence> FilterEvidence(
         IReadOnlyDictionary<ulong, MessageEvidence> evidence,
         HashSet<ulong> messageIds
-    ) => evidence.Where(pair => messageIds.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
+    )
+    {
+        return evidence.Where(pair => messageIds.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
+    }
 
-    private static bool TryGetPreviousContent(Cacheable<IMessage, ulong> cachedMessage, MessageEvidence before, bool hasBefore, out string? content)
+    private static bool TryGetPreviousContent(Cacheable<IMessage, ulong> cachedMessage, MessageEvidence before,
+        bool hasBefore, out string? content)
     {
         if (hasBefore)
         {
@@ -598,10 +650,15 @@ public sealed class ModerationLoggingGatewayHandler(
         }
     }
 
-    private static bool IsQualifyingUserMessage(IMessage message) =>
-        message.Source == MessageSource.User && !message.Author.IsBot && !message.Author.IsWebhook;
+    private static bool IsQualifyingUserMessage(IMessage message)
+    {
+        return message.Source == MessageSource.User && !message.Author.IsBot && !message.Author.IsWebhook;
+    }
 
-    private static string? NullIfEmpty(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
+    private static string? NullIfEmpty(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
 
     private static string SingleLineSnippet(string value)
     {

@@ -26,7 +26,10 @@ public sealed class PostgresDatabaseFixture
         return new BotDbContext(options);
     }
 
-    public static QuorumConfigurationStore CreateQuorumConfigurationStore() => new QuorumConfigurationStore(ConnectionString);
+    public static QuorumConfigurationStore CreateQuorumConfigurationStore()
+    {
+        return new QuorumConfigurationStore(ConnectionString);
+    }
 
     public static async Task ResetAsync()
     {

@@ -2,7 +2,9 @@ namespace RatBot.Domain.Moderation;
 
 public sealed record AutobannedUser
 {
-    private AutobannedUser() { }
+    private AutobannedUser()
+    {
+    }
 
     public ulong BannedUser { get; private init; }
 
@@ -10,12 +12,15 @@ public sealed record AutobannedUser
     public ulong Moderator { get; private init; }
     public DateTimeOffset RegisteredAtUtc { get; private init; }
 
-    public static AutobannedUser Create(ulong guildId, ulong bannedUser, ulong moderator, DateTimeOffset registeredAtUtc) =>
-        new AutobannedUser
+    public static AutobannedUser Create(ulong guildId, ulong bannedUser, ulong moderator,
+        DateTimeOffset registeredAtUtc)
+    {
+        return new AutobannedUser
         {
             GuildId = guildId,
             BannedUser = bannedUser,
             Moderator = moderator,
-            RegisteredAtUtc = registeredAtUtc,
+            RegisteredAtUtc = registeredAtUtc
         };
+    }
 }

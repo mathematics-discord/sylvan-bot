@@ -6,7 +6,8 @@ namespace RatBot.Features.Meta.Commands;
 
 [Group("meta-cabinet", "Cabinet meta commands.")]
 [DefaultMemberPermissions(GuildPermission.BanMembers)]
-public sealed class MetaCabinetModule(MetaProposalService metaProposalService, MetaProposalDiscordWorkflow workflow) : SlashCommandBase
+public sealed class MetaCabinetModule(MetaProposalService metaProposalService, MetaProposalDiscordWorkflow workflow)
+    : SlashCommandBase
 {
     [SlashCommand("close", "End the suggestion poll immediately.")]
     [RequireUserPermission(GuildPermission.BanMembers)]
@@ -32,7 +33,8 @@ public sealed class MetaCabinetModule(MetaProposalService metaProposalService, M
             return;
         }
 
-        ErrorOr<MetaProposalState> stateResult = await metaProposalService.GetForSuggestionThreadAsync(Context.Guild.Id, thread.Id);
+        ErrorOr<MetaProposalState> stateResult =
+            await metaProposalService.GetForSuggestionThreadAsync(Context.Guild.Id, thread.Id);
 
         if (stateResult.IsError)
         {
@@ -56,11 +58,11 @@ public sealed class MetaCabinetModule(MetaProposalService metaProposalService, M
             return;
         }
 
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(true);
 
         try
         {
-            await pollMessage.EndPollAsync(options: null);
+            await pollMessage.EndPollAsync(null);
             await FollowupAsync("Poll ended immediately.", ephemeral: true);
         }
         catch (Exception)
@@ -71,7 +73,8 @@ public sealed class MetaCabinetModule(MetaProposalService metaProposalService, M
 
     [SlashCommand("propose", "Create a Cabinet proposal poll.")]
     [RequireUserPermission(GuildPermission.BanMembers)]
-    public async Task ProposeAsync([Summary("hours", "Poll duration in hours.")] uint hours = MetaCommandIds.DefaultPollHours)
+    public async Task ProposeAsync(
+        [Summary("hours", "Poll duration in hours.")] uint hours = MetaCommandIds.DefaultPollHours)
     {
         if (Context.Guild is null || Context.Channel is not IThreadChannel thread)
         {
@@ -93,7 +96,8 @@ public sealed class MetaCabinetModule(MetaProposalService metaProposalService, M
             return;
         }
 
-        if (hours != MetaCommandIds.DefaultPollHours && !MetaCommandPermissions.IsChairOrAdmin(settingsResult.Value, user))
+        if (hours != MetaCommandIds.DefaultPollHours &&
+            !MetaCommandPermissions.IsChairOrAdmin(settingsResult.Value, user))
         {
             await RespondAsync("Only administrators or the Cabinet Chair may override poll duration.", ephemeral: true);
             return;
@@ -105,7 +109,8 @@ public sealed class MetaCabinetModule(MetaProposalService metaProposalService, M
             return;
         }
 
-        ErrorOr<MetaProposalState> stateResult = await metaProposalService.GetForSuggestionThreadAsync(Context.Guild.Id, thread.Id);
+        ErrorOr<MetaProposalState> stateResult =
+            await metaProposalService.GetForSuggestionThreadAsync(Context.Guild.Id, thread.Id);
 
         if (stateResult.IsError)
         {
@@ -141,7 +146,8 @@ public sealed class MetaCabinetModule(MetaProposalService metaProposalService, M
             return;
         }
 
-        ErrorOr<MetaProposalState> stateResult = await metaProposalService.GetForAnyThreadAsync(Context.Guild.Id, thread.Id);
+        ErrorOr<MetaProposalState> stateResult =
+            await metaProposalService.GetForAnyThreadAsync(Context.Guild.Id, thread.Id);
 
         if (stateResult.IsError)
         {
@@ -168,7 +174,7 @@ public sealed class MetaCabinetModule(MetaProposalService metaProposalService, M
             return;
         }
 
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(true);
 
         ErrorOr<MetaSuggestionSettings> settingsResult = await metaProposalService.GetSettingsAsync(Context.Guild.Id);
 

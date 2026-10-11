@@ -3,11 +3,15 @@ using RatBot.Domain.Features.Quorum;
 
 namespace RatBot.Features.Quorum;
 
-public sealed class DiscordQuorumMemberSource(DiscordSocketClient client, DiscordQuorumMemberIndex index, ILogger logger) : IQuorumMemberSource
+public sealed class DiscordQuorumMemberSource(
+    DiscordSocketClient client,
+    DiscordQuorumMemberIndex index,
+    ILogger logger) : IQuorumMemberSource
 {
     private readonly ILogger _logger = logger.ForContext<DiscordQuorumMemberSource>();
 
-    public async Task<ErrorOr<int>> CountEligibleVotersAsync(QuorumScope scope, ImmutableHashSet<ulong> roleIds, CancellationToken ct)
+    public async Task<ErrorOr<int>> CountEligibleVotersAsync(QuorumScope scope, ImmutableHashSet<ulong> roleIds,
+        CancellationToken ct)
     {
         if (roleIds.IsEmpty)
             return 0;

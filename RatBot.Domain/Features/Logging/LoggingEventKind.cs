@@ -4,5 +4,5 @@ public enum LoggingEventKind
 {
     Delete,
     Edit,
-    BulkDelete,
+    BulkDelete
 }

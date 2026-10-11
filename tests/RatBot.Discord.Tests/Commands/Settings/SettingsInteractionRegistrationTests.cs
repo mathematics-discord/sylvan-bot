@@ -17,12 +17,14 @@ public sealed class SettingsInteractionRegistrationTests
     private static void AssertMetaCommand(string methodName, string commandName, Type parameterType)
     {
         MethodInfo method =
-            typeof(SettingsModule.MetaSettingsModule).GetMethod(methodName) ?? throw new InvalidOperationException($"Expected {methodName} method.");
+            typeof(SettingsModule.MetaSettingsModule).GetMethod(methodName) ??
+            throw new InvalidOperationException($"Expected {methodName} method.");
 
         method.GetParameters().Single().ParameterType.ShouldBe(parameterType);
 
         SlashCommandAttribute slashCommand =
-            method.GetCustomAttribute<SlashCommandAttribute>() ?? throw new InvalidOperationException("Expected slash command attribute.");
+            method.GetCustomAttribute<SlashCommandAttribute>() ??
+            throw new InvalidOperationException("Expected slash command attribute.");
 
         slashCommand.Name.ShouldBe(commandName);
     }
@@ -45,7 +47,8 @@ public sealed class SettingsInteractionRegistrationTests
 
         // Assert
         command.Name.ShouldBe("image-spam-config");
-        command.Parameters.Select(parameter => parameter.Name).ShouldBe(["number-of-channels", "attachment-count", "burst-duration"]);
+        command.Parameters.Select(parameter => parameter.Name)
+            .ShouldBe(["number-of-channels", "attachment-count", "burst-duration"]);
         command.Parameters.Select(parameter => parameter.Name.Length <= 32).ShouldBe([true, true, true]);
         command.Parameters.Select(parameter => parameter.IsRequired).ShouldBe([false, false, false]);
     }
@@ -60,10 +63,12 @@ public sealed class SettingsInteractionRegistrationTests
 
         // Act
         GroupAttribute group =
-            typeof(SpamModule).GetCustomAttribute<GroupAttribute>() ?? throw new InvalidOperationException("Expected group attribute.");
+            typeof(SpamModule).GetCustomAttribute<GroupAttribute>() ??
+            throw new InvalidOperationException("Expected group attribute.");
 
         SlashCommandAttribute slashCommand =
-            method.GetCustomAttribute<SlashCommandAttribute>() ?? throw new InvalidOperationException("Expected slash command attribute.");
+            method.GetCustomAttribute<SlashCommandAttribute>() ??
+            throw new InvalidOperationException("Expected slash command attribute.");
 
         ParameterInfo[] parameters = method.GetParameters();
 
@@ -77,15 +82,18 @@ public sealed class SettingsInteractionRegistrationTests
             .Select(parameter => parameter.GetCustomAttribute<SummaryAttribute>()?.Name)
             .ShouldBe(["number-of-channels", "attachment-count", "burst-duration"]);
 
-        parameters.Select(parameter => parameter.HasDefaultValue && parameter.DefaultValue is null).ShouldBe([true, true, true]);
+        parameters.Select(parameter => parameter.HasDefaultValue && parameter.DefaultValue is null)
+            .ShouldBe([true, true, true]);
     }
 
     [Test]
     public void MetaSettingsCommands_HaveExpectedParameters()
     {
-        AssertMetaCommand(nameof(SettingsModule.MetaSettingsModule.SetSuggestionsForumChannelAsync), "suggestions", typeof(IForumChannel));
+        AssertMetaCommand(nameof(SettingsModule.MetaSettingsModule.SetSuggestionsForumChannelAsync), "suggestions",
+            typeof(IForumChannel));
 
-        AssertMetaCommand(nameof(SettingsModule.MetaSettingsModule.SetProposalsForumChannelAsync), "proposals", typeof(IForumChannel));
+        AssertMetaCommand(nameof(SettingsModule.MetaSettingsModule.SetProposalsForumChannelAsync), "proposals",
+            typeof(IForumChannel));
 
         AssertMetaCommand(nameof(SettingsModule.MetaSettingsModule.SetCabinetRoleAsync), "cabinet", typeof(IRole));
 
@@ -102,7 +110,8 @@ public sealed class SettingsInteractionRegistrationTests
 
         // Act
         GroupAttribute group =
-            moduleType.GetCustomAttribute<GroupAttribute>() ?? throw new InvalidOperationException("Expected meta group attribute.");
+            moduleType.GetCustomAttribute<GroupAttribute>() ??
+            throw new InvalidOperationException("Expected meta group attribute.");
 
         // Assert
         group.Name.ShouldBe("meta");
@@ -111,9 +120,15 @@ public sealed class SettingsInteractionRegistrationTests
 
     private sealed class FakeImageSpamSettingsStore : IImageSpamSettingsStore
     {
-        public Task<ImageSpamSettings?> GetAsync(ulong guildId, CancellationToken ct) => Task.FromResult<ImageSpamSettings?>(null);
+        public Task<ImageSpamSettings?> GetAsync(ulong guildId, CancellationToken ct)
+        {
+            return Task.FromResult<ImageSpamSettings?>(null);
+        }
 
-        public Task<IReadOnlyList<ImageSpamSettings>> ListEnabledAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<ImageSpamSettings>>([]);
+        public Task<IReadOnlyList<ImageSpamSettings>> ListEnabledAsync(CancellationToken ct)
+        {
+            return Task.FromResult<IReadOnlyList<ImageSpamSettings>>([]);
+        }
 
         public Task<ImageSpamSettings> UpsertAsync(
             ulong guildId,
@@ -121,6 +136,9 @@ public sealed class SettingsInteractionRegistrationTests
             int? requiredAttachmentCount,
             int? burstDurationSeconds,
             CancellationToken ct
-        ) => Task.FromResult(ImageSpamSettings.CreateDefault(guildId));
+        )
+        {
+            return Task.FromResult(ImageSpamSettings.CreateDefault(guildId));
+        }
     }
 }

@@ -8,15 +8,20 @@ internal static class QuorumPersistenceMapping
     private const string ForumChannel = "forum";
     private const string TextChannel = "text";
 
-    public static string ToChannelKind(QuorumScope scope) =>
-        scope switch
+    public static string ToChannelKind(QuorumScope scope)
+    {
+        return scope switch
         {
             QuorumScope.TextChannel => TextChannel,
             QuorumScope.ForumChannel => ForumChannel,
-            _ => throw new UnreachableException(),
+            _ => throw new UnreachableException()
         };
+    }
 
-    public static long ToDatabaseId(ulong id) => checked((long)id);
+    public static long ToDatabaseId(ulong id)
+    {
+        return checked((long)id);
+    }
 
     public static QuorumConfiguration ToDomain(Data data, IEnumerable<long> roleIds)
     {
@@ -35,15 +40,20 @@ internal static class QuorumPersistenceMapping
         );
     }
 
-    private static ulong ToDomainId(long id) => checked((ulong)id);
+    private static ulong ToDomainId(long id)
+    {
+        return checked((ulong)id);
+    }
 
-    private static QuorumScope ToScope(Data data) =>
-        data.ChannelKind switch
+    private static QuorumScope ToScope(Data data)
+    {
+        return data.ChannelKind switch
         {
             TextChannel => new QuorumScope.TextChannel(ToDomainId(data.GuildId), ToDomainId(data.ChannelId)),
             ForumChannel => new QuorumScope.ForumChannel(ToDomainId(data.GuildId), ToDomainId(data.ChannelId)),
-            _ => throw new InvalidOperationException($"Unknown quorum channel kind '{data.ChannelKind}'."),
+            _ => throw new InvalidOperationException($"Unknown quorum channel kind '{data.ChannelKind}'.")
         };
+    }
 
     internal sealed class Data
     {

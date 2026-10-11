@@ -13,7 +13,7 @@ public sealed class MessageLogEntryConfiguration : IEntityTypeConfiguration<Mess
         {
             entry.GuildId,
             entry.OriginalMessageId,
-            entry.LogMessageId,
+            entry.LogMessageId
         });
         builder.Property(entry => entry.GuildId).HasColumnName("guild_id").IsRequired().ValueGeneratedNever();
         builder.Property(entry => entry.OriginalMessageId).HasColumnName("original_message_id").ValueGeneratedNever();

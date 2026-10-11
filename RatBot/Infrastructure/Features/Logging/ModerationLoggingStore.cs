@@ -21,7 +21,8 @@ public sealed class ModerationLoggingStore(IDbContextFactory<BotDbContext> dbCon
         return deletedObservedMessages + deletedLogEntries;
     }
 
-    public async Task<ExcludeChannelResult> ExcludeAsync(ulong guildId, ulong channelId, DateTimeOffset excludedAtUtc, CancellationToken ct)
+    public async Task<ExcludeChannelResult> ExcludeAsync(ulong guildId, ulong channelId, DateTimeOffset excludedAtUtc,
+        CancellationToken ct)
     {
         await using BotDbContext db = await dbContextFactory.CreateDbContextAsync(ct);
 
@@ -35,13 +36,15 @@ public sealed class ModerationLoggingStore(IDbContextFactory<BotDbContext> dbCon
         return ExcludeChannelResult.Excluded;
     }
 
-    public async Task<ObservedMessage?> FindObservedMessageAsync(ulong guildId, ulong originalMessageId, CancellationToken ct)
+    public async Task<ObservedMessage?> FindObservedMessageAsync(ulong guildId, ulong originalMessageId,
+        CancellationToken ct)
     {
         await using BotDbContext db = await dbContextFactory.CreateDbContextAsync(ct);
 
         return await db
             .ObservedMessages.AsNoTracking()
-            .SingleOrDefaultAsync(message => message.GuildId == guildId && message.OriginalMessageId == originalMessageId, ct)
+            .SingleOrDefaultAsync(
+                message => message.GuildId == guildId && message.OriginalMessageId == originalMessageId, ct)
             .ConfigureAwait(false);
     }
 
@@ -180,7 +183,8 @@ public sealed class ModerationLoggingStore(IDbContextFactory<BotDbContext> dbCon
             return Error.Validation(description: "Enable logging only after setting a delete or edit log channel.");
         }
 
-        LoggingConfiguration? tracked = await db.LoggingConfigurations.FindAsync(new object[] { guildId }, ct).ConfigureAwait(false);
+        LoggingConfiguration? tracked =
+            await db.LoggingConfigurations.FindAsync(new object[] { guildId }, ct).ConfigureAwait(false);
 
         if (tracked is not null)
             db.LoggingConfigurations.Remove(tracked);

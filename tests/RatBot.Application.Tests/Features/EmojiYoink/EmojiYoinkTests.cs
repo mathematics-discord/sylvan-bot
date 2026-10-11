@@ -27,7 +27,8 @@ public sealed class EmojiYoinkTests
         using RecordingHandler handler = new RecordingHandler(HttpStatusCode.OK);
         using HttpClient client = new HttpClient(handler);
 
-        DiscordGuildEmojiImporter importer = new DiscordGuildEmojiImporter(client, new LoggerConfiguration().CreateLogger());
+        DiscordGuildEmojiImporter importer =
+            new DiscordGuildEmojiImporter(client, new LoggerConfiguration().CreateLogger());
 
         IGuild guild = Substitute.For<IGuild>();
         IUser moderator = Substitute.For<IUser>();
@@ -47,7 +48,8 @@ public sealed class EmojiYoinkTests
         using RecordingHandler handler = new RecordingHandler(HttpStatusCode.OK);
         using HttpClient client = new HttpClient(handler);
 
-        DiscordGuildEmojiImporter importer = new DiscordGuildEmojiImporter(client, new LoggerConfiguration().CreateLogger());
+        DiscordGuildEmojiImporter importer =
+            new DiscordGuildEmojiImporter(client, new LoggerConfiguration().CreateLogger());
 
         IGuild guild = Substitute.For<IGuild>();
         IUser moderator = Substitute.For<IUser>();
@@ -110,7 +112,8 @@ public sealed class EmojiYoinkTests
     {
         public Uri? RequestUri { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
         {
             RequestUri = request.RequestUri;
             return Task.FromResult(new HttpResponseMessage(statusCode) { Content = new ByteArrayContent([1, 2, 3]) });

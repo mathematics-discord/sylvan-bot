@@ -2,11 +2,13 @@ namespace RatBot.Features.Logging.Gateway;
 
 internal static class AttachmentEvidenceDownloader
 {
-    public static async Task<byte[]?> TryDownloadAsync(HttpClient httpClient, string url, long maxBytes, ILogger logger, CancellationToken ct)
+    public static async Task<byte[]?> TryDownloadAsync(HttpClient httpClient, string url, long maxBytes, ILogger logger,
+        CancellationToken ct)
     {
         try
         {
-            using HttpResponseMessage response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            using HttpResponseMessage response = await httpClient
+                .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
                 return null;

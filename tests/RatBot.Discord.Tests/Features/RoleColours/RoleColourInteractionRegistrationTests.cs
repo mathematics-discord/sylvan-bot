@@ -25,7 +25,8 @@ public sealed class RoleColourInteractionRegistrationTests
             .AddSingleton<RoleColourReconciler>()
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
 
-        using InteractionService interactions = new InteractionService(client, new InteractionServiceConfig { AutoServiceScopes = true });
+        using InteractionService interactions =
+            new InteractionService(client, new InteractionServiceConfig { AutoServiceScopes = true });
 
         // Act
         ModuleInfo colour = await interactions.AddModuleAsync<ColourModule>(services);
@@ -35,10 +36,11 @@ public sealed class RoleColourInteractionRegistrationTests
         colour.SlashGroupName.ShouldBeNull();
         colour.SlashCommands.Select(command => command.Name).ShouldBe(["colour"]);
 
-        colour.ComponentCommands.Select(command => command.Name).ShouldBe(["colour-swap:select:*", "colour-swap:reset:*"], ignoreOrder: true);
+        colour.ComponentCommands.Select(command => command.Name)
+            .ShouldBe(["colour-swap:select:*", "colour-swap:reset:*"], true);
 
         admin.SlashGroupName.ShouldBe("colour-admin");
 
-        admin.SlashCommands.Select(command => command.Name).ShouldBe(["upsert", "delete", "list", "sync"], ignoreOrder: true);
+        admin.SlashCommands.Select(command => command.Name).ShouldBe(["upsert", "delete", "list", "sync"], true);
     }
 }

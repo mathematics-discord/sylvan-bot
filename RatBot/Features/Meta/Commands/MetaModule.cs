@@ -5,12 +5,16 @@ using RatBot.Infrastructure.Features.Meta;
 namespace RatBot.Features.Meta.Commands;
 
 [Group("meta", "Meta proposal commands.")]
-public sealed class MetaModule(MetaProposalService metaProposalService, MetaProposalDiscordWorkflow workflow) : SlashCommandBase
+public sealed class MetaModule(MetaProposalService metaProposalService, MetaProposalDiscordWorkflow workflow)
+    : SlashCommandBase
 {
-    private static bool CanSubmitProposalModal(MetaProposalState state, MetaSuggestionSettings settings, IGuildUser user, uint hours) =>
-        MetaCommandPermissions.IsAuthorOrAdmin(state, user)
-        || MetaCommandPermissions.IsCabinet(settings, user)
-        || hours != MetaCommandIds.DefaultPollHours && MetaCommandPermissions.IsChairOrAdmin(settings, user);
+    private static bool CanSubmitProposalModal(MetaProposalState state, MetaSuggestionSettings settings,
+        IGuildUser user, uint hours)
+    {
+        return MetaCommandPermissions.IsAuthorOrAdmin(state, user)
+               || MetaCommandPermissions.IsCabinet(settings, user)
+               || (hours != MetaCommandIds.DefaultPollHours && MetaCommandPermissions.IsChairOrAdmin(settings, user));
+    }
 
     [ModalInteraction($"{MetaCommandIds.ProposalModalPrefix}:*:*:*", true)]
     public async Task ProposalModalAsync(ulong userId, ulong threadId, uint hours, MetaProposalModal modal)
@@ -27,7 +31,7 @@ public sealed class MetaModule(MetaProposalService metaProposalService, MetaProp
             return;
         }
 
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(true);
 
         ErrorOr<MetaSuggestionSettings> settingsResult = await metaProposalService.GetSettingsAsync(Context.Guild.Id);
 
@@ -37,7 +41,8 @@ public sealed class MetaModule(MetaProposalService metaProposalService, MetaProp
             return;
         }
 
-        ErrorOr<MetaProposalState> stateResult = await metaProposalService.GetForSuggestionThreadAsync(Context.Guild.Id, thread.Id);
+        ErrorOr<MetaProposalState> stateResult =
+            await metaProposalService.GetForSuggestionThreadAsync(Context.Guild.Id, thread.Id);
 
         if (stateResult.IsError)
         {
@@ -45,7 +50,8 @@ public sealed class MetaModule(MetaProposalService metaProposalService, MetaProp
             return;
         }
 
-        if (Context.User is not IGuildUser user || !CanSubmitProposalModal(stateResult.Value, settingsResult.Value, user, hours))
+        if (Context.User is not IGuildUser user ||
+            !CanSubmitProposalModal(stateResult.Value, settingsResult.Value, user, hours))
         {
             await FollowupAsync("You are not allowed to propose here.", ephemeral: true);
             return;
@@ -57,9 +63,11 @@ public sealed class MetaModule(MetaProposalService metaProposalService, MetaProp
             return;
         }
 
-        if (hours != MetaCommandIds.DefaultPollHours && !MetaCommandPermissions.IsChairOrAdmin(settingsResult.Value, user))
+        if (hours != MetaCommandIds.DefaultPollHours &&
+            !MetaCommandPermissions.IsChairOrAdmin(settingsResult.Value, user))
         {
-            await FollowupAsync("Only administrators or the Cabinet Chair may override poll duration.", ephemeral: true);
+            await FollowupAsync("Only administrators or the Cabinet Chair may override poll duration.",
+                ephemeral: true);
 
             return;
         }
@@ -70,7 +78,8 @@ public sealed class MetaModule(MetaProposalService metaProposalService, MetaProp
             return;
         }
 
-        await workflow.SendProposalContentAsync(thread, Context.User.Id, modal.ProposalTitle, modal.Summary, modal.Motivation, modal.Specification);
+        await workflow.SendProposalContentAsync(thread, Context.User.Id, modal.ProposalTitle, modal.Summary,
+            modal.Motivation, modal.Specification);
 
         ErrorOr<IUserMessage> pollResult = await workflow.CreateProposalPollAsync(thread, hours);
 
@@ -110,7 +119,8 @@ public sealed class MetaModule(MetaProposalService metaProposalService, MetaProp
             return;
         }
 
-        ErrorOr<MetaProposalState> stateResult = await metaProposalService.GetForSuggestionThreadAsync(Context.Guild.Id, thread.Id);
+        ErrorOr<MetaProposalState> stateResult =
+            await metaProposalService.GetForSuggestionThreadAsync(Context.Guild.Id, thread.Id);
 
         if (stateResult.IsError)
         {
@@ -124,7 +134,8 @@ public sealed class MetaModule(MetaProposalService metaProposalService, MetaProp
             return;
         }
 
-        string customId = $"{MetaCommandIds.ProposalModalPrefix}:{Context.User.Id}:{thread.Id}:{MetaCommandIds.DefaultPollHours}";
+        string customId =
+            $"{MetaCommandIds.ProposalModalPrefix}:{Context.User.Id}:{thread.Id}:{MetaCommandIds.DefaultPollHours}";
 
         await Context.Interaction.RespondWithModalAsync<MetaProposalModal>(customId);
     }
@@ -138,9 +149,10 @@ public sealed class MetaModule(MetaProposalService metaProposalService, MetaProp
             return;
         }
 
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(true);
 
-        ErrorOr<MetaProposalState> retryStart = await metaProposalService.MarkPublicationRetryStartedAsync(stateId, DateTimeOffset.UtcNow);
+        ErrorOr<MetaProposalState> retryStart =
+            await metaProposalService.MarkPublicationRetryStartedAsync(stateId, DateTimeOffset.UtcNow);
 
         if (retryStart.IsError)
         {
@@ -170,10 +182,12 @@ public sealed class MetaModule(MetaProposalService metaProposalService, MetaProp
             return;
         }
 
-        ErrorOr<ulong> errorMessage = await workflow.PostPublicationErrorAsync(state, settingsResult.Value, state.PublicationErrorMessageId);
+        ErrorOr<ulong> errorMessage =
+            await workflow.PostPublicationErrorAsync(state, settingsResult.Value, state.PublicationErrorMessageId);
 
         if (!errorMessage.IsError)
-            await metaProposalService.RecordPublicationFailureAsync(state.Id, errorMessage.Value, DateTimeOffset.UtcNow);
+            await metaProposalService.RecordPublicationFailureAsync(state.Id, errorMessage.Value,
+                DateTimeOffset.UtcNow);
 
         await FollowupAsync(publishResult.FirstError.Description, ephemeral: true);
     }
@@ -191,7 +205,8 @@ public record MetaProposalModal : IModal
     public required string Motivation { get; [UsedImplicitly] init; }
 
     [InputLabel("Title")]
-    [ModalTextInput("title", maxLength: MetaProposalState.MaxTitleLength, placeholder: "The title of the proposal thread")]
+    [ModalTextInput("title", maxLength: MetaProposalState.MaxTitleLength,
+        placeholder: "The title of the proposal thread")]
     public required string ProposalTitle { get; [UsedImplicitly] init; }
 
     [InputLabel("Specification")]

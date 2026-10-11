@@ -23,23 +23,33 @@ public sealed class MultiGuildMigrationBackfillTests
 
             await db.Database.ExecuteSqlRawAsync(CreateBackfillSql(LegacyGuildId));
 
-            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"RoleColourOptions\"").SingleAsync()).ShouldBe(1);
-            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"MemberColourPreferences\"").SingleAsync()).ShouldBe(1);
-            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"ImageSpamSettings\"").SingleAsync()).ShouldBe(1);
-            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"EmojiUsageCounts\"").SingleAsync()).ShouldBe(1);
-            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"AdventureForumThreadLinks\"").SingleAsync()).ShouldBe(1);
-            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM message_log_entries").SingleAsync()).ShouldBe(1);
+            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"RoleColourOptions\"")
+                .SingleAsync()).ShouldBe(1);
+            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"MemberColourPreferences\"")
+                .SingleAsync()).ShouldBe(1);
+            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"ImageSpamSettings\"")
+                .SingleAsync()).ShouldBe(1);
+            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"EmojiUsageCounts\"").SingleAsync())
+                .ShouldBe(1);
+            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"AdventureForumThreadLinks\"")
+                .SingleAsync()).ShouldBe(1);
+            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM message_log_entries").SingleAsync())
+                .ShouldBe(1);
 
-            (await db.Database.SqlQueryRaw<long>("SELECT \"GuildId\" AS \"Value\" FROM \"RoleColourOptions\"").SingleAsync()).ShouldBe(
+            (await db.Database.SqlQueryRaw<long>("SELECT \"GuildId\" AS \"Value\" FROM \"RoleColourOptions\"")
+                .SingleAsync()).ShouldBe(
                 (long)LegacyGuildId
             );
-            (await db.Database.SqlQueryRaw<long>("SELECT \"GuildId\" AS \"Value\" FROM \"MemberColourPreferences\"").SingleAsync()).ShouldBe(
+            (await db.Database.SqlQueryRaw<long>("SELECT \"GuildId\" AS \"Value\" FROM \"MemberColourPreferences\"")
+                .SingleAsync()).ShouldBe(
                 (long)LegacyGuildId
             );
-            (await db.Database.SqlQueryRaw<bool>("SELECT \"IsEnabled\" AS \"Value\" FROM \"ImageSpamSettings\"").SingleAsync()).ShouldBeTrue();
-            (await db.Database.SqlQueryRaw<long>("SELECT guild_id AS \"Value\" FROM message_log_entries").SingleAsync()).ShouldBe(
-                (long)LegacyGuildId
-            );
+            (await db.Database.SqlQueryRaw<bool>("SELECT \"IsEnabled\" AS \"Value\" FROM \"ImageSpamSettings\"")
+                .SingleAsync()).ShouldBeTrue();
+            (await db.Database.SqlQueryRaw<long>("SELECT guild_id AS \"Value\" FROM message_log_entries").SingleAsync())
+                .ShouldBe(
+                    (long)LegacyGuildId
+                );
 
             await db.Database.MigrateAsync("20260719054819_RemoveMessageLogEntryObservedMessageForeignKey");
             await db.Database.ExecuteSqlRawAsync(
@@ -68,9 +78,12 @@ public sealed class MultiGuildMigrationBackfillTests
                     )
                     .SingleAsync()
             ).ShouldBe(0);
-            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"RoleColourOptions\"").SingleAsync()).ShouldBe(1);
-            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"EmojiUsageCounts\"").SingleAsync()).ShouldBe(1);
-            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM message_log_entries").SingleAsync()).ShouldBe(1);
+            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"RoleColourOptions\"")
+                .SingleAsync()).ShouldBe(1);
+            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM \"EmojiUsageCounts\"").SingleAsync())
+                .ShouldBe(1);
+            (await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS \"Value\" FROM message_log_entries").SingleAsync())
+                .ShouldBe(1);
 
             (
                 await db
@@ -161,7 +174,8 @@ public sealed class MultiGuildMigrationBackfillTests
 
     private static BotDbContext CreateDbContext(string databaseName)
     {
-        DbContextOptions<BotDbContext> options = new DbContextOptionsBuilder<BotDbContext>().UseNpgsql(CreateConnectionString(databaseName)).Options;
+        DbContextOptions<BotDbContext> options = new DbContextOptionsBuilder<BotDbContext>()
+            .UseNpgsql(CreateConnectionString(databaseName)).Options;
 
         return new BotDbContext(options);
     }
@@ -188,13 +202,17 @@ public sealed class MultiGuildMigrationBackfillTests
 
     private static string CreateConnectionString(string databaseName)
     {
-        NpgsqlConnectionStringBuilder builder = new NpgsqlConnectionStringBuilder(PostgresDatabaseFixture.ConnectionString)
-        {
-            Database = databaseName,
-        };
+        NpgsqlConnectionStringBuilder builder =
+            new NpgsqlConnectionStringBuilder(PostgresDatabaseFixture.ConnectionString)
+            {
+                Database = databaseName
+            };
 
         return builder.ConnectionString;
     }
 
-    private static string QuoteIdentifier(string identifier) => '"' + identifier.Replace("\"", "\"\"", StringComparison.Ordinal) + '"';
+    private static string QuoteIdentifier(string identifier)
+    {
+        return '"' + identifier.Replace("\"", "\"\"", StringComparison.Ordinal) + '"';
+    }
 }

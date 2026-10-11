@@ -3,7 +3,9 @@ namespace RatBot.Features.RoleColours;
 public sealed class RoleColourOption
 {
     // EF Core private ctor
-    private RoleColourOption() { }
+    private RoleColourOption()
+    {
+    }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public ulong DisplayRoleId { get; private set; }
@@ -18,7 +20,8 @@ public sealed class RoleColourOption
             return Error.Validation("RoleColourOption.GuildRequired", "Guild is required.");
 
         if (sourceRoleId == displayRoleId)
-            return Error.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different.");
+            return Error.Validation("RoleColourOption.RolesMustDiffer",
+                "Source and display role IDs must be different.");
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
         return new RoleColourOption
@@ -27,14 +30,15 @@ public sealed class RoleColourOption
             SourceRoleId = sourceRoleId,
             DisplayRoleId = displayRoleId,
             CreatedAtUtc = now,
-            UpdatedAtUtc = now,
+            UpdatedAtUtc = now
         };
     }
 
     public ErrorOr<Success> Update(ulong sourceRoleId, ulong displayRoleId)
     {
         if (sourceRoleId == displayRoleId)
-            return Error.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different.");
+            return Error.Validation("RoleColourOption.RolesMustDiffer",
+                "Source and display role IDs must be different.");
 
         SourceRoleId = sourceRoleId;
         DisplayRoleId = displayRoleId;

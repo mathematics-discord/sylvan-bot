@@ -2,7 +2,8 @@ using RatBot.Gateway;
 
 namespace RatBot.Features.RoleColours;
 
-public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, RoleColourReconciler colours) : IDiscordGatewayHandler
+public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, RoleColourReconciler colours)
+    : IDiscordGatewayHandler
 {
     public Task InitializeAsync(CancellationToken ct)
     {
@@ -25,5 +26,8 @@ public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, 
         await colours.ReconcileUserRolesAsync(after.Guild, after.Id, CancellationToken.None, previous);
     }
 
-    private Task HandleMemberJoinedAsync(SocketGuildUser member) => colours.ReconcileUserRolesAsync(member.Guild, member.Id, CancellationToken.None);
+    private Task HandleMemberJoinedAsync(SocketGuildUser member)
+    {
+        return colours.ReconcileUserRolesAsync(member.Guild, member.Id, CancellationToken.None);
+    }
 }

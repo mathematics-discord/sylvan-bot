@@ -8,17 +8,21 @@ namespace RatBot.Features.Logging.Commands;
 
 [Group("logging", "Moderation logging commands.")]
 [DefaultMemberPermissions(GuildPermission.Administrator)]
-public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory) : InteractionModuleBase<IInteractionContext>
+public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory)
+    : InteractionModuleBase<IInteractionContext>
 {
     [SlashCommand("config", "View or update moderation logging configuration.")]
     [RequireUserPermission(GuildPermission.Administrator)]
     public async Task ConfigAsync(
-        [Summary("enabled", "Whether moderation logging is enabled.")] bool? enabled = null,
+        [Summary("enabled", "Whether moderation logging is enabled.")]
+        bool? enabled = null,
         [Summary("delete-log-channel", "Channel for delete and bulk-delete logs.")]
         [ChannelTypes(ChannelType.Text, ChannelType.News)]
-            IChannel? deleteLogChannel = null,
-        [Summary("edit-log-channel", "Channel for edit logs.")] [ChannelTypes(ChannelType.Text, ChannelType.News)] IChannel? editLogChannel = null,
-        [Summary("retention-period", "Evidence retention period in seconds.")] int? retentionPeriod = null
+        IChannel? deleteLogChannel = null,
+        [Summary("edit-log-channel", "Channel for edit logs.")] [ChannelTypes(ChannelType.Text, ChannelType.News)]
+        IChannel? editLogChannel = null,
+        [Summary("retention-period", "Evidence retention period in seconds.")]
+        int? retentionPeriod = null
     )
     {
         if (!await ValidateAsync().ConfigureAwait(false))
@@ -57,7 +61,7 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
             ChannelType.PublicThread,
             ChannelType.PrivateThread
         )]
-            IChannel? channel = null
+        IChannel? channel = null
     )
     {
         if (!await ValidateAsync().ConfigureAwait(false))
@@ -89,7 +93,7 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
             ChannelType.PublicThread,
             ChannelType.PrivateThread
         )]
-            IChannel? channel = null
+        IChannel? channel = null
     )
     {
         if (!await ValidateAsync().ConfigureAwait(false))
@@ -97,7 +101,8 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
 
         IChannel targetChannel = channel ?? Context.Channel;
         ModerationLoggingStore store = new ModerationLoggingStore(contextFactory);
-        IncludeChannelResult result = await store.IncludeAsync(Context.Guild.Id, targetChannel.Id, CancellationToken.None).ConfigureAwait(false);
+        IncludeChannelResult result = await store
+            .IncludeAsync(Context.Guild.Id, targetChannel.Id, CancellationToken.None).ConfigureAwait(false);
 
         string response =
             result is IncludeChannelResult.Included
@@ -146,7 +151,8 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
 
         if (Context.Channel is not ITextChannel && Context.Channel is not IThreadChannel)
         {
-            await RespondAsync("This command can only be used in a text channel.", ephemeral: true).ConfigureAwait(false);
+            await RespondAsync("This command can only be used in a text channel.", ephemeral: true)
+                .ConfigureAwait(false);
             return false;
         }
 
@@ -154,7 +160,8 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
 
         if (!guildUser.GuildPermissions.Administrator)
         {
-            await RespondAsync("You need Administrator permission to manage logging exclusions.", ephemeral: true).ConfigureAwait(false);
+            await RespondAsync("You need Administrator permission to manage logging exclusions.", ephemeral: true)
+                .ConfigureAwait(false);
             return false;
         }
 
@@ -163,15 +170,22 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
 
     private static string FormatConfiguration(LoggingConfiguration configuration)
     {
-        string deleteLogChannel = configuration.DeleteLogChannelId is null ? "unset" : $"<#{configuration.DeleteLogChannelId.Value}>";
-        string editLogChannel = configuration.EditLogChannelId is null ? "unset" : $"<#{configuration.EditLogChannelId.Value}>";
+        string deleteLogChannel = configuration.DeleteLogChannelId is null
+            ? "unset"
+            : $"<#{configuration.DeleteLogChannelId.Value}>";
+        string editLogChannel = configuration.EditLogChannelId is null
+            ? "unset"
+            : $"<#{configuration.EditLogChannelId.Value}>";
 
         return "Logging configuration:\n"
-            + $"- Enabled: {configuration.Enabled}\n"
-            + $"- Delete log channel: {deleteLogChannel}\n"
-            + $"- Edit log channel: {editLogChannel}\n"
-            + $"- Evidence retention: {(int)configuration.EvidenceRetentionPeriod.TotalSeconds}s";
+               + $"- Enabled: {configuration.Enabled}\n"
+               + $"- Delete log channel: {deleteLogChannel}\n"
+               + $"- Edit log channel: {editLogChannel}\n"
+               + $"- Evidence retention: {(int)configuration.EvidenceRetentionPeriod.TotalSeconds}s";
     }
 
-    private static string Mention(IChannel channel) => $"<#{channel.Id}>";
+    private static string Mention(IChannel channel)
+    {
+        return $"<#{channel.Id}>";
+    }
 }

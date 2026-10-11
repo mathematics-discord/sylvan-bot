@@ -12,9 +12,13 @@ public static class ErrorOrExtensions
 
     extension<T>(ErrorOr<T> source)
     {
-        public ErrorOr<TResult> Select<TResult>(Func<T, TResult> selector) => source.IsError ? source.Errors : selector(source.Value);
+        public ErrorOr<TResult> Select<TResult>(Func<T, TResult> selector)
+        {
+            return source.IsError ? source.Errors : selector(source.Value);
+        }
 
-        public ErrorOr<TResult> SelectMany<TInner, TResult>(Func<T, ErrorOr<TInner>> bind, Func<T, TInner, TResult> project)
+        public ErrorOr<TResult> SelectMany<TInner, TResult>(Func<T, ErrorOr<TInner>> bind,
+            Func<T, TInner, TResult> project)
         {
             if (source.IsError)
                 return source.Errors;
@@ -24,7 +28,8 @@ public static class ErrorOrExtensions
             return inner.IsError ? inner.Errors : project(source.Value, inner.Value);
         }
 
-        public async Task<ErrorOr<TResult>> SelectMany<TInner, TResult>(Func<T, Task<ErrorOr<TInner>>> bind, Func<T, TInner, TResult> project)
+        public async Task<ErrorOr<TResult>> SelectMany<TInner, TResult>(Func<T, Task<ErrorOr<TInner>>> bind,
+            Func<T, TInner, TResult> project)
         {
             if (source.IsError)
                 return source.Errors;
@@ -44,7 +49,8 @@ public static class ErrorOrExtensions
             return source.IsError ? source.Errors : selector(source.Value);
         }
 
-        public async Task<ErrorOr<TResult>> SelectMany<TInner, TResult>(Func<T, ErrorOr<TInner>> bind, Func<T, TInner, TResult> project)
+        public async Task<ErrorOr<TResult>> SelectMany<TInner, TResult>(Func<T, ErrorOr<TInner>> bind,
+            Func<T, TInner, TResult> project)
         {
             ErrorOr<T> source = await sourceTask.ConfigureAwait(false);
 
@@ -56,7 +62,8 @@ public static class ErrorOrExtensions
             return inner.IsError ? inner.Errors : project(source.Value, inner.Value);
         }
 
-        public async Task<ErrorOr<TResult>> SelectMany<TInner, TResult>(Func<T, Task<ErrorOr<TInner>>> bind, Func<T, TInner, TResult> project)
+        public async Task<ErrorOr<TResult>> SelectMany<TInner, TResult>(Func<T, Task<ErrorOr<TInner>>> bind,
+            Func<T, TInner, TResult> project)
         {
             ErrorOr<T> source = await sourceTask.ConfigureAwait(false);
 

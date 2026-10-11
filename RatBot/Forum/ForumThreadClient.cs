@@ -4,7 +4,8 @@ namespace RatBot.Forum;
 
 public sealed class ForumThreadClient(DiscordSocketClient client) : IForumThreadClient
 {
-    public async Task<ErrorOr<PublishedForumThread>> CreateThreadWithMessagesAsync(ulong forumChannelId, string title, IReadOnlyList<string> messages)
+    public async Task<ErrorOr<PublishedForumThread>> CreateThreadWithMessagesAsync(ulong forumChannelId, string title,
+        IReadOnlyList<string> messages)
     {
         if (messages.Count == 0)
             return Error.Validation("Forum.MessagesRequired", "At least one message is required to start a thread.");
@@ -17,7 +18,8 @@ public sealed class ForumThreadClient(DiscordSocketClient client) : IForumThread
         if (messages.Count == 0)
             return Error.Validation("Forum.MessagesRequired", "At least one message is required to create a thread.");
 
-        IThreadChannel thread = await forumChannel.CreatePostAsync(title, text: messages[0], allowedMentions: AllowedMentions.None);
+        IThreadChannel thread =
+            await forumChannel.CreatePostAsync(title, text: messages[0], allowedMentions: AllowedMentions.None);
 
         for (int i = 1; i < messages.Count; i++)
             await thread.SendMessageAsync(messages[i], allowedMentions: AllowedMentions.None);

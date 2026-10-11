@@ -8,17 +8,17 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Discord.Net.Interactions" />
-        <PackageReference Include="Discord.Net.WebSocket" />
-        <PackageReference Include="ErrorOr" />
-        <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" />
-        <PackageReference Include="NSubstitute" />
-        <PackageReference Include="Serilog" />
-        <PackageReference Include="Shouldly" />
-        <PackageReference Include="NUnit" />
-        <PackageReference Include="NUnit3TestAdapter" />
+        <PackageReference Include="Discord.Net.Interactions"/>
+        <PackageReference Include="Discord.Net.WebSocket"/>
+        <PackageReference Include="ErrorOr"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
+        <PackageReference Include="Microsoft.NET.Test.Sdk"/>
+        <PackageReference Include="NSubstitute"/>
+        <PackageReference Include="Serilog"/>
+        <PackageReference Include="Shouldly"/>
+        <PackageReference Include="NUnit"/>
+        <PackageReference Include="NUnit3TestAdapter"/>
         <PackageReference Include="NUnit.Analyzers">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -26,11 +26,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Using Include="NUnit.Framework" />
+        <Using Include="NUnit.Framework"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\RatBot.Domain\RatBot.Domain.csproj" />
-        <ProjectReference Include="..\..\RatBot\RatBot.csproj" />
+        <ProjectReference Include="..\..\RatBot.Domain\RatBot.Domain.csproj"/>
+        <ProjectReference Include="..\..\RatBot\RatBot.csproj"/>
     </ItemGroup>
 </Project>

@@ -11,7 +11,13 @@ public sealed record QuorumVoterRoleSet
 
     public ImmutableHashSet<ulong> RoleIds { get; }
 
-    public QuorumVoterRoleSet Add(ulong roleId) => new QuorumVoterRoleSet(RoleIds.Add(roleId));
+    public QuorumVoterRoleSet Add(ulong roleId)
+    {
+        return new QuorumVoterRoleSet(RoleIds.Add(roleId));
+    }
 
-    public QuorumVoterRoleSet Remove(ulong roleId) => new QuorumVoterRoleSet(RoleIds.Remove(roleId));
+    public QuorumVoterRoleSet Remove(ulong roleId)
+    {
+        return new QuorumVoterRoleSet(RoleIds.Remove(roleId));
+    }
 }

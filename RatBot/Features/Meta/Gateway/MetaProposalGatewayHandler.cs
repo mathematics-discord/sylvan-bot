@@ -27,7 +27,8 @@ public sealed class MetaProposalGatewayHandler(
         discordClient.MessageUpdated -= HandleMessageUpdatedAsync;
     }
 
-    private async Task HandleMessageDeletedAsync(Cacheable<IMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel)
+    private async Task HandleMessageDeletedAsync(Cacheable<IMessage, ulong> message,
+        Cacheable<IMessageChannel, ulong> channel)
     {
         if (!channel.HasValue || !TryGetGuildId(channel.Value, out ulong guildId))
             return;
@@ -80,7 +81,8 @@ public sealed class MetaProposalGatewayHandler(
             if (stateResult.IsError || stateResult.Value.Status is not MetaProposalStatus.PollActive)
                 return;
 
-            await pollResolver.ResolveFinalizedPollAsync(service, stateResult.Value, pollMessage, CancellationToken.None);
+            await pollResolver.ResolveFinalizedPollAsync(service, stateResult.Value, pollMessage,
+                CancellationToken.None);
 
             _logger.Information(
                 "Resolved manually finalized meta proposal poll {PollMessageId} for state {StateId} in guild {GuildId}",
@@ -91,7 +93,8 @@ public sealed class MetaProposalGatewayHandler(
         }
         catch (Exception ex)
         {
-            _logger.Warning(ex, "Failed to handle manually finalized meta proposal poll update in guild {GuildId}", guildId);
+            _logger.Warning(ex, "Failed to handle manually finalized meta proposal poll update in guild {GuildId}",
+                guildId);
         }
     }
 
@@ -115,12 +118,14 @@ public sealed class MetaProposalGatewayHandler(
 
             if (ownerId == 0)
             {
-                _logger.Warning("Ignoring meta suggestion thread {ThreadId} because owner id was unavailable", thread.Id);
+                _logger.Warning("Ignoring meta suggestion thread {ThreadId} because owner id was unavailable",
+                    thread.Id);
 
                 return;
             }
 
-            await service.TrackSuggestionThreadAsync(thread.Guild.Id, thread.Id, settings.SuggestionsForumChannelId, ownerId, DateTimeOffset.UtcNow);
+            await service.TrackSuggestionThreadAsync(thread.Guild.Id, thread.Id, settings.SuggestionsForumChannelId,
+                ownerId, DateTimeOffset.UtcNow);
         }
         catch (Exception ex)
         {

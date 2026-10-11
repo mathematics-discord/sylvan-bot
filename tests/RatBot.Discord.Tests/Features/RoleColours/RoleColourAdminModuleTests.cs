@@ -16,7 +16,8 @@ public sealed class RoleColourAdminModuleTests
         Type moduleType = typeof(RoleColourAdminModule);
 
         // Act
-        GroupAttribute group = moduleType.GetCustomAttribute<GroupAttribute>() ?? throw new InvalidOperationException("Expected group attribute.");
+        GroupAttribute group = moduleType.GetCustomAttribute<GroupAttribute>() ??
+                               throw new InvalidOperationException("Expected group attribute.");
         DefaultMemberPermissionsAttribute permissions =
             moduleType.GetCustomAttribute<DefaultMemberPermissionsAttribute>()
             ?? throw new InvalidOperationException("Expected default permissions attribute.");
@@ -29,7 +30,7 @@ public sealed class RoleColourAdminModuleTests
 
         // Assert
         group.Name.ShouldBe("colour-admin");
-        commandNames.ShouldBe(["upsert", "delete", "list", "sync"], ignoreOrder: true);
+        commandNames.ShouldBe(["upsert", "delete", "list", "sync"], true);
         permissions.Permissions.ShouldBe(GuildPermission.Administrator);
     }
 }

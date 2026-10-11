@@ -29,8 +29,8 @@ public sealed class ModerationLogComponentsTests
             "https://discord.com/channels/1/2/3",
             2,
             4,
-            beforeContent: null,
-            afterContent: null
+            null,
+            null
         );
 
         TextDisplays(log).Last().Content.ShouldBe("```ansi\n*Unavailable*\n```\n```ansi\n*Unavailable*\n```");
@@ -50,7 +50,8 @@ public sealed class ModerationLogComponentsTests
             "hates"
         );
 
-        TextDisplays(log).Last().Content.ShouldBe("```ansi\n\e[1;31mH\e[0ma\e[1;31my\e[0mes\n```\n```ansi\n\e[1;32mh\e[0ma\e[1;32mt\e[0mes\n```");
+        TextDisplays(log).Last().Content
+            .ShouldBe("```ansi\n\e[1;31mH\e[0ma\e[1;31my\e[0mes\n```\n```ansi\n\e[1;32mh\e[0ma\e[1;32mt\e[0mes\n```");
         TextDisplays(log).Last().Content.ShouldNotContain("Before:");
         TextDisplays(log).Last().Content.ShouldNotContain("After:");
     }
@@ -66,7 +67,8 @@ public sealed class ModerationLogComponentsTests
             "hates"
         );
 
-        TextDisplays(log).First().Content.ShouldBe("**Message Edit:** [Message](https://discord.com/channels/1/2/3) by <@4> (`4`) in <#2>");
+        TextDisplays(log).First().Content
+            .ShouldBe("**Message Edit:** [Message](https://discord.com/channels/1/2/3) by <@4> (`4`) in <#2>");
     }
 
     [Test]
@@ -82,7 +84,8 @@ public sealed class ModerationLogComponentsTests
 
         TextDisplays(log)
             .First()
-            .Content.ShouldBe("**Message Delete:** <@4> (`4`) in <#2> • [Preceding message](https://discord.com/channels/1/2/3)");
+            .Content.ShouldBe(
+                "**Message Delete:** <@4> (`4`) in <#2> • [Preceding message](https://discord.com/channels/1/2/3)");
     }
 
     [Test]
@@ -109,8 +112,8 @@ public sealed class ModerationLogComponentsTests
         ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
             2,
             4,
-            precedingMessageJumpUrl: null,
-            content: null,
+            null,
+            null,
             Array.Empty<CachedAttachmentEvidence>()
         );
 
@@ -123,8 +126,8 @@ public sealed class ModerationLogComponentsTests
         ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
             2,
             4,
-            precedingMessageJumpUrl: null,
-            content: null,
+            null,
+            null,
             Array.Empty<CachedAttachmentEvidence>()
         );
 
@@ -143,18 +146,21 @@ public sealed class ModerationLogComponentsTests
         ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
             2,
             4,
-            precedingMessageJumpUrl: null,
-            content: null,
+            null,
+            null,
             [image, video]
         );
 
         MediaGalleryComponent gallery = ContainerComponents(log).OfType<MediaGalleryComponent>().Single();
 
         log.Attachments.Select(attachment => attachment.FileName).ShouldBe(["evidence-3.png", "evidence-4.mp4"]);
-        log.Attachments.Select(attachment => attachment.AttachmentUrl).ShouldBe(["attachment://evidence-3.png", "attachment://evidence-4.mp4"]);
-        gallery.Items.Select(item => item.Media.Url).ShouldBe(["attachment://evidence-3.png", "attachment://evidence-4.mp4"]);
+        log.Attachments.Select(attachment => attachment.AttachmentUrl)
+            .ShouldBe(["attachment://evidence-3.png", "attachment://evidence-4.mp4"]);
+        gallery.Items.Select(item => item.Media.Url)
+            .ShouldBe(["attachment://evidence-3.png", "attachment://evidence-4.mp4"]);
         gallery.Items.Select(item => item.Description).ShouldBe([null, null]);
-        gallery.Items.Select(item => item.Media.Url).ShouldBe(log.Attachments.Select(attachment => $"attachment://{attachment.FileName}"));
+        gallery.Items.Select(item => item.Media.Url)
+            .ShouldBe(log.Attachments.Select(attachment => $"attachment://{attachment.FileName}"));
         ContainerComponents(log).OfType<FileComponent>().ShouldBeEmpty();
     }
 
@@ -166,8 +172,8 @@ public sealed class ModerationLogComponentsTests
         ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
             2,
             4,
-            precedingMessageJumpUrl: null,
-            content: null,
+            null,
+            null,
             [file]
         );
 
@@ -180,16 +186,23 @@ public sealed class ModerationLogComponentsTests
         ContainerComponents(log).OfType<MediaGalleryComponent>().ShouldBeEmpty();
     }
 
-    private static ModerationLogComponents.ModerationLogMessage BuildDeleteLogWithoutPrecedingMessage() =>
-        ModerationLogComponents.BuildDeleteLog(2, 4, precedingMessageJumpUrl: null, "cached", Array.Empty<CachedAttachmentEvidence>());
-
-    private static IReadOnlyCollection<IMessageComponent> ContainerComponents(ModerationLogComponents.ModerationLogMessage log)
+    private static ModerationLogComponents.ModerationLogMessage BuildDeleteLogWithoutPrecedingMessage()
     {
-        ContainerComponent container = log.Components.Components.ShouldHaveSingleItem().ShouldBeOfType<ContainerComponent>();
+        return ModerationLogComponents.BuildDeleteLog(2, 4, null, "cached", Array.Empty<CachedAttachmentEvidence>());
+    }
+
+    private static IReadOnlyCollection<IMessageComponent> ContainerComponents(
+        ModerationLogComponents.ModerationLogMessage log)
+    {
+        ContainerComponent container =
+            log.Components.Components.ShouldHaveSingleItem().ShouldBeOfType<ContainerComponent>();
 
         return container.Components;
     }
 
-    private static IReadOnlyCollection<TextDisplayComponent> TextDisplays(ModerationLogComponents.ModerationLogMessage log) =>
-        ContainerComponents(log).OfType<TextDisplayComponent>().ToArray();
+    private static IReadOnlyCollection<TextDisplayComponent> TextDisplays(
+        ModerationLogComponents.ModerationLogMessage log)
+    {
+        return ContainerComponents(log).OfType<TextDisplayComponent>().ToArray();
+    }
 }

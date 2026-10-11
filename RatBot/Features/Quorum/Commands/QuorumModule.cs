@@ -10,8 +10,9 @@ public sealed class QuorumModule(QuorumOperations operations) : InteractionModul
     [SlashCommand("calculate", "Calculate required quorum for a channel.")]
     public async Task CalculateAsync(
         [Summary("channel", "The guild text channel, forum channel, or a thread under one.")]
-        [ChannelTypes(ChannelType.Text, ChannelType.Forum, ChannelType.NewsThread, ChannelType.PublicThread, ChannelType.PrivateThread)]
-            IChannel? channel = null
+        [ChannelTypes(ChannelType.Text, ChannelType.Forum, ChannelType.NewsThread, ChannelType.PublicThread,
+            ChannelType.PrivateThread)]
+        IChannel? channel = null
     )
     {
         channel ??= Context.Channel;
@@ -35,8 +36,9 @@ public sealed class QuorumModule(QuorumOperations operations) : InteractionModul
     [SlashCommand("inspect", "Inspect quorum configuration for a channel.")]
     public async Task InspectAsync(
         [Summary("channel", "The guild text channel, forum channel, or a thread under one.")]
-        [ChannelTypes(ChannelType.Text, ChannelType.Forum, ChannelType.NewsThread, ChannelType.PublicThread, ChannelType.PrivateThread)]
-            IChannel? channel = null
+        [ChannelTypes(ChannelType.Text, ChannelType.Forum, ChannelType.NewsThread, ChannelType.PublicThread,
+            ChannelType.PrivateThread)]
+        IChannel? channel = null
     )
     {
         channel ??= Context.Channel;

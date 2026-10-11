@@ -2,7 +2,10 @@ using RatBot.Infrastructure.Features.Meta;
 
 namespace RatBot.Features.Meta.BackgroundWorkers;
 
-public sealed class MetaProposalPollBackgroundWorker(IServiceScopeFactory scopeFactory, MetaProposalPollResolver pollResolver, ILogger logger)
+public sealed class MetaProposalPollBackgroundWorker(
+    IServiceScopeFactory scopeFactory,
+    MetaProposalPollResolver pollResolver,
+    ILogger logger)
     : BackgroundService
 {
     private const int BatchSize = 20;
@@ -35,7 +38,8 @@ public sealed class MetaProposalPollBackgroundWorker(IServiceScopeFactory scopeF
         using IServiceScope scope = scopeFactory.CreateScope();
         MetaProposalService service = scope.ServiceProvider.GetRequiredService<MetaProposalService>();
 
-        IReadOnlyList<MetaProposalState> expiredPolls = await service.FindExpiredPollsAsync(DateTimeOffset.UtcNow, BatchSize, ct);
+        IReadOnlyList<MetaProposalState> expiredPolls =
+            await service.FindExpiredPollsAsync(DateTimeOffset.UtcNow, BatchSize, ct);
 
         foreach (MetaProposalState state in expiredPolls)
             await pollResolver.ResolveExpiredPollAsync(service, state, ct);

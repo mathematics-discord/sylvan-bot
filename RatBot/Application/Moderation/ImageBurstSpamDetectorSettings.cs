@@ -2,12 +2,16 @@ namespace RatBot.Application.Moderation;
 
 public sealed class ImageBurstSpamDetectorSettings(ImageBurstSpamDetectorOptions initialOptions)
 {
-    private readonly Dictionary<ulong, ImageBurstSpamDetectorOptions> _current = new Dictionary<ulong, ImageBurstSpamDetectorOptions>();
+    private readonly Dictionary<ulong, ImageBurstSpamDetectorOptions> _current =
+        new Dictionary<ulong, ImageBurstSpamDetectorOptions>();
+
     private readonly ImageBurstSpamDetectorOptions _defaultOptions = initialOptions;
     private readonly Lock _gate = new Lock();
 
     public ImageBurstSpamDetectorSettings()
-        : this(new ImageBurstSpamDetectorOptions()) { }
+        : this(new ImageBurstSpamDetectorOptions())
+    {
+    }
 
     public ImageBurstSpamDetectorOptions Current
     {

@@ -13,7 +13,7 @@ public sealed class AttachmentEvidenceDownloaderTests
     {
         byte[] body = [1, 2, 3, 4];
 
-        byte[]? result = await DownloadAsync(body, declaredLength: body.Length, maxBytes: body.Length);
+        byte[]? result = await DownloadAsync(body, body.Length, body.Length);
 
         result.ShouldBe(body);
     }
@@ -23,7 +23,7 @@ public sealed class AttachmentEvidenceDownloaderTests
     {
         byte[] body = [1, 2, 3, 4];
 
-        byte[]? result = await DownloadAsync(body, declaredLength: body.Length, maxBytes: body.Length - 1);
+        byte[]? result = await DownloadAsync(body, body.Length, body.Length - 1);
 
         result.ShouldBeNull();
     }
@@ -33,7 +33,7 @@ public sealed class AttachmentEvidenceDownloaderTests
     {
         byte[] body = [1, 2, 3, 4, 5];
 
-        byte[]? result = await DownloadAsync(body, declaredLength: null, maxBytes: 4);
+        byte[]? result = await DownloadAsync(body, null, 4);
 
         result.ShouldBeNull();
     }
@@ -43,7 +43,7 @@ public sealed class AttachmentEvidenceDownloaderTests
     {
         byte[] body = [1, 2, 3, 4, 5];
 
-        byte[]? result = await DownloadAsync(body, declaredLength: 1, maxBytes: 4);
+        byte[]? result = await DownloadAsync(body, 1, 4);
 
         result.ShouldBeNull();
     }
@@ -53,7 +53,7 @@ public sealed class AttachmentEvidenceDownloaderTests
     {
         CountingStream stream = new CountingStream([1, 2, 3, 4, 5, 6, 7]);
 
-        byte[]? result = await AttachmentEvidenceDownloader.ReadLimitedAsync(stream, maxBytes: 3, CancellationToken.None);
+        byte[]? result = await AttachmentEvidenceDownloader.ReadLimitedAsync(stream, 3, CancellationToken.None);
 
         result.ShouldBeNull();
         stream.BytesRead.ShouldBe(4);
@@ -65,14 +65,17 @@ public sealed class AttachmentEvidenceDownloaderTests
 
         httpClient.BaseAddress = new Uri("https://example.invalid");
 
-        return await AttachmentEvidenceDownloader.TryDownloadAsync(httpClient, "/attachment", maxBytes, Logger.None, CancellationToken.None);
+        return await AttachmentEvidenceDownloader.TryDownloadAsync(httpClient, "/attachment", maxBytes, Logger.None,
+            CancellationToken.None);
     }
 
     private sealed class StaticResponseHandler(byte[] body, long? declaredLength) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
         {
-            HttpResponseMessage response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new StaticLengthContent(body, declaredLength) };
+            HttpResponseMessage response = new HttpResponseMessage(HttpStatusCode.OK)
+                { Content = new StaticLengthContent(body, declaredLength) };
 
             return Task.FromResult(response);
         }
@@ -80,7 +83,10 @@ public sealed class AttachmentEvidenceDownloaderTests
 
     private sealed class StaticLengthContent(byte[] body, long? declaredLength) : HttpContent
     {
-        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) => stream.WriteAsync(body, 0, body.Length);
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            return stream.WriteAsync(body, 0, body.Length);
+        }
 
         protected override bool TryComputeLength(out long length)
         {
@@ -94,7 +100,10 @@ public sealed class AttachmentEvidenceDownloaderTests
             return true;
         }
 
-        protected override Task<Stream> CreateContentReadStreamAsync() => Task.FromResult<Stream>(new MemoryStream(body));
+        protected override Task<Stream> CreateContentReadStreamAsync()
+        {
+            return Task.FromResult<Stream>(new MemoryStream(body));
+        }
     }
 
     private sealed class CountingStream(byte[] body) : Stream
@@ -106,13 +115,16 @@ public sealed class AttachmentEvidenceDownloaderTests
         public override bool CanSeek => false;
         public override bool CanWrite => false;
         public override long Length => body.Length;
+
         public override long Position
         {
             get => _position;
             set => throw new NotSupportedException();
         }
 
-        public override void Flush() { }
+        public override void Flush()
+        {
+        }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
@@ -133,13 +145,24 @@ public sealed class AttachmentEvidenceDownloaderTests
             return bytesToRead;
         }
 
-        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
-            ValueTask.FromResult(Read(buffer.Span));
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            return ValueTask.FromResult(Read(buffer.Span));
+        }
 
-        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            throw new NotSupportedException();
+        }
 
-        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void SetLength(long value)
+        {
+            throw new NotSupportedException();
+        }
 
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

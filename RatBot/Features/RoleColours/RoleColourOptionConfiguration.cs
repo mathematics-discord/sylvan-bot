@@ -11,7 +11,8 @@ public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<Rol
             "RoleColourOptions",
             table =>
             {
-                table.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\"");
+                table.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles",
+                    "\"SourceRoleId\" <> \"DisplayRoleId\"");
             }
         );
 
@@ -30,7 +31,7 @@ public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<Rol
             {
                 x.GuildId,
                 x.SourceRoleId,
-                x.DisplayRoleId,
+                x.DisplayRoleId
             })
             .IsUnique();
     }

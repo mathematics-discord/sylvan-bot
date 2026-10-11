@@ -14,6 +14,7 @@ public sealed class LoggingConfigurationConfiguration : IEntityTypeConfiguration
         builder.Property(configuration => configuration.Enabled).HasColumnName("enabled").IsRequired();
         builder.Property(configuration => configuration.DeleteLogChannelId).HasColumnName("delete_log_channel_id");
         builder.Property(configuration => configuration.EditLogChannelId).HasColumnName("edit_log_channel_id");
-        builder.Property(configuration => configuration.EvidenceRetentionPeriod).HasColumnName("evidence_retention_period").IsRequired();
+        builder.Property(configuration => configuration.EvidenceRetentionPeriod)
+            .HasColumnName("evidence_retention_period").IsRequired();
     }
 }

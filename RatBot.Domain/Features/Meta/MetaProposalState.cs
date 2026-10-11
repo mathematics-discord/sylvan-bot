@@ -6,7 +6,9 @@ public sealed class MetaProposalState
     public const int MaxPublicationRetryFailuresBeforePing = 10;
     public const int MaxTitleLength = 100;
 
-    private MetaProposalState() { }
+    private MetaProposalState()
+    {
+    }
 
     public int FailedPollAttempts { get; private set; }
     public ulong GuildId { get; private set; }
@@ -19,7 +21,8 @@ public sealed class MetaProposalState
         && !string.IsNullOrWhiteSpace(Specification)
         && ProposedAtUtc is not null;
 
-    public bool HasSubmittedProposal => Status is not MetaProposalStatus.SuggestionOpen and not MetaProposalStatus.PollActive;
+    public bool HasSubmittedProposal =>
+        Status is not MetaProposalStatus.SuggestionOpen and not MetaProposalStatus.PollActive;
 
     public Guid Id { get; private set; }
 
@@ -78,15 +81,21 @@ public sealed class MetaProposalState
             SuggestionsForumChannelId = suggestionsForumChannelId,
             OriginalThreadAuthorUserId = originalThreadAuthorUserId,
             TrackedAtUtc = trackedAtUtc,
-            Status = MetaProposalStatus.SuggestionOpen,
+            Status = MetaProposalStatus.SuggestionOpen
         };
     }
 
-    private static Error RequiredFieldMissing(string fieldName) =>
-        Error.Validation($"MetaProposal.{fieldName}Required", $"Meta proposal {fieldName.ToLowerInvariant()} is required.");
+    private static Error RequiredFieldMissing(string fieldName)
+    {
+        return Error.Validation($"MetaProposal.{fieldName}Required",
+            $"Meta proposal {fieldName.ToLowerInvariant()} is required.");
+    }
 
-    private static Error RequiredId(string fieldName) =>
-        Error.Validation($"MetaProposal.{fieldName}Required", $"A valid {fieldName.ToLowerInvariant()} is required.");
+    private static Error RequiredId(string fieldName)
+    {
+        return Error.Validation($"MetaProposal.{fieldName}Required",
+            $"A valid {fieldName.ToLowerInvariant()} is required.");
+    }
 
     public ErrorOr<Success> ClearDeletedPoll()
     {
@@ -129,7 +138,9 @@ public sealed class MetaProposalState
 
         FailedPollAttempts++;
 
-        Status = FailedPollAttempts >= MaxFailedPollAttempts ? MetaProposalStatus.Closed : MetaProposalStatus.SuggestionOpen;
+        Status = FailedPollAttempts >= MaxFailedPollAttempts
+            ? MetaProposalStatus.Closed
+            : MetaProposalStatus.SuggestionOpen;
 
         return Result.Success;
     }
@@ -197,7 +208,8 @@ public sealed class MetaProposalState
             return Error.Conflict("MetaProposal.NotOpen", "This suggestion thread is no longer open for proposals.");
 
         if (FailedPollAttempts >= MaxFailedPollAttempts)
-            return Error.Conflict("MetaProposal.AttemptsExhausted", "This suggestion thread has no proposal attempts left.");
+            return Error.Conflict("MetaProposal.AttemptsExhausted",
+                "This suggestion thread has no proposal attempts left.");
 
         title = title.Trim();
         summary = summary.Trim();
@@ -211,7 +223,8 @@ public sealed class MetaProposalState
             return RequiredFieldMissing(nameof(ProposalTitle));
 
         if (title.Length > MaxTitleLength)
-            return Error.Validation("MetaProposal.TitleTooLong", $"Proposal title must be at most {MaxTitleLength} characters.");
+            return Error.Validation("MetaProposal.TitleTooLong",
+                $"Proposal title must be at most {MaxTitleLength} characters.");
 
         if (string.IsNullOrWhiteSpace(summary))
             return RequiredFieldMissing(nameof(Summary));

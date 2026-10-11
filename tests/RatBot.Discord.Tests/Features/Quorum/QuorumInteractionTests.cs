@@ -43,7 +43,8 @@ public sealed class QuorumInteractionTests
         fixture.ClearResponses();
         await fixture.Quorum.CalculateAsync(channel);
 
-        await fixture.Interaction.Received(1).RespondAsync(QuorumErrors.ConfigurationIncomplete.Description, ephemeral: true);
+        await fixture.Interaction.Received(1)
+            .RespondAsync(QuorumErrors.ConfigurationIncomplete.Description, ephemeral: true);
     }
 
     [Test]
@@ -87,7 +88,8 @@ public sealed class QuorumInteractionTests
 
         fixture.Store.Configuration.ShouldNotBeNull();
         fixture.Store.Configuration.Scope.ShouldBe(new QuorumScope.ForumChannel(GuildId, ChannelId));
-        await fixture.Interaction.Received(1).RespondAsync($"Registered quorum for <#{ChannelId}> at 60%.", ephemeral: true);
+        await fixture.Interaction.Received(1)
+            .RespondAsync($"Registered quorum for <#{ChannelId}> at 60%.", ephemeral: true);
     }
 
     [Test]
@@ -98,7 +100,8 @@ public sealed class QuorumInteractionTests
 
         await fixture.Admin.RegisterAsync(category, 0.6);
 
-        await fixture.Interaction.Received(1).RespondAsync("Choose a guild text channel or forum channel.", ephemeral: true);
+        await fixture.Interaction.Received(1)
+            .RespondAsync("Choose a guild text channel or forum channel.", ephemeral: true);
         fixture.Store.Configuration.ShouldBeNull();
 
         fixture.ClearResponses();
@@ -106,7 +109,8 @@ public sealed class QuorumInteractionTests
 
         await fixture.Admin.RegisterAsync(otherGuildChannel, 0.6);
 
-        await fixture.Interaction.Received(1).RespondAsync("That channel does not belong to this guild.", ephemeral: true);
+        await fixture.Interaction.Received(1)
+            .RespondAsync("That channel does not belong to this guild.", ephemeral: true);
         fixture.Store.Configuration.ShouldBeNull();
     }
 
@@ -125,7 +129,8 @@ public sealed class QuorumInteractionTests
         fixture.Store.Configuration!.Scope.ShouldBe(new QuorumScope.TextChannel(GuildId, ChannelId));
         fixture.Store.Configuration.Proportion.Value.ShouldBe(0.75m);
         fixture.Store.Configuration.VoterRoles.RoleIds.ShouldContain(RoleId);
-        await fixture.Interaction.Received(1).RespondAsync($"Updated quorum for <#{ChannelId}> at 75%.", ephemeral: true);
+        await fixture.Interaction.Received(1)
+            .RespondAsync($"Updated quorum for <#{ChannelId}> at 75%.", ephemeral: true);
     }
 
     [Test]
@@ -139,7 +144,8 @@ public sealed class QuorumInteractionTests
         await fixture.Admin.RemoveAsync(channel);
 
         fixture.Store.Configuration.ShouldBeNull();
-        await fixture.Interaction.Received(1).RespondAsync($"Removed quorum configuration for <#{ChannelId}>.", ephemeral: true);
+        await fixture.Interaction.Received(1)
+            .RespondAsync($"Removed quorum configuration for <#{ChannelId}>.", ephemeral: true);
     }
 
     [Test]
@@ -178,8 +184,8 @@ public sealed class QuorumInteractionTests
 
         fixture.Store.Configuration!.VoterRoles.RoleIds.ShouldBe(ImmutableHashSet.Create(RoleId));
 
-        await fixture.Admin.RoleAsync(channel, role, shouldAdd: false);
-        await fixture.Admin.RoleAsync(channel, role, shouldAdd: false);
+        await fixture.Admin.RoleAsync(channel, role, false);
+        await fixture.Admin.RoleAsync(channel, role, false);
 
         fixture.Store.Configuration.VoterRoles.IsEmpty.ShouldBeTrue();
         await fixture.Interaction.Received(4).RespondAsync(Arg.Any<string>(), ephemeral: true);
@@ -189,12 +195,17 @@ public sealed class QuorumInteractionTests
     {
         public QuorumConfiguration? Configuration { get; private set; }
 
-        public Task<ErrorOr<QuorumConfiguration>> GetAsync(QuorumScope scope, CancellationToken ct) =>
-            Task.FromResult<ErrorOr<QuorumConfiguration>>(
-                Configuration is not null && Configuration.Scope == scope ? Configuration : QuorumErrors.ConfigurationNotFound
+        public Task<ErrorOr<QuorumConfiguration>> GetAsync(QuorumScope scope, CancellationToken ct)
+        {
+            return Task.FromResult<ErrorOr<QuorumConfiguration>>(
+                Configuration is not null && Configuration.Scope == scope
+                    ? Configuration
+                    : QuorumErrors.ConfigurationNotFound
             );
+        }
 
-        public Task<ErrorOr<QuorumRegistration>> RegisterAsync(QuorumScope scope, QuorumProportion proportion, CancellationToken ct)
+        public Task<ErrorOr<QuorumRegistration>> RegisterAsync(QuorumScope scope, QuorumProportion proportion,
+            CancellationToken ct)
         {
             bool created = Configuration is null;
             Configuration =
@@ -276,7 +287,10 @@ public sealed class QuorumInteractionTests
             return role;
         }
 
-        public void ClearResponses() => Interaction.ClearReceivedCalls();
+        public void ClearResponses()
+        {
+            Interaction.ClearReceivedCalls();
+        }
 
         private static void SetChannel(IGuildChannel channel, ulong guildId, ulong channelId = ChannelId)
         {
@@ -289,7 +303,10 @@ public sealed class QuorumInteractionTests
     {
         public int EligibleVoterCount { get; set; } = 1;
 
-        public Task<ErrorOr<int>> CountEligibleVotersAsync(QuorumScope scope, ImmutableHashSet<ulong> roleIds, CancellationToken ct) =>
-            Task.FromResult<ErrorOr<int>>(EligibleVoterCount);
+        public Task<ErrorOr<int>> CountEligibleVotersAsync(QuorumScope scope, ImmutableHashSet<ulong> roleIds,
+            CancellationToken ct)
+        {
+            return Task.FromResult<ErrorOr<int>>(EligibleVoterCount);
+        }
     }
 }

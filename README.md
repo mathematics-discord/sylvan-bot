@@ -1,10 +1,10 @@
 # RatBot
 
-A Discord bot built with .NET 10.0 and Discord.Net, featuring a modular architecture and optional observability.
+A Discord bot built with .NET 11.0 and C# 15, using Discord.Net and optional observability.
 
 ## Prerequisites
 
-- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [.NET 11.0 SDK](https://dotnet.microsoft.com/download/dotnet/11.0) (RC 1 or later)
 - [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/install/)
 - A Discord Bot Token (from the [Discord Developer Portal](https://discord.com/developers/applications))
 

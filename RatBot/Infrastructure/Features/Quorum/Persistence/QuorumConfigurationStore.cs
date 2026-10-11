@@ -8,40 +8,45 @@ namespace RatBot.Infrastructure.Features.Quorum.Persistence;
 public sealed class QuorumConfigurationStore(string connectionString) : IQuorumConfigurationStore
 {
     private const string ConfigurationColumns = """
-        id AS "Id",
-        guild_id AS "GuildId",
-        channel_id AS "ChannelId",
-        channel_kind AS "ChannelKind",
-        proportion AS "Proportion"
-        """;
+                                                id AS "Id",
+                                                guild_id AS "GuildId",
+                                                channel_id AS "ChannelId",
+                                                channel_kind AS "ChannelKind",
+                                                proportion AS "Proportion"
+                                                """;
 
-    private static object ConfigurationParameters(Guid id, QuorumScope scope, QuorumProportion proportion) =>
-        new
+    private static object ConfigurationParameters(Guid id, QuorumScope scope, QuorumProportion proportion)
+    {
+        return new
         {
             Id = id,
             GuildId = QuorumPersistenceMapping.ToDatabaseId(scope.GuildId),
             ChannelId = QuorumPersistenceMapping.ToDatabaseId(scope.ChannelId),
             ChannelKind = QuorumPersistenceMapping.ToChannelKind(scope),
-            Proportion = proportion.Value,
+            Proportion = proportion.Value
         };
+    }
 
-    private static QuorumPersistenceMapping.Data CreateData(Guid id, QuorumScope scope, QuorumProportion proportion) =>
-        new QuorumPersistenceMapping.Data
+    private static QuorumPersistenceMapping.Data CreateData(Guid id, QuorumScope scope, QuorumProportion proportion)
+    {
+        return new QuorumPersistenceMapping.Data
         {
             Id = id,
             GuildId = QuorumPersistenceMapping.ToDatabaseId(scope.GuildId),
             ChannelId = QuorumPersistenceMapping.ToDatabaseId(scope.ChannelId),
             ChannelKind = QuorumPersistenceMapping.ToChannelKind(scope),
-            Proportion = proportion.Value,
+            Proportion = proportion.Value
         };
+    }
 
     private static Task<IEnumerable<long>> GetRoleIdsAsync(
         NpgsqlConnection connection,
         Guid configurationId,
         NpgsqlTransaction? transaction,
         CancellationToken ct
-    ) =>
-        connection.QueryAsync<long>(
+    )
+    {
+        return connection.QueryAsync<long>(
             new CommandDefinition(
                 """
                 SELECT role_id
@@ -54,6 +59,7 @@ public sealed class QuorumConfigurationStore(string connectionString) : IQuorumC
                 cancellationToken: ct
             )
         );
+    }
 
     private static async Task ReplaceRolesAsync(
         NpgsqlConnection connection,
@@ -75,7 +81,10 @@ public sealed class QuorumConfigurationStore(string connectionString) : IQuorumC
 
         object[] roles = configuration
             .VoterRoles.RoleIds.Order()
-            .Select(roleId => (object)new { QuorumConfigurationId = configuration.Id.Value, RoleId = QuorumPersistenceMapping.ToDatabaseId(roleId) })
+            .Select(roleId => (object)new
+            {
+                QuorumConfigurationId = configuration.Id.Value, RoleId = QuorumPersistenceMapping.ToDatabaseId(roleId)
+            })
             .ToArray();
 
         if (roles.Length == 0)
@@ -96,8 +105,14 @@ public sealed class QuorumConfigurationStore(string connectionString) : IQuorumC
             .ConfigureAwait(false);
     }
 
-    private static object ScopeParameters(QuorumScope scope) =>
-        new { GuildId = QuorumPersistenceMapping.ToDatabaseId(scope.GuildId), ChannelId = QuorumPersistenceMapping.ToDatabaseId(scope.ChannelId) };
+    private static object ScopeParameters(QuorumScope scope)
+    {
+        return new
+        {
+            GuildId = QuorumPersistenceMapping.ToDatabaseId(scope.GuildId),
+            ChannelId = QuorumPersistenceMapping.ToDatabaseId(scope.ChannelId)
+        };
+    }
 
     public async Task<ErrorOr<Deleted>> DeleteAsync(QuorumScope scope, CancellationToken ct)
     {
@@ -126,10 +141,10 @@ public sealed class QuorumConfigurationStore(string connectionString) : IQuorumC
             .QuerySingleOrDefaultAsync<QuorumPersistenceMapping.Data>(
                 new CommandDefinition(
                     $"""
-                    SELECT {ConfigurationColumns}
-                    FROM public.quorum_configurations
-                    WHERE guild_id = @GuildId AND channel_id = @ChannelId
-                    """,
+                     SELECT {ConfigurationColumns}
+                     FROM public.quorum_configurations
+                     WHERE guild_id = @GuildId AND channel_id = @ChannelId
+                     """,
                     ScopeParameters(scope),
                     cancellationToken: ct
                 )
@@ -138,10 +153,12 @@ public sealed class QuorumConfigurationStore(string connectionString) : IQuorumC
 
         return data is null
             ? QuorumErrors.ConfigurationNotFound
-            : QuorumPersistenceMapping.ToDomain(data, await GetRoleIdsAsync(connection, data.Id, null, ct).ConfigureAwait(false));
+            : QuorumPersistenceMapping.ToDomain(data,
+                await GetRoleIdsAsync(connection, data.Id, null, ct).ConfigureAwait(false));
     }
 
-    public async Task<ErrorOr<QuorumRegistration>> RegisterAsync(QuorumScope scope, QuorumProportion proportion, CancellationToken ct)
+    public async Task<ErrorOr<QuorumRegistration>> RegisterAsync(QuorumScope scope, QuorumProportion proportion,
+        CancellationToken ct)
     {
         await using NpgsqlConnection connection = CreateConnection();
         await connection.OpenAsync(ct).ConfigureAwait(false);
@@ -167,27 +184,23 @@ public sealed class QuorumConfigurationStore(string connectionString) : IQuorumC
 
         QuorumPersistenceMapping.Data data;
         if (inserted == 1)
-        {
             data = CreateData(id, scope, proportion);
-        }
         else
-        {
             data = await connection
                 .QuerySingleAsync<QuorumPersistenceMapping.Data>(
                     new CommandDefinition(
                         $"""
-                        UPDATE public.quorum_configurations
-                        SET channel_kind = @ChannelKind, proportion = @Proportion
-                        WHERE guild_id = @GuildId AND channel_id = @ChannelId
-                        RETURNING {ConfigurationColumns}
-                        """,
+                         UPDATE public.quorum_configurations
+                         SET channel_kind = @ChannelKind, proportion = @Proportion
+                         WHERE guild_id = @GuildId AND channel_id = @ChannelId
+                         RETURNING {ConfigurationColumns}
+                         """,
                         parameters,
                         transaction,
                         cancellationToken: ct
                     )
                 )
                 .ConfigureAwait(false);
-        }
 
         IEnumerable<long> roleIds = await GetRoleIdsAsync(connection, data.Id, transaction, ct).ConfigureAwait(false);
         await transaction.CommitAsync(ct).ConfigureAwait(false);
@@ -228,5 +241,8 @@ public sealed class QuorumConfigurationStore(string connectionString) : IQuorumC
         return configuration;
     }
 
-    private NpgsqlConnection CreateConnection() => new NpgsqlConnection(connectionString);
+    private NpgsqlConnection CreateConnection()
+    {
+        return new NpgsqlConnection(connectionString);
+    }
 }

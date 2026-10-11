@@ -7,33 +7,33 @@
         <Version>0.0.1-1</Version>
     </PropertyGroup>
     <ItemGroup>
-        <PackageReference Include="Dapper" />
-        <PackageReference Include="DiffPlex" />
-        <PackageReference Include="Discord.Net.Interactions" />
-        <PackageReference Include="Discord.Net.WebSocket" />
-        <PackageReference Include="DotNetEnv" />
-        <PackageReference Include="ErrorOr" />
-        <PackageReference Include="JetBrains.Annotations" />
+        <PackageReference Include="Dapper"/>
+        <PackageReference Include="DiffPlex"/>
+        <PackageReference Include="Discord.Net.Interactions"/>
+        <PackageReference Include="Discord.Net.WebSocket"/>
+        <PackageReference Include="DotNetEnv"/>
+        <PackageReference Include="ErrorOr"/>
+        <PackageReference Include="JetBrains.Annotations"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-        <PackageReference Include="Microsoft.Extensions.Hosting" />
-        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-        <PackageReference Include="Serilog" />
-        <PackageReference Include="Serilog.Extensions.Hosting" />
-        <PackageReference Include="Serilog.Sinks.Console" />
-        <PackageReference Include="Serilog.Sinks.File" />
-        <PackageReference Include="Serilog.Sinks.OpenTelemetry" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
+        <PackageReference Include="Microsoft.Extensions.Hosting"/>
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL"/>
+        <PackageReference Include="Serilog"/>
+        <PackageReference Include="Serilog.Extensions.Hosting"/>
+        <PackageReference Include="Serilog.Sinks.Console"/>
+        <PackageReference Include="Serilog.Sinks.File"/>
+        <PackageReference Include="Serilog.Sinks.OpenTelemetry"/>
     </ItemGroup>
     <ItemGroup>
-        <ProjectReference Include="..\RatBot.Domain\RatBot.Domain.csproj" />
+        <ProjectReference Include="..\RatBot.Domain\RatBot.Domain.csproj"/>
     </ItemGroup>
     <ItemGroup>
-        <Folder Include="Features\Joy\BackgroundWorkers\" />
-        <Folder Include="Features\Joy\Commands\" />
+        <Folder Include="Features\Joy\BackgroundWorkers\"/>
+        <Folder Include="Features\Joy\Commands\"/>
     </ItemGroup>
     <ItemGroup>
         <None Update="Features\Logging\Gateway\birb-images.json">

@@ -22,7 +22,7 @@ public sealed class DependencyInjectionTests
                 {
                     ["DB:ConnectionString"] = "Host=localhost;Database=ratbot_di_test;Username=ratbot;Password=unused",
                     ["Discord:Token"] = "inert-test-token",
-                    ["Discord:MessageCacheSize"] = "1000",
+                    ["Discord:MessageCacheSize"] = "1000"
                 }
             )
             .Build();
@@ -54,7 +54,7 @@ public sealed class DependencyInjectionTests
                 new Dictionary<string, string?>(StringComparer.Ordinal)
                 {
                     ["Discord:Token"] = "inert-test-token",
-                    ["Discord:MessageCacheSize"] = "1000",
+                    ["Discord:MessageCacheSize"] = "1000"
                 }
             )
             .Build();

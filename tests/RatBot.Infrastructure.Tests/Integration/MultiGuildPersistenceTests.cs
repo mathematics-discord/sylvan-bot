@@ -10,7 +10,10 @@ namespace RatBot.Infrastructure.Tests.Integration;
 public sealed class MultiGuildPersistenceTests
 {
     [SetUp]
-    public async Task SetUp() => await PostgresDatabaseFixture.ResetAsync();
+    public async Task SetUp()
+    {
+        await PostgresDatabaseFixture.ResetAsync();
+    }
 
     [Test]
     public async Task RoleColourState_IsIsolatedByGuild()
@@ -18,16 +21,21 @@ public sealed class MultiGuildPersistenceTests
         await using BotDbContext db = PostgresDatabaseFixture.CreateDbContext();
         RoleColourOperations operations = new RoleColourOperations(db);
 
-        RoleColourOption guildA = (await operations.UpsertMappingAsync(1, null, 10, 20, CancellationToken.None)).Value.Option;
-        RoleColourOption guildB = (await operations.UpsertMappingAsync(2, null, 10, 20, CancellationToken.None)).Value.Option;
+        RoleColourOption guildA = (await operations.UpsertMappingAsync(1, null, 10, 20, CancellationToken.None)).Value
+            .Option;
+        RoleColourOption guildB = (await operations.UpsertMappingAsync(2, null, 10, 20, CancellationToken.None)).Value
+            .Option;
 
-        (await operations.ListConfiguredOptionsAsync(1, CancellationToken.None)).Single().OptionId.ShouldBe(guildA.OptionId);
-        (await operations.ListConfiguredOptionsAsync(2, CancellationToken.None)).Single().OptionId.ShouldBe(guildB.OptionId);
+        (await operations.ListConfiguredOptionsAsync(1, CancellationToken.None)).Single().OptionId
+            .ShouldBe(guildA.OptionId);
+        (await operations.ListConfiguredOptionsAsync(2, CancellationToken.None)).Single().OptionId
+            .ShouldBe(guildB.OptionId);
 
         (await operations.DeleteMappingAsync(1, guildA.OptionId, CancellationToken.None)).IsError.ShouldBeFalse();
 
         (await operations.ListConfiguredOptionsAsync(1, CancellationToken.None)).ShouldBeEmpty();
-        (await operations.ListConfiguredOptionsAsync(2, CancellationToken.None)).Single().OptionId.ShouldBe(guildB.OptionId);
+        (await operations.ListConfiguredOptionsAsync(2, CancellationToken.None)).Single().OptionId
+            .ShouldBe(guildB.OptionId);
     }
 
     [Test]
@@ -53,7 +61,7 @@ public sealed class MultiGuildPersistenceTests
                 GuildId = 1,
                 EmojiId = 500,
                 MessageUsageCount = 1,
-                ReactionUsageCount = 1,
+                ReactionUsageCount = 1
             }
         );
         db.EmojiUsageCounts.Add(
@@ -62,21 +70,25 @@ public sealed class MultiGuildPersistenceTests
                 GuildId = 2,
                 EmojiId = 500,
                 MessageUsageCount = 3,
-                ReactionUsageCount = 5,
+                ReactionUsageCount = 5
             }
         );
         await db.SaveChangesAsync();
 
         EmojiUsageStore emojiUsageStore = new EmojiUsageStore(new EmojiDbContextFactory());
-        (await emojiUsageStore.GetUsagePageAsync(1, [500UL], 1, ct: CancellationToken.None)).Value.Items.Single().ReactionUsageCount.ShouldBe(1);
-        (await emojiUsageStore.GetUsagePageAsync(2, [500UL], 1, ct: CancellationToken.None)).Value.Items.Single().ReactionUsageCount.ShouldBe(5);
+        (await emojiUsageStore.GetUsagePageAsync(1, [500UL], 1, ct: CancellationToken.None)).Value.Items.Single()
+            .ReactionUsageCount.ShouldBe(1);
+        (await emojiUsageStore.GetUsagePageAsync(2, [500UL], 1, ct: CancellationToken.None)).Value.Items.Single()
+            .ReactionUsageCount.ShouldBe(5);
 
-        ErrorOr<EmojiUsagePage> pruningRead = await emojiUsageStore.GetUsagePageAsync(1, [501UL], 1, ct: CancellationToken.None);
+        ErrorOr<EmojiUsagePage> pruningRead =
+            await emojiUsageStore.GetUsagePageAsync(1, [501UL], 1, ct: CancellationToken.None);
 
         pruningRead.FirstError.Type.ShouldBe(ErrorType.NotFound);
         (await db.EmojiUsageCounts.AnyAsync(x => x.GuildId == 1 && x.EmojiId == 500)).ShouldBeTrue();
 
-        await emojiUsageStore.RecordBatchAsync(1, [new EmojiUsageIncrement(1, 501, 0, 1)], [501UL], CancellationToken.None);
+        await emojiUsageStore.RecordBatchAsync(1, [new EmojiUsageIncrement(1, 501, 0, 1)], [501UL],
+            CancellationToken.None);
 
         (await db.EmojiUsageCounts.AnyAsync(x => x.GuildId == 1 && x.EmojiId == 500)).ShouldBeFalse();
         EmojiUsageCount guild2Emoji = await db.EmojiUsageCounts.SingleAsync(x => x.GuildId == 2 && x.EmojiId == 500);
@@ -106,6 +118,9 @@ public sealed class MultiGuildPersistenceTests
 
     private sealed class EmojiDbContextFactory : IDbContextFactory<BotDbContext>
     {
-        public BotDbContext CreateDbContext() => PostgresDatabaseFixture.CreateDbContext();
+        public BotDbContext CreateDbContext()
+        {
+            return PostgresDatabaseFixture.CreateDbContext();
+        }
     }
 }

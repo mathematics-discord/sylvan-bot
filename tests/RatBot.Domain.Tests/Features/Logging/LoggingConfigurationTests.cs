@@ -41,7 +41,7 @@ public sealed class LoggingConfigurationTests
     {
         LoggingConfiguration configuration = new LoggingConfiguration(1, true, 10, null, TimeSpan.FromMinutes(15));
 
-        configuration.AllowsLogging(channelIsExcluded: true).ShouldBeFalse();
+        configuration.AllowsLogging(true).ShouldBeFalse();
     }
 
     [Test]
@@ -49,6 +49,6 @@ public sealed class LoggingConfigurationTests
     {
         LoggingConfiguration configuration = new LoggingConfiguration(1, false, 10, null, TimeSpan.FromMinutes(15));
 
-        configuration.AllowsLogging(channelIsExcluded: false).ShouldBeFalse();
+        configuration.AllowsLogging(false).ShouldBeFalse();
     }
 }

@@ -72,14 +72,15 @@ public sealed class DiscordBotHostedService : IHostedService
             LogSeverity.Warning => LogEventLevel.Warning,
             LogSeverity.Info => LogEventLevel.Information,
             LogSeverity.Verbose => LogEventLevel.Verbose,
-            _ => LogEventLevel.Debug,
+            _ => LogEventLevel.Debug
         };
 
         string source = string.IsNullOrWhiteSpace(message.Source) ? "Unknown" : message.Source;
 
         if (message.Exception is not null)
         {
-            _logger.Write(level, message.Exception, "[{Category}] {Source}: {Message}", category, source, message.Message);
+            _logger.Write(level, message.Exception, "[{Category}] {Source}: {Message}", category, source,
+                message.Message);
 
             return;
         }

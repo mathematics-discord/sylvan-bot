@@ -10,12 +10,9 @@ public sealed class DiscordOptions
 
     public ulong[] ImageBurstSpamAllowlistedUserIds { get; init; } = [];
 
-    [Range(0, 7)]
-    public int ImageBurstSpamHistoryPruneDays { get; init; } = 1;
+    [Range(0, 7)] public int ImageBurstSpamHistoryPruneDays { get; init; } = 1;
 
-    [Range(1000, 50000)]
-    public int MessageCacheSize { get; init; } = 5000;
+    [Range(1000, 50000)] public int MessageCacheSize { get; init; } = 5000;
 
-    [Required]
-    public string Token { get; init; } = string.Empty;
+    [Required] public string Token { get; init; } = string.Empty;
 }

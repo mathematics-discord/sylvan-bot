@@ -11,29 +11,45 @@ public sealed class MetaSuggestionSettingsService(BotDbContext db, ILogger logge
 
     public async Task<ErrorOr<MetaSuggestionSettings>> GetAsync(ulong guildId, CancellationToken ct = default)
     {
-        MetaSuggestionSettings? setting = await _db.MetaSuggestionSettings.AsNoTracking().SingleOrDefaultAsync(x => x.GuildId == guildId, ct);
+        MetaSuggestionSettings? setting = await _db.MetaSuggestionSettings.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.GuildId == guildId, ct);
 
         return setting is null ? MetaProposalErrors.SettingsNotConfigured : setting;
     }
 
-    public Task<ErrorOr<Success>> UpsertCabinetChairRoleAsync(ulong guildId, ulong roleId, CancellationToken ct = default) =>
-        UpsertAsync(guildId, settings => settings.SetCabinetChairRole(roleId), ct);
-
-    public Task<ErrorOr<Success>> UpsertCabinetRoleAsync(ulong guildId, ulong roleId, CancellationToken ct = default) =>
-        UpsertAsync(guildId, settings => settings.SetCabinetRole(roleId), ct);
-
-    public Task<ErrorOr<Success>> UpsertCommitteeRoleAsync(ulong guildId, ulong roleId, CancellationToken ct = default) =>
-        UpsertAsync(guildId, settings => settings.SetCommitteeRole(roleId), ct);
-
-    public Task<ErrorOr<Success>> UpsertProposalsForumChannelAsync(ulong guildId, ulong forumChannelId, CancellationToken ct = default) =>
-        UpsertAsync(guildId, settings => settings.SetProposalsForum(forumChannelId), ct);
-
-    public Task<ErrorOr<Success>> UpsertSuggestionsForumChannelAsync(ulong guildId, ulong forumChannelId, CancellationToken ct = default) =>
-        UpsertAsync(guildId, settings => settings.SetSuggestionsForum(forumChannelId), ct);
-
-    private async Task<ErrorOr<Success>> UpsertAsync(ulong guildId, Func<MetaSuggestionSettings, ErrorOr<Success>> update, CancellationToken ct)
+    public Task<ErrorOr<Success>> UpsertCabinetChairRoleAsync(ulong guildId, ulong roleId,
+        CancellationToken ct = default)
     {
-        MetaSuggestionSettings? existing = await _db.MetaSuggestionSettings.SingleOrDefaultAsync(x => x.GuildId == guildId, ct);
+        return UpsertAsync(guildId, settings => settings.SetCabinetChairRole(roleId), ct);
+    }
+
+    public Task<ErrorOr<Success>> UpsertCabinetRoleAsync(ulong guildId, ulong roleId, CancellationToken ct = default)
+    {
+        return UpsertAsync(guildId, settings => settings.SetCabinetRole(roleId), ct);
+    }
+
+    public Task<ErrorOr<Success>> UpsertCommitteeRoleAsync(ulong guildId, ulong roleId, CancellationToken ct = default)
+    {
+        return UpsertAsync(guildId, settings => settings.SetCommitteeRole(roleId), ct);
+    }
+
+    public Task<ErrorOr<Success>> UpsertProposalsForumChannelAsync(ulong guildId, ulong forumChannelId,
+        CancellationToken ct = default)
+    {
+        return UpsertAsync(guildId, settings => settings.SetProposalsForum(forumChannelId), ct);
+    }
+
+    public Task<ErrorOr<Success>> UpsertSuggestionsForumChannelAsync(ulong guildId, ulong forumChannelId,
+        CancellationToken ct = default)
+    {
+        return UpsertAsync(guildId, settings => settings.SetSuggestionsForum(forumChannelId), ct);
+    }
+
+    private async Task<ErrorOr<Success>> UpsertAsync(ulong guildId,
+        Func<MetaSuggestionSettings, ErrorOr<Success>> update, CancellationToken ct)
+    {
+        MetaSuggestionSettings? existing =
+            await _db.MetaSuggestionSettings.SingleOrDefaultAsync(x => x.GuildId == guildId, ct);
 
         MetaSuggestionSettings settings = existing ?? MetaSuggestionSettings.Create(guildId);
 

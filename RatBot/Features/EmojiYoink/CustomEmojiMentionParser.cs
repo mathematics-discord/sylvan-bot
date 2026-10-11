@@ -5,7 +5,7 @@ namespace RatBot.Features.EmojiYoink;
 
 public static partial class CustomEmojiMentionParser
 {
-    [GeneratedRegex(@"<a?:[^<>\s:]+:[0-9]+>", options: Compiled, matchTimeoutMilliseconds: 500)]
+    [GeneratedRegex(@"<a?:[^<>\s:]+:[0-9]+>", Compiled, 500)]
     private static partial Regex MentionPattern { get; }
 
     public static ErrorOr<Emote> ParseStrict(string input)

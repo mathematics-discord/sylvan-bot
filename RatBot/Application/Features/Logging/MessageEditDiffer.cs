@@ -11,7 +11,9 @@ public sealed class MessageEditDiffer
     private readonly IDiffer _differ;
 
     public MessageEditDiffer()
-        : this(Differ.Instance) { }
+        : this(Differ.Instance)
+    {
+    }
 
     private MessageEditDiffer(IDiffer differ)
     {
@@ -111,10 +113,13 @@ public sealed class MessageEditDiffer
         return longestTokenLength > 0 && (double)commonCharacters / longestTokenLength >= SimilarTokenThreshold;
     }
 
-    private DiffResult CreateCharacterDiff(string beforeToken, string afterToken) =>
-        _differ.CreateDiffs(beforeToken, afterToken, false, false, CharacterChunker.Instance);
+    private DiffResult CreateCharacterDiff(string beforeToken, string afterToken)
+    {
+        return _differ.CreateDiffs(beforeToken, afterToken, false, false, CharacterChunker.Instance);
+    }
 
-    private static void AddUnchangedTokens(DiffResult tokenDiff, DiffBuilder builder, int start, int end) =>
+    private static void AddUnchangedTokens(DiffResult tokenDiff, DiffBuilder builder, int start, int end)
+    {
         AddTokenRange(
             tokenDiff.PiecesOld,
             start,
@@ -126,8 +131,10 @@ public sealed class MessageEditDiffer
                 builder.AddAfter(segment.Text, segment.Kind);
             }
         );
+    }
 
-    private static void AddUnchangedCharacters(DiffResult characterDiff, DiffBuilder builder, int start, int end) =>
+    private static void AddUnchangedCharacters(DiffResult characterDiff, DiffBuilder builder, int start, int end)
+    {
         AddCharacterRange(
             characterDiff.PiecesOld,
             start,
@@ -139,6 +146,7 @@ public sealed class MessageEditDiffer
                 builder.AddAfter(segment.Text, segment.Kind);
             }
         );
+    }
 
     private static void AddTokenRange(
         IReadOnlyList<string> tokens,
@@ -170,16 +178,29 @@ public sealed class MessageEditDiffer
 
     private sealed class DiffBuilder
     {
-        private readonly ImmutableArray<MessageEditDiffSegment>.Builder _before = ImmutableArray.CreateBuilder<MessageEditDiffSegment>();
-        private readonly ImmutableArray<MessageEditDiffSegment>.Builder _after = ImmutableArray.CreateBuilder<MessageEditDiffSegment>();
+        private readonly ImmutableArray<MessageEditDiffSegment>.Builder _before =
+            ImmutableArray.CreateBuilder<MessageEditDiffSegment>();
 
-        public void AddBefore(string text, MessageEditDiffSegmentKind kind) => Add(_before, text, kind);
+        private readonly ImmutableArray<MessageEditDiffSegment>.Builder _after =
+            ImmutableArray.CreateBuilder<MessageEditDiffSegment>();
 
-        public void AddAfter(string text, MessageEditDiffSegmentKind kind) => Add(_after, text, kind);
+        public void AddBefore(string text, MessageEditDiffSegmentKind kind)
+        {
+            Add(_before, text, kind);
+        }
 
-        public MessageEditDiff Build() => new MessageEditDiff(_before.ToImmutable(), _after.ToImmutable());
+        public void AddAfter(string text, MessageEditDiffSegmentKind kind)
+        {
+            Add(_after, text, kind);
+        }
 
-        private static void Add(ImmutableArray<MessageEditDiffSegment>.Builder segments, string text, MessageEditDiffSegmentKind kind)
+        public MessageEditDiff Build()
+        {
+            return new MessageEditDiff(_before.ToImmutable(), _after.ToImmutable());
+        }
+
+        private static void Add(ImmutableArray<MessageEditDiffSegment>.Builder segments, string text,
+            MessageEditDiffSegmentKind kind)
         {
             if (string.IsNullOrEmpty(text))
                 return;

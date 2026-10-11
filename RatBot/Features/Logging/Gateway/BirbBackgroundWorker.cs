@@ -47,7 +47,7 @@ public sealed class BirbBackgroundWorker(DiscordSocketClient discordClient, ILog
                         new ButtonBuilder()
                             .WithStyle(ButtonStyle.Danger)
                             .WithLabel("Decline the Invitation")
-                            .WithCustomId(BirbResponseHandler.DeclineId),
+                            .WithCustomId(BirbResponseHandler.DeclineId)
                     ])
                 )
         ).Build();
@@ -61,14 +61,19 @@ public sealed class BirbBackgroundWorker(DiscordSocketClient discordClient, ILog
             await Task.Delay(delay, ct).ConfigureAwait(false);
     }
 
-    private static DateTimeOffset GetNextHour(DateTimeOffset now) =>
-        new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, 0, 0, TimeSpan.Zero).AddHours(1);
+    private static DateTimeOffset GetNextHour(DateTimeOffset now)
+    {
+        return new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, 0, 0, TimeSpan.Zero).AddHours(1);
+    }
 
-    private static string[] LoadImageUrls() =>
-        System.Text.Json.JsonSerializer.Deserialize<string[]>(
-            File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Features", "Logging", "Gateway", "birb-images.json"))
-        )
-        ?? throw new InvalidOperationException("Robin image list is empty.");
+    private static string[] LoadImageUrls()
+    {
+        return System.Text.Json.JsonSerializer.Deserialize<string[]>(
+                   File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Features", "Logging", "Gateway",
+                       "birb-images.json"))
+               )
+               ?? throw new InvalidOperationException("Robin image list is empty.");
+    }
 
     public async Task<bool> PostOnceAsync(IMessageChannel channel, CancellationToken ct)
     {

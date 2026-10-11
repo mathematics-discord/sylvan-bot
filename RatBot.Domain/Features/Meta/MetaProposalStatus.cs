@@ -8,5 +8,5 @@ public enum MetaProposalStatus
     PublicationRetry = 3,
     Published = 4,
     Vetoed = 5,
-    Closed = 6,
+    Closed = 6
 }

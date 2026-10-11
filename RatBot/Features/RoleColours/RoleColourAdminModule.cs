@@ -12,9 +12,12 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
     [SlashCommand("upsert", "Create or update a source/display role colour mapping.")]
     [RequireUserPermission(GuildPermission.Administrator)]
     public async Task UpsertAsync(
-        [Summary("source", "Uncoloured source role granting access.")] IRole source,
-        [Summary("display", "Display colour role RatBot manages.")] IRole display,
-        [Summary("id", "Existing mapping ID to update; omit to create.")] long? id = null
+        [Summary("source", "Uncoloured source role granting access.")]
+        IRole source,
+        [Summary("display", "Display colour role RatBot manages.")]
+        IRole display,
+        [Summary("id", "Existing mapping ID to update; omit to create.")]
+        long? id = null
     )
     {
         if (Context.Guild is null)
@@ -31,9 +34,10 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
             return;
         }
 
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(true);
 
-        ImmutableArray<RoleColourOption> previous = await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
+        ImmutableArray<RoleColourOption> previous =
+            await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
 
         ErrorOr<(RoleColourOption Option, bool Created)> result = await operations.UpsertMappingAsync(
             Context.Guild.Id,
@@ -68,11 +72,13 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
             return;
         }
 
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(true);
 
-        ImmutableArray<RoleColourOption> previous = await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
+        ImmutableArray<RoleColourOption> previous =
+            await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
 
-        ErrorOr<RoleColourOption> result = await operations.DeleteMappingAsync(Context.Guild.Id, id, CancellationToken.None);
+        ErrorOr<RoleColourOption> result =
+            await operations.DeleteMappingAsync(Context.Guild.Id, id, CancellationToken.None);
 
         if (result.IsError)
         {
@@ -81,7 +87,8 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
         }
 
         int incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None, previous);
-        await FollowupAsync($"Deleted colour mapping `{result.Value.OptionId}`.{CheckSummary(incomplete)}", ephemeral: true);
+        await FollowupAsync($"Deleted colour mapping `{result.Value.OptionId}`.{CheckSummary(incomplete)}",
+            ephemeral: true);
     }
 
     [SlashCommand("list", "List configured role colour options.")]
@@ -94,7 +101,8 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
             return;
         }
 
-        ImmutableArray<RoleColourOption> options = await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
+        ImmutableArray<RoleColourOption> options =
+            await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
 
         if (options.IsEmpty)
         {
@@ -115,9 +123,10 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
             return;
         }
 
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(true);
 
-        ImmutableArray<RoleColourOption> mappings = await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
+        ImmutableArray<RoleColourOption> mappings =
+            await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
 
         if (mappings.IsEmpty)
         {
@@ -129,16 +138,18 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
         await FollowupAsync($"Role colour check completed.{CheckSummary(incomplete)}", ephemeral: true);
     }
 
-    private static string CheckSummary(int incomplete) => incomplete == 0 ? string.Empty : $" {incomplete} update(s) incomplete; see logs.";
+    private static string CheckSummary(int incomplete)
+    {
+        return incomplete == 0 ? string.Empty : $" {incomplete} update(s) incomplete; see logs.";
+    }
 
     private static string BuildListResponse(IReadOnlyList<RoleColourOption> options)
     {
         StringBuilder builder = new StringBuilder("Configured colour options:");
 
         foreach (RoleColourOption option in options)
-        {
-            builder.AppendLine().Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
-        }
+            builder.AppendLine()
+                .Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
 
         return builder.ToString();
     }

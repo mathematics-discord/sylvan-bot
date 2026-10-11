@@ -12,5 +12,6 @@ public interface IQuorumMemberSource
     /// <param name="roleIds">The configured voter role IDs for the quorum scope. The set should already be deduplicated.</param>
     /// <param name="ct">A cancellation token for the Discord member fetch.</param>
     /// <returns>The number of distinct eligible voters, or an expected failure if member data cannot be fetched.</returns>
-    Task<ErrorOr<int>> CountEligibleVotersAsync(QuorumScope scope, ImmutableHashSet<ulong> roleIds, CancellationToken ct);
+    Task<ErrorOr<int>> CountEligibleVotersAsync(QuorumScope scope, ImmutableHashSet<ulong> roleIds,
+        CancellationToken ct);
 }

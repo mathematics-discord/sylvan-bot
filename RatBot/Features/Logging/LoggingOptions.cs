@@ -13,11 +13,13 @@ public sealed class LoggingOptions
     public TimeSpan MetadataRetentionPeriod { get; init; } = TimeSpan.FromDays(30);
     public TimeSpan MetadataCleanupInterval { get; init; } = TimeSpan.FromHours(1);
 
-    public EvidenceCacheSettings ToEvidenceCacheSettings() =>
-        new EvidenceCacheSettings(
+    public EvidenceCacheSettings ToEvidenceCacheSettings()
+    {
+        return new EvidenceCacheSettings(
             MaxCachedMessageCount,
             MaxAttachmentCountPerMessage,
             MaxAttachmentBytesPerAttachment,
             MaxTotalCachedAttachmentBytes
         );
+    }
 }

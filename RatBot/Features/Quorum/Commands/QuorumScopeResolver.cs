@@ -9,7 +9,9 @@ public static class QuorumScopeResolver
         if (currentGuild is null)
             return Error.Validation(description: "This command can only be used in a guild.");
 
-        return role.Guild.Id == currentGuild.Id ? role.Id : Error.Validation(description: "That role does not belong to this guild.");
+        return role.Guild.Id == currentGuild.Id
+            ? role.Id
+            : Error.Validation(description: "That role does not belong to this guild.");
     }
 
     public static ErrorOr<QuorumScope> ResolveScope(IGuild? currentGuild, IChannel channel)
@@ -24,15 +26,17 @@ public static class QuorumScopeResolver
         {
             SocketThreadChannel thread => ResolveScopeChannel(currentGuild, thread.ParentChannel),
             IThreadChannel => Error.Validation(description: "The thread's parent channel could not be resolved."),
-            _ => ResolveScopeChannel(currentGuild, channel),
+            _ => ResolveScopeChannel(currentGuild, channel)
         };
     }
 
-    internal static ErrorOr<QuorumScope> ResolveScopeChannel(IGuild currentGuild, IChannel scopeChannel) =>
-        scopeChannel switch
+    internal static ErrorOr<QuorumScope> ResolveScopeChannel(IGuild currentGuild, IChannel scopeChannel)
+    {
+        return scopeChannel switch
         {
             IForumChannel => new QuorumScope.ForumChannel(currentGuild.Id, scopeChannel.Id),
             ITextChannel and not IThreadChannel => new QuorumScope.TextChannel(currentGuild.Id, scopeChannel.Id),
-            _ => Error.Validation(description: "Choose a guild text channel or forum channel."),
+            _ => Error.Validation(description: "Choose a guild text channel or forum channel.")
         };
+    }
 }

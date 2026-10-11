@@ -2,9 +2,12 @@ namespace RatBot.Domain.Features.Logging;
 
 public sealed class ObservedMessage
 {
-    private ObservedMessage() { }
+    private ObservedMessage()
+    {
+    }
 
-    public ObservedMessage(ulong originalMessageId, ulong guildId, ulong channelId, ulong authorId, DateTimeOffset observedAtUtc)
+    public ObservedMessage(ulong originalMessageId, ulong guildId, ulong channelId, ulong authorId,
+        DateTimeOffset observedAtUtc)
     {
         if (originalMessageId == 0)
             throw new ArgumentOutOfRangeException(nameof(originalMessageId), "Message id is required.");
@@ -31,6 +34,8 @@ public sealed class ObservedMessage
     public ulong AuthorId { get; private set; }
     public DateTimeOffset ObservedAtUtc { get; private set; }
 
-    public ObservedMessage MoveTo(ulong guildId, ulong channelId, ulong authorId, DateTimeOffset observedAtUtc) =>
-        new ObservedMessage(OriginalMessageId, guildId, channelId, authorId, observedAtUtc);
+    public ObservedMessage MoveTo(ulong guildId, ulong channelId, ulong authorId, DateTimeOffset observedAtUtc)
+    {
+        return new ObservedMessage(OriginalMessageId, guildId, channelId, authorId, observedAtUtc);
+    }
 }

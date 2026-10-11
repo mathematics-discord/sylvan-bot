@@ -3,7 +3,10 @@ using RatBot.Domain.Moderation;
 
 namespace RatBot.Gateway;
 
-public sealed class AutobanGatewayHandler(DiscordSocketClient discordClient, IServiceScopeFactory scopeFactory, ILogger logger)
+public sealed class AutobanGatewayHandler(
+    DiscordSocketClient discordClient,
+    IServiceScopeFactory scopeFactory,
+    ILogger logger)
     : IDiscordGatewayHandler
 {
     private readonly ILogger _logger = logger.ForContext<AutobanGatewayHandler>();
@@ -14,7 +17,10 @@ public sealed class AutobanGatewayHandler(DiscordSocketClient discordClient, ISe
         return Task.CompletedTask;
     }
 
-    public void Unsubscribe() => discordClient.UserJoined -= HandleUserJoinedAsync;
+    public void Unsubscribe()
+    {
+        discordClient.UserJoined -= HandleUserJoinedAsync;
+    }
 
     private async Task HandleUserJoinedAsync(SocketGuildUser user)
     {
@@ -31,17 +37,23 @@ public sealed class AutobanGatewayHandler(DiscordSocketClient discordClient, ISe
             if (autobannedUser is null)
                 return;
 
-            string reason = $"Autoban registered by moderator {autobannedUser.Moderator} at {autobannedUser.RegisteredAtUtc:O}.";
+            string reason =
+                $"Autoban registered by moderator {autobannedUser.Moderator} at {autobannedUser.RegisteredAtUtc:O}.";
 
             await user.Guild.AddBanAsync(user.Id, 0, reason);
 
-            _logger.Information("Banned autobanned user {UserId} immediately after joining guild {GuildId}", userId, guildId);
+            _logger.Information("Banned autobanned user {UserId} immediately after joining guild {GuildId}", userId,
+                guildId);
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "Failed processing autoban join check for user {UserId} in guild {GuildId}", userId, guildId);
+            _logger.Error(ex, "Failed processing autoban join check for user {UserId} in guild {GuildId}", userId,
+                guildId);
         }
     }
 
-    private void Subscribe() => discordClient.UserJoined += HandleUserJoinedAsync;
+    private void Subscribe()
+    {
+        discordClient.UserJoined += HandleUserJoinedAsync;
+    }
 }

@@ -47,24 +47,32 @@ public sealed class RoleColourReconciler(
 
     private static ImmutableArray<IRole> EligibleColours(IGuild guild,
         IReadOnlyCollection<ulong> roles,
-        ImmutableArray<RoleColourOption> mappings) =>
-    [
-        .. HeldGrants(guild.Id, roles, mappings)
-            .Where(o => !ValidateMapping(guild, o.SourceRoleId, o.DisplayRoleId).IsError)
-            .Select(o => guild.GetRole(o.DisplayRoleId))
-            .DistinctBy(role => role.Id)
-            .OrderBy(role => role.Name, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(role => role.Id),
-    ];
+        ImmutableArray<RoleColourOption> mappings)
+    {
+        return
+        [
+            .. HeldGrants(guild.Id, roles, mappings)
+                .Where(o => !ValidateMapping(guild, o.SourceRoleId, o.DisplayRoleId).IsError)
+                .Select(o => guild.GetRole(o.DisplayRoleId))
+                .DistinctBy(role => role.Id)
+                .OrderBy(role => role.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(role => role.Id)
+        ];
+    }
 
-    private static bool HoldsSource(ulong guildId, IReadOnlyCollection<ulong> roles, ulong sourceId) =>
-        sourceId == guildId || roles.Contains(sourceId);
+    private static bool HoldsSource(ulong guildId, IReadOnlyCollection<ulong> roles, ulong sourceId)
+    {
+        return sourceId == guildId || roles.Contains(sourceId);
+    }
 
     private static IEnumerable<RoleColourOption> HeldGrants(
         ulong guildId,
         IReadOnlyCollection<ulong> roles,
         ImmutableArray<RoleColourOption> mappings
-    ) => mappings.Where(o => HoldsSource(guildId, roles, o.SourceRoleId));
+    )
+    {
+        return mappings.Where(o => HoldsSource(guildId, roles, o.SourceRoleId));
+    }
 
     public async Task<ErrorOr<ulong?>> TrySetUserColourAsync(IGuild guild,
         ulong userId,
@@ -301,17 +309,26 @@ public sealed class RoleColourReconciler(
             await member.RemoveRoleAsync(roleId, request);
     }
 
-    private static ulong? SoleColour(HashSet<ulong> colours) => colours.Count == 1 ? colours.Single() : null;
+    private static ulong? SoleColour(HashSet<ulong> colours)
+    {
+        return colours.Count == 1 ? colours.Single() : null;
+    }
 
-    private static Error RolesChangedError() =>
-        Error.Failure(description: "Discord roles changed during the update. Please check your roles and try again.");
+    private static Error RolesChangedError()
+    {
+        return Error.Failure(
+            description: "Discord roles changed during the update. Please check your roles and try again.");
+    }
 
-    private async Task<IGuildUser?> ReadMemberAsync(IGuild guild, ulong userId, RequestOptions request) =>
-        guild is SocketGuild
+    private async Task<IGuildUser?> ReadMemberAsync(IGuild guild, ulong userId, RequestOptions request)
+    {
+        return guild is SocketGuild
             ? await discordClient.Rest.GetGuildUserAsync(guild.Id, userId, request)
             : await guild.GetUserAsync(userId, CacheMode.AllowDownload, request);
+    }
 
-    private static HashSet<ulong> ManagedDisplayRoles(IReadOnlyCollection<ulong> roles, IEnumerable<RoleColourOption> mappings)
+    private static HashSet<ulong> ManagedDisplayRoles(IReadOnlyCollection<ulong> roles,
+        IEnumerable<RoleColourOption> mappings)
     {
         HashSet<ulong> displayRoleIds = mappings.Select(mapping => mapping.DisplayRoleId).ToHashSet();
         return roles.Where(displayRoleIds.Contains).ToHashSet();

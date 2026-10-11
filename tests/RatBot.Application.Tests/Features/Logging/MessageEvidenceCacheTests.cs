@@ -12,7 +12,7 @@ public sealed class MessageEvidenceCacheTests
         MessageEvidenceCache cache = new MessageEvidenceCache(Settings());
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        cache.Put(Evidence(1, attachmentSize: 10), now, TimeSpan.FromSeconds(5));
+        cache.Put(Evidence(1, 10), now, TimeSpan.FromSeconds(5));
 
         bool found = cache.TryGet(10, 1, now.AddSeconds(6), out MessageEvidence _);
 
@@ -24,13 +24,13 @@ public sealed class MessageEvidenceCacheTests
     public void Put_EnforcesMessageCountAndAttachmentLimits()
     {
         MessageEvidenceCache cache = new MessageEvidenceCache(
-            Settings(maxCachedMessageCount: 2, maxAttachmentCountPerMessage: 1, maxBytesPerAttachment: 10, maxTotalCachedAttachmentBytes: 100)
+            Settings(2, 1, 10, 100)
         );
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        cache.Put(Evidence(1, attachmentSize: 10), now, TimeSpan.FromMinutes(5));
-        cache.Put(Evidence(2, attachmentSize: 10), now.AddSeconds(1), TimeSpan.FromMinutes(5));
-        cache.Put(Evidence(3, attachmentSize: 20), now.AddSeconds(2), TimeSpan.FromMinutes(5));
+        cache.Put(Evidence(1, 10), now, TimeSpan.FromMinutes(5));
+        cache.Put(Evidence(2, 10), now.AddSeconds(1), TimeSpan.FromMinutes(5));
+        cache.Put(Evidence(3, 20), now.AddSeconds(2), TimeSpan.FromMinutes(5));
 
         cache.TryGet(10, 1, now.AddSeconds(2), out MessageEvidence _).ShouldBeFalse();
         cache.TryGet(10, 2, now.AddSeconds(2), out MessageEvidence second).ShouldBeTrue();
@@ -42,13 +42,13 @@ public sealed class MessageEvidenceCacheTests
     [Test]
     public void Put_WhenEntryIsRefreshed_DoesNotEvictItFromStaleQueueEntry()
     {
-        MessageEvidenceCache cache = new MessageEvidenceCache(Settings(maxCachedMessageCount: 2));
+        MessageEvidenceCache cache = new MessageEvidenceCache(Settings(2));
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        cache.Put(Evidence(1, attachmentSize: 10), now, TimeSpan.FromMinutes(5));
-        cache.Put(Evidence(2, attachmentSize: 10), now.AddSeconds(1), TimeSpan.FromMinutes(5));
-        cache.Put(Evidence(1, attachmentSize: 10), now.AddSeconds(2), TimeSpan.FromMinutes(5));
-        cache.Put(Evidence(3, attachmentSize: 10), now.AddSeconds(3), TimeSpan.FromMinutes(5));
+        cache.Put(Evidence(1, 10), now, TimeSpan.FromMinutes(5));
+        cache.Put(Evidence(2, 10), now.AddSeconds(1), TimeSpan.FromMinutes(5));
+        cache.Put(Evidence(1, 10), now.AddSeconds(2), TimeSpan.FromMinutes(5));
+        cache.Put(Evidence(3, 10), now.AddSeconds(3), TimeSpan.FromMinutes(5));
 
         cache.TryGet(10, 1, now.AddSeconds(3), out MessageEvidence _).ShouldBeTrue();
         cache.TryGet(10, 2, now.AddSeconds(3), out MessageEvidence _).ShouldBeFalse();
@@ -59,12 +59,12 @@ public sealed class MessageEvidenceCacheTests
     public void Put_EnforcesTotalAttachmentBytes()
     {
         MessageEvidenceCache cache = new MessageEvidenceCache(
-            Settings(maxCachedMessageCount: 10, maxAttachmentCountPerMessage: 1, maxBytesPerAttachment: 100, maxTotalCachedAttachmentBytes: 15)
+            Settings(10, 1, 100, 15)
         );
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        cache.Put(Evidence(1, attachmentSize: 10), now, TimeSpan.FromMinutes(5));
-        cache.Put(Evidence(2, attachmentSize: 10), now.AddSeconds(1), TimeSpan.FromMinutes(5));
+        cache.Put(Evidence(1, 10), now, TimeSpan.FromMinutes(5));
+        cache.Put(Evidence(2, 10), now.AddSeconds(1), TimeSpan.FromMinutes(5));
 
         cache.TryGet(10, 1, now.AddSeconds(1), out MessageEvidence _).ShouldBeFalse();
         cache.TryGet(10, 2, now.AddSeconds(1), out MessageEvidence _).ShouldBeTrue();
@@ -73,11 +73,11 @@ public sealed class MessageEvidenceCacheTests
     [Test]
     public void Put_WhenCapacityIsSustained_EvictsOldestCurrentEntries()
     {
-        MessageEvidenceCache cache = new MessageEvidenceCache(Settings(maxCachedMessageCount: 3));
+        MessageEvidenceCache cache = new MessageEvidenceCache(Settings(3));
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
         for (ulong messageId = 1; messageId <= 10; messageId++)
-            cache.Put(Evidence(messageId, attachmentSize: 10), now.AddSeconds(messageId), TimeSpan.FromMinutes(5));
+            cache.Put(Evidence(messageId, 10), now.AddSeconds(messageId), TimeSpan.FromMinutes(5));
 
         cache.Count.ShouldBe(3);
 
@@ -94,8 +94,8 @@ public sealed class MessageEvidenceCacheTests
         MessageEvidenceCache cache = new MessageEvidenceCache(Settings());
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        cache.Put(Evidence(1, attachmentSize: 10), now, TimeSpan.FromSeconds(5));
-        cache.Put(Evidence(2, attachmentSize: 10), now, TimeSpan.FromSeconds(20));
+        cache.Put(Evidence(1, 10), now, TimeSpan.FromSeconds(5));
+        cache.Put(Evidence(2, 10), now, TimeSpan.FromSeconds(20));
 
         cache.TryGet(10, 1, now.AddSeconds(6), out MessageEvidence _).ShouldBeFalse();
         cache.TryGet(10, 2, now.AddSeconds(6), out MessageEvidence _).ShouldBeTrue();
@@ -107,7 +107,7 @@ public sealed class MessageEvidenceCacheTests
         MessageEvidenceCache cache = new MessageEvidenceCache(Settings());
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        cache.Put(Evidence(1, attachmentSize: 10), now, TimeSpan.FromMinutes(5));
+        cache.Put(Evidence(1, 10), now, TimeSpan.FromMinutes(5));
 
         cache.TryGet(10, 1, now, out MessageEvidence sameGuildEvidence).ShouldBeTrue();
         cache.TryGet(11, 1, now, out MessageEvidence otherGuildEvidence).ShouldBeFalse();
@@ -115,8 +115,9 @@ public sealed class MessageEvidenceCacheTests
         otherGuildEvidence.GuildId.ShouldBe(11UL);
     }
 
-    private static MessageEvidence Evidence(ulong messageId, int attachmentSize) =>
-        new MessageEvidence(
+    private static MessageEvidence Evidence(ulong messageId, int attachmentSize)
+    {
+        return new MessageEvidence(
             10,
             20,
             messageId,
@@ -125,11 +126,16 @@ public sealed class MessageEvidenceCacheTests
             "content",
             new[] { new CachedAttachmentEvidence(1, new byte[attachmentSize], "application/octet-stream") }
         );
+    }
 
     private static EvidenceCacheSettings Settings(
         int maxCachedMessageCount = 10,
         int maxAttachmentCountPerMessage = 2,
         long maxBytesPerAttachment = 1024,
         long maxTotalCachedAttachmentBytes = 1024
-    ) => new EvidenceCacheSettings(maxCachedMessageCount, maxAttachmentCountPerMessage, maxBytesPerAttachment, maxTotalCachedAttachmentBytes);
+    )
+    {
+        return new EvidenceCacheSettings(maxCachedMessageCount, maxAttachmentCountPerMessage, maxBytesPerAttachment,
+            maxTotalCachedAttachmentBytes);
+    }
 }

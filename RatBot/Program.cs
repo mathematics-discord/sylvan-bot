@@ -56,7 +56,7 @@ public static class Program
                 ["service.instance.id"] = serviceInstanceId,
                 ["service_name"] = serviceName,
                 ["service_instance_id"] = serviceInstanceId,
-                ["environment"] = environment,
+                ["environment"] = environment
             };
         });
     }
@@ -71,10 +71,11 @@ public static class Program
             .Enrich.FromLogContext()
             .Enrich.WithProperty("service_name", config["OTEL:Resource:ServiceName"] ?? "ratbot")
             .Enrich.WithProperty("service_instance_id", serviceInstanceId)
-            .Enrich.WithProperty("environment", config["OTEL:Resource:Environment"] ?? config["ASPNETCORE_ENVIRONMENT"] ?? "production")
+            .Enrich.WithProperty("environment",
+                config["OTEL:Resource:Environment"] ?? config["ASPNETCORE_ENVIRONMENT"] ?? "production")
             .WriteTo.Console(
-                restrictedToMinimumLevel: LogEventLevel.Debug,
-                outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff'Z'} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}"
+                LogEventLevel.Debug,
+                "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff'Z'} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}"
             )
             .WriteTo.File("logs/verbose-.log", rollingInterval: RollingInterval.Day)
             .WriteTo.File("logs/debug-.log", LogEventLevel.Debug, rollingInterval: RollingInterval.Day)
@@ -85,7 +86,10 @@ public static class Program
         ConfigureOpenTelemetryLogs(config, loggerConfiguration);
     }
 
-    private static void EnableSerilogSelfDiagnostics() => SelfLog.Enable(message => Console.Error.WriteLine($"[SerilogSelfLog] {message}"));
+    private static void EnableSerilogSelfDiagnostics()
+    {
+        SelfLog.Enable(message => Console.Error.WriteLine($"[SerilogSelfLog] {message}"));
+    }
 
     private static void LogOpenTelemetryStartupConfiguration(IConfiguration config)
     {

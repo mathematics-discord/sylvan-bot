@@ -12,7 +12,8 @@ public sealed class DatabaseMigrationHostedService(IServiceScopeFactory scopeFac
         await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
         BotDbContext dbContext = scope.ServiceProvider.GetRequiredService<BotDbContext>();
 
-        List<string> pendingMigrations = (await dbContext.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
+        List<string> pendingMigrations =
+            (await dbContext.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
 
         if (pendingMigrations.Count == 0)
             return;
@@ -22,5 +23,8 @@ public sealed class DatabaseMigrationHostedService(IServiceScopeFactory scopeFac
         _logger.Information("Database migrations applied successfully");
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
 }

@@ -21,7 +21,8 @@ public sealed class LoggingInteractionTests
     [Test]
     public async Task ExcludeAsync_WhenChannelOmitted_UsesCurrentChannel()
     {
-        await using ServiceProvider services = CreateServices(nameof(ExcludeAsync_WhenChannelOmitted_UsesCurrentChannel));
+        await using ServiceProvider services =
+            CreateServices(nameof(ExcludeAsync_WhenChannelOmitted_UsesCurrentChannel));
         IDbContextFactory<BotDbContext> contextFactory = services.GetRequiredService<IDbContextFactory<BotDbContext>>();
         LoggingInteractionFixture fixture = new LoggingInteractionFixture(contextFactory);
 
@@ -29,7 +30,8 @@ public sealed class LoggingInteractionTests
 
         await using BotDbContext db = await contextFactory.CreateDbContextAsync();
         (await db.LoggingExcludedChannels.SingleAsync()).ChannelId.ShouldBe(ChannelId);
-        await fixture.Interaction.Received(1).RespondAsync($"Logging is now excluded in <#{ChannelId}>.", ephemeral: true);
+        await fixture.Interaction.Received(1)
+            .RespondAsync($"Logging is now excluded in <#{ChannelId}>.", ephemeral: true);
     }
 
     [Test]
@@ -45,7 +47,8 @@ public sealed class LoggingInteractionTests
 
         await using BotDbContext db = await contextFactory.CreateDbContextAsync();
         (await db.LoggingExcludedChannels.CountAsync()).ShouldBe(0);
-        await fixture.Interaction.Received(1).RespondAsync($"Logging is enabled again in <#{ChannelId}>.", ephemeral: true);
+        await fixture.Interaction.Received(1)
+            .RespondAsync($"Logging is enabled again in <#{ChannelId}>.", ephemeral: true);
     }
 
     [Test]
@@ -59,7 +62,8 @@ public sealed class LoggingInteractionTests
 
         await fixture.Module.ExclusionsAsync();
 
-        await fixture.Interaction.Received(1).RespondAsync($"Excluded logging channels:\n- <#{ChannelId}>", ephemeral: true);
+        await fixture.Interaction.Received(1)
+            .RespondAsync($"Excluded logging channels:{Environment.NewLine}- <#{ChannelId}>", ephemeral: true);
     }
 
     [Test]
@@ -69,13 +73,14 @@ public sealed class LoggingInteractionTests
         IDbContextFactory<BotDbContext> contextFactory = services.GetRequiredService<IDbContextFactory<BotDbContext>>();
         LoggingInteractionFixture fixture = new LoggingInteractionFixture(contextFactory);
 
-        await fixture.Module.ConfigAsync(enabled: true, deleteLogChannel: fixture.DeleteLogChannel, retentionPeriod: 600);
+        await fixture.Module.ConfigAsync(true, fixture.DeleteLogChannel, retentionPeriod: 600);
         fixture.Interaction.ClearReceivedCalls();
 
         await fixture.Module.ConfigAsync(editLogChannel: fixture.EditLogChannel);
 
         await using BotDbContext db = await contextFactory.CreateDbContextAsync();
-        RatBot.Domain.Features.Logging.LoggingConfiguration configuration = await db.LoggingConfigurations.SingleAsync();
+        RatBot.Domain.Features.Logging.LoggingConfiguration
+            configuration = await db.LoggingConfigurations.SingleAsync();
         configuration.Enabled.ShouldBeTrue();
         configuration.DeleteLogChannelId.ShouldBe(DeleteLogChannelId);
         configuration.EditLogChannelId.ShouldBe(EditLogChannelId);
@@ -84,10 +89,10 @@ public sealed class LoggingInteractionTests
             .Interaction.Received(1)
             .RespondAsync(
                 "Logging configuration:\n"
-                    + "- Enabled: True\n"
-                    + $"- Delete log channel: <#{DeleteLogChannelId}>\n"
-                    + $"- Edit log channel: <#{EditLogChannelId}>\n"
-                    + "- Evidence retention: 600s",
+                + "- Enabled: True\n"
+                + $"- Delete log channel: <#{DeleteLogChannelId}>\n"
+                + $"- Edit log channel: <#{EditLogChannelId}>\n"
+                + "- Evidence retention: 600s",
                 ephemeral: true
             );
     }
@@ -95,35 +100,43 @@ public sealed class LoggingInteractionTests
     [Test]
     public async Task ConfigAsync_WhenEnablingWithoutEitherChannel_Fails()
     {
-        await using ServiceProvider services = CreateServices(nameof(ConfigAsync_WhenEnablingWithoutEitherChannel_Fails));
+        await using ServiceProvider services =
+            CreateServices(nameof(ConfigAsync_WhenEnablingWithoutEitherChannel_Fails));
         IDbContextFactory<BotDbContext> contextFactory = services.GetRequiredService<IDbContextFactory<BotDbContext>>();
         LoggingInteractionFixture fixture = new LoggingInteractionFixture(contextFactory);
 
-        await fixture.Module.ConfigAsync(enabled: true);
+        await fixture.Module.ConfigAsync(true);
 
         await using BotDbContext db = await contextFactory.CreateDbContextAsync();
         (await db.LoggingConfigurations.CountAsync()).ShouldBe(0);
-        await fixture.Interaction.Received(1).RespondAsync("Enable logging only after setting a delete or edit log channel.", ephemeral: true);
+        await fixture.Interaction.Received(1)
+            .RespondAsync("Enable logging only after setting a delete or edit log channel.", ephemeral: true);
     }
 
     [Test]
     public async Task LoggingModule_RegistersConfigCommandWithFourOptionalParameters()
     {
-        await using ServiceProvider services = CreateServices(nameof(LoggingModule_RegistersConfigCommandWithFourOptionalParameters));
+        await using ServiceProvider services =
+            CreateServices(nameof(LoggingModule_RegistersConfigCommandWithFourOptionalParameters));
         InteractionService interactionService = new InteractionService(
             new DiscordSocketClient(),
             new InteractionServiceConfig { AutoServiceScopes = true }
         );
 
         ModuleInfo module = await interactionService.AddModuleAsync<LoggingModule>(services);
-        SlashCommandInfo command = module.SlashCommands.Single(command => string.Equals(command.Name, "config", StringComparison.Ordinal));
+        SlashCommandInfo command =
+            module.SlashCommands.Single(command => string.Equals(command.Name, "config", StringComparison.Ordinal));
 
-        command.Parameters.Select(parameter => parameter.Name).ShouldBe(["enabled", "delete-log-channel", "edit-log-channel", "retention-period"]);
+        command.Parameters.Select(parameter => parameter.Name)
+            .ShouldBe(["enabled", "delete-log-channel", "edit-log-channel", "retention-period"]);
         command.Parameters.Select(parameter => parameter.IsRequired).ShouldBe([false, false, false, false]);
     }
 
-    private static ServiceProvider CreateServices(string name) =>
-        new ServiceCollection().AddDbContextFactory<BotDbContext>(options => options.UseInMemoryDatabase(name)).BuildServiceProvider();
+    private static ServiceProvider CreateServices(string name)
+    {
+        return new ServiceCollection().AddDbContextFactory<BotDbContext>(options => options.UseInMemoryDatabase(name))
+            .BuildServiceProvider();
+    }
 
     private sealed class LoggingInteractionFixture
     {

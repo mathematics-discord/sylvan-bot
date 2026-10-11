@@ -5,10 +5,13 @@ namespace RatBot.Features.RoleColours;
 
 public sealed class RoleColourOperations(BotDbContext db)
 {
-    public async Task<ImmutableArray<RoleColourOption>> ListConfiguredOptionsAsync(ulong guildId, CancellationToken ct) =>
-        (
-            await db.RoleColourOptions.AsNoTracking().Where(option => option.GuildId == guildId).OrderBy(option => option.OptionId).ToArrayAsync(ct)
+    public async Task<ImmutableArray<RoleColourOption>> ListConfiguredOptionsAsync(ulong guildId, CancellationToken ct)
+    {
+        return (
+            await db.RoleColourOptions.AsNoTracking().Where(option => option.GuildId == guildId)
+                .OrderBy(option => option.OptionId).ToArrayAsync(ct)
         ).ToImmutableArray();
+    }
 
     public async Task<ErrorOr<(RoleColourOption Option, bool Created)>> UpsertMappingAsync(
         ulong guildId,
@@ -22,7 +25,8 @@ public sealed class RoleColourOperations(BotDbContext db)
             return Error.Validation(description: "Mapping ID must be positive.");
 
         RoleColourOption? option = optionId.HasValue
-            ? await db.RoleColourOptions.SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId.Value, ct)
+            ? await db.RoleColourOptions.SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId.Value,
+                ct)
             : null;
 
         if (optionId.HasValue && option is null)
@@ -66,7 +70,8 @@ public sealed class RoleColourOperations(BotDbContext db)
         if (optionId <= 0)
             return Error.Validation(description: "Mapping ID must be positive.");
 
-        RoleColourOption? option = await db.RoleColourOptions.SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId, ct);
+        RoleColourOption? option =
+            await db.RoleColourOptions.SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId, ct);
         if (option is null)
             return Error.NotFound(description: $"Colour mapping {optionId} was not found in this guild.");
 

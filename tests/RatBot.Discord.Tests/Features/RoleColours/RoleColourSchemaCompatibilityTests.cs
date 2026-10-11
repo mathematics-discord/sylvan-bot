@@ -15,15 +15,17 @@ public sealed class RoleColourSchemaCompatibilityTests
     {
         // Arrange
         using BotDbContext db = new BotDbContext(
-            new DbContextOptionsBuilder<BotDbContext>().UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused").Options
+            new DbContextOptionsBuilder<BotDbContext>()
+                .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused").Options
         );
 
         IMigrationsAssembly migrations = db.GetService<IMigrationsAssembly>();
 
         // Act
-        Migration latestMigration = migrations.CreateMigration(migrations.Migrations.Last().Value, db.Database.ProviderName!);
+        Migration latestMigration =
+            migrations.CreateMigration(migrations.Migrations.Last().Value, db.Database.ProviderName!);
 
-        IModel migrationModel = db.GetService<IModelRuntimeInitializer>().Initialize(latestMigration.TargetModel, designTime: true);
+        IModel migrationModel = db.GetService<IModelRuntimeInitializer>().Initialize(latestMigration.TargetModel, true);
 
         IModel currentModel = db.GetService<IDesignTimeModel>().Model;
 

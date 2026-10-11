@@ -45,7 +45,9 @@ public static class DependencyInjection
         private void AddApplication()
         {
             services.AddSingleton<ImageBurstSpamDetectorSettings>();
-            services.AddSingleton(sp => new ImageBurstSpamDetector(TimeProvider.System, sp.GetRequiredService<ImageBurstSpamDetectorSettings>()));
+            services.AddSingleton(sp =>
+                new ImageBurstSpamDetector(TimeProvider.System,
+                    sp.GetRequiredService<ImageBurstSpamDetectorSettings>()));
 
             services.AddScoped<ImageSpamSettingsService>();
             services.AddScoped<IModerationService, ModerationService>();
@@ -72,27 +74,34 @@ public static class DependencyInjection
                 .AddOptions<DiscordOptions>()
                 .Bind(configuration.GetSection(DiscordOptions.SectionName))
                 .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "Discord token is required.")
-                .Validate(options => options.MessageCacheSize >= 1000, "Discord message cache size must be at least 1000.")
+                .Validate(options => options.MessageCacheSize >= 1000,
+                    "Discord message cache size must be at least 1000.")
                 .ValidateOnStart();
 
             services
                 .AddOptions<EmojiAnalyticsOptions>()
                 .Bind(configuration.GetSection(EmojiAnalyticsOptions.SectionName))
-                .Validate(options => options.EnabledGuildIds.All(guildId => guildId != 0), "Emoji analytics guild ids must be non-zero.")
+                .Validate(options => options.EnabledGuildIds.All(guildId => guildId != 0),
+                    "Emoji analytics guild ids must be non-zero.")
                 .ValidateOnStart();
 
             services
                 .AddOptions<LoggingOptions>()
                 .Bind(configuration.GetSection(LoggingOptions.SectionName))
-                .Validate(options => options.MaxCachedMessageCount > 0, "Logging max cached message count must be positive.")
-                .Validate(options => options.MaxAttachmentCountPerMessage >= 0, "Logging max attachment count per message must not be negative.")
+                .Validate(options => options.MaxCachedMessageCount > 0,
+                    "Logging max cached message count must be positive.")
+                .Validate(options => options.MaxAttachmentCountPerMessage >= 0,
+                    "Logging max attachment count per message must not be negative.")
                 .Validate(
                     options => options.MaxAttachmentBytesPerAttachment >= 0,
                     "Logging max attachment bytes per attachment must not be negative."
                 )
-                .Validate(options => options.MaxTotalCachedAttachmentBytes >= 0, "Logging max total cached attachment bytes must not be negative.")
-                .Validate(options => options.MetadataRetentionPeriod > TimeSpan.Zero, "Logging metadata retention period must be positive.")
-                .Validate(options => options.MetadataCleanupInterval > TimeSpan.Zero, "Logging metadata cleanup interval must be positive.")
+                .Validate(options => options.MaxTotalCachedAttachmentBytes >= 0,
+                    "Logging max total cached attachment bytes must not be negative.")
+                .Validate(options => options.MetadataRetentionPeriod > TimeSpan.Zero,
+                    "Logging metadata retention period must be positive.")
+                .Validate(options => options.MetadataCleanupInterval > TimeSpan.Zero,
+                    "Logging metadata cleanup interval must be positive.")
                 .ValidateOnStart();
 
             services.AddSingleton(sp =>
@@ -110,7 +119,7 @@ public static class DependencyInjection
                             | GatewayIntents.GuildMessages
                             | GatewayIntents.GuildMessageReactions
                             | GatewayIntents.GuildMessagePolls
-                            | GatewayIntents.MessageContent,
+                            | GatewayIntents.MessageContent
                     }
                 );
             });
@@ -124,11 +133,14 @@ public static class DependencyInjection
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordInteractionHandler>());
             services.AddSingleton<AutobanGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<AutobanGatewayHandler>());
-            services.AddSingleton(sp => new MessageEvidenceCache(sp.GetRequiredService<IOptions<LoggingOptions>>().Value.ToEvidenceCacheSettings()));
+            services.AddSingleton(sp =>
+                new MessageEvidenceCache(sp.GetRequiredService<IOptions<LoggingOptions>>().Value
+                    .ToEvidenceCacheSettings()));
             services.AddSingleton<HttpClient>();
             services.AddSingleton<DiscordGuildEmojiImporter>();
             services.AddSingleton<ModerationLoggingGatewayHandler>();
-            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ModerationLoggingGatewayHandler>());
+            services.AddSingleton<IDiscordGatewayHandler>(sp =>
+                sp.GetRequiredService<ModerationLoggingGatewayHandler>());
             services.AddSingleton<ImageBurstSpamGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ImageBurstSpamGatewayHandler>());
             services.AddSingleton<MetaProposalPollResolver>();
@@ -142,7 +154,7 @@ public static class DependencyInjection
                     {
                         SingleReader = true,
                         SingleWriter = false,
-                        AllowSynchronousContinuations = false,
+                        AllowSynchronousContinuations = false
                     }
                 )
             );

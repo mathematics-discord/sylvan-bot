@@ -2,7 +2,9 @@ namespace RatBot.Domain.Features.Meta;
 
 public sealed class MetaSuggestionSettings
 {
-    private MetaSuggestionSettings() { }
+    private MetaSuggestionSettings()
+    {
+    }
 
     public ulong CabinetChairRoleId { get; private set; }
     public ulong CabinetRoleId { get; private set; }
@@ -19,19 +21,24 @@ public sealed class MetaSuggestionSettings
         ulong cabinetRoleId = 0,
         ulong cabinetChairRoleId = 0,
         ulong committeeRoleId = 0
-    ) =>
-        new MetaSuggestionSettings
+    )
+    {
+        return new MetaSuggestionSettings
         {
             GuildId = guildId,
             SuggestionsForumChannelId = suggestionsForumChannelId,
             ProposalsForumChannelId = proposalsForumChannelId,
             CabinetRoleId = cabinetRoleId,
             CabinetChairRoleId = cabinetChairRoleId,
-            CommitteeRoleId = committeeRoleId,
+            CommitteeRoleId = committeeRoleId
         };
+    }
 
-    private static Error Required(string fieldName) =>
-        Error.Validation($"MetaSuggestionSettings.{fieldName}Required", $"Meta proposal setting {fieldName} must be configured.");
+    private static Error Required(string fieldName)
+    {
+        return Error.Validation($"MetaSuggestionSettings.{fieldName}Required",
+            $"Meta proposal setting {fieldName} must be configured.");
+    }
 
     private static ErrorOr<Success> SetId(ulong id, Action<ulong> assign)
     {
@@ -62,13 +69,28 @@ public sealed class MetaSuggestionSettings
         return Result.Success;
     }
 
-    public ErrorOr<Success> SetCabinetChairRole(ulong roleId) => SetId(roleId, value => CabinetChairRoleId = value);
+    public ErrorOr<Success> SetCabinetChairRole(ulong roleId)
+    {
+        return SetId(roleId, value => CabinetChairRoleId = value);
+    }
 
-    public ErrorOr<Success> SetCabinetRole(ulong roleId) => SetId(roleId, value => CabinetRoleId = value);
+    public ErrorOr<Success> SetCabinetRole(ulong roleId)
+    {
+        return SetId(roleId, value => CabinetRoleId = value);
+    }
 
-    public ErrorOr<Success> SetCommitteeRole(ulong roleId) => SetId(roleId, value => CommitteeRoleId = value);
+    public ErrorOr<Success> SetCommitteeRole(ulong roleId)
+    {
+        return SetId(roleId, value => CommitteeRoleId = value);
+    }
 
-    public ErrorOr<Success> SetProposalsForum(ulong channelId) => SetId(channelId, value => ProposalsForumChannelId = value);
+    public ErrorOr<Success> SetProposalsForum(ulong channelId)
+    {
+        return SetId(channelId, value => ProposalsForumChannelId = value);
+    }
 
-    public ErrorOr<Success> SetSuggestionsForum(ulong channelId) => SetId(channelId, value => SuggestionsForumChannelId = value);
+    public ErrorOr<Success> SetSuggestionsForum(ulong channelId)
+    {
+        return SetId(channelId, value => SuggestionsForumChannelId = value);
+    }
 }

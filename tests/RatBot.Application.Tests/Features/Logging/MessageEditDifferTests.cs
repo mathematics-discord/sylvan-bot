@@ -18,7 +18,7 @@ public sealed class MessageEditDifferTests
                     new SegmentAssertion("H", MessageEditDiffSegmentKind.Removed),
                     new SegmentAssertion("a", MessageEditDiffSegmentKind.Unchanged),
                     new SegmentAssertion("y", MessageEditDiffSegmentKind.Removed),
-                    new SegmentAssertion("es", MessageEditDiffSegmentKind.Unchanged),
+                    new SegmentAssertion("es", MessageEditDiffSegmentKind.Unchanged)
                 }
             );
         diff.After.Select(segment => new SegmentAssertion(segment.Text, segment.Kind))
@@ -28,7 +28,7 @@ public sealed class MessageEditDifferTests
                     new SegmentAssertion("h", MessageEditDiffSegmentKind.Added),
                     new SegmentAssertion("a", MessageEditDiffSegmentKind.Unchanged),
                     new SegmentAssertion("t", MessageEditDiffSegmentKind.Added),
-                    new SegmentAssertion("es", MessageEditDiffSegmentKind.Unchanged),
+                    new SegmentAssertion("es", MessageEditDiffSegmentKind.Unchanged)
                 }
             );
     }
@@ -46,7 +46,7 @@ public sealed class MessageEditDifferTests
                 new[]
                 {
                     new SegmentAssertion("which are `significant' (", MessageEditDiffSegmentKind.Removed),
-                    new SegmentAssertion("disregarding the rest", MessageEditDiffSegmentKind.Unchanged),
+                    new SegmentAssertion("disregarding the rest", MessageEditDiffSegmentKind.Unchanged)
                 }
             );
         diff.After.Select(segment => new SegmentAssertion(segment.Text, segment.Kind))
@@ -54,7 +54,7 @@ public sealed class MessageEditDifferTests
                 new[]
                 {
                     new SegmentAssertion("instead (and ", MessageEditDiffSegmentKind.Added),
-                    new SegmentAssertion("disregarding the rest", MessageEditDiffSegmentKind.Unchanged),
+                    new SegmentAssertion("disregarding the rest", MessageEditDiffSegmentKind.Unchanged)
                 }
             );
     }

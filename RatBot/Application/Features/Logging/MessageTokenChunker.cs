@@ -6,7 +6,9 @@ internal sealed class MessageTokenChunker : IChunker
 {
     public static readonly MessageTokenChunker Instance = new MessageTokenChunker();
 
-    private MessageTokenChunker() { }
+    private MessageTokenChunker()
+    {
+    }
 
     public IReadOnlyList<string> Chunk(string text)
     {

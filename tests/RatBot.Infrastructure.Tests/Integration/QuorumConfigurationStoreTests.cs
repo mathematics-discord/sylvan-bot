@@ -11,7 +11,10 @@ public sealed class QuorumConfigurationStoreTests
 {
     private QuorumConfigurationStore _store = null!;
 
-    private static QuorumScope.TextChannel TextScope() => new QuorumScope.TextChannel(123, 456);
+    private static QuorumScope.TextChannel TextScope()
+    {
+        return new QuorumScope.TextChannel(123, 456);
+    }
 
     [Test]
     public async Task DeleteAsync_ShouldDeleteConfigurationAndRoles_AndReturnNotFoundWhenRepeated()
@@ -96,7 +99,8 @@ public sealed class QuorumConfigurationStoreTests
         QuorumProportion initialProportion = QuorumProportion.Create(0.5m).Value;
         QuorumProportion updatedProportion = QuorumProportion.Create(0.75m).Value;
 
-        ErrorOr<QuorumRegistration> firstResult = await _store.RegisterAsync(scope, initialProportion, CancellationToken.None);
+        ErrorOr<QuorumRegistration> firstResult =
+            await _store.RegisterAsync(scope, initialProportion, CancellationToken.None);
         firstResult.IsError.ShouldBeFalse();
         firstResult.Value.Created.ShouldBeTrue();
 
@@ -104,7 +108,8 @@ public sealed class QuorumConfigurationStoreTests
         ErrorOr<QuorumConfiguration> saveResult = await _store.SaveAsync(withRoles, CancellationToken.None);
         saveResult.IsError.ShouldBeFalse();
 
-        ErrorOr<QuorumRegistration> secondResult = await _store.RegisterAsync(scope, updatedProportion, CancellationToken.None);
+        ErrorOr<QuorumRegistration> secondResult =
+            await _store.RegisterAsync(scope, updatedProportion, CancellationToken.None);
 
         secondResult.IsError.ShouldBeFalse();
         secondResult.Value.Created.ShouldBeFalse();
@@ -119,9 +124,11 @@ public sealed class QuorumConfigurationStoreTests
         QuorumScope scope = TextScope();
         QuorumProportion initialProportion = QuorumProportion.Create(0.5m).Value;
         QuorumProportion updatedProportion = QuorumProportion.Create(0.8m).Value;
-        QuorumConfiguration configuration = (await _store.RegisterAsync(scope, initialProportion, CancellationToken.None)).Value.Configuration;
+        QuorumConfiguration configuration =
+            (await _store.RegisterAsync(scope, initialProportion, CancellationToken.None)).Value.Configuration;
 
-        QuorumConfiguration updated = configuration.WithProportion(updatedProportion).AddRole(10).AddRole(10).AddRole(20);
+        QuorumConfiguration updated =
+            configuration.WithProportion(updatedProportion).AddRole(10).AddRole(10).AddRole(20);
 
         ErrorOr<QuorumConfiguration> saveResult = await _store.SaveAsync(updated, CancellationToken.None);
         ErrorOr<QuorumConfiguration> getResult = await _store.GetAsync(scope, CancellationToken.None);
@@ -135,7 +142,8 @@ public sealed class QuorumConfigurationStoreTests
     [Test]
     public async Task SaveAsync_ShouldReturnNotFound_WhenConfigurationIdIsMissing()
     {
-        QuorumConfiguration configuration = QuorumConfiguration.Create(TextScope(), QuorumProportion.Create(0.5m).Value);
+        QuorumConfiguration configuration =
+            QuorumConfiguration.Create(TextScope(), QuorumProportion.Create(0.5m).Value);
 
         ErrorOr<QuorumConfiguration> result = await _store.SaveAsync(configuration, CancellationToken.None);
 

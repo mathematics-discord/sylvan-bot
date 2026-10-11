@@ -2,15 +2,19 @@ using RatBot.Domain.Moderation;
 
 namespace RatBot.Application.Moderation;
 
-public sealed class ImageSpamSettingsService(IImageSpamSettingsStore store, ImageBurstSpamDetectorSettings detectorSettings)
+public sealed class ImageSpamSettingsService(
+    IImageSpamSettingsStore store,
+    ImageBurstSpamDetectorSettings detectorSettings)
 {
-    private static ImageBurstSpamDetectorOptions ToOptions(ImageSpamSettings settings) =>
-        new ImageBurstSpamDetectorOptions
+    private static ImageBurstSpamDetectorOptions ToOptions(ImageSpamSettings settings)
+    {
+        return new ImageBurstSpamDetectorOptions
         {
             Window = settings.BurstDurationSeconds,
             DistinctChannelThreshold = settings.RequiredChannelCount,
-            RequiredAttachmentCount = settings.RequiredAttachmentCount,
+            RequiredAttachmentCount = settings.RequiredAttachmentCount
         };
+    }
 
     public async Task<ImageBurstSpamDetectorOptions?> GetCurrentAsync(ulong guildId, CancellationToken ct)
     {

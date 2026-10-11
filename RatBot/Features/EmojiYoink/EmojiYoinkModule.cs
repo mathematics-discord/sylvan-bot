@@ -13,7 +13,7 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
     {
         ErrorOr<Emote> sourceResult = CustomEmojiMentionParser.ParseStrict(emoji);
 
-        await ExecuteAsync(sourceResult, rejectLocalSource: false).ConfigureAwait(false);
+        await ExecuteAsync(sourceResult, false).ConfigureAwait(false);
     }
 
     [MessageCommand("Yoink emoji")]
@@ -21,7 +21,7 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
     {
         ErrorOr<Emote> sourceResult = CustomEmojiMentionParser.ParseMessage(message.Content);
 
-        await ExecuteAsync(sourceResult, rejectLocalSource: true).ConfigureAwait(false);
+        await ExecuteAsync(sourceResult, true).ConfigureAwait(false);
     }
 
     private async Task ExecuteAsync(ErrorOr<Emote> sourceResult, bool rejectLocalSource)
@@ -50,7 +50,8 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
 
         await DeferAsync().ConfigureAwait(false);
 
-        ErrorOr<GuildEmote> result = await importer.ImportAsync(guild, Context.User, source, CancellationToken.None).ConfigureAwait(false);
+        ErrorOr<GuildEmote> result = await importer.ImportAsync(guild, Context.User, source, CancellationToken.None)
+            .ConfigureAwait(false);
 
         await result.SwitchFirstAsync(
             async created => await FollowupAsync($"Added emoji {created}.").ConfigureAwait(false),

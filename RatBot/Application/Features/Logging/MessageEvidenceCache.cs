@@ -6,8 +6,13 @@ namespace RatBot.Application.Features.Logging;
 public sealed class MessageEvidenceCache(EvidenceCacheSettings settings)
 {
     private readonly Dictionary<EvidenceKey, CacheEntry> _entries = new Dictionary<EvidenceKey, CacheEntry>();
-    private readonly PriorityQueue<QueuedEntry, DateTimeOffset> _evictionQueue = new PriorityQueue<QueuedEntry, DateTimeOffset>();
-    private readonly PriorityQueue<QueuedEntry, DateTimeOffset> _expiryQueue = new PriorityQueue<QueuedEntry, DateTimeOffset>();
+
+    private readonly PriorityQueue<QueuedEntry, DateTimeOffset> _evictionQueue =
+        new PriorityQueue<QueuedEntry, DateTimeOffset>();
+
+    private readonly PriorityQueue<QueuedEntry, DateTimeOffset> _expiryQueue =
+        new PriorityQueue<QueuedEntry, DateTimeOffset>();
+
     private readonly Lock _lock = new Lock();
     private long _totalAttachmentBytes;
 
@@ -23,12 +28,19 @@ public sealed class MessageEvidenceCache(EvidenceCacheSettings settings)
         }
     }
 
-    private static MessageEvidence Empty(ulong guildId, ulong messageId) =>
-        new MessageEvidence(guildId, 0, messageId, 0, DateTimeOffset.MinValue, null, ImmutableArray<CachedAttachmentEvidence>.Empty);
+    private static MessageEvidence Empty(ulong guildId, ulong messageId)
+    {
+        return new MessageEvidence(guildId, 0, messageId, 0, DateTimeOffset.MinValue, null,
+            ImmutableArray<CachedAttachmentEvidence>.Empty);
+    }
 
-    private static long TotalBytes(IEnumerable<CachedAttachmentEvidence> attachments) => attachments.Sum(attachment => attachment.Bytes.LongLength);
+    private static long TotalBytes(IEnumerable<CachedAttachmentEvidence> attachments)
+    {
+        return attachments.Sum(attachment => attachment.Bytes.LongLength);
+    }
 
-    public IReadOnlyDictionary<ulong, MessageEvidence> GetMany(ulong guildId, IEnumerable<ulong> messageIds, DateTimeOffset nowUtc)
+    public IReadOnlyDictionary<ulong, MessageEvidence> GetMany(ulong guildId, IEnumerable<ulong> messageIds,
+        DateTimeOffset nowUtc)
     {
         Dictionary<ulong, MessageEvidence> results = new Dictionary<ulong, MessageEvidence>();
 
@@ -116,7 +128,8 @@ public sealed class MessageEvidenceCache(EvidenceCacheSettings settings)
 
     private void EvictExpired(DateTimeOffset nowUtc)
     {
-        while (_expiryQueue.TryPeek(out QueuedEntry? queued, out DateTimeOffset expiresAtUtc) && queued is not null && expiresAtUtc <= nowUtc)
+        while (_expiryQueue.TryPeek(out QueuedEntry? queued, out DateTimeOffset expiresAtUtc) && queued is not null &&
+               expiresAtUtc <= nowUtc)
         {
             _expiryQueue.Dequeue();
 
@@ -130,7 +143,8 @@ public sealed class MessageEvidenceCache(EvidenceCacheSettings settings)
 
     private void EvictOverflow()
     {
-        while (_entries.Count > settings.MaxCachedMessageCount || _totalAttachmentBytes > settings.MaxTotalCachedAttachmentBytes)
+        while (_entries.Count > settings.MaxCachedMessageCount ||
+               _totalAttachmentBytes > settings.MaxTotalCachedAttachmentBytes)
         {
             if (!_evictionQueue.TryDequeue(out QueuedEntry? queued, out DateTimeOffset _) || queued is null)
                 return;
@@ -154,7 +168,11 @@ public sealed class MessageEvidenceCache(EvidenceCacheSettings settings)
     [StructLayout(LayoutKind.Auto)]
     private readonly record struct EvidenceKey(ulong GuildId, ulong MessageId);
 
-    private sealed record CacheEntry(MessageEvidence Evidence, DateTimeOffset LastTouchedAtUtc, DateTimeOffset ExpiresAtUtc, long AttachmentBytes);
+    private sealed record CacheEntry(
+        MessageEvidence Evidence,
+        DateTimeOffset LastTouchedAtUtc,
+        DateTimeOffset ExpiresAtUtc,
+        long AttachmentBytes);
 
     private sealed record QueuedEntry(EvidenceKey Key, DateTimeOffset LastTouchedAtUtc, DateTimeOffset ExpiresAtUtc);
 }

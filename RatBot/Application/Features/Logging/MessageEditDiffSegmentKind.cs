@@ -4,5 +4,5 @@ public enum MessageEditDiffSegmentKind
 {
     Unchanged,
     Removed,
-    Added,
+    Added
 }

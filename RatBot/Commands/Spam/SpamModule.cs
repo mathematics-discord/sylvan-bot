@@ -6,11 +6,13 @@ namespace RatBot.Commands.Spam;
 [DefaultMemberPermissions(GuildPermission.Administrator)]
 public sealed class SpamModule(ImageSpamSettingsService settingsService) : SlashCommandBase
 {
-    private static string FormatSettings(ImageBurstSpamDetectorOptions settings) =>
-        "Image spam detection settings: "
-        + $"{settings.DistinctChannelThreshold} channel(s), "
-        + $"{settings.RequiredAttachmentCount} attachment(s) per message, "
-        + $"{settings.Window}s burst duration.";
+    private static string FormatSettings(ImageBurstSpamDetectorOptions settings)
+    {
+        return "Image spam detection settings: "
+               + $"{settings.DistinctChannelThreshold} channel(s), "
+               + $"{settings.RequiredAttachmentCount} attachment(s) per message, "
+               + $"{settings.Window}s burst duration.";
+    }
 
     private static ErrorOr<Success> Validate(int? numberOfChannels, int? attachmentCount, int? burstDuration)
     {
@@ -20,15 +22,20 @@ public sealed class SpamModule(ImageSpamSettingsService settingsService) : Slash
         if (attachmentCount is <= 0)
             return Error.Validation(description: "Attachment count must be greater than zero.");
 
-        return burstDuration is <= 0 ? Error.Validation(description: "Burst duration must be greater than zero seconds.") : Result.Success;
+        return burstDuration is <= 0
+            ? Error.Validation(description: "Burst duration must be greater than zero seconds.")
+            : Result.Success;
     }
 
     [SlashCommand("image-spam-config", "View or update image spam detection settings.")]
     [RequireUserPermission(GuildPermission.Administrator)]
     public async Task ImageSpamConfigAsync(
-        [Summary("number-of-channels", "Distinct channels required within the burst duration.")] int? numberOfChannels = null,
-        [Summary("attachment-count", "Attachments required on a message before it counts toward detection.")] int? attachmentCount = null,
-        [Summary("burst-duration", "Detection burst duration in seconds.")] int? burstDuration = null
+        [Summary("number-of-channels", "Distinct channels required within the burst duration.")]
+        int? numberOfChannels = null,
+        [Summary("attachment-count", "Attachments required on a message before it counts toward detection.")]
+        int? attachmentCount = null,
+        [Summary("burst-duration", "Detection burst duration in seconds.")]
+        int? burstDuration = null
     )
     {
         if (Context.Guild is null)
@@ -49,12 +56,14 @@ public sealed class SpamModule(ImageSpamSettingsService settingsService) : Slash
             numberOfChannels is null && attachmentCount is null && burstDuration is null
                 ? await settingsService.GetCurrentAsync(Context.Guild.Id, CancellationToken.None).ConfigureAwait(false)
                 : await settingsService
-                    .UpsertAsync(Context.Guild.Id, numberOfChannels, attachmentCount, burstDuration, CancellationToken.None)
+                    .UpsertAsync(Context.Guild.Id, numberOfChannels, attachmentCount, burstDuration,
+                        CancellationToken.None)
                     .ConfigureAwait(false);
 
         if (settings is null)
         {
-            await RespondAsync("Image spam detection is not configured for this guild.", ephemeral: true).ConfigureAwait(false);
+            await RespondAsync("Image spam detection is not configured for this guild.", ephemeral: true)
+                .ConfigureAwait(false);
             return;
         }
 

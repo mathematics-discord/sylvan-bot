@@ -13,6 +13,9 @@ public sealed class AutobannedUserRepository(BotDbContext dbContext) : IAutobann
         await dbContext.SaveChangesAsync(ct);
     }
 
-    public Task<AutobannedUser?> GetAsync(ulong guildId, ulong userId, CancellationToken ct = default) =>
-        dbContext.AutobannedUsers.SingleOrDefaultAsync(user => user.GuildId == guildId && user.BannedUser == userId, ct);
+    public Task<AutobannedUser?> GetAsync(ulong guildId, ulong userId, CancellationToken ct = default)
+    {
+        return dbContext.AutobannedUsers.SingleOrDefaultAsync(
+            user => user.GuildId == guildId && user.BannedUser == userId, ct);
+    }
 }

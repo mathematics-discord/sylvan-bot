@@ -29,5 +29,8 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
         configurationBuilder.Properties<ulong?>().HaveConversion<long?>();
     }
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder) => modelBuilder.ApplyConfigurationsFromAssembly(typeof(BotDbContext).Assembly);
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(BotDbContext).Assembly);
+    }
 }

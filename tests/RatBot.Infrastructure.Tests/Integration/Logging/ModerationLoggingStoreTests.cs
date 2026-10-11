@@ -9,15 +9,20 @@ namespace RatBot.Infrastructure.Tests.Integration.Logging;
 public sealed class ModerationLoggingStoreTests
 {
     [SetUp]
-    public async Task SetUp() => await PostgresDatabaseFixture.ResetAsync().ConfigureAwait(false);
+    public async Task SetUp()
+    {
+        await PostgresDatabaseFixture.ResetAsync().ConfigureAwait(false);
+    }
 
     [Test]
     public async Task ExcludeAsync_AndIncludeAsync_TogglePersistedExclusion()
     {
         ModerationLoggingStore store = CreateStore();
 
-        ExcludeChannelResult firstExclude = await store.ExcludeAsync(1, 2, DateTimeOffset.UtcNow, CancellationToken.None);
-        ExcludeChannelResult secondExclude = await store.ExcludeAsync(1, 2, DateTimeOffset.UtcNow, CancellationToken.None);
+        ExcludeChannelResult firstExclude =
+            await store.ExcludeAsync(1, 2, DateTimeOffset.UtcNow, CancellationToken.None);
+        ExcludeChannelResult secondExclude =
+            await store.ExcludeAsync(1, 2, DateTimeOffset.UtcNow, CancellationToken.None);
         IReadOnlyList<LoggingExcludedChannel> exclusions = await store.ListExclusionsAsync(1, CancellationToken.None);
         IncludeChannelResult firstInclude = await store.IncludeAsync(1, 2, CancellationToken.None);
         IncludeChannelResult secondInclude = await store.IncludeAsync(1, 2, CancellationToken.None);
@@ -71,14 +76,17 @@ public sealed class ModerationLoggingStoreTests
         await store.UpdateConfigurationAsync(1, true, 10, null, null, CancellationToken.None).ConfigureAwait(false);
         await store.UpdateConfigurationAsync(2, false, 20, null, null, CancellationToken.None).ConfigureAwait(false);
 
-        LoggingConfiguration firstGuildBefore = await store.GetConfigurationAsync(1, CancellationToken.None).ConfigureAwait(false);
-        LoggingConfiguration secondGuild = await store.GetConfigurationAsync(2, CancellationToken.None).ConfigureAwait(false);
+        LoggingConfiguration firstGuildBefore =
+            await store.GetConfigurationAsync(1, CancellationToken.None).ConfigureAwait(false);
+        LoggingConfiguration secondGuild =
+            await store.GetConfigurationAsync(2, CancellationToken.None).ConfigureAwait(false);
         await store.UpdateConfigurationAsync(1, false, null, null, null, CancellationToken.None).ConfigureAwait(false);
-        LoggingConfiguration firstGuildAfter = await store.GetConfigurationAsync(1, CancellationToken.None).ConfigureAwait(false);
+        LoggingConfiguration firstGuildAfter =
+            await store.GetConfigurationAsync(1, CancellationToken.None).ConfigureAwait(false);
 
-        firstGuildBefore.AllowsLogging(channelIsExcluded: false).ShouldBeTrue();
-        secondGuild.AllowsLogging(channelIsExcluded: false).ShouldBeFalse();
-        firstGuildAfter.AllowsLogging(channelIsExcluded: false).ShouldBeFalse();
+        firstGuildBefore.AllowsLogging(false).ShouldBeTrue();
+        secondGuild.AllowsLogging(false).ShouldBeFalse();
+        firstGuildAfter.AllowsLogging(false).ShouldBeFalse();
     }
 
     [Test]
@@ -90,8 +98,10 @@ public sealed class ModerationLoggingStoreTests
 
         if (!await store.IsExcludedAsync(1, 2, CancellationToken.None))
         {
-            await store.ObserveMessageAsync(new ObservedMessage(10, 1, 2, 3, DateTimeOffset.UtcNow), CancellationToken.None);
-            await store.RecordLogEntriesAsync(new[] { new MessageLogEntry(1, 10, 20, DateTimeOffset.UtcNow) }, CancellationToken.None);
+            await store.ObserveMessageAsync(new ObservedMessage(10, 1, 2, 3, DateTimeOffset.UtcNow),
+                CancellationToken.None);
+            await store.RecordLogEntriesAsync(new[] { new MessageLogEntry(1, 10, 20, DateTimeOffset.UtcNow) },
+                CancellationToken.None);
         }
 
         (await db.ObservedMessages.CountAsync()).ShouldBe(0);
@@ -149,7 +159,8 @@ public sealed class ModerationLoggingStoreTests
             CancellationToken.None
         );
 
-        List<MessageLogEntry> entries = await db.MessageLogEntries.AsNoTracking().OrderBy(entry => entry.OriginalMessageId).ToListAsync();
+        List<MessageLogEntry> entries = await db.MessageLogEntries.AsNoTracking()
+            .OrderBy(entry => entry.OriginalMessageId).ToListAsync();
 
         entries.Count.ShouldBe(2);
         entries.Select(entry => entry.LogMessageId).Distinct().Single().ShouldBe(99UL);
@@ -162,10 +173,12 @@ public sealed class ModerationLoggingStoreTests
         await using BotDbContext db = PostgresDatabaseFixture.CreateDbContext();
         ModerationLoggingStore store = CreateStore();
 
-        await store.ObserveMessageAsync(new ObservedMessage(10, 1, 2, 3, cutoff.AddSeconds(-1)), CancellationToken.None);
+        await store.ObserveMessageAsync(new ObservedMessage(10, 1, 2, 3, cutoff.AddSeconds(-1)),
+            CancellationToken.None);
         await store.ObserveMessageAsync(new ObservedMessage(11, 1, 2, 3, cutoff), CancellationToken.None);
         await store.ObserveMessageAsync(new ObservedMessage(12, 1, 2, 3, cutoff.AddSeconds(1)), CancellationToken.None);
-        await store.ObserveMessageAsync(new ObservedMessage(20, 1, 2, 3, cutoff.AddSeconds(-1)), CancellationToken.None);
+        await store.ObserveMessageAsync(new ObservedMessage(20, 1, 2, 3, cutoff.AddSeconds(-1)),
+            CancellationToken.None);
         await store.ObserveMessageAsync(new ObservedMessage(21, 1, 2, 3, cutoff), CancellationToken.None);
         await store.ObserveMessageAsync(new ObservedMessage(22, 1, 2, 3, cutoff.AddSeconds(1)), CancellationToken.None);
         await store.RecordLogEntriesAsync(
@@ -173,7 +186,7 @@ public sealed class ModerationLoggingStoreTests
             {
                 new MessageLogEntry(1, 20, 30, cutoff.AddSeconds(-1)),
                 new MessageLogEntry(1, 21, 31, cutoff),
-                new MessageLogEntry(1, 22, 32, cutoff.AddSeconds(1)),
+                new MessageLogEntry(1, 22, 32, cutoff.AddSeconds(1))
             },
             CancellationToken.None
         );
@@ -184,11 +197,13 @@ public sealed class ModerationLoggingStoreTests
         firstDeletedCount.ShouldBe(3);
         secondDeletedCount.ShouldBe(0);
         (
-            await db.ObservedMessages.AsNoTracking().Select(message => message.OriginalMessageId).OrderBy(messageId => messageId).ToListAsync()
+            await db.ObservedMessages.AsNoTracking().Select(message => message.OriginalMessageId)
+                .OrderBy(messageId => messageId).ToListAsync()
         ).ShouldBe([11UL, 12UL, 21UL, 22UL]);
-        (await db.MessageLogEntries.AsNoTracking().Select(entry => entry.OriginalMessageId).OrderBy(messageId => messageId).ToListAsync()).ShouldBe([
+        (await db.MessageLogEntries.AsNoTracking().Select(entry => entry.OriginalMessageId)
+            .OrderBy(messageId => messageId).ToListAsync()).ShouldBe([
             21UL,
-            22UL,
+            22UL
         ]);
     }
 
@@ -201,7 +216,8 @@ public sealed class ModerationLoggingStoreTests
 
         await store.ObserveMessageAsync(new ObservedMessage(10, 1, 2, 3, now), CancellationToken.None);
         await store.ObserveMessageAsync(new ObservedMessage(10, 2, 4, 5, now), CancellationToken.None);
-        await store.RecordLogEntriesAsync(new[] { new MessageLogEntry(1, 10, 99, now), new MessageLogEntry(2, 10, 99, now) }, CancellationToken.None);
+        await store.RecordLogEntriesAsync(
+            new[] { new MessageLogEntry(1, 10, 99, now), new MessageLogEntry(2, 10, 99, now) }, CancellationToken.None);
 
         ObservedMessage? firstGuild = await store.FindObservedMessageAsync(1, 10, CancellationToken.None);
         ObservedMessage? secondGuild = await store.FindObservedMessageAsync(2, 10, CancellationToken.None);
@@ -214,18 +230,21 @@ public sealed class ModerationLoggingStoreTests
         firstGuild.ChannelId.ShouldBe(2UL);
         secondGuild.ChannelId.ShouldBe(4UL);
         firstGuildBatch.Single().Value.GuildId.ShouldBe(1UL);
-        (await db.MessageLogEntries.CountAsync(entry => entry.OriginalMessageId == 10 && entry.LogMessageId == 99)).ShouldBe(2);
+        (await db.MessageLogEntries.CountAsync(entry => entry.OriginalMessageId == 10 && entry.LogMessageId == 99))
+            .ShouldBe(2);
     }
 
     [Test]
     public void PersistenceModel_DoesNotContainPrivateEvidenceOrDiscordIdentityFields()
     {
         using BotDbContext db = PostgresDatabaseFixture.CreateDbContext();
-        string[] forbiddenFragments = { "content", "filename", "url", "bytes", "username", "nick", "discriminator", "path" };
+        string[] forbiddenFragments =
+            { "content", "filename", "url", "bytes", "username", "nick", "discriminator", "path" };
 
         string[] loggingColumns = db
             .Model.GetEntityTypes()
-            .Where(entityType => string.Equals(entityType.ClrType.Namespace, typeof(LoggingConfiguration).Namespace!, StringComparison.Ordinal))
+            .Where(entityType => string.Equals(entityType.ClrType.Namespace, typeof(LoggingConfiguration).Namespace!,
+                StringComparison.Ordinal))
             .SelectMany(entityType => entityType.GetProperties())
             .Select(property => property.GetColumnName())
             .ToArray();
@@ -233,13 +252,20 @@ public sealed class ModerationLoggingStoreTests
         loggingColumns.ShouldNotBeEmpty();
 
         foreach (string column in loggingColumns)
-            forbiddenFragments.Any(fragment => column.Contains(fragment, StringComparison.OrdinalIgnoreCase)).ShouldBeFalse(column);
+            forbiddenFragments.Any(fragment => column.Contains(fragment, StringComparison.OrdinalIgnoreCase))
+                .ShouldBeFalse(column);
     }
 
-    private static ModerationLoggingStore CreateStore() => new ModerationLoggingStore(new PostgresBotDbContextFactory());
+    private static ModerationLoggingStore CreateStore()
+    {
+        return new ModerationLoggingStore(new PostgresBotDbContextFactory());
+    }
 
     private sealed class PostgresBotDbContextFactory : IDbContextFactory<BotDbContext>
     {
-        public BotDbContext CreateDbContext() => PostgresDatabaseFixture.CreateDbContext();
+        public BotDbContext CreateDbContext()
+        {
+            return PostgresDatabaseFixture.CreateDbContext();
+        }
     }
 }

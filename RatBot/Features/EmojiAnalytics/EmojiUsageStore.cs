@@ -33,7 +33,7 @@ public sealed class EmojiUsageStore(IDbContextFactory<BotDbContext> dbContextFac
                     GuildId = guildId,
                     EmojiId = increment.EmojiId,
                     MessageUsageCount = 0,
-                    ReactionUsageCount = 0,
+                    ReactionUsageCount = 0
                 };
 
                 db.EmojiUsageCounts.Add(row);

@@ -9,9 +9,15 @@ internal static class MessageEditDiffAnsiRenderer
     private const string Red = "\e[1;31m";
     private const string Green = "\e[1;32m";
 
-    public static string RenderBefore(MessageEditDiff diff) => RenderSegments(diff.Before);
+    public static string RenderBefore(MessageEditDiff diff)
+    {
+        return RenderSegments(diff.Before);
+    }
 
-    public static string RenderAfter(MessageEditDiff diff) => RenderSegments(diff.After);
+    public static string RenderAfter(MessageEditDiff diff)
+    {
+        return RenderSegments(diff.After);
+    }
 
     private static string RenderSegments(IReadOnlyList<MessageEditDiffSegment> segments)
     {
@@ -38,11 +44,13 @@ internal static class MessageEditDiffAnsiRenderer
         }
     }
 
-    private static string? GetColor(MessageEditDiffSegmentKind kind) =>
-        kind switch
+    private static string? GetColor(MessageEditDiffSegmentKind kind)
+    {
+        return kind switch
         {
             MessageEditDiffSegmentKind.Removed => Red,
             MessageEditDiffSegmentKind.Added => Green,
-            _ => null,
+            _ => null
         };
+    }
 }

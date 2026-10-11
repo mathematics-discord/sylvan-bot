@@ -41,11 +41,10 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
             {
                 RequestOptions requestOptions = new RequestOptions { CancelToken = ct };
 
-                await foreach (IReadOnlyCollection<IGuildUser> page in guild.GetUsersAsync(requestOptions).WithCancellation(ct).ConfigureAwait(false))
-                {
-                    foreach (IGuildUser user in page)
-                        IndexUserForRoles(user, missingRoleIds);
-                }
+                await foreach (IReadOnlyCollection<IGuildUser> page in guild.GetUsersAsync(requestOptions)
+                                   .WithCancellation(ct).ConfigureAwait(false))
+                foreach (IGuildUser user in page)
+                    IndexUserForRoles(user, missingRoleIds);
             }
 
             MarkRolesReady(guild.Id, missingRoleIds);
@@ -86,10 +85,8 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
             HashSet<ulong> distinctUserIds = [];
 
             foreach (ulong roleId in roleIds)
-            {
                 if (guild.RoleMembers.TryGetValue(roleId, out HashSet<ulong>? userIds))
                     distinctUserIds.UnionWith(userIds);
-            }
 
             eligibleVoterCount = distinctUserIds.Count;
 
@@ -130,7 +127,9 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
     {
         lock (_lock)
         {
-            return _guilds.TryGetValue(guildId, out GuildIndex? guild) ? guild.RoleMembers.Keys.ToImmutableHashSet() : ImmutableHashSet<ulong>.Empty;
+            return _guilds.TryGetValue(guildId, out GuildIndex? guild)
+                ? guild.RoleMembers.Keys.ToImmutableHashSet()
+                : ImmutableHashSet<ulong>.Empty;
         }
     }
 
@@ -143,7 +142,8 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
         }
         catch (Exception ex)
         {
-            _logger.ForContext("GuildId", after.Guild.Id).Warning(ex, "Failed to update quorum member index after member update");
+            _logger.ForContext("GuildId", after.Guild.Id)
+                .Warning(ex, "Failed to update quorum member index after member update");
         }
 
         return Task.CompletedTask;
@@ -157,7 +157,8 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
         }
         catch (Exception ex)
         {
-            _logger.ForContext("GuildId", role.Guild.Id).Warning(ex, "Failed to update quorum member index after role deletion");
+            _logger.ForContext("GuildId", role.Guild.Id)
+                .Warning(ex, "Failed to update quorum member index after role deletion");
         }
 
         return Task.CompletedTask;
@@ -171,7 +172,8 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
         }
         catch (Exception ex)
         {
-            _logger.ForContext("GuildId", user.Guild.Id).Warning(ex, "Failed to update quorum member index after member joined");
+            _logger.ForContext("GuildId", user.Guild.Id)
+                .Warning(ex, "Failed to update quorum member index after member joined");
         }
 
         return Task.CompletedTask;
@@ -185,7 +187,8 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
         }
         catch (Exception ex)
         {
-            _logger.ForContext("GuildId", guild.Id).Warning(ex, "Failed to update quorum member index after member left");
+            _logger.ForContext("GuildId", guild.Id)
+                .Warning(ex, "Failed to update quorum member index after member left");
         }
 
         return Task.CompletedTask;
@@ -206,10 +209,8 @@ public sealed class DiscordQuorumMemberIndex(DiscordSocketClient client, ILogger
             GuildIndex guild = GetOrCreateGuildIndex(user.GuildId);
 
             foreach (ulong roleId in matchingRoleIds)
-            {
                 if (guild.RoleMembers.TryGetValue(roleId, out HashSet<ulong>? userIds))
                     userIds.Add(user.Id);
-            }
         }
     }
 

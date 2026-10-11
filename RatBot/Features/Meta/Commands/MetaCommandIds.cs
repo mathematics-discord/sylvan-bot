@@ -7,5 +7,8 @@ internal static class MetaCommandIds
     public const string ResubmitPrefix = "meta-resubmit";
     public const string VetoModalPrefix = "meta-veto";
 
-    public static string ResubmitCustomId(Guid stateId) => $"{ResubmitPrefix}:{stateId:N}";
+    public static string ResubmitCustomId(Guid stateId)
+    {
+        return $"{ResubmitPrefix}:{stateId:N}";
+    }
 }

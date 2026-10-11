@@ -7,11 +7,16 @@ namespace RatBot.Infrastructure.Stores;
 
 public sealed class ImageSpamSettingsStore(BotDbContext dbContext) : IImageSpamSettingsStore
 {
-    public Task<ImageSpamSettings?> GetAsync(ulong guildId, CancellationToken ct) =>
-        dbContext.ImageSpamSettings.AsNoTracking().SingleOrDefaultAsync(x => x.GuildId == guildId, ct);
+    public Task<ImageSpamSettings?> GetAsync(ulong guildId, CancellationToken ct)
+    {
+        return dbContext.ImageSpamSettings.AsNoTracking().SingleOrDefaultAsync(x => x.GuildId == guildId, ct);
+    }
 
-    public async Task<IReadOnlyList<ImageSpamSettings>> ListEnabledAsync(CancellationToken ct) =>
-        await dbContext.ImageSpamSettings.AsNoTracking().Where(x => x.IsEnabled).ToListAsync(ct).ConfigureAwait(false);
+    public async Task<IReadOnlyList<ImageSpamSettings>> ListEnabledAsync(CancellationToken ct)
+    {
+        return await dbContext.ImageSpamSettings.AsNoTracking().Where(x => x.IsEnabled).ToListAsync(ct)
+            .ConfigureAwait(false);
+    }
 
     public async Task<ImageSpamSettings> UpsertAsync(
         ulong guildId,
@@ -21,7 +26,8 @@ public sealed class ImageSpamSettingsStore(BotDbContext dbContext) : IImageSpamS
         CancellationToken ct
     )
     {
-        ImageSpamSettings? settings = await dbContext.ImageSpamSettings.SingleOrDefaultAsync(x => x.GuildId == guildId, ct).ConfigureAwait(false);
+        ImageSpamSettings? settings = await dbContext.ImageSpamSettings
+            .SingleOrDefaultAsync(x => x.GuildId == guildId, ct).ConfigureAwait(false);
 
         if (settings is null)
         {

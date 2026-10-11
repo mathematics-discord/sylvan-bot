@@ -2,7 +2,9 @@ namespace RatBot.Domain.Features.Logging;
 
 public sealed class LoggingExcludedChannel
 {
-    private LoggingExcludedChannel() { }
+    private LoggingExcludedChannel()
+    {
+    }
 
     public LoggingExcludedChannel(ulong guildId, ulong channelId, DateTimeOffset excludedAtUtc)
     {

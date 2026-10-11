@@ -30,7 +30,8 @@ public sealed class QuorumOperations(IQuorumConfigurationStore configurations, I
         if (!configuration.IsComplete)
             return QuorumErrors.ConfigurationIncomplete;
 
-        ErrorOr<int> eligibleVoterCount = await members.CountEligibleVotersAsync(configuration.Scope, configuration.VoterRoles.RoleIds, ct);
+        ErrorOr<int> eligibleVoterCount =
+            await members.CountEligibleVotersAsync(configuration.Scope, configuration.VoterRoles.RoleIds, ct);
 
         if (eligibleVoterCount.IsError)
             return eligibleVoterCount.Errors;
@@ -38,16 +39,23 @@ public sealed class QuorumOperations(IQuorumConfigurationStore configurations, I
         return Calculate(eligibleVoterCount.Value, configuration.Proportion);
     }
 
-    public Task<ErrorOr<QuorumConfiguration>> InspectAsync(QuorumScope scope, CancellationToken ct) => configurations.GetAsync(scope, ct);
+    public Task<ErrorOr<QuorumConfiguration>> InspectAsync(QuorumScope scope, CancellationToken ct)
+    {
+        return configurations.GetAsync(scope, ct);
+    }
 
-    public async Task<ErrorOr<QuorumRegistration>> RegisterAsync(QuorumScope scope, decimal proportionValue, CancellationToken ct)
+    public async Task<ErrorOr<QuorumRegistration>> RegisterAsync(QuorumScope scope, decimal proportionValue,
+        CancellationToken ct)
     {
         ErrorOr<QuorumProportion> proportion = QuorumProportion.Create(proportionValue);
 
         return proportion.IsError ? proportion.Errors : await configurations.RegisterAsync(scope, proportion.Value, ct);
     }
 
-    public Task<ErrorOr<Deleted>> RemoveAsync(QuorumScope scope, CancellationToken ct) => configurations.DeleteAsync(scope, ct);
+    public Task<ErrorOr<Deleted>> RemoveAsync(QuorumScope scope, CancellationToken ct)
+    {
+        return configurations.DeleteAsync(scope, ct);
+    }
 
     public async Task<ErrorOr<QuorumConfiguration>> UpdateRoleAsync(QuorumRoleUpdate update, CancellationToken ct)
     {
@@ -60,7 +68,7 @@ public sealed class QuorumOperations(IQuorumConfigurationStore configurations, I
         {
             QuorumRoleUpdate.Add add => configurationResult.Value.AddRole(add.RoleId),
             QuorumRoleUpdate.Remove remove => configurationResult.Value.RemoveRole(remove.RoleId),
-            _ => throw new UnreachableException(),
+            _ => throw new UnreachableException()
         };
 
         return await configurations.SaveAsync(updated, ct);

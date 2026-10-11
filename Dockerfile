@@ -1,8 +1,9 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 
 COPY Directory.Build.props ./
 COPY Directory.Packages.props ./
+COPY global.json ./
 COPY RatBot/RatBot.csproj RatBot/
 COPY RatBot.Domain/RatBot.Domain.csproj RatBot.Domain/
 
@@ -11,7 +12,7 @@ RUN dotnet restore RatBot/RatBot.csproj
 COPY . .
 RUN dotnet publish RatBot/RatBot.csproj -c Release -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/runtime:10.0
+FROM mcr.microsoft.com/dotnet/runtime:11.0
 WORKDIR /app
 
 RUN apt-get update \

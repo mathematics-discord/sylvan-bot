@@ -9,7 +9,8 @@ public sealed class MetaProposalPollResolver(MetaProposalDiscordWorkflow workflo
 
     private static bool SubmitWon(Poll poll, PollResults results)
     {
-        PollAnswer submitAnswer = poll.Answers.FirstOrDefault(answer => string.Equals(answer.PollMedia.Text, "Submit", StringComparison.Ordinal));
+        PollAnswer submitAnswer = poll.Answers.FirstOrDefault(answer =>
+            string.Equals(answer.PollMedia.Text, "Submit", StringComparison.Ordinal));
 
         PollAnswer doNotSubmitAnswer = poll.Answers.FirstOrDefault(answer =>
             string.Equals(answer.PollMedia.Text, "Do Not Submit", StringComparison.Ordinal)
@@ -20,12 +21,14 @@ public sealed class MetaProposalPollResolver(MetaProposalDiscordWorkflow workflo
 
         uint submitCount = results.AnswerCounts.FirstOrDefault(count => count.AnswerId == submitAnswer.AnswerId).Count;
 
-        uint doNotSubmitCount = results.AnswerCounts.FirstOrDefault(count => count.AnswerId == doNotSubmitAnswer.AnswerId).Count;
+        uint doNotSubmitCount = results.AnswerCounts
+            .FirstOrDefault(count => count.AnswerId == doNotSubmitAnswer.AnswerId).Count;
 
         return submitCount > 0 && submitCount > doNotSubmitCount;
     }
 
-    public async Task ResolveExpiredPollAsync(MetaProposalService service, MetaProposalState state, CancellationToken ct)
+    public async Task ResolveExpiredPollAsync(MetaProposalService service, MetaProposalState state,
+        CancellationToken ct)
     {
         IUserMessage? pollMessage = await workflow.GetPollMessageAsync(state, ct);
 
@@ -35,13 +38,17 @@ public sealed class MetaProposalPollResolver(MetaProposalDiscordWorkflow workflo
             return;
         }
 
-        await ResolvePollMessageAsync(service, state, pollMessage, requestFinalization: true, ct);
+        await ResolvePollMessageAsync(service, state, pollMessage, true, ct);
     }
 
-    public Task ResolveFinalizedPollAsync(MetaProposalService service, MetaProposalState state, IUserMessage pollMessage, CancellationToken ct) =>
-        ResolvePollMessageAsync(service, state, pollMessage, requestFinalization: false, ct);
+    public Task ResolveFinalizedPollAsync(MetaProposalService service, MetaProposalState state,
+        IUserMessage pollMessage, CancellationToken ct)
+    {
+        return ResolvePollMessageAsync(service, state, pollMessage, false, ct);
+    }
 
-    private async Task CompletePollAsync(MetaProposalService service, MetaProposalState state, bool submitWon, CancellationToken ct)
+    private async Task CompletePollAsync(MetaProposalService service, MetaProposalState state, bool submitWon,
+        CancellationToken ct)
     {
         ErrorOr<MetaProposalState> completed = await service.CompletePollAsync(state.Id, submitWon, ct);
 
@@ -63,7 +70,7 @@ public sealed class MetaProposalPollResolver(MetaProposalDiscordWorkflow workflo
         if (settingsResult.IsError)
             return;
 
-        ErrorOr<ulong> publishResult = await workflow.PublishProposalAsync(updated, settingsResult.Value, pingCabinet: false, ct);
+        ErrorOr<ulong> publishResult = await workflow.PublishProposalAsync(updated, settingsResult.Value, false, ct);
 
         if (!publishResult.IsError)
         {
@@ -72,7 +79,9 @@ public sealed class MetaProposalPollResolver(MetaProposalDiscordWorkflow workflo
             return;
         }
 
-        ErrorOr<ulong> errorMessage = await workflow.PostPublicationErrorAsync(updated, settingsResult.Value, updated.PublicationErrorMessageId, ct);
+        ErrorOr<ulong> errorMessage =
+            await workflow.PostPublicationErrorAsync(updated, settingsResult.Value, updated.PublicationErrorMessageId,
+                ct);
 
         if (!errorMessage.IsError)
             await service.RecordPublicationFailureAsync(updated.Id, errorMessage.Value, DateTimeOffset.UtcNow, ct);
@@ -91,7 +100,7 @@ public sealed class MetaProposalPollResolver(MetaProposalDiscordWorkflow workflo
         if (pollValue is null)
         {
             if (requestFinalization)
-                await CompletePollAsync(service, state, submitWon: false, ct);
+                await CompletePollAsync(service, state, false, ct);
 
             return;
         }
@@ -105,17 +114,18 @@ public sealed class MetaProposalPollResolver(MetaProposalDiscordWorkflow workflo
 
             if (state.PollFinalizationRetries >= MaxFinalizationRetries)
             {
-                await CompletePollAsync(service, state, submitWon: false, ct);
+                await CompletePollAsync(service, state, false, ct);
                 return;
             }
 
             try
             {
-                await pollMessage.EndPollAsync(options: null);
+                await pollMessage.EndPollAsync(null);
             }
             catch (Exception ex)
             {
-                _logger.Debug(ex, "Could not request finalization for meta proposal poll {PollMessageId}", pollMessage.Id);
+                _logger.Debug(ex, "Could not request finalization for meta proposal poll {PollMessageId}",
+                    pollMessage.Id);
             }
 
             await service.RecordPollFinalizationRetryAsync(state.Id, ct);

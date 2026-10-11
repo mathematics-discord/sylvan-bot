@@ -9,13 +9,18 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
 
     private readonly Lock _gate = new Lock();
 
-    private readonly Dictionary<ImageBurstBufferKey, DateTimeOffset> _handlingLocks = new Dictionary<ImageBurstBufferKey, DateTimeOffset>();
+    private readonly Dictionary<ImageBurstBufferKey, DateTimeOffset> _handlingLocks =
+        new Dictionary<ImageBurstBufferKey, DateTimeOffset>();
 
     public ImageBurstSpamDetector()
-        : this(TimeProvider.System, new ImageBurstSpamDetectorOptions()) { }
+        : this(TimeProvider.System, new ImageBurstSpamDetectorOptions())
+    {
+    }
 
     public ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurstSpamDetectorOptions options)
-        : this(timeProvider, CreateSettings(options)) { }
+        : this(timeProvider, CreateSettings(options))
+    {
+    }
 
     private static ImageBurstSpamDetectorSettings CreateSettings(ImageBurstSpamDetectorOptions options)
     {

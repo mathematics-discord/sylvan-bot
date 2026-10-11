@@ -17,7 +17,8 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
         string? user = c["DB:User"] ?? c["Database:User"] ?? Environment.GetEnvironmentVariable("DB__USER");
         string? pwd = c["DB:Password"] ?? c["Database:Password"] ?? Environment.GetEnvironmentVariable("DB__PASSWORD");
 
-        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(db) || string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pwd))
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(db) || string.IsNullOrWhiteSpace(user) ||
+            string.IsNullOrWhiteSpace(pwd))
             return null;
 
         string resolvedPort = string.IsNullOrWhiteSpace(port) ? "5432" : port;
@@ -43,9 +44,11 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
             ?? BuildFromDiscrete(configurationRoot);
 
         if (string.IsNullOrWhiteSpace(connectionString))
-            throw new InvalidOperationException("Design-time connection string missing. Set DB__CONNECTION_STRING or discrete DB__* vars.");
+            throw new InvalidOperationException(
+                "Design-time connection string missing. Set DB__CONNECTION_STRING or discrete DB__* vars.");
 
-        DbContextOptions<BotDbContext> options = new DbContextOptionsBuilder<BotDbContext>().UseNpgsql(connectionString).Options;
+        DbContextOptions<BotDbContext> options =
+            new DbContextOptionsBuilder<BotDbContext>().UseNpgsql(connectionString).Options;
 
         return new BotDbContext(options);
     }

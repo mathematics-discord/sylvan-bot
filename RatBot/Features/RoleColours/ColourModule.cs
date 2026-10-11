@@ -37,12 +37,12 @@ public sealed class ColourModule(RoleColourReconciler colours) : InteractionModu
             return;
         }
 
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(true);
 
         ImmutableArray<IRole> eligible = await colours.ListEligibleColoursAsync(
-            guild: Context.Guild,
-            userId: Context.User.Id,
-            ct: CancellationToken.None
+            Context.Guild,
+            Context.User.Id,
+            CancellationToken.None
         );
 
         if (eligible.Length > 25)
@@ -86,9 +86,10 @@ public sealed class ColourModule(RoleColourReconciler colours) : InteractionModu
 
     private async Task ApplySelectionAsync(ulong? selected)
     {
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(true);
 
-        ErrorOr<ulong?> result = await colours.TrySetUserColourAsync(Context.Guild, Context.User.Id, selected, CancellationToken.None);
+        ErrorOr<ulong?> result =
+            await colours.TrySetUserColourAsync(Context.Guild, Context.User.Id, selected, CancellationToken.None);
 
         await FollowupAsync(ResultMessage(result), ephemeral: true);
 

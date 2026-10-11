@@ -98,7 +98,8 @@ Automatic production flow:
 - The deployment workflow builds and publishes the immutable `sha-<commit_sha>` image
 - The deployment workflow applies that exact image to production
 
-For bot stacks, the deployment helper also writes the deployed `RATBOT_IMAGE` back to the server-side `.env` so later manual
+For bot stacks, the deployment helper also writes the deployed `RATBOT_IMAGE` back to the server-side `.env` so later
+manual
 `docker compose` runs do not drift to an older moving tag.
 
 The deployment helper writes a simple rollback state on the VPS per stack:

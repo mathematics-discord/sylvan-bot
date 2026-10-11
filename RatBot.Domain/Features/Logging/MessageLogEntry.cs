@@ -2,7 +2,9 @@ namespace RatBot.Domain.Features.Logging;
 
 public sealed class MessageLogEntry
 {
-    private MessageLogEntry() { }
+    private MessageLogEntry()
+    {
+    }
 
     public MessageLogEntry(ulong guildId, ulong originalMessageId, ulong logMessageId, DateTimeOffset capturedAtUtc)
     {

@@ -2,7 +2,10 @@ using RatBot.Infrastructure.Features.Logging;
 
 namespace RatBot.Features.Logging.BackgroundWorkers;
 
-public sealed class LoggingMetadataCleanupBackgroundWorker(IServiceScopeFactory scopeFactory, IOptions<LoggingOptions> options, ILogger logger)
+public sealed class LoggingMetadataCleanupBackgroundWorker(
+    IServiceScopeFactory scopeFactory,
+    IOptions<LoggingOptions> options,
+    ILogger logger)
     : BackgroundService
 {
     private readonly ILogger _logger = logger.ForContext<LoggingMetadataCleanupBackgroundWorker>();
@@ -60,6 +63,7 @@ public sealed class LoggingMetadataCleanupBackgroundWorker(IServiceScopeFactory 
         int deletedRows = await store.DeleteExpiredMetadataAsync(cutoffUtc, ct).ConfigureAwait(false);
 
         if (deletedRows > 0)
-            _logger.Information("Deleted {DeletedRows} expired logging metadata row(s). CutoffUtc={CutoffUtc}", deletedRows, cutoffUtc);
+            _logger.Information("Deleted {DeletedRows} expired logging metadata row(s). CutoffUtc={CutoffUtc}",
+                deletedRows, cutoffUtc);
     }
 }

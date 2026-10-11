@@ -18,7 +18,8 @@ public sealed class BirbResponseHandler(ILogger logger) : InteractionModuleBase<
     [ComponentInteraction(DeclineId)]
     public async Task Decline()
     {
-        await RespondAsync($"The Robyne passeth onward, troubling thee no further, <@{Context.User.Id}> ☺️", ephemeral: true);
+        await RespondAsync($"The Robyne passeth onward, troubling thee no further, <@{Context.User.Id}> ☺️",
+            ephemeral: true);
         _logger.Information("declined by {UserId}", Context.User.Id);
     }
 }

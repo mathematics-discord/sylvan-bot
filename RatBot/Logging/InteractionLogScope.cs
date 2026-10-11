@@ -25,7 +25,7 @@ public sealed class InteractionLogScope : IDisposable
             LogContext.PushProperty("user_id", details.UserId),
             LogContext.PushProperty("guild_id", details.GuildId),
             LogContext.PushProperty("channel_id", details.ChannelId),
-            LogContext.PushProperty("command_name", details.CommandName),
+            LogContext.PushProperty("command_name", details.CommandName)
         };
 
         return new InteractionLogScope(properties);
