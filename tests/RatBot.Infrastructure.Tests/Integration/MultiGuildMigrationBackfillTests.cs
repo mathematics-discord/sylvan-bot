@@ -12,6 +12,97 @@ public sealed class MultiGuildMigrationBackfillTests
     private const ulong LegacyGuildId = 123456789012345678;
 
     [Test]
+    public async Task RemoveModerationLogging_PopulatedTables_DropsLoggingAndPreservesEmojiUsage()
+    {
+        // Arrange
+        string databaseName = await CreateDatabaseAsync()
+            .ConfigureAwait(false);
+
+        try
+        {
+            await using BotDbContext db = CreateDbContext(databaseName);
+            await db.Database.MigrateAsync("20261011221538_RemoveMeta")
+                .ConfigureAwait(false);
+            await SeedModerationLoggingRowsAsync(db)
+                .ConfigureAwait(false);
+            await db.Database.ExecuteSqlRawAsync(
+                    """
+                    INSERT INTO "EmojiUsageCounts" ("GuildId", "EmojiId", "MessageUsageCount", "ReactionUsageCount")
+                    VALUES (1, 500, 7, 9);
+                    """)
+                .ConfigureAwait(false);
+
+            // Act
+            await db.Database.MigrateAsync()
+                .ConfigureAwait(false);
+
+            // Assert
+            int remainingLoggingTables = await db.Database.SqlQueryRaw<int>(
+                    """
+                    SELECT COUNT(*)::integer AS "Value" FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN ('logging_configurations', 'logging_excluded_channels',
+                                         'message_log_entries', 'observed_messages')
+                    """)
+                .SingleAsync()
+                .ConfigureAwait(false);
+            remainingLoggingTables.ShouldBe(0);
+
+            EmojiUsageCount persisted = await db.EmojiUsageCounts
+                .AsNoTracking()
+                .SingleAsync(row => row.GuildId == 1 && row.EmojiId == 500)
+                .ConfigureAwait(false);
+            persisted.MessageUsageCount.ShouldBe(7);
+            persisted.ReactionUsageCount.ShouldBe(9);
+        }
+        finally
+        {
+            await DropDatabaseAsync(databaseName)
+                .ConfigureAwait(false);
+        }
+    }
+
+    [Test]
+    public async Task RemoveModerationLoggingDown_AfterDataRemoval_RestoresEmptyTables()
+    {
+        // Arrange
+        string databaseName = await CreateDatabaseAsync()
+            .ConfigureAwait(false);
+
+        try
+        {
+            await using BotDbContext db = CreateDbContext(databaseName);
+            await db.Database.MigrateAsync("20261011221538_RemoveMeta")
+                .ConfigureAwait(false);
+            await SeedModerationLoggingRowsAsync(db)
+                .ConfigureAwait(false);
+            await db.Database.MigrateAsync()
+                .ConfigureAwait(false);
+
+            // Act
+            await db.Database.MigrateAsync("20261011221538_RemoveMeta")
+                .ConfigureAwait(false);
+
+            // Assert
+            int restoredRows = await db.Database.SqlQueryRaw<int>(
+                    """
+                    SELECT ((SELECT COUNT(*) FROM logging_configurations)
+                          + (SELECT COUNT(*) FROM logging_excluded_channels)
+                          + (SELECT COUNT(*) FROM message_log_entries)
+                          + (SELECT COUNT(*) FROM observed_messages))::integer AS "Value"
+                    """)
+                .SingleAsync()
+                .ConfigureAwait(false);
+            restoredRows.ShouldBe(0);
+        }
+        finally
+        {
+            await DropDatabaseAsync(databaseName)
+                .ConfigureAwait(false);
+        }
+    }
+
+    [Test]
     public async Task RemoveMeta_PopulatedTables_RemovesMetaAndPreservesEmojiUsage()
     {
         // Arrange
@@ -125,7 +216,7 @@ public sealed class MultiGuildMigrationBackfillTests
             await db.Database.ExecuteSqlRawAsync(
                 "INSERT INTO user_timezones (user_id, timezone_id, updated_at_utc) VALUES (100, 'Europe/London', now())"
             );
-            await db.Database.MigrateAsync();
+            await db.Database.MigrateAsync("20261011221538_RemoveMeta");
 
             (
                 await db
@@ -177,6 +268,25 @@ public sealed class MultiGuildMigrationBackfillTests
         {
             await DropDatabaseAsync(databaseName);
         }
+    }
+
+    private static Task SeedModerationLoggingRowsAsync(BotDbContext db)
+    {
+        return db.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO logging_configurations
+                (guild_id, enabled, delete_log_channel_id, edit_log_channel_id, evidence_retention_period)
+            VALUES (1, true, 20, 30, interval '5 minutes');
+
+            INSERT INTO logging_excluded_channels (guild_id, channel_id, excluded_at_utc)
+            VALUES (1, 40, now());
+
+            INSERT INTO observed_messages (guild_id, original_message_id, channel_id, author_id, observed_at_utc)
+            VALUES (1, 50, 60, 70, now());
+
+            INSERT INTO message_log_entries (guild_id, original_message_id, log_message_id, captured_at_utc)
+            VALUES (1, 50, 80, now());
+            """);
     }
 
     private static async Task SeedRepresentativeLegacyRowsAsync(BotDbContext db)

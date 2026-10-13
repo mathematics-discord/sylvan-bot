@@ -1,10 +1,9 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using RatBot.Application.Moderation;
 using RatBot.Configuration;
 using RatBot.Features.EmojiAnalytics;
-using RatBot.Features.Logging.Gateway;
 using RatBot.Features.RoleColours;
 using RatBot.Gateway;
 using Serilog;
@@ -39,16 +38,15 @@ public sealed class DependencyInjectionTests
             new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true }
         );
 
-        IDiscordGatewayHandler[] gatewayHandlers = provider.GetServices<IDiscordGatewayHandler>().ToArray();
+        IDiscordGatewayHandler[] gatewayHandlers = provider.GetServices<IDiscordGatewayHandler>()
+            .ToArray();
         await using AsyncServiceScope scope = provider.CreateAsyncScope();
         ImageSpamSettingsService settingsService = scope.ServiceProvider.GetRequiredService<ImageSpamSettingsService>();
 
         // Assert
         settingsService.ShouldNotBeNull();
-        gatewayHandlers.ShouldContain(handler => handler is ModerationLoggingGatewayHandler);
         gatewayHandlers.ShouldContain(handler => handler is RoleColourGatewayHandler);
         gatewayHandlers.ShouldContain(handler => handler is EmojiAnalyticsGatewayHandler);
-        provider.GetRequiredService<ModerationLoggingGatewayHandler>().ShouldNotBeNull();
     }
 
     [Test]
