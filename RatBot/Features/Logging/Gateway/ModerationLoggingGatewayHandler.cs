@@ -29,7 +29,7 @@ public sealed class ModerationLoggingGatewayHandler(
 
     public void Unsubscribe()
     {
-        discordClient.MessageReceived -= HandleMessageReceivedAsync;
+        discordClient.MessageReceived -= DispatchMessageReceivedAsync;
         discordClient.MessageUpdated -= HandleMessageUpdatedAsync;
         discordClient.MessageDeleted -= HandleMessageDeletedAsync;
         discordClient.MessagesBulkDeleted -= HandleMessagesBulkDeletedAsync;
