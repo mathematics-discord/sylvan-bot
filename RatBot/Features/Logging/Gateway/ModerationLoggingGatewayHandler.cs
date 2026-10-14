@@ -321,7 +321,7 @@ public sealed class ModerationLoggingGatewayHandler(
             message.Id,
             message.Author.Id,
             now,
-            ToOptionalContent(message.Content).Value is Some<string>(var content) ? content : null,
+            message.Content,
             attachments.ToImmutable()
         );
     }
@@ -569,7 +569,7 @@ public sealed class ModerationLoggingGatewayHandler(
 
         if (cachedMessage.HasValue)
         {
-            content = ToOptionalContent(cachedMessage.Value.Content).Value is Some<string>(var value) ? value : null;
+            content = cachedMessage.Value.Content;
             return true;
         }
 
@@ -602,11 +602,6 @@ public sealed class ModerationLoggingGatewayHandler(
     private static bool IsQualifyingUserMessage(IMessage message)
     {
         return message.Source == MessageSource.User && !message.Author.IsBot && !message.Author.IsWebhook;
-    }
-
-    private static Option<string> ToOptionalContent(string value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? new None() : new Some<string>(value);
     }
 
     private static string SingleLineSnippet(string value)
