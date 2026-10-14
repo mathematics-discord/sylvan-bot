@@ -189,6 +189,10 @@ public sealed class ModerationLoggingGatewayHandler(
             ulong authorId = observed.Value is Some<ObservedMessage>(var observedMessage)
                 ? observedMessage.AuthorId
                 : evidence.AuthorId;
+
+            string? content = (hasEvidence ? evidence.Content : null)
+                ?? (message.HasValue ? message.Value.Content : null);
+
             Option<string> precedingMessageResult =
                 await TryGetPrecedingMessageJumpUrlAsync(channelValue, message.Id)
                     .ConfigureAwait(false);
@@ -199,7 +203,7 @@ public sealed class ModerationLoggingGatewayHandler(
                     channelValue.Id,
                     authorId,
                     precedingMessageJumpUrl,
-                    hasEvidence ? evidence.Content : null,
+                    content,
                     hasEvidence ? evidence.Attachments : ImmutableArray<CachedAttachmentEvidence>.Empty
                 );
 
@@ -209,7 +213,7 @@ public sealed class ModerationLoggingGatewayHandler(
                         channelValue.Id,
                         authorId,
                         precedingMessageJumpUrl,
-                        hasEvidence ? evidence.Content : null,
+                        content,
                         compactLog
                     )
                     .ConfigureAwait(false);
