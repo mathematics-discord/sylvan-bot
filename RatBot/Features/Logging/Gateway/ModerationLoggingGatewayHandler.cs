@@ -108,6 +108,8 @@ public sealed class ModerationLoggingGatewayHandler(
             bool hasPreviousContent =
                 TryGetPreviousContent(cachedMessage, before, hasBefore, out string? beforeContent);
 
+            evidenceCache.Put(after, now, configuration.EvidenceRetentionPeriod);
+
             if (!hasPreviousContent || !string.Equals(beforeContent, after.Content, StringComparison.Ordinal))
             {
                 ModerationLogComponents.ModerationLogMessage compactLog = ModerationLogComponents.BuildEditLog(
@@ -135,8 +137,6 @@ public sealed class ModerationLoggingGatewayHandler(
                     new ObservedMessage(userMessage.Id, guildId, channel.Id, userMessage.Author.Id, now),
                     CancellationToken.None)
                 .ConfigureAwait(false);
-
-            evidenceCache.Put(after, now, configuration.EvidenceRetentionPeriod);
         }
         catch (Exception ex)
         {
