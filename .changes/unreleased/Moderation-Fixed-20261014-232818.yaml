@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: Ignore stale attachment downloads.
+time: 2026-10-14T23:28:18.4708397+01:00

@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: Preserve text when the attachment cache is full.
+time: 2026-10-14T23:28:19.6354034+01:00

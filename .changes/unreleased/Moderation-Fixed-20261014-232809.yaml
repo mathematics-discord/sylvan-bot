@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: Use cached Discord text in bulk-delete logs.
+time: 2026-10-14T23:28:09.2043659+01:00

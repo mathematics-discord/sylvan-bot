@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: Prevent delayed creates from overwriting edit evidence.
+time: 2026-10-14T23:28:17.316884+01:00
