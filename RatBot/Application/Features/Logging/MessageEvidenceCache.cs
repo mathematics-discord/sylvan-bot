@@ -60,18 +60,14 @@ public sealed class MessageEvidenceCache(EvidenceCacheSettings settings)
         return results;
     }
 
-    public void Put(MessageEvidence evidence, DateTimeOffset nowUtc, TimeSpan retentionPeriod)
+    public MessageEvidence Put(MessageEvidence evidence, DateTimeOffset nowUtc, TimeSpan retentionPeriod)
     {
         settings.Validate();
 
         if (retentionPeriod <= TimeSpan.Zero)
             throw new InvalidOperationException("Evidence retention period must be positive.");
 
-        ImmutableArray<CachedAttachmentEvidence> attachments = evidence
-            .Attachments.Where(attachment => attachment.Bytes.LongLength <= settings.MaxBytesPerAttachment)
-            .Take(settings.MaxAttachmentCountPerMessage)
-            .Select(attachment => attachment with { Bytes = attachment.Bytes.ToArray() })
-            .ToImmutableArray();
+        ImmutableArray<CachedAttachmentEvidence> attachments = NormalizeAttachments(evidence.Attachments, long.MaxValue);
 
         MessageEvidence cachedEvidence = evidence with { Attachments = attachments };
         CacheEntry entry = new CacheEntry(cachedEvidence, nowUtc, nowUtc + retentionPeriod, TotalBytes(attachments));
@@ -90,7 +86,79 @@ public sealed class MessageEvidenceCache(EvidenceCacheSettings settings)
             Enqueue(key, entry);
 
             EvictOverflow();
+            return cachedEvidence;
         }
+    }
+
+    public Option<MessageEvidence> TryAdd(MessageEvidence evidence, DateTimeOffset nowUtc, TimeSpan retentionPeriod)
+    {
+        lock (_lock)
+        {
+            EvictExpired(nowUtc);
+            EvidenceKey key = new EvidenceKey(evidence.GuildId, evidence.MessageId);
+            bool alreadyCached = _entries.ContainsKey(key);
+
+            if (alreadyCached)
+                return new None();
+
+            MessageEvidence storedEvidence = Put(evidence, nowUtc, retentionPeriod);
+            return new Some<MessageEvidence>(storedEvidence);
+        }
+    }
+
+    public bool TryUpdateAttachments(MessageEvidence storedEvidence,
+        IReadOnlyList<CachedAttachmentEvidence> attachments, DateTimeOffset nowUtc)
+    {
+        lock (_lock)
+        {
+            EvidenceKey key = new EvidenceKey(storedEvidence.GuildId, storedEvidence.MessageId);
+            bool found = _entries.TryGetValue(key, out CacheEntry? entry);
+
+            if (!found)
+                return false;
+
+            bool isCurrent = ReferenceEquals(entry!.Evidence, storedEvidence) && entry.ExpiresAtUtc > nowUtc;
+
+            if (!isCurrent)
+                return false;
+
+            long availableBytes =
+                settings.MaxTotalCachedAttachmentBytes - (_totalAttachmentBytes - entry.AttachmentBytes);
+
+            ImmutableArray<CachedAttachmentEvidence> normalizedAttachments =
+                NormalizeAttachments(attachments, availableBytes);
+
+            MessageEvidence updatedEvidence = storedEvidence with { Attachments = normalizedAttachments };
+            long attachmentBytes = TotalBytes(normalizedAttachments);
+
+            _entries[key] = entry with { Evidence = updatedEvidence, AttachmentBytes = attachmentBytes };
+            _totalAttachmentBytes += attachmentBytes - entry.AttachmentBytes;
+            return true;
+        }
+    }
+
+    private ImmutableArray<CachedAttachmentEvidence> NormalizeAttachments(
+        IEnumerable<CachedAttachmentEvidence> attachments, long availableBytes)
+    {
+        IEnumerable<CachedAttachmentEvidence> boundedAttachments = attachments
+            .Where(attachment => attachment.Bytes.LongLength <= settings.MaxBytesPerAttachment)
+            .Take(settings.MaxAttachmentCountPerMessage);
+
+        ImmutableArray<CachedAttachmentEvidence>.Builder normalizedAttachments =
+            ImmutableArray.CreateBuilder<CachedAttachmentEvidence>();
+
+        foreach (CachedAttachmentEvidence attachment in boundedAttachments)
+        {
+            bool fitsBudget = attachment.Bytes.LongLength <= availableBytes;
+
+            if (!fitsBudget)
+                continue;
+
+            normalizedAttachments.Add(attachment with { Bytes = attachment.Bytes.ToArray() });
+            availableBytes -= attachment.Bytes.LongLength;
+        }
+
+        return normalizedAttachments.ToImmutable();
     }
 
     public void Remove(ulong guildId, ulong messageId)

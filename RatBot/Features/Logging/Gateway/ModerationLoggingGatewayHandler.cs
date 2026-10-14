@@ -58,6 +58,21 @@ public sealed class ModerationLoggingGatewayHandler(
                 return;
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
+            MessageEvidence evidence = CreateEvidence(guildId, userMessage, now);
+
+            ImmutableArray<Attachment> messageAttachments = userMessage.Attachments
+                .Take(_options.MaxAttachmentCountPerMessage)
+                .ToImmutableArray();
+
+            ImmutableArray<ulong> attachmentIds = messageAttachments
+                .Select(attachment => attachment.Id)
+                .ToImmutableArray();
+
+            evidence = evidence with { SourceAttachmentIds = attachmentIds };
+
+            Option<MessageEvidence> insertionResult =
+                evidenceCache.TryAdd(evidence, now, configuration.EvidenceRetentionPeriod);
+
             await loggingStore
                 .ObserveMessageAsync(
                     new ObservedMessage(userMessage.Id, guildId, userMessage.Channel.Id, userMessage.Author.Id, now),
@@ -65,9 +80,14 @@ public sealed class ModerationLoggingGatewayHandler(
                 )
                 .ConfigureAwait(false);
 
-            MessageEvidence evidence = await CreateEvidenceAsync(guildId, userMessage, now, CancellationToken.None)
-                .ConfigureAwait(false);
-            evidenceCache.Put(evidence, now, configuration.EvidenceRetentionPeriod);
+            if (insertionResult.Value is not Some<MessageEvidence>(MessageEvidence insertedEvidence))
+                return;
+
+            ImmutableArray<CachedAttachmentEvidence> attachments =
+                await DownloadAttachmentEvidenceAsync(messageAttachments, CancellationToken.None)
+                    .ConfigureAwait(false);
+
+            evidenceCache.TryUpdateAttachments(insertedEvidence, attachments, DateTimeOffset.UtcNow);
         }
         catch (Exception ex)
         {
@@ -102,13 +122,40 @@ public sealed class ModerationLoggingGatewayHandler(
 
             DateTimeOffset now = DateTimeOffset.UtcNow;
             bool hasBefore = evidenceCache.TryGet(guildId, userMessage.Id, now, out MessageEvidence before);
-            MessageEvidence after = await CreateEvidenceAsync(guildId, userMessage, now, CancellationToken.None)
-                .ConfigureAwait(false);
 
             bool hasPreviousContent =
                 TryGetPreviousContent(cachedMessage, before, hasBefore, out string? beforeContent);
 
-            evidenceCache.Put(after, now, configuration.EvidenceRetentionPeriod);
+            MessageEvidence after = CreateEvidence(guildId, userMessage, now);
+
+            ImmutableArray<Attachment> messageAttachments = userMessage.Attachments
+                .Take(_options.MaxAttachmentCountPerMessage)
+                .ToImmutableArray();
+
+            ImmutableArray<ulong> attachmentIds = messageAttachments
+                .Select(attachment => attachment.Id)
+                .ToImmutableArray();
+
+            after = after with { SourceAttachmentIds = attachmentIds };
+
+            bool sameAttachmentIds = before.SourceAttachmentIds
+                .SequenceEqual(attachmentIds);
+
+            bool reuseAttachments = hasBefore && sameAttachmentIds && before.Attachments.Count > 0;
+
+            if (reuseAttachments)
+                after = after with { Attachments = before.Attachments };
+
+            MessageEvidence storedEvidence = evidenceCache.Put(after, now, configuration.EvidenceRetentionPeriod);
+
+            if (!reuseAttachments)
+            {
+                ImmutableArray<CachedAttachmentEvidence> attachments =
+                    await DownloadAttachmentEvidenceAsync(messageAttachments, CancellationToken.None)
+                        .ConfigureAwait(false);
+
+                evidenceCache.TryUpdateAttachments(storedEvidence, attachments, DateTimeOffset.UtcNow);
+            }
 
             if (!hasPreviousContent || !string.Equals(beforeContent, after.Content, StringComparison.Ordinal))
             {
@@ -324,13 +371,26 @@ public sealed class ModerationLoggingGatewayHandler(
         }
     }
 
-    private async Task<MessageEvidence> CreateEvidenceAsync(ulong guildId, SocketUserMessage message,
-        DateTimeOffset now, CancellationToken ct)
+    private static MessageEvidence CreateEvidence(ulong guildId, SocketUserMessage message, DateTimeOffset now)
+    {
+        return new MessageEvidence(
+            guildId,
+            message.Channel.Id,
+            message.Id,
+            message.Author.Id,
+            now,
+            message.Content,
+            ImmutableArray<CachedAttachmentEvidence>.Empty
+        );
+    }
+
+    private async Task<ImmutableArray<CachedAttachmentEvidence>> DownloadAttachmentEvidenceAsync(
+        IReadOnlyCollection<Attachment> messageAttachments, CancellationToken ct)
     {
         ImmutableArray<CachedAttachmentEvidence>.Builder attachments =
             ImmutableArray.CreateBuilder<CachedAttachmentEvidence>();
 
-        foreach (Attachment attachment in message.Attachments.Take(_options.MaxAttachmentCountPerMessage))
+        foreach (Attachment attachment in messageAttachments)
         {
             Option<byte[]> downloadResult = await TryDownloadAttachmentAsync(attachment.Url, ct)
                 .ConfigureAwait(false);
@@ -340,15 +400,7 @@ public sealed class ModerationLoggingGatewayHandler(
                     attachment.ContentType ?? "application/octet-stream"));
         }
 
-        return new MessageEvidence(
-            guildId,
-            message.Channel.Id,
-            message.Id,
-            message.Author.Id,
-            now,
-            message.Content,
-            attachments.ToImmutable()
-        );
+        return attachments.ToImmutable();
     }
 
     private Task<Option<byte[]>> TryDownloadAttachmentAsync(string url, CancellationToken ct)
