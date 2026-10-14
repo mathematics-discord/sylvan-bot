@@ -273,6 +273,31 @@ public sealed class ModerationLoggingGatewayHandler(
                 FilterObservedMessages(observed, qualifyingMessageIdSet);
             Dictionary<ulong, MessageEvidence> qualifyingEvidence = FilterEvidence(evidence, qualifyingMessageIdSet);
 
+            IEnumerable<Cacheable<IMessage, ulong>> qualifyingCachedMessages = messages
+                .Where(cachedMessage => qualifyingMessageIdSet.Contains(cachedMessage.Id)
+                                        && cachedMessage.HasValue
+                                        && IsQualifyingUserMessage(cachedMessage.Value));
+
+            foreach (Cacheable<IMessage, ulong> cachedMessage in qualifyingCachedMessages)
+            {
+                qualifyingEvidence.TryGetValue(cachedMessage.Id, out MessageEvidence? existingEvidence);
+                bool hasEvidenceContent = existingEvidence?.Content is not null;
+
+                if (hasEvidenceContent)
+                    continue;
+
+                qualifyingEvidence[cachedMessage.Id] = existingEvidence is null
+                    ? new MessageEvidence(
+                        guildId,
+                        channelValue.Id,
+                        cachedMessage.Id,
+                        cachedMessage.Value.Author.Id,
+                        now,
+                        cachedMessage.Value.Content,
+                        ImmutableArray<CachedAttachmentEvidence>.Empty)
+                    : existingEvidence with { Content = cachedMessage.Value.Content };
+            }
+
             Option<IUserMessage> logResult = await SendLogAsync(
                     configuration,
                     LoggingEventKind.BulkDelete,
