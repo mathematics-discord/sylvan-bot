@@ -72,7 +72,7 @@ jobs:
           tar -xzf "$RUNNER_TEMP/changie.tar.gz" -C "$RUNNER_TEMP" changie
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
-      - name: Batch and publish release
+      - name: Batch and stage release
         id: publish
         shell: bash
         env:
@@ -88,15 +88,44 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m "Release v${version}"
-          git push origin HEAD:master
+          git push origin "HEAD:refs/heads/release/${version}"
           {
             echo "before_sha=$before_sha"
             echo "source_sha=$(git rev-parse HEAD)"
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
 
-  build-and-push:
+  scan-release:
     needs: release
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/codeql.yml
+    with:
+      source_sha: ${{ needs.release.outputs.source_sha }}
+      source_ref: refs/heads/release/${{ needs.release.outputs.version }}
+
+  publish-release:
+    needs:
+      - release
+      - scan-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out scanned release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Publish scanned release
+        run: git push origin HEAD:master
+
+  build-and-push:
+    needs:
+      - release
+      - publish-release
     runs-on: ubuntu-latest
     permissions:
       contents: read
