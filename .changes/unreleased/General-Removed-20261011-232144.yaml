@@ -1,4 +1,0 @@
-component: General
-kind: Removed
-body: Removed the `/meta` and associated proposals commands due to lack of usage.
-time: 2026-10-11T23:21:44.62946994+01:00

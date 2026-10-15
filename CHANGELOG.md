@@ -2,6 +2,24 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.3 - 2026-10-15
+## General
+### Removed
+- Removed the `/meta` and associated proposals commands due to lack of usage.
+## Moderation
+### Fixed
+- Use cached Discord text in single-delete logs.
+- Use cached Discord text in bulk-delete logs.
+- Preserve empty and whitespace-only message text.
+- Refresh edit evidence before log delivery.
+- Send deletion logs only once.
+- Unsubscribe the registered message handler.
+- Capture text and attachment metadata before downloads.
+- Preserve text evidence when metadata writes fail.
+- Prevent delayed creates from overwriting edit evidence.
+- Ignore stale attachment downloads.
+- Preserve text when the attachment cache is full.
+- Reuse downloaded attachments across text edits.
 # v0.1.2 - 2026-10-11
 ## General
 ### Added

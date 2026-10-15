@@ -1,4 +1,0 @@
-component: Moderation
-kind: Fixed
-body: Preserve text evidence when metadata writes fail.
-time: 2026-10-14T23:28:16.1584279+01:00

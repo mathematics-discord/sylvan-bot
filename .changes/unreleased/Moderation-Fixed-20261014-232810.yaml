@@ -1,4 +1,0 @@
-component: Moderation
-kind: Fixed
-body: Preserve empty and whitespace-only message text.
-time: 2026-10-14T23:28:10.3733839+01:00

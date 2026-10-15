@@ -1,4 +1,0 @@
-component: Moderation
-kind: Fixed
-body: Send deletion logs only once.
-time: 2026-10-14T23:28:12.6900497+01:00
