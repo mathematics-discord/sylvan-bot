@@ -1,10 +1,11 @@
-using RatBot.Features.Quorum;
+﻿using RatBot.Features.Quorum.Persistence;
 
 namespace RatBot.Features.Quorum.Commands;
 
 [Group("quorum-admin", "Administrative quorum commands.")]
 [DefaultMemberPermissions(GuildPermission.Administrator)]
-public sealed class QuorumAdminModule(QuorumOperations operations) : InteractionModuleBase<IInteractionContext>
+public sealed class QuorumAdminModule(QuorumConfigurationStore configurations)
+    : InteractionModuleBase<IInteractionContext>
 {
     [SlashCommand("register", "Register or update quorum for a channel.")]
     public async Task RegisterAsync(
@@ -13,25 +14,37 @@ public sealed class QuorumAdminModule(QuorumOperations operations) : Interaction
             ChannelType.PrivateThread)]
         IChannel channel,
         [Summary("proportion", "The quorum proportion, greater than 0 and at most 1.")]
-        double proportion
-    )
+        double proportion)
     {
-        ErrorOr<QuorumScope> scopeResult = QuorumScopeResolver.ResolveScope(Context.Guild, channel);
+        ErrorOr<IGuildChannel> channelResult = QuorumChannelResolver.ResolveChannel(Context.Guild, channel);
 
-        if (scopeResult.IsError)
+        if (channelResult.IsError)
         {
-            await RespondAsync(scopeResult.FirstError.Description, ephemeral: true);
+            await RespondAsync(channelResult.FirstError.Description, ephemeral: true);
             return;
         }
 
-        ErrorOr<QuorumRegistration> result =
-            await operations.RegisterAsync(scopeResult.Value, (decimal)proportion, CancellationToken.None);
+        bool validProportion = double.IsFinite(proportion) && proportion is > 0 and <= 1;
 
-        await result.SwitchFirstAsync(
-            async registration =>
-                await RespondAsync(QuorumCommandResponses.Registration(registration), ephemeral: true),
-            async error => await RespondAsync(error.Description, ephemeral: true)
-        );
+        if (!validProportion)
+        {
+            await RespondAsync("Quorum proportion must be greater than 0 and at most 1.", ephemeral: true);
+            return;
+        }
+
+        await DeferAsync(ephemeral: true);
+
+        decimal proportionValue = (decimal)proportion;
+        ErrorOr<bool> result = await configurations.RegisterAsync(
+            channelResult.Value, proportionValue, CancellationToken.None);
+
+        string response = result.IsError
+            ? result.FirstError.Description
+            : $"{(result.Value ? "Registered" : "Updated")} quorum for "
+              + $"{MentionUtils.MentionChannel(channelResult.Value.Id)} "
+              + $"at {QuorumCommandResponses.FormatProportion(proportionValue)}.";
+
+        await ModifyOriginalResponseAsync(properties => properties.Content = response);
     }
 
     [SlashCommand("remove", "Remove quorum configuration for a channel.")]
@@ -39,23 +52,26 @@ public sealed class QuorumAdminModule(QuorumOperations operations) : Interaction
         [Summary("channel", "The configured guild text channel or forum channel.")]
         [ChannelTypes(ChannelType.Text, ChannelType.Forum, ChannelType.NewsThread, ChannelType.PublicThread,
             ChannelType.PrivateThread)]
-        IChannel channel
-    )
+        IChannel channel)
     {
-        ErrorOr<QuorumScope> scopeResult = QuorumScopeResolver.ResolveScope(Context.Guild, channel);
+        ErrorOr<IGuildChannel> channelResult = QuorumChannelResolver.ResolveChannel(Context.Guild, channel);
 
-        if (scopeResult.IsError)
+        if (channelResult.IsError)
         {
-            await RespondAsync(scopeResult.FirstError.Description, ephemeral: true);
+            await RespondAsync(channelResult.FirstError.Description, ephemeral: true);
             return;
         }
 
-        ErrorOr<Deleted> result = await operations.RemoveAsync(scopeResult.Value, CancellationToken.None);
+        await DeferAsync(ephemeral: true);
 
-        await result.SwitchFirstAsync(
-            async _ => await RespondAsync(QuorumCommandResponses.Removed(scopeResult.Value), ephemeral: true),
-            async error => await RespondAsync(error.Description, ephemeral: true)
-        );
+        IGuildChannel ch = channelResult.Value;
+        ErrorOr<Deleted> result = await configurations.DeleteAsync(ch.GuildId, ch.Id, CancellationToken.None);
+
+        string response = result.IsError
+            ? result.FirstError.Description
+            : $"Removed quorum configuration for {MentionUtils.MentionChannel(ch.Id)}.";
+
+        await ModifyOriginalResponseAsync(properties => properties.Content = response);
     }
 
     [SlashCommand("role", "Add or remove a quorum voter role.")]
@@ -67,26 +83,38 @@ public sealed class QuorumAdminModule(QuorumOperations operations) : Interaction
         [Summary("role", "The voter role to add or remove.")]
         IRole role,
         [Summary("should_add", "True to add the role; false to remove it.")]
-        bool shouldAdd = true
-    )
+        bool shouldAdd = true)
     {
-        ErrorOr<QuorumScope> scopeResult = QuorumScopeResolver.ResolveScope(Context.Guild, channel);
-        ErrorOr<ulong> roleIdResult = QuorumScopeResolver.ResolveRoleId(Context.Guild, role);
+        ErrorOr<IGuildChannel> channelResult = QuorumChannelResolver.ResolveChannel(Context.Guild, channel);
 
-        if (scopeResult.IsError || roleIdResult.IsError)
+        if (channelResult.IsError)
         {
-            Error error = scopeResult.IsError ? scopeResult.FirstError : roleIdResult.FirstError;
-            await RespondAsync(error.Description, ephemeral: true);
+            await RespondAsync(channelResult.FirstError.Description, ephemeral: true);
             return;
         }
 
-        QuorumRoleUpdate update = QuorumRoleUpdate.FromOption(scopeResult.Value, roleIdResult.Value, shouldAdd);
-        ErrorOr<QuorumConfiguration> result = await operations.UpdateRoleAsync(update, CancellationToken.None);
+        if (role.Guild.Id != Context.Guild.Id)
+        {
+            await RespondAsync("That role does not belong to this guild.", ephemeral: true);
+            return;
+        }
 
-        await result.SwitchFirstAsync(
-            async _ => await RespondAsync(QuorumCommandResponses.Role(scopeResult.Value, role, shouldAdd),
-                ephemeral: true),
-            async error => await RespondAsync(error.Description, ephemeral: true)
-        );
+        await DeferAsync(ephemeral: true);
+
+        IGuildChannel ch = channelResult.Value;
+        ErrorOr<Success> result = await configurations.UpdateRoleAsync(
+            ch.GuildId, ch.Id, role.Id, shouldAdd, CancellationToken.None);
+
+        string response = result.IsError
+            ? result.FirstError.Description
+            : shouldAdd
+                ? $"Added {role.Mention} as a voter role for {MentionUtils.MentionChannel(ch.Id)}."
+                : $"Removed {role.Mention} from the voter roles for {MentionUtils.MentionChannel(ch.Id)}.";
+
+        await ModifyOriginalResponseAsync(properties =>
+        {
+            properties.Content = response;
+            properties.AllowedMentions = AllowedMentions.None;
+        });
     }
 }

@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: Concurrent quorum voter-role edits now preserve other roles and proportion changes.
+time: 2026-10-16T22:19:51.5097293+01:00

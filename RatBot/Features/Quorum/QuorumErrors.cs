@@ -1,4 +1,4 @@
-namespace RatBot.Features.Quorum;
+﻿namespace RatBot.Features.Quorum;
 
 public static class QuorumErrors
 {
@@ -13,10 +13,5 @@ public static class QuorumErrors
         Error.Failure(description: "Member data is currently unavailable, so quorum could not be calculated.");
 
     public static Error NoEligibleVoters =>
-        Error.Validation(description: "No eligible voters were found for this quorum configuration.");
-
-    public static Error ConfiguredRoleNotFound(ulong roleId)
-    {
-        return Error.Validation(description: $"Configured quorum role `{roleId}` could not be found.");
-    }
+        Error.Validation(description: "No eligible voters were found.");
 }
