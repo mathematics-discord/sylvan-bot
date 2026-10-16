@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using RatBot.Domain.Features.Logging;
 using RatBot.Domain.Moderation;
 using RatBot.Features.EmojiAnalytics;
+using RatBot.Features.Logging;
 using RatBot.Features.RoleColours;
 
 namespace RatBot.Infrastructure.Data;
@@ -15,8 +15,6 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<ImageSpamSettings> ImageSpamSettings => Set<ImageSpamSettings>();
     public DbSet<LoggingConfiguration> LoggingConfigurations => Set<LoggingConfiguration>();
     public DbSet<LoggingExcludedChannel> LoggingExcludedChannels => Set<LoggingExcludedChannel>();
-    public DbSet<MessageLogEntry> MessageLogEntries => Set<MessageLogEntry>();
-    public DbSet<ObservedMessage> ObservedMessages => Set<ObservedMessage>();
     public DbSet<RoleColourOption> RoleColourOptions => Set<RoleColourOption>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

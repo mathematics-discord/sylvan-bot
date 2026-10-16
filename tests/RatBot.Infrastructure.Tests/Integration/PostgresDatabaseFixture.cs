@@ -26,26 +26,19 @@ public sealed class PostgresDatabaseFixture
         return new BotDbContext(options);
     }
 
-    public static QuorumConfigurationStore CreateQuorumConfigurationStore()
-    {
-        return new QuorumConfigurationStore(ConnectionString);
-    }
+    public static QuorumConfigurationStore CreateQuorumConfigurationStore() =>
+        new QuorumConfigurationStore(ConnectionString);
 
     public static async Task ResetAsync()
     {
-        BotDbContext db = CreateDbContext();
+        await using var db = CreateDbContext();
 
-        await using (db.ConfigureAwait(false))
-        {
-            await db.Database.ExecuteSqlRawAsync("DELETE FROM message_log_entries").ConfigureAwait(false);
-            await db.Database.ExecuteSqlRawAsync("DELETE FROM observed_messages").ConfigureAwait(false);
-            await db.Database.ExecuteSqlRawAsync("DELETE FROM logging_excluded_channels").ConfigureAwait(false);
-            await db.Database.ExecuteSqlRawAsync("DELETE FROM logging_configurations").ConfigureAwait(false);
-            await db.Database.ExecuteSqlRawAsync("DELETE FROM quorum_configurations").ConfigureAwait(false);
-            await db.RoleColourOptions.ExecuteDeleteAsync().ConfigureAwait(false);
-            await db.ImageSpamSettings.ExecuteDeleteAsync().ConfigureAwait(false);
-            await db.EmojiUsageCounts.ExecuteDeleteAsync().ConfigureAwait(false);
-        }
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM logging_excluded_channels").ConfigureAwait(false);
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM logging_configurations").ConfigureAwait(false);
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM quorum_configurations").ConfigureAwait(false);
+        await db.RoleColourOptions.ExecuteDeleteAsync().ConfigureAwait(false);
+        await db.ImageSpamSettings.ExecuteDeleteAsync().ConfigureAwait(false);
+        await db.EmojiUsageCounts.ExecuteDeleteAsync().ConfigureAwait(false);
     }
 
     [OneTimeSetUp]
@@ -55,7 +48,7 @@ public sealed class PostgresDatabaseFixture
 
         await _container.StartAsync();
 
-        await using BotDbContext db = CreateDbContext();
+        await using var db = CreateDbContext();
         await db.Database.MigrateAsync();
     }
 

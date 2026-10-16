@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using RatBot.Application.Moderation;
 using RatBot.Configuration;
 using RatBot.Features.EmojiAnalytics;
-using RatBot.Features.Logging.Gateway;
+using RatBot.Features.Logging;
 using RatBot.Features.RoleColours;
 using RatBot.Gateway;
 using Serilog;
@@ -48,7 +48,6 @@ public sealed class DependencyInjectionTests
         gatewayHandlers.ShouldContain(handler => handler is ModerationLoggingGatewayHandler);
         gatewayHandlers.ShouldContain(handler => handler is RoleColourGatewayHandler);
         gatewayHandlers.ShouldContain(handler => handler is EmojiAnalyticsGatewayHandler);
-        provider.GetRequiredService<ModerationLoggingGatewayHandler>().ShouldNotBeNull();
     }
 
     [Test]

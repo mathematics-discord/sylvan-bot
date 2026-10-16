@@ -1,39 +1,31 @@
 using Discord;
-using NSubstitute;
-using RatBot.Application.Features.Logging;
-using RatBot.Features.Logging.Gateway;
+using DownloadedAttachment = RatBot.Features.Logging.ModerationLogComponents.DownloadedAttachment;
+using RatBot.Features.Logging;
 using Shouldly;
 
 namespace RatBot.Discord.Tests.Features.Logging;
 
 public sealed class ModerationLogComponentsTests
 {
-    [Test]
-    public void GetJumpUrl_UsesDiscordNetMessageJumpUrl()
+    [TestCase(null, null, "```ansi\n*Unavailable*\n```\n```ansi\n*Unavailable*\n```")]
+    [TestCase("", "", "```ansi\n\n```\n```ansi\n\n```")]
+    public void BuildEditLog_UnknownOrEmptyVersions_PreservesAvailability(
+        string? beforeContent, string? afterContent, string expected)
     {
-        ITextChannel channel = Substitute.For<ITextChannel>();
-        IMessage message = Substitute.For<IMessage>();
+        // Arrange
+        const string jumpUrl = "https://discord.com/channels/1/2/3";
 
-        channel.GuildId.Returns(123UL);
-        channel.Id.Returns(456UL);
-        message.Channel.Returns(channel);
-        message.Id.Returns(789UL);
-
-        ModerationLogComponents.GetJumpUrl(message).ShouldBe("https://discord.com/channels/123/456/789");
-    }
-
-    [Test]
-    public void BuildEditLog_RendersBeforeAndAfterUnavailableStates()
-    {
+        // Act
         ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildEditLog(
-            "https://discord.com/channels/1/2/3",
+            jumpUrl,
             2,
             4,
-            null,
-            null
+            beforeContent,
+            afterContent
         );
 
-        TextDisplays(log).Last().Content.ShouldBe("```ansi\n*Unavailable*\n```\n```ansi\n*Unavailable*\n```");
+        // Assert
+        TextDisplays(log).Last().Content.ShouldBe(expected);
         TextDisplays(log).Last().Content.ShouldNotContain("Content");
         TextDisplays(log).Last().Content.ShouldNotContain("Before:");
         TextDisplays(log).Last().Content.ShouldNotContain("After:");
@@ -76,10 +68,11 @@ public sealed class ModerationLogComponentsTests
     {
         ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
             2,
+            3,
             4,
             "https://discord.com/channels/1/2/3",
             "cached",
-            Array.Empty<CachedAttachmentEvidence>()
+            []
         );
 
         TextDisplays(log)
@@ -96,14 +89,51 @@ public sealed class ModerationLogComponentsTests
         TextDisplays(log).First().Content.ShouldBe("**Message Delete:** <@4> (`4`) in <#2>");
     }
 
-    [Test]
-    public void BuildDeleteLog_RendersCachedContentInPlainCodeBlock()
+    [TestCase("cached", "```cached```")]
+    [TestCase("", "``````")]
+    [TestCase("first\nsecond", "```first\nsecond```")]
+    [TestCase("```", "````\u200b`````")]
+    public void BuildDeleteLog_KnownContent_PreservesLiteralContentInCodeBlock(string content, string expected)
     {
-        ModerationLogComponents.ModerationLogMessage log = BuildDeleteLogWithoutPrecedingMessage();
+        // Arrange
+        const ulong channelId = 2;
 
-        TextDisplays(log).Last().Content.ShouldBe("```cached```");
+        // Act
+        var log = ModerationLogComponents.BuildDeleteLog(channelId, 3, 4, null, content, []);
+
+        // Assert
+        TextDisplays(log).Last().Content.ShouldBe(expected);
         TextDisplays(log).Last().Content.ShouldNotContain("Observed");
         TextDisplays(log).Last().Content.ShouldNotContain("Deleted");
+    }
+
+    [Test]
+    public void BuildEditLog_ExpandedAnsiOutput_TruncatesSafelyWithinTextLimit()
+    {
+        // Arrange
+        var before = string.Concat(Enumerable.Repeat("Ha", count: 500));
+        var after = string.Concat(Enumerable.Repeat("ha", count: 500));
+
+        // Act
+        var log = ModerationLogComponents.BuildEditLog("https://discord.com/channels/1/2/3", 2, 4, before, after);
+
+        // Assert
+        var textDisplays = TextDisplays(log);
+        var totalTextLength = textDisplays
+            .Sum(display => display.Content.Length);
+
+        var content = textDisplays.Last().Content;
+        totalTextLength.ShouldBeLessThanOrEqualTo(4000);
+        content.ShouldContain("[Content truncated]");
+        content.ShouldStartWith("```ansi\n");
+        content.ShouldContain("\n```\n```ansi\n");
+        content.ShouldEndWith("\n```");
+        var withoutColors = content
+            .Replace("\e[1;31m", string.Empty, StringComparison.Ordinal)
+            .Replace("\e[1;32m", string.Empty, StringComparison.Ordinal)
+            .Replace("\e[0m", string.Empty, StringComparison.Ordinal);
+
+        withoutColors.ShouldNotContain("\e");
     }
 
     [Test]
@@ -111,10 +141,11 @@ public sealed class ModerationLogComponentsTests
     {
         ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
             2,
+            3,
             4,
             null,
             null,
-            Array.Empty<CachedAttachmentEvidence>()
+            []
         );
 
         TextDisplays(log).Last().Content.ShouldBe("*Unavailable*");
@@ -125,10 +156,11 @@ public sealed class ModerationLogComponentsTests
     {
         ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
             2,
+            3,
             4,
             null,
             null,
-            Array.Empty<CachedAttachmentEvidence>()
+            []
         );
 
         log.Attachments.ShouldBeEmpty();
@@ -140,11 +172,12 @@ public sealed class ModerationLogComponentsTests
     [Test]
     public void BuildDeleteLog_RendersMediaAttachmentsAsGalleryItems()
     {
-        CachedAttachmentEvidence image = new CachedAttachmentEvidence(3, new byte[] { 1 }, "image/png");
-        CachedAttachmentEvidence video = new CachedAttachmentEvidence(4, new byte[] { 2 }, "video/mp4");
+        DownloadedAttachment image = new DownloadedAttachment("evidence-3.png", "image/png", new byte[] { 1 });
+        DownloadedAttachment video = new DownloadedAttachment("evidence-4.mp4", "video/mp4", new byte[] { 2 });
 
         ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
             2,
+            3,
             4,
             null,
             null,
@@ -154,7 +187,7 @@ public sealed class ModerationLogComponentsTests
         MediaGalleryComponent gallery = ContainerComponents(log).OfType<MediaGalleryComponent>().Single();
 
         log.Attachments.Select(attachment => attachment.FileName).ShouldBe(["evidence-3.png", "evidence-4.mp4"]);
-        log.Attachments.Select(attachment => attachment.AttachmentUrl)
+        log.Attachments.Select(attachment => attachment.Url)
             .ShouldBe(["attachment://evidence-3.png", "attachment://evidence-4.mp4"]);
         gallery.Items.Select(item => item.Media.Url)
             .ShouldBe(["attachment://evidence-3.png", "attachment://evidence-4.mp4"]);
@@ -167,10 +200,11 @@ public sealed class ModerationLogComponentsTests
     [Test]
     public void BuildDeleteLog_RendersNonMediaAttachmentsAsFileComponents()
     {
-        CachedAttachmentEvidence file = new CachedAttachmentEvidence(4, new byte[] { 2 }, "text/plain");
+        DownloadedAttachment file = new DownloadedAttachment("evidence-4.bin", "text/plain", new byte[] { 2 });
 
         ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
             2,
+            3,
             4,
             null,
             null,
@@ -180,7 +214,7 @@ public sealed class ModerationLogComponentsTests
         FileComponent fileComponent = ContainerComponents(log).OfType<FileComponent>().Single();
 
         log.Attachments.Select(attachment => attachment.FileName).ShouldBe(["evidence-4.bin"]);
-        log.Attachments.Select(attachment => attachment.AttachmentUrl).ShouldBe(["attachment://evidence-4.bin"]);
+        log.Attachments.Select(attachment => attachment.Url).ShouldBe(["attachment://evidence-4.bin"]);
         fileComponent.File.Url.ShouldBe("attachment://evidence-4.bin");
         fileComponent.File.Url.ShouldBe($"attachment://{log.Attachments.Single().FileName}");
         ContainerComponents(log).OfType<MediaGalleryComponent>().ShouldBeEmpty();
@@ -188,7 +222,7 @@ public sealed class ModerationLogComponentsTests
 
     private static ModerationLogComponents.ModerationLogMessage BuildDeleteLogWithoutPrecedingMessage()
     {
-        return ModerationLogComponents.BuildDeleteLog(2, 4, null, "cached", Array.Empty<CachedAttachmentEvidence>());
+        return ModerationLogComponents.BuildDeleteLog(2, 3, 4, null, "cached", []);
     }
 
     private static IReadOnlyCollection<IMessageComponent> ContainerComponents(

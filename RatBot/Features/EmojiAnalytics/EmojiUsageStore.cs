@@ -12,7 +12,7 @@ public sealed class EmojiUsageStore(IDbContextFactory<BotDbContext> dbContextFac
         CancellationToken ct = default
     )
     {
-        await using BotDbContext db = await dbContextFactory.CreateDbContextAsync(ct);
+        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
         HashSet<ulong> tracked = trackedEmojiIds.ToHashSet();
 
         EmojiUsageCount[] rows = await db.EmojiUsageCounts.Where(row => row.GuildId == guildId).ToArrayAsync(ct);
@@ -21,19 +21,19 @@ public sealed class EmojiUsageStore(IDbContextFactory<BotDbContext> dbContextFac
 
         Dictionary<ulong, EmojiUsageCount> rowsById = rows.ToDictionary(row => row.EmojiId);
 
-        foreach (EmojiUsageIncrement increment in increments)
+        foreach (var increment in increments)
         {
             if (increment.GuildId != guildId || !tracked.Contains(increment.EmojiId))
                 continue;
 
-            if (!rowsById.TryGetValue(increment.EmojiId, out EmojiUsageCount? row))
+            if (!rowsById.TryGetValue(increment.EmojiId, out var row))
             {
                 row = new EmojiUsageCount
                 {
                     GuildId = guildId,
                     EmojiId = increment.EmojiId,
                     MessageUsageCount = 0,
-                    ReactionUsageCount = 0
+                    ReactionUsageCount = 0,
                 };
 
                 db.EmojiUsageCounts.Add(row);
@@ -55,23 +55,22 @@ public sealed class EmojiUsageStore(IDbContextFactory<BotDbContext> dbContextFac
         CancellationToken ct = default
     )
     {
-        await using BotDbContext db = await dbContextFactory.CreateDbContextAsync(ct);
+        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
 
         IQueryable<EmojiUsageCount> query = db
             .EmojiUsageCounts.AsNoTracking()
             .Where(row => row.GuildId == guildId && trackedEmojiIds.Contains(row.EmojiId));
 
-        int totalCount = await query.CountAsync(ct);
+        var totalCount = await query.CountAsync(ct);
 
         if (totalCount == 0)
             return Error.NotFound(description: "No emoji usage has been recorded yet.");
 
-        int clampedPageSize = Math.Clamp(pageSize, 1, 100);
-        int totalPages = (int)Math.Ceiling((double)totalCount / clampedPageSize);
-        int clampedPage = Math.Clamp(page, 1, totalPages);
+        var clampedPageSize = Math.Clamp(pageSize, 1, 100);
+        var totalPages = (int)Math.Ceiling((double)totalCount / clampedPageSize);
+        var clampedPage = Math.Clamp(page, 1, totalPages);
 
-        ImmutableArray<EmojiUsageEntry>.Builder
-            builder = ImmutableArray.CreateBuilder<EmojiUsageEntry>(clampedPageSize);
+        var builder = ImmutableArray.CreateBuilder<EmojiUsageEntry>(clampedPageSize);
 
         IQueryable<EmojiUsageEntry> items = query
             .OrderByDescending(row => row.ReactionUsageCount + row.MessageUsageCount)
@@ -80,7 +79,7 @@ public sealed class EmojiUsageStore(IDbContextFactory<BotDbContext> dbContextFac
             .Take(clampedPageSize)
             .Select(row => new EmojiUsageEntry(row.EmojiId, row.MessageUsageCount, row.ReactionUsageCount));
 
-        await foreach (EmojiUsageEntry item in items.AsAsyncEnumerable().WithCancellation(ct))
+        await foreach (var item in items.AsAsyncEnumerable().WithCancellation(ct))
             builder.Add(item);
 
         return new EmojiUsagePage(builder.ToImmutable(), clampedPage, totalPages);

@@ -1,4 +1,4 @@
-﻿namespace RatBot.Features.Logging.Gateway;
+namespace RatBot.Features.Logging;
 
 internal static class AttachmentEvidenceDownloader
 {
@@ -9,8 +9,7 @@ internal static class AttachmentEvidenceDownloader
         try
         {
             using HttpResponseMessage response = await httpClient
-                .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct)
-                .ConfigureAwait(false);
+                .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
 
             if (!response.IsSuccessStatusCode)
                 return new None();
@@ -20,10 +19,8 @@ internal static class AttachmentEvidenceDownloader
             if (contentLength > maxBytes)
                 return new None();
 
-            await using Stream stream = await response.Content.ReadAsStreamAsync(ct)
-                .ConfigureAwait(false);
-            return await ReadLimitedAsync(stream, maxBytes, ct)
-                .ConfigureAwait(false);
+            await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
+            return await ReadLimitedAsync(stream, maxBytes, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -53,7 +50,7 @@ internal static class AttachmentEvidenceDownloader
         while (bytesRemaining > 0)
         {
             int bytesToRead = (int)Math.Min(readBuffer.Length, bytesRemaining);
-            int bytesRead = await stream.ReadAsync(readBuffer.AsMemory(0, bytesToRead), ct).ConfigureAwait(false);
+            int bytesRead = await stream.ReadAsync(readBuffer.AsMemory(0, bytesToRead), ct);
 
             if (bytesRead == 0)
                 return new Some<byte[]>(buffer.ToArray());
