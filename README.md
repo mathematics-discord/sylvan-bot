@@ -39,6 +39,8 @@ Stopping the bot leaves PostgreSQL running. `docker compose down` stops the loca
 
 Keep pull requests focused, follow the existing formatting rules in `.editorconfig`, and include tests for changed behaviour.
 
+Code is organised by feature under `RatBot/Features/`. Each feature keeps its commands, gateway handlers, operations, and models together; database stores and EF mappings live in its `Persistence/` subfolder. Shared Discord interaction code lives in `RatBot/Interactions/`, gateway lifecycle code in `RatBot/Gateway/`, and general helpers in `RatBot/Common/`. The database context and connection setup live in `RatBot/Infrastructure/Data/`, with migration history in `RatBot/Infrastructure/Migrations/`. Registrations are explicit in `RatBot/DependencyInjection.cs`.
+
 Build and test from the repository root:
 
 ```sh

@@ -1,4 +1,5 @@
 ﻿using DotNetEnv;
+using RatBot.Interactions;
 using Serilog.Debugging;
 using Serilog.Events;
 

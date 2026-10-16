@@ -1,19 +1,17 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
-using RatBot.Application.Features.Quorum;
-using RatBot.Application.Moderation;
-using RatBot.Configuration;
+using RatBot.Features.EmojiAnalytics.Persistence;
 using RatBot.Features.EmojiAnalytics;
 using RatBot.Features.EmojiYoink;
 using RatBot.Features.Logging;
+using RatBot.Features.Moderation;
+using RatBot.Features.Quorum.Persistence;
 using RatBot.Features.Quorum;
 using RatBot.Features.RoleColours;
 using RatBot.Gateway;
-using RatBot.Handlers;
-using RatBot.Hosting;
 using RatBot.Infrastructure.Data;
-using RatBot.Infrastructure.Features.Quorum.Persistence;
+using RatBot.Interactions;
 
 namespace RatBot;
 
@@ -26,12 +24,12 @@ public static class DependencyInjection
         {
             services.AddHostedService<DatabaseMigrationHostedService>();
 
-            services.AddApplication();
-            services.AddInfrastructure(configuration);
-            services.AddDiscordAdapter(configuration);
+            services.AddPersistence(configuration);
+            services.AddDiscord(configuration);
+            services.AddFeatures(configuration);
         }
 
-        private void AddApplication()
+        private void AddFeatures(IConfiguration configuration)
         {
             services.AddSingleton<ImageBurstSpamDetectorSettings>();
             services.AddSingleton(sp =>
@@ -40,26 +38,6 @@ public static class DependencyInjection
 
             services.AddScoped<ImageSpamSettingsService>();
             services.AddScoped<QuorumOperations>();
-        }
-
-        private void AddInfrastructure(IConfiguration configuration)
-        {
-            string connectionString = PostgresConnectionStringBuilder.Build(configuration);
-
-            services.AddDbContextFactory<BotDbContext>(options => options.UseNpgsql(connectionString));
-
-            services.AddScoped<IQuorumConfigurationStore>(_ => new QuorumConfigurationStore(connectionString));
-        }
-
-        private void AddDiscordAdapter(IConfiguration configuration)
-        {
-            services
-                .AddOptions<DiscordOptions>()
-                .Bind(configuration.GetSection(DiscordOptions.SectionName))
-                .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "Discord token is required.")
-                .Validate(options => options.MessageCacheSize >= 1000,
-                    "Discord message cache size must be at least 1000.")
-                .ValidateOnStart();
 
             services
                 .AddOptions<EmojiAnalyticsOptions>()
@@ -77,6 +55,55 @@ public static class DependencyInjection
                     options => options.MaxAttachmentBytesPerAttachment >= 0,
                     "Logging max attachment bytes per attachment must not be negative."
                 )
+                .ValidateOnStart();
+
+            services.AddSingleton<DiscordGuildEmojiImporter>();
+            services.AddSingleton<IDiscordGatewayHandler, ModerationLoggingGatewayHandler>();
+            services.AddSingleton<ImageBurstSpamGatewayHandler>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ImageBurstSpamGatewayHandler>());
+
+            services.AddSingleton(
+                Channel.CreateUnbounded<EmojiUsageIncrement>(
+                    new UnboundedChannelOptions
+                    {
+                        SingleReader = true,
+                        SingleWriter = false,
+                        AllowSynchronousContinuations = false,
+                    }
+                )
+            );
+            services.AddSingleton<EmojiUsageStore>();
+            services.AddSingleton<EmojiAnalyticsGatewayHandler>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<EmojiAnalyticsGatewayHandler>());
+            services.AddHostedService<EmojiAnalyticsWorker>();
+
+            services.AddScoped<RoleColourOperations>();
+            services.AddSingleton<RoleColourReconciler>();
+            services.AddSingleton<RoleColourGatewayHandler>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<RoleColourGatewayHandler>());
+
+            services.AddSingleton<DiscordQuorumMemberIndex>();
+            services.AddSingleton<IQuorumMemberSource, DiscordQuorumMemberSource>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordQuorumMemberIndex>());
+        }
+
+        private void AddPersistence(IConfiguration configuration)
+        {
+            string connectionString = PostgresConnectionStringBuilder.Build(configuration);
+
+            services.AddDbContextFactory<BotDbContext>(options => options.UseNpgsql(connectionString));
+
+            services.AddScoped<IQuorumConfigurationStore>(_ => new QuorumConfigurationStore(connectionString));
+        }
+
+        private void AddDiscord(IConfiguration configuration)
+        {
+            services
+                .AddOptions<DiscordOptions>()
+                .Bind(configuration.GetSection(DiscordOptions.SectionName))
+                .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "Discord token is required.")
+                .Validate(options => options.MessageCacheSize >= 1000,
+                    "Discord message cache size must be at least 1000.")
                 .ValidateOnStart();
 
             services.AddSingleton(sp =>
@@ -104,36 +131,8 @@ public static class DependencyInjection
             services.AddSingleton<DiscordInteractionHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordInteractionHandler>());
             services.AddSingleton<HttpClient>();
-            services.AddSingleton<DiscordGuildEmojiImporter>();
-            services.AddSingleton<IDiscordGatewayHandler, ModerationLoggingGatewayHandler>();
-            services.AddSingleton<ImageBurstSpamGatewayHandler>();
-            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ImageBurstSpamGatewayHandler>());
-
-            services.AddHostedService<DiscordBotHostedService>();
-            services.AddSingleton(
-                Channel.CreateUnbounded<EmojiUsageIncrement>(
-                    new UnboundedChannelOptions
-                    {
-                        SingleReader = true,
-                        SingleWriter = false,
-                        AllowSynchronousContinuations = false,
-                    }
-                )
-            );
             services.AddSingleton<IDiscordClient>(sp => sp.GetRequiredService<DiscordSocketClient>());
-            services.AddSingleton<EmojiUsageStore>();
-            services.AddSingleton<EmojiAnalyticsGatewayHandler>();
-            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<EmojiAnalyticsGatewayHandler>());
-            services.AddHostedService<EmojiAnalyticsWorker>();
-
-            services.AddScoped<RoleColourOperations>();
-            services.AddSingleton<RoleColourReconciler>();
-            services.AddSingleton<RoleColourGatewayHandler>();
-            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<RoleColourGatewayHandler>());
-
-            services.AddSingleton<DiscordQuorumMemberIndex>();
-            services.AddSingleton<IQuorumMemberSource, DiscordQuorumMemberSource>();
-            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordQuorumMemberIndex>());
+            services.AddHostedService<DiscordBotHostedService>();
         }
     }
 }

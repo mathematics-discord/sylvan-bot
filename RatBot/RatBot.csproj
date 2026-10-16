@@ -36,7 +36,4 @@
         <PackageReference Include="Serilog.Sinks.Console"/>
         <PackageReference Include="Serilog.Sinks.File"/>
     </ItemGroup>
-    <ItemGroup>
-        <ProjectReference Include="..\RatBot.Domain\RatBot.Domain.csproj"/>
-    </ItemGroup>
 </Project>

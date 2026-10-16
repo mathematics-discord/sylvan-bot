@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using RatBot.Domain.Moderation;
 using RatBot.Features.EmojiAnalytics;
 using RatBot.Features.Logging;
+using RatBot.Features.Moderation;
 using RatBot.Features.RoleColours;
 
 namespace RatBot.Infrastructure.Data;
