@@ -478,10 +478,15 @@ public sealed class ModerationLoggingGatewayHandler(
     private async Task<string?> TryGetPrecedingMessageJumpUrlAsync(
         IMessageChannel sourceChannel, ulong deletedMessageId, CancellationToken ct)
     {
+        using var lookupTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        lookupTimeout.CancelAfter(TimeSpan.FromSeconds(2));
+
         try
         {
+            var request = new RequestOptions { CancelToken = lookupTimeout.Token };
+
             IEnumerable<IMessage> messages = await sourceChannel
-                .GetMessagesAsync(deletedMessageId, Direction.Before, limit: 1, options: new RequestOptions { CancelToken = ct })
+                .GetMessagesAsync(deletedMessageId, Direction.Before, limit: 1, options: request)
                 .FlattenAsync();
 
             var precedingMessage = messages.FirstOrDefault();
@@ -490,6 +495,11 @@ public sealed class ModerationLoggingGatewayHandler(
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
+        }
+        catch (OperationCanceledException) when (lookupTimeout.IsCancellationRequested)
+        {
+            _logger.Debug("Preceding message lookup timed out for deleted message {MessageId}", deletedMessageId);
+            return null;
         }
         catch (Exception ex)
         {
