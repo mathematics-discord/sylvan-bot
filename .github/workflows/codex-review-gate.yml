@@ -1,0 +1,48 @@
+name: Codex review gate
+
+on:
+  pull_request_target:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  issue_comment:
+    types: [created, edited, deleted]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to reconcile
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Never cancel a writer midway through publication. A replacement pending run is
+# safe: every run fetches current PR/comment state rather than replaying its event.
+concurrency:
+  group: codex-review-gate-${{ github.event.pull_request.number || github.event.issue.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: >-
+      (github.event_name == 'pull_request_target') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
+       (github.event.comment.user.id == 199175422 ||
+        contains(github.event.comment.body, 'codex-pull-request-review-summary')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: write
+    steps:
+      - name: Check out trusted default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Reconcile native Codex summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/codex-review-gate.py
