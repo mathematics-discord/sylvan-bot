@@ -12,13 +12,14 @@ kindFormat: '### {{.Kind}}'
 changeFormat: '- {{.Body}}'
 
 body:
-  maxLength: 300
+  maxLength: 600
   block: true
 
 components:
   - General
   - Administration
   - Moderation
+  - Internal
 
 kinds:
   - label: Security

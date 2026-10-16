@@ -51,3 +51,5 @@ dotnet test RatBot.slnx --configuration Release --results-directory ./TestResult
 The PostgreSQL integration tests use Testcontainers and need Docker running. They create their own test databases; the development bot does not need to be running. For a focused change, run the affected test project or use `--filter`.
 
 See the [changelog](CHANGELOG.md) for release history.
+
+Write changelog entries around what users will notice, need to do differently, or can no longer rely on. Use the `Internal` component for refactors, build tooling, and other changes without user-facing effects, with the usual Added/Changed/Fixed kinds. Internal entries remain in the full changelog; Discord announcements link to them in a small-text footer instead of listing them. Releases containing only internal changes are announced as maintenance releases with no user-facing changes.

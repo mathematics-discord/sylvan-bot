@@ -1,4 +1,4 @@
 component: Moderation
 kind: Removed
-body: Remove the retention-period option from `/logging config`.
+body: Removed the retention-period option from `/logging config`.
 time: 2026-10-16T17:49:17.9707862+01:00

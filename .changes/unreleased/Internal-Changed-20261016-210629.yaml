@@ -1,0 +1,4 @@
+component: Internal
+kind: Changed
+body: Consolidated bot and test projects and organised code by feature.
+time: 2026-10-16T21:06:29.0794825+01:00

@@ -1,4 +1,4 @@
 component: Moderation
 kind: Fixed
-body: Prevent moderation logging from delaying Discord event processing.
+body: Fixed moderation logging holding up other bot activity.
 time: 2026-10-16T17:49:27.2827333+01:00

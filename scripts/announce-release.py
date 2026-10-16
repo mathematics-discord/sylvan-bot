@@ -16,7 +16,7 @@ from urllib.request import Request, urlopen
 SEMVER = r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
 VERSION = re.compile(rf"{SEMVER}\Z")
 USER_AGENT = "DiscordBot (https://github.com/ratgirl-laboratories/sylvan-bot, 1.0)"
-COMPONENT_NAMES = ("General", "Administration", "Moderation")
+COMPONENT_NAMES = ("General", "Administration", "Moderation", "Internal")
 KIND_NAMES = ("Security", "Added", "Changed", "Fixed", "Deprecated", "Removed")
 MAX_TEXT_UNITS = 4000
 MAX_COMPONENTS = 40
@@ -191,9 +191,16 @@ def container_message(version, chunks, part=None, total=None):
             "allowed_mentions": {"parse": []}}
 
 
-def build_messages(version, notes):
+def build_messages(version, notes, notes_url):
     sections = parse_sections(version, notes)
-    chunks = [section_text(section) for section in sections]
+    has_internal = any(section["name"] == "Internal" for section in sections)
+    sections = [section for section in sections if section["name"] != "Internal"]
+    closing_chunks = []
+    if has_internal and not sections:
+        closing_chunks.append("Maintenance release; no user-facing changes.")
+    if has_internal:
+        closing_chunks.append(f"-# Internal changes are listed in the [full release notes]({notes_url}).")
+    chunks = [section_text(section) for section in sections] + closing_chunks
     title = f"# v{version}"
     if (length(title) + sum(map(length, chunks)) <= MAX_TEXT_UNITS
             and 2 + 2 * len(chunks) <= MAX_COMPONENTS):
@@ -207,6 +214,9 @@ def build_messages(version, notes):
         raise ValueError("Release version leaves no room for Discord components.")
 
     chunks = [chunk for section in sections for chunk in section_chunks(section, limit)]
+    if any(length(chunk) > limit for chunk in closing_chunks):
+        raise ValueError("Release notes summary cannot fit in a Discord Text Display.")
+    chunks.extend(closing_chunks)
     groups = []
     current = []
     used = length(largest_title)
@@ -308,7 +318,10 @@ def main():
         summary(f"Skipped v{version}: DISCORD_RELEASE_WEBHOOK_URL Actions secret is absent.")
         return
 
-    messages = build_messages(version, notes)
+    repository = os.environ.get("GITHUB_REPOSITORY", "ratgirl-laboratories/sylvan-bot")
+    commit = os.environ["RELEASE_AFTER"]
+    notes_url = f"https://github.com/{repository}/blob/{commit}/.changes/v{version}.md"
+    messages = build_messages(version, notes, notes_url)
     post(webhook, messages)
     summary(f"Posted v{version} to Discord in {len(messages)} message(s).")
 
