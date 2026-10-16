@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: Keep exclusion lists and bulk-delete summaries within Discord message limits.
+time: 2026-10-16T17:49:17.9334704+01:00
