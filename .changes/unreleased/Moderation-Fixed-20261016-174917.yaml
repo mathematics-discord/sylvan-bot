@@ -1,4 +1,0 @@
-component: Moderation
-kind: Fixed
-body: Fixed failures when displaying long exclusion lists or large bulk-deletion summaries.
-time: 2026-10-16T17:49:17.9334704+01:00

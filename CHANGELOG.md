@@ -2,6 +2,18 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.4 - 2026-10-16
+## Moderation
+### Changed
+- Edit and deletion logs can only show message history the bot still remembers; restarts or older messages may leave it unavailable. Deleted-message attachments are included only when they can still be retrieved.
+### Fixed
+- Fixed failures when displaying long exclusion lists or large bulk-deletion summaries.
+- Fixed moderation logging holding up other bot activity.
+### Removed
+- Removed the retention-period option from `/logging config`.
+## Internal
+### Changed
+- Consolidated bot and test projects and organised code by feature.
 # v0.1.3 - 2026-10-15
 ## General
 ### Removed

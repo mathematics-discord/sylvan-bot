@@ -1,4 +1,0 @@
-component: Moderation
-kind: Changed
-body: Edit and deletion logs can only show message history the bot still remembers; restarts or older messages may leave it unavailable. Deleted-message attachments are included only when they can still be retrieved.
-time: 2026-10-16T17:49:17.8524794+01:00
