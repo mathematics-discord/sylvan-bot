@@ -752,3 +752,6 @@ dotnet_diagnostic.ma0007.severity = warning
 dotnet_diagnostic.rcs1261.severity = error
 
 dotnet_diagnostic.ma0076.severity = none
+
+
+dotnet_diagnostic.MA0004.severity = silent

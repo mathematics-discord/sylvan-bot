@@ -22,108 +22,6 @@ namespace RatBot.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("RatBot.Domain.Features.Logging.LoggingConfiguration", b =>
-                {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("guild_id");
-
-                    b.Property<long?>("DeleteLogChannelId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("delete_log_channel_id");
-
-                    b.Property<long?>("EditLogChannelId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("edit_log_channel_id");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("boolean")
-                        .HasColumnName("enabled");
-
-                    b.Property<TimeSpan>("EvidenceRetentionPeriod")
-                        .HasColumnType("interval")
-                        .HasColumnName("evidence_retention_period");
-
-                    b.HasKey("GuildId");
-
-                    b.ToTable("logging_configurations", (string)null);
-                });
-
-            modelBuilder.Entity("RatBot.Domain.Features.Logging.LoggingExcludedChannel", b =>
-                {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("guild_id");
-
-                    b.Property<long>("ChannelId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("channel_id");
-
-                    b.Property<DateTimeOffset>("ExcludedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("excluded_at_utc");
-
-                    b.HasKey("GuildId", "ChannelId");
-
-                    b.ToTable("logging_excluded_channels", (string)null);
-                });
-
-            modelBuilder.Entity("RatBot.Domain.Features.Logging.MessageLogEntry", b =>
-                {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("guild_id");
-
-                    b.Property<long>("OriginalMessageId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("original_message_id");
-
-                    b.Property<long>("LogMessageId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("log_message_id");
-
-                    b.Property<DateTimeOffset>("CapturedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("captured_at_utc");
-
-                    b.HasKey("GuildId", "OriginalMessageId", "LogMessageId");
-
-                    b.HasIndex("GuildId", "LogMessageId");
-
-                    b.ToTable("message_log_entries", (string)null);
-                });
-
-            modelBuilder.Entity("RatBot.Domain.Features.Logging.ObservedMessage", b =>
-                {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("guild_id");
-
-                    b.Property<long>("OriginalMessageId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("original_message_id");
-
-                    b.Property<long>("AuthorId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("author_id");
-
-                    b.Property<long>("ChannelId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("channel_id");
-
-                    b.Property<DateTimeOffset>("ObservedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("observed_at_utc");
-
-                    b.HasKey("GuildId", "OriginalMessageId");
-
-                    b.HasIndex("AuthorId");
-
-                    b.HasIndex("GuildId", "ChannelId");
-
-                    b.ToTable("observed_messages", (string)null);
-                });
-
             modelBuilder.Entity("RatBot.Domain.Moderation.ImageSpamSettings", b =>
                 {
                     b.Property<long>("GuildId")
@@ -170,6 +68,52 @@ namespace RatBot.Infrastructure.Migrations
                     b.HasKey("GuildId", "EmojiId");
 
                     b.ToTable("EmojiUsageCounts", (string)null);
+                });
+
+            modelBuilder.Entity("RatBot.Features.Logging.LoggingConfiguration", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("guild_id");
+
+                    b.Property<long?>("DeleteLogChannelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("delete_log_channel_id");
+
+                    b.Property<long?>("EditLogChannelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("edit_log_channel_id");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<TimeSpan>("LegacyEvidenceRetentionPeriod")
+                        .HasColumnType("interval")
+                        .HasColumnName("evidence_retention_period");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("logging_configurations", (string)null);
+                });
+
+            modelBuilder.Entity("RatBot.Features.Logging.LoggingExcludedChannel", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("guild_id");
+
+                    b.Property<long>("ChannelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("channel_id");
+
+                    b.Property<DateTimeOffset>("ExcludedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("excluded_at_utc");
+
+                    b.HasKey("GuildId", "ChannelId");
+
+                    b.ToTable("logging_excluded_channels", (string)null);
                 });
 
             modelBuilder.Entity("RatBot.Features.RoleColours.RoleColourOption", b =>

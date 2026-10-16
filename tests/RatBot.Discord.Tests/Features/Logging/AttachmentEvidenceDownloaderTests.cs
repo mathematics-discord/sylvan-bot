@@ -1,6 +1,6 @@
 ﻿using RatBot.Domain.Common;
 using System.Net;
-using RatBot.Features.Logging.Gateway;
+using RatBot.Features.Logging;
 using Serilog.Core;
 using Shouldly;
 

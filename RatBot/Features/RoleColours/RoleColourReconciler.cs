@@ -49,18 +49,15 @@ public sealed class RoleColourReconciler(
 
     private static ImmutableArray<IRole> EligibleColours(IGuild guild,
         IReadOnlyCollection<ulong> roles,
-        ImmutableArray<RoleColourOption> mappings)
-    {
-        return
-        [
-            .. HeldGrants(guild.Id, roles, mappings)
-                .Where(o => !ValidateMapping(guild, o.SourceRoleId, o.DisplayRoleId).IsError)
-                .Select(o => guild.GetRole(o.DisplayRoleId))
-                .DistinctBy(role => role.Id)
-                .OrderBy(role => role.Name, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(role => role.Id)
-        ];
-    }
+        ImmutableArray<RoleColourOption> mappings) =>
+    [
+        .. HeldGrants(guild.Id, roles, mappings)
+            .Where(o => !ValidateMapping(guild, o.SourceRoleId, o.DisplayRoleId).IsError)
+            .Select(o => guild.GetRole(o.DisplayRoleId))
+            .DistinctBy(role => role.Id)
+            .OrderBy(role => role.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(role => role.Id),
+    ];
 
     private static bool HoldsSource(ulong guildId, IReadOnlyCollection<ulong> roles, ulong sourceId)
     {
@@ -111,7 +108,7 @@ public sealed class RoleColourReconciler(
         ulong? colourId,
         CancellationToken ct)
     {
-        RequestOptions request = new RequestOptions { CancelToken = ct };
+        var request = new RequestOptions { CancelToken = ct };
         Option<IGuildUser> memberResult = await ReadMemberAsync(guild, userId, request);
 
         if (memberResult.Value is not Some<IGuildUser>(var member))

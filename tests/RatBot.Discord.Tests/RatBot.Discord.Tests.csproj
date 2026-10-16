@@ -34,7 +34,4 @@
         <ProjectReference Include="..\..\RatBot\RatBot.csproj"/>
     </ItemGroup>
 
-    <ItemGroup>
-      <Compile Remove="Features\Logging\ModerationLogSendingTests.cs" />
-    </ItemGroup>
 </Project>
