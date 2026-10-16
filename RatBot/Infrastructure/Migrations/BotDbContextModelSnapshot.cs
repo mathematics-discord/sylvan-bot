@@ -22,7 +22,7 @@ namespace RatBot.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("RatBot.Domain.Moderation.ImageSpamSettings", b =>
+            modelBuilder.Entity("RatBot.Features.Moderation.ImageSpamSettings", b =>
                 {
                     b.Property<long>("GuildId")
                         .HasColumnType("bigint");

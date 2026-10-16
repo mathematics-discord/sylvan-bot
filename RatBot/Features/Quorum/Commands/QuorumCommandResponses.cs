@@ -1,6 +1,5 @@
 using System.Globalization;
-using RatBot.Application.Features.Quorum;
-using RatBot.Domain.Features.Quorum;
+using RatBot.Features.Quorum;
 
 namespace RatBot.Features.Quorum.Commands;
 

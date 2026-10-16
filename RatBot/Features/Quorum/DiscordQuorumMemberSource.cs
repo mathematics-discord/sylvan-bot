@@ -1,6 +1,3 @@
-using RatBot.Application.Features.Quorum;
-using RatBot.Domain.Features.Quorum;
-
 namespace RatBot.Features.Quorum;
 
 public sealed class DiscordQuorumMemberSource(

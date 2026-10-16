@@ -1,7 +1,6 @@
 <Solution>
     <Folder Name="/src/">
         <Project Path="RatBot\RatBot.csproj" />
-        <Project Path="RatBot.Domain\RatBot.Domain.csproj" />
     </Folder>
     <Folder Name="/ops/docker/">
         <File Path="docker-compose.yml" />
@@ -17,9 +16,6 @@
         <File Path="Directory.Packages.props" />
     </Folder>
     <Folder Name="/tests/">
-        <Project Path="tests/RatBot.Domain.Tests/RatBot.Domain.Tests.csproj" />
-        <Project Path="tests/RatBot.Application.Tests/RatBot.Application.Tests.csproj" />
-        <Project Path="tests/RatBot.Discord.Tests/RatBot.Discord.Tests.csproj" />
-        <Project Path="tests\RatBot.Infrastructure.Tests\RatBot.Infrastructure.Tests.csproj" />
+        <Project Path="tests/RatBot.Tests/RatBot.Tests.csproj" />
     </Folder>
 </Solution>

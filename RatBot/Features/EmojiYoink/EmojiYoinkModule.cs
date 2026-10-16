@@ -1,4 +1,4 @@
-using RatBot.Commands;
+using RatBot.Interactions;
 
 namespace RatBot.Features.EmojiYoink;
 

@@ -1,4 +1,5 @@
 using System.Text;
+using RatBot.Features.EmojiAnalytics.Persistence;
 
 namespace RatBot.Features.EmojiAnalytics;
 

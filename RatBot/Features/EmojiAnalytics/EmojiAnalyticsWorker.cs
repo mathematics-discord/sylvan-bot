@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using RatBot.Features.EmojiAnalytics.Persistence;
 
 namespace RatBot.Features.EmojiAnalytics;
 
