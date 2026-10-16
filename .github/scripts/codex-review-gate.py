@@ -67,22 +67,26 @@ def api(method, path, data=None):
 
 
 def reconcile(number, request=api):
-    pr = request("GET", f"pulls/{number}")
-    if pr["base"]["ref"] != "master" or pr["state"] != "open":
-        print("PR is not open against master; nothing to reconcile.")
-        return
-    sha = pr["head"]["sha"]
-    if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
-        raise ValueError("GitHub returned an invalid PR head SHA")
-    # A new run supersedes earlier evidence, including a previous success.
-    check = request("POST", "check-runs", {
-        "name": NAME, "head_sha": sha, "status": "in_progress",
-        "external_id": f"codex-review-gate:pr:{number}",
-        "details_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
-        "output": {"title": "Reconciling native Codex Code Review", "summary": "Fetching current PR and comment state."},
-    })
-    path = f"check-runs/{check['id']}"
+    sha = None
+    check_id = None
+    failure = {"status": "completed", "conclusion": "failure",
+               "output": {"title": "Reconciliation failed", "summary": "GitHub API or response error. See workflow logs and manually reconcile after recovery."}}
     try:
+        pr = request("GET", f"pulls/{number}")
+        if pr["base"]["ref"] != "master" or pr["state"] != "open":
+            print("PR is not open against master; nothing to reconcile.")
+            return
+        sha = pr["head"]["sha"]
+        if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+            raise ValueError("GitHub returned an invalid PR head SHA")
+        # A new run supersedes earlier evidence, including a previous success.
+        check = request("POST", "check-runs", {
+            "name": NAME, "head_sha": sha, "status": "in_progress",
+            "external_id": f"codex-review-gate:pr:{number}",
+            "details_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+            "output": {"title": "Reconciling native Codex Code Review", "summary": "Fetching current PR and comment state."},
+        })
+        check_id = check["id"]
         comments = []
         page = 1
         while True:  # Pagination only; no polling or waiting for a review.
@@ -102,12 +106,32 @@ def reconcile(number, request=api):
                    "output": {"title": NAME if passed else "Waiting for native Code Review", "summary": detail}}
         if passed:
             payload["conclusion"] = "success"
-        request("PATCH", path, payload)
+        request("PATCH", f"check-runs/{check_id}", payload)
         print(f"PR #{number} head {sha}: {'complete' if passed else 'blocked'}: {detail}")
     except Exception:
-        # Failure to fetch/parse/publish cannot leave this run's check successful.
-        request("PATCH", path, {"status": "completed", "conclusion": "failure",
-                "output": {"title": "Reconciliation failed", "summary": "GitHub API or response error. See workflow logs and manually reconcile after recovery."}})
+        # Also handle errors before check creation. Fetch the actual head again;
+        # never use GITHUB_SHA or an old event payload as the publication target.
+        # If creation failed, revoke existing Actions evidence using PATCH instead.
+        # During a total GitHub API/write outage no client can revoke a prior
+        # result; surface recovery failure and never manufacture a success.
+        try:
+            current = request("GET", f"pulls/{number}")
+            head = current["head"]["sha"]
+            if not isinstance(head, str) or not re.fullmatch(r"[0-9a-f]{40}", head):
+                raise ValueError("Cannot establish current head for failure publication")
+            if check_id is not None and head == sha:
+                request("PATCH", f"check-runs/{check_id}", failure)
+            else:
+                runs = request("GET", f"commits/{head}/check-runs?check_name=Codex%20review%20complete&per_page=100")
+                existing = [run for run in runs["check_runs"]
+                            if run["name"] == NAME and run["app"]["id"] == 15368]
+                if existing:
+                    latest = max(existing, key=lambda run: run["id"])
+                    request("PATCH", f"check-runs/{latest['id']}", failure)
+                else:
+                    request("POST", "check-runs", {"name": NAME, "head_sha": head, **failure})
+        except Exception as recovery_error:
+            print(f"Unable to publish blocking recovery result: {type(recovery_error).__name__}")
         raise
 
 
