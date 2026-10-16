@@ -111,13 +111,16 @@ jobs:
       - scan-release
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Check out scanned release commit
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.release.outputs.source_sha }}
           fetch-depth: 0
+          # The deploy-key bypass applies only to the Codex completion rule.
+          # Existing CodeQL rules still require the exact staged SHA to be scanned.
+          ssh-key: ${{ secrets.CODEX_GATE_RELEASE_SSH_KEY }}
 
       - name: Publish scanned release
         run: git push origin HEAD:master
