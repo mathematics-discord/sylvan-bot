@@ -3,6 +3,7 @@ using RatBot.Domain.Features.Logging;
 using RatBot.Domain.Moderation;
 using RatBot.Features.EmojiAnalytics;
 using RatBot.Features.RoleColours;
+using RatBot.Features.TicketCollection;
 
 namespace RatBot.Infrastructure.Data;
 
@@ -11,6 +12,8 @@ namespace RatBot.Infrastructure.Data;
 /// </summary>
 public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbContext(options)
 {
+    public DbSet<AuditCollectionPosition> AuditCollectionPositions => Set<AuditCollectionPosition>();
+    public DbSet<CapturedAuditEntry> CapturedAuditEntries => Set<CapturedAuditEntry>();
     public DbSet<EmojiUsageCount> EmojiUsageCounts => Set<EmojiUsageCount>();
     public DbSet<ImageSpamSettings> ImageSpamSettings => Set<ImageSpamSettings>();
     public DbSet<LoggingConfiguration> LoggingConfigurations => Set<LoggingConfiguration>();

@@ -205,6 +205,89 @@ namespace RatBot.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\"");
                         });
                 });
+
+            modelBuilder.Entity("RatBot.Features.TicketCollection.AuditCollectionPosition", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CaptureStartedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastScannedAuditId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("AuditCollectionPositions", (string)null);
+                });
+
+            modelBuilder.Entity("RatBot.Features.TicketCollection.CapturedAuditEntry", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("AuditId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("ActorId")
+                        .HasColumnType("bigint");
+
+                    b.PrimitiveCollection<long[]>("AddedRoleIds")
+                        .IsRequired()
+                        .HasColumnType("bigint[]");
+
+                    b.Property<DateTimeOffset>("CapturedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("HasTimeoutChange")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text");
+
+                    b.PrimitiveCollection<long[]>("RemovedRoleIds")
+                        .IsRequired()
+                        .HasColumnType("bigint[]");
+
+                    b.Property<long?>("TargetId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("TimeoutAfterUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("TimeoutBeforeUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool?>("VoiceDeafenAfter")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("VoiceDeafenBefore")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("VoiceMuteAfter")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("VoiceMuteBefore")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("GuildId", "AuditId");
+
+                    b.ToTable("CapturedAuditEntries", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CapturedAuditEntries_TimeoutPresence", "\"HasTimeoutChange\" OR (\"TimeoutBeforeUtc\" IS NULL AND \"TimeoutAfterUtc\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_CapturedAuditEntries_VoiceDeafenPair", "(\"VoiceDeafenBefore\" IS NULL) = (\"VoiceDeafenAfter\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_CapturedAuditEntries_VoiceMutePair", "(\"VoiceMuteBefore\" IS NULL) = (\"VoiceMuteAfter\" IS NULL)");
+                        });
+                });
 #pragma warning restore 612, 618
         }
     }
