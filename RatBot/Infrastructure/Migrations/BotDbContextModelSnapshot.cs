@@ -149,6 +149,68 @@ namespace RatBot.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\"");
                         });
                 });
+
+            modelBuilder.Entity("RatBot.Features.Tickets.TicketConfiguration", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DestinationChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("ticket_configurations", (string)null);
+                });
+
+            modelBuilder.Entity("RatBot.Features.Tickets.TicketNote", b =>
+                {
+                    b.Property<long>("TicketNumber")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("TicketNumber"));
+                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<long>("TicketNumber"), 1L, null, 1L, null, null, null);
+
+                    b.Property<long>("AuthorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("LegacyTicketNumber")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PublishedChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PublishedMessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("SubjectUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("TicketNumber");
+
+                    b.HasIndex("GuildId", "LegacyTicketNumber")
+                        .IsUnique();
+
+                    b.ToTable("ticket_notes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ticket_notes_positive_number", "\"TicketNumber\" > 0");
+                        });
+                });
 #pragma warning restore 612, 618
         }
     }
