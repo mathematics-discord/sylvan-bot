@@ -1,311 +1,269 @@
-using System.Collections.Immutable;
+﻿using Discord;
 using Discord.Interactions;
-using Discord;
-using ErrorOr;
 using NSubstitute;
-using RatBot.Features.Quorum.Commands;
 using RatBot.Features.Quorum;
+using RatBot.Features.Quorum.Commands;
+using RatBot.Features.Quorum.Persistence;
+using Serilog;
 using Shouldly;
 
-namespace RatBot.Tests.Features.Quorum;
+namespace RatBot.Tests.Integration.Quorum;
 
 [TestFixture]
 public sealed class QuorumInteractionTests
 {
-    private const ulong ChannelId = 200;
     private const ulong GuildId = 100;
-    private const ulong ParentChannelId = 400;
+    private const ulong ChannelId = 200;
     private const ulong RoleId = 300;
+    private QuorumConfigurationStore _store = null!;
+    private QuorumAdminModule _admin = null!;
+    private QuorumModule _quorum = null!;
+    private IGuild _gld = null!;
+    private ITextChannel _ch = null!;
+    private IDiscordInteraction _interaction = null!;
+    private readonly List<string> _responses = [];
 
-    [Test]
-    public async Task CalculateAsync_ShowsEligibleCountProportionAndRequiredQuorum()
+    [SetUp]
+    public async Task SetUp()
     {
-        QuorumInteractionFixture fixture = new QuorumInteractionFixture();
-        ITextChannel channel = QuorumInteractionFixture.CreateTextChannel();
-        await fixture.Admin.RegisterAsync(channel, 0.6);
-        await fixture.Admin.RoleAsync(channel, fixture.CreateRole());
-        fixture.MemberSource.EligibleVoterCount = 7;
+        await PostgresDatabaseFixture.ResetAsync();
+        _store = PostgresDatabaseFixture.CreateQuorumConfigurationStore();
+        _gld = Substitute.For<IGuild>();
+        _gld.Id.Returns(GuildId);
+        _ch = CreateChannel<ITextChannel>(GuildId, ChannelId);
+        _interaction = Substitute.For<IDiscordInteraction>();
+        _responses.Clear();
 
-        fixture.ClearResponses();
-        await fixture.Quorum.CalculateAsync(channel);
+        _interaction.ModifyOriginalResponseAsync(Arg.Any<Action<MessageProperties>>())
+            .Returns(call =>
+            {
+                MessageProperties properties = new MessageProperties();
+                Action<MessageProperties> modify = call.Arg<Action<MessageProperties>>()
+                                                   ?? throw new InvalidOperationException("Expected a response edit.");
+                modify(properties);
+                _responses.Add(properties.Content.Value);
+                return Task.FromResult(Substitute.For<IUserMessage>());
+            });
 
-        await fixture.Interaction.Received(1).RespondAsync("Eligible voters: 7\nProportion: 60%\nRequired quorum: 5");
+        IInteractionContext context = Substitute.For<IInteractionContext>();
+        context.Guild.Returns(_gld);
+        context.Channel.Returns(_ch);
+        context.Interaction.Returns(_interaction);
+        _admin = new QuorumAdminModule(_store);
+        _quorum = new QuorumModule(_store, new LoggerConfiguration().CreateLogger());
+        ((IInteractionModuleBase)_admin).SetContext(context);
+        ((IInteractionModuleBase)_quorum).SetContext(context);
     }
 
     [Test]
-    public async Task CalculateAsync_WhenConfigurationIncomplete_ReturnsEphemeralError()
+    public async Task CalculateAsync_AcknowledgesBeforeMemberFetch_ThenPublishesRoundedResult()
     {
-        QuorumInteractionFixture fixture = new QuorumInteractionFixture();
-        ITextChannel channel = QuorumInteractionFixture.CreateTextChannel();
-        await fixture.Admin.RegisterAsync(channel, 0.5);
+        // Arrange
+        await RegisterWithRoleAsync();
+        var members = new TaskCompletionSource<IReadOnlyCollection<IGuildUser>>();
+        _gld.GetUsersAsync(CacheMode.AllowDownload, Arg.Any<RequestOptions>()).Returns(members.Task);
 
-        fixture.ClearResponses();
-        await fixture.Quorum.CalculateAsync(channel);
+        // Act
+        Task calculation = _quorum.CalculateAsync();
 
-        await fixture.Interaction.Received(1)
-            .RespondAsync(QuorumErrors.ConfigurationIncomplete.Description, ephemeral: true);
+        // The acknowledgement precedes the unfinished member fetch.
+        await _interaction.Received(1).RespondAsync("Calculating quorum…", ephemeral: true);
+        await _interaction.DidNotReceiveWithAnyArgs().FollowupAsync();
+        calculation.IsCompleted.ShouldBeFalse();
+        members.SetResult(Enumerable.Range(1, 7)
+            .Select(id => CreateMember((ulong)id))
+            .ToArray());
+        await calculation;
+
+        // Assert
+        await _interaction.Received(1).FollowupAsync(
+            "Eligible voters: 7\nProportion: 60%\nRequired quorum: 5",
+            allowedMentions: Arg.Any<AllowedMentions>());
+        await _interaction.Received(1).DeleteOriginalResponseAsync();
     }
 
     [Test]
-    public async Task CalculateAsync_WhenNoEligibleVoters_ReturnsApplicationErrorEphemerally()
+    public async Task CalculateAsync_WhenConfigurationIncomplete_KeepsErrorEphemeral()
     {
-        QuorumInteractionFixture fixture = new QuorumInteractionFixture();
-        ITextChannel channel = QuorumInteractionFixture.CreateTextChannel();
-        await fixture.Admin.RegisterAsync(channel, 0.5);
-        await fixture.Admin.RoleAsync(channel, fixture.CreateRole());
-        fixture.MemberSource.EligibleVoterCount = 0;
+        await _store.RegisterAsync(_ch, 0.5m, CancellationToken.None);
 
-        fixture.ClearResponses();
-        await fixture.Quorum.CalculateAsync(channel);
+        await _quorum.CalculateAsync(_ch);
 
-        await fixture.Interaction.Received(1).RespondAsync("No eligible voters were found.", ephemeral: true);
+        _responses.ShouldBe([QuorumErrors.ConfigurationIncomplete.Description]);
+        await _interaction.Received(1).RespondAsync("Calculating quorum…", ephemeral: true);
+        await _interaction.DidNotReceiveWithAnyArgs().FollowupAsync();
+        await _gld.DidNotReceiveWithAnyArgs().GetUsersAsync();
     }
 
     [Test]
-    public async Task InspectAsync_ShowsChannelProportionRolesAndCompleteness()
+    public async Task CalculateAsync_WhenNoEligibleVoters_KeepsErrorEphemeral()
     {
-        QuorumInteractionFixture fixture = new QuorumInteractionFixture();
-        ITextChannel channel = QuorumInteractionFixture.CreateTextChannel();
-        IRole role = fixture.CreateRole();
-        await fixture.Admin.RegisterAsync(channel, 0.625);
-        await fixture.Admin.RoleAsync(channel, role);
+        await RegisterWithRoleAsync();
+        _gld.GetUsersAsync(CacheMode.AllowDownload, Arg.Any<RequestOptions>())
+            .Returns(Task.FromResult<IReadOnlyCollection<IGuildUser>>([]));
 
-        fixture.ClearResponses();
-        await fixture.Quorum.InspectAsync(channel);
+        await _quorum.CalculateAsync(_ch);
 
-        string expected = $"Channel: <#{ChannelId}>\nProportion: 62.5%\nVoter roles: <@&{RoleId}>\nComplete: yes";
-        await fixture.Interaction.Received(1).RespondAsync(expected);
+        _responses.ShouldBe([QuorumErrors.NoEligibleVoters.Description]);
+        await _interaction.DidNotReceiveWithAnyArgs().FollowupAsync();
     }
 
     [Test]
-    public async Task RegisterAsync_RegistersForumScopeAndRespondsEphemeral()
+    public async Task CalculateAsync_WhenMemberFetchFails_KeepsErrorEphemeral()
     {
-        QuorumInteractionFixture fixture = new QuorumInteractionFixture();
-        IForumChannel channel = QuorumInteractionFixture.CreateForumChannel();
+        await RegisterWithRoleAsync();
+        _gld.GetUsersAsync(CacheMode.AllowDownload, Arg.Any<RequestOptions>())
+            .Returns(Task.FromException<IReadOnlyCollection<IGuildUser>>(new HttpRequestException("Fetch failed")));
 
-        await fixture.Admin.RegisterAsync(channel, 0.6);
+        await _quorum.CalculateAsync(_ch);
 
-        fixture.Store.Configuration.ShouldNotBeNull();
-        fixture.Store.Configuration.Scope.ShouldBe(new QuorumScope.ForumChannel(GuildId, ChannelId));
-        await fixture.Interaction.Received(1)
-            .RespondAsync($"Registered quorum for <#{ChannelId}> at 60%.", ephemeral: true);
+        _responses.ShouldBe([QuorumErrors.MemberDataUnavailable.Description]);
+        await _interaction.DidNotReceiveWithAnyArgs().FollowupAsync();
+    }
+
+    [Test]
+    public async Task InspectAsync_ShowsPublicConfiguration()
+    {
+        await RegisterWithRoleAsync(0.625m);
+
+        await _quorum.InspectAsync(_ch);
+
+        await _interaction.Received(1).RespondAsync("Loading quorum configuration…", ephemeral: true);
+        await _interaction.Received(1).FollowupAsync(
+            $"Channel: <#{ChannelId}>\nProportion: 62.5%\nVoter roles: <@&{RoleId}>\nComplete: yes",
+            allowedMentions: Arg.Any<AllowedMentions>());
+        await _interaction.Received(1).DeleteOriginalResponseAsync();
+    }
+
+    [Test]
+    public async Task InspectAsync_WhenMissing_KeepsErrorEphemeral()
+    {
+        await _quorum.InspectAsync(_ch);
+
+        _responses.ShouldBe([QuorumErrors.ConfigurationNotFound.Description]);
+        await _interaction.DidNotReceiveWithAnyArgs().FollowupAsync();
+    }
+
+    [Test]
+    public async Task RegisterAsync_RegistersForumAndRespondsEphemerally()
+    {
+        IForumChannel ch = CreateChannel<IForumChannel>(GuildId, ChannelId);
+
+        await _admin.RegisterAsync(ch, 0.6);
+
+        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).Value.ChannelKind.ShouldBe("forum");
+        _responses.ShouldBe([$"Registered quorum for <#{ChannelId}> at 60%."]);
+        await _interaction.Received(1).DeferAsync(ephemeral: true);
     }
 
     [Test]
     public async Task RegisterAsync_RejectsCategoryAndDifferentGuildChannelsEphemerally()
     {
-        QuorumInteractionFixture fixture = new QuorumInteractionFixture();
-        ICategoryChannel category = QuorumInteractionFixture.CreateCategoryChannel();
+        await _admin.RegisterAsync(CreateChannel<ICategoryChannel>(GuildId, ChannelId), 0.6);
+        await _admin.RegisterAsync(CreateChannel<ITextChannel>(GuildId + 1, ChannelId), 0.6);
 
-        await fixture.Admin.RegisterAsync(category, 0.6);
+        await _interaction.Received(1).RespondAsync("Choose a guild text channel or forum channel.", ephemeral: true);
+        await _interaction.Received(1).RespondAsync("That channel does not belong to this guild.", ephemeral: true);
+        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).IsError.ShouldBeTrue();
+    }
 
-        await fixture.Interaction.Received(1)
-            .RespondAsync("Choose a guild text channel or forum channel.", ephemeral: true);
-        fixture.Store.Configuration.ShouldBeNull();
+    [TestCase(0)]
+    [TestCase(-0.1)]
+    [TestCase(1.1)]
+    [TestCase(double.NaN)]
+    [TestCase(double.PositiveInfinity)]
+    public async Task RegisterAsync_InvalidProportion_ReturnsValidationError(double proportion)
+    {
+        await _admin.RegisterAsync(_ch, proportion);
 
-        fixture.ClearResponses();
-        ITextChannel otherGuildChannel = QuorumInteractionFixture.CreateTextChannel(GuildId + 1);
-
-        await fixture.Admin.RegisterAsync(otherGuildChannel, 0.6);
-
-        await fixture.Interaction.Received(1)
-            .RespondAsync("That channel does not belong to this guild.", ephemeral: true);
-        fixture.Store.Configuration.ShouldBeNull();
+        await _interaction.Received(1)
+            .RespondAsync("Quorum proportion must be greater than 0 and at most 1.", ephemeral: true);
+        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).IsError.ShouldBeTrue();
     }
 
     [Test]
-    public async Task RegisterAsync_UpdatesTextChannelConfigurationWithoutRemovingRoles()
+    public async Task RegisterAsync_UpdatesProportionWithoutRemovingRoles()
     {
-        QuorumInteractionFixture fixture = new QuorumInteractionFixture();
-        ITextChannel channel = QuorumInteractionFixture.CreateTextChannel();
-        IRole role = fixture.CreateRole();
-        await fixture.Admin.RegisterAsync(channel, 0.5);
-        await fixture.Admin.RoleAsync(channel, role);
+        await RegisterWithRoleAsync();
 
-        fixture.ClearResponses();
-        await fixture.Admin.RegisterAsync(channel, 0.75);
+        await _admin.RegisterAsync(_ch, 0.75);
 
-        fixture.Store.Configuration!.Scope.ShouldBe(new QuorumScope.TextChannel(GuildId, ChannelId));
-        fixture.Store.Configuration.Proportion.Value.ShouldBe(0.75m);
-        fixture.Store.Configuration.VoterRoles.RoleIds.ShouldContain(RoleId);
-        await fixture.Interaction.Received(1)
-            .RespondAsync($"Updated quorum for <#{ChannelId}> at 75%.", ephemeral: true);
+        QuorumConfiguration configuration = (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).Value;
+        configuration.Proportion.ShouldBe(0.75m);
+        configuration.RoleIds.ShouldContain(RoleId);
+        _responses.ShouldBe([$"Updated quorum for <#{ChannelId}> at 75%."]);
     }
 
     [Test]
-    public async Task RemoveAsync_RemovesConfigurationAndRespondsEphemeral()
+    public async Task RoleAsync_AddAndRemoveAreIdempotent()
     {
-        QuorumInteractionFixture fixture = new QuorumInteractionFixture();
-        ITextChannel channel = QuorumInteractionFixture.CreateTextChannel();
-        await fixture.Admin.RegisterAsync(channel, 0.5);
+        await _store.RegisterAsync(_ch, 0.5m, CancellationToken.None);
+        IRole role = CreateRole(_gld);
 
-        fixture.ClearResponses();
-        await fixture.Admin.RemoveAsync(channel);
+        await _admin.RoleAsync(_ch, role);
+        await _admin.RoleAsync(_ch, role);
+        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).Value.RoleIds.ShouldBe([RoleId]);
 
-        fixture.Store.Configuration.ShouldBeNull();
-        await fixture.Interaction.Received(1)
-            .RespondAsync($"Removed quorum configuration for <#{ChannelId}>.", ephemeral: true);
+        await _admin.RoleAsync(_ch, role, false);
+        await _admin.RoleAsync(_ch, role, false);
+
+        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).Value.RoleIds.ShouldBeEmpty();
+        await _interaction.Received(4).DeferAsync(ephemeral: true);
+        _responses.Count.ShouldBe(4);
     }
 
     [Test]
-    public void ResolveScopeChannel_WhenThreadParentIsForumChannel_ReturnsForumParentScope()
+    public async Task RoleAsync_RejectsRoleFromAnotherGuild()
     {
-        QuorumInteractionFixture fixture = new QuorumInteractionFixture();
-        IForumChannel parent = QuorumInteractionFixture.CreateForumChannel(ParentChannelId);
+        IGuild otherGuild = Substitute.For<IGuild>();
+        otherGuild.Id.Returns(GuildId + 1);
 
-        ErrorOr<QuorumScope> result = QuorumScopeResolver.ResolveScopeChannel(fixture.Guild, parent);
+        await _admin.RoleAsync(_ch, CreateRole(otherGuild));
 
-        result.Value.ShouldBe(new QuorumScope.ForumChannel(GuildId, ParentChannelId));
+        await _interaction.Received(1).RespondAsync("That role does not belong to this guild.", ephemeral: true);
+        await _interaction.DidNotReceiveWithAnyArgs().DeferAsync();
     }
 
     [Test]
-    public void ResolveScopeChannel_WhenThreadParentIsTextChannel_ReturnsTextParentScope()
+    public async Task RemoveAsync_RemovesConfigurationAndRespondsEphemerally()
     {
-        QuorumInteractionFixture fixture = new QuorumInteractionFixture();
-        ITextChannel parent = QuorumInteractionFixture.CreateTextChannel(channelId: ParentChannelId);
+        await RegisterWithRoleAsync();
 
-        ErrorOr<QuorumScope> result = QuorumScopeResolver.ResolveScopeChannel(fixture.Guild, parent);
+        await _admin.RemoveAsync(_ch);
 
-        result.Value.ShouldBe(new QuorumScope.TextChannel(GuildId, ParentChannelId));
+        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).IsError.ShouldBeTrue();
+        _responses.ShouldBe([$"Removed quorum configuration for <#{ChannelId}>."]);
+        await _interaction.Received(1).DeferAsync(ephemeral: true);
     }
 
-    [Test]
-    public async Task RoleAsync_AddAndRemoveAreIdempotentAndUseRoleOption()
+    private async Task RegisterWithRoleAsync(decimal proportion = 0.6m)
     {
-        QuorumInteractionFixture fixture = new QuorumInteractionFixture();
-        ITextChannel channel = QuorumInteractionFixture.CreateTextChannel();
-        IRole role = fixture.CreateRole();
-        await fixture.Admin.RegisterAsync(channel, 0.5);
-
-        fixture.ClearResponses();
-        await fixture.Admin.RoleAsync(channel, role);
-        await fixture.Admin.RoleAsync(channel, role);
-
-        fixture.Store.Configuration!.VoterRoles.RoleIds.ShouldBe(ImmutableHashSet.Create(RoleId));
-
-        await fixture.Admin.RoleAsync(channel, role, false);
-        await fixture.Admin.RoleAsync(channel, role, false);
-
-        fixture.Store.Configuration.VoterRoles.IsEmpty.ShouldBeTrue();
-        await fixture.Interaction.Received(4).RespondAsync(Arg.Any<string>(), ephemeral: true);
+        await _store.RegisterAsync(_ch, proportion, CancellationToken.None);
+        await _store.UpdateRoleAsync(GuildId, ChannelId, RoleId, true, CancellationToken.None);
     }
 
-    private sealed class InMemoryConfigurationStore : IQuorumConfigurationStore
+    private static T CreateChannel<T>(ulong guildId, ulong channelId) where T : class, IGuildChannel
     {
-        public QuorumConfiguration? Configuration { get; private set; }
-
-        public Task<ErrorOr<QuorumConfiguration>> GetAsync(QuorumScope scope, CancellationToken ct)
-        {
-            return Task.FromResult<ErrorOr<QuorumConfiguration>>(
-                Configuration is not null && Configuration.Scope == scope
-                    ? Configuration
-                    : QuorumErrors.ConfigurationNotFound
-            );
-        }
-
-        public Task<ErrorOr<QuorumRegistration>> RegisterAsync(QuorumScope scope, QuorumProportion proportion,
-            CancellationToken ct)
-        {
-            bool created = Configuration is null;
-            Configuration =
-                Configuration is null || Configuration.Scope != scope
-                    ? QuorumConfiguration.Create(scope, proportion)
-                    : Configuration.WithProportion(proportion);
-
-            return Task.FromResult<ErrorOr<QuorumRegistration>>(new QuorumRegistration(created, Configuration));
-        }
-
-        public Task<ErrorOr<QuorumConfiguration>> SaveAsync(QuorumConfiguration configuration, CancellationToken ct)
-        {
-            Configuration = configuration;
-            return Task.FromResult<ErrorOr<QuorumConfiguration>>(configuration);
-        }
-
-        public Task<ErrorOr<Deleted>> DeleteAsync(QuorumScope scope, CancellationToken ct)
-        {
-            if (Configuration is null || Configuration.Scope != scope)
-                return Task.FromResult<ErrorOr<Deleted>>(QuorumErrors.ConfigurationNotFound);
-
-            Configuration = null;
-            return Task.FromResult<ErrorOr<Deleted>>(Result.Deleted);
-        }
+        T ch = Substitute.For<T>();
+        ch.GuildId.Returns(guildId);
+        ch.Id.Returns(channelId);
+        return ch;
     }
 
-    private sealed class QuorumInteractionFixture
+    private static IGuildUser CreateMember(ulong id)
     {
-        private readonly IInteractionContext _context = Substitute.For<IInteractionContext>();
-
-        public QuorumInteractionFixture()
-        {
-            Guild.Id.Returns(GuildId);
-            Interaction.HasResponded.Returns(false);
-            _context.Guild.Returns(Guild);
-            _context.Interaction.Returns(Interaction);
-
-            QuorumOperations operations = new QuorumOperations(Store, MemberSource);
-            Admin = new QuorumAdminModule(operations);
-            Quorum = new QuorumModule(operations);
-            ((IInteractionModuleBase)Admin).SetContext(_context);
-            ((IInteractionModuleBase)Quorum).SetContext(_context);
-        }
-
-        public QuorumAdminModule Admin { get; }
-        public IGuild Guild { get; } = Substitute.For<IGuild>();
-        public IDiscordInteraction Interaction { get; } = Substitute.For<IDiscordInteraction>();
-        public StubMemberSource MemberSource { get; } = new StubMemberSource();
-        public QuorumModule Quorum { get; }
-        public InMemoryConfigurationStore Store { get; } = new InMemoryConfigurationStore();
-
-        public static ICategoryChannel CreateCategoryChannel()
-        {
-            ICategoryChannel channel = Substitute.For<ICategoryChannel>();
-            SetChannel(channel, GuildId);
-            return channel;
-        }
-
-        public static IForumChannel CreateForumChannel(ulong channelId = ChannelId)
-        {
-            IForumChannel channel = Substitute.For<IForumChannel>();
-            SetChannel(channel, GuildId, channelId);
-            return channel;
-        }
-
-        public static ITextChannel CreateTextChannel(ulong guildId = GuildId, ulong channelId = ChannelId)
-        {
-            ITextChannel channel = Substitute.For<ITextChannel>();
-            SetChannel(channel, guildId, channelId);
-            return channel;
-        }
-
-        public IRole CreateRole()
-        {
-            IRole role = Substitute.For<IRole>();
-            role.Id.Returns(RoleId);
-            role.Mention.Returns($"<@&{RoleId}>");
-            role.Guild.Returns(Guild);
-            return role;
-        }
-
-        public void ClearResponses()
-        {
-            Interaction.ClearReceivedCalls();
-        }
-
-        private static void SetChannel(IGuildChannel channel, ulong guildId, ulong channelId = ChannelId)
-        {
-            channel.Id.Returns(channelId);
-            channel.GuildId.Returns(guildId);
-        }
+        IGuildUser member = Substitute.For<IGuildUser>();
+        member.Id.Returns(id);
+        member.RoleIds.Returns(new[] { RoleId });
+        return member;
     }
 
-    private sealed class StubMemberSource : IQuorumMemberSource
+    private static IRole CreateRole(IGuild gld)
     {
-        public int EligibleVoterCount { get; set; } = 1;
-
-        public Task<ErrorOr<int>> CountEligibleVotersAsync(QuorumScope scope, ImmutableHashSet<ulong> roleIds,
-            CancellationToken ct)
-        {
-            return Task.FromResult<ErrorOr<int>>(EligibleVoterCount);
-        }
+        IRole role = Substitute.For<IRole>();
+        role.Id.Returns(RoleId);
+        role.Guild.Returns(gld);
+        role.Mention.Returns($"<@&{RoleId}>");
+        return role;
     }
 }

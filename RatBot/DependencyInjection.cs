@@ -7,7 +7,6 @@ using RatBot.Features.EmojiYoink;
 using RatBot.Features.Logging;
 using RatBot.Features.Moderation;
 using RatBot.Features.Quorum.Persistence;
-using RatBot.Features.Quorum;
 using RatBot.Features.RoleColours;
 using RatBot.Gateway;
 using RatBot.Infrastructure.Data;
@@ -37,7 +36,6 @@ public static class DependencyInjection
                     sp.GetRequiredService<ImageBurstSpamDetectorSettings>()));
 
             services.AddScoped<ImageSpamSettingsService>();
-            services.AddScoped<QuorumOperations>();
 
             services
                 .AddOptions<EmojiAnalyticsOptions>()
@@ -81,10 +79,6 @@ public static class DependencyInjection
             services.AddSingleton<RoleColourReconciler>();
             services.AddSingleton<RoleColourGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<RoleColourGatewayHandler>());
-
-            services.AddSingleton<DiscordQuorumMemberIndex>();
-            services.AddSingleton<IQuorumMemberSource, DiscordQuorumMemberSource>();
-            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordQuorumMemberIndex>());
         }
 
         private void AddPersistence(IConfiguration configuration)
@@ -93,7 +87,7 @@ public static class DependencyInjection
 
             services.AddDbContextFactory<BotDbContext>(options => options.UseNpgsql(connectionString));
 
-            services.AddScoped<IQuorumConfigurationStore>(_ => new QuorumConfigurationStore(connectionString));
+            services.AddScoped(_ => new QuorumConfigurationStore(connectionString));
         }
 
         private void AddDiscord(IConfiguration configuration)

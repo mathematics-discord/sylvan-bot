@@ -1,5 +1,7 @@
-using Dapper;
+﻿using Dapper;
+using Discord;
 using Npgsql;
+using NSubstitute;
 using RatBot.Features.Quorum.Persistence;
 using RatBot.Features.Quorum;
 
@@ -9,54 +11,55 @@ namespace RatBot.Tests.Integration;
 public sealed class QuorumConfigurationStoreTests
 {
     private QuorumConfigurationStore _store = null!;
+    private ITextChannel _ch = null!;
 
-    private static QuorumScope.TextChannel TextScope()
+    [SetUp]
+    public async Task SetUp()
     {
-        return new QuorumScope.TextChannel(123, 456);
+        await PostgresDatabaseFixture.ResetAsync();
+        _store = PostgresDatabaseFixture.CreateQuorumConfigurationStore();
+        _ch = Substitute.For<ITextChannel>();
+        _ch.GuildId.Returns(123UL);
+        _ch.Id.Returns(456UL);
     }
 
     [Test]
-    public async Task DeleteAsync_ShouldDeleteConfigurationAndRoles_AndReturnNotFoundWhenRepeated()
+    public async Task DeleteAsync_DeletesConfigurationAndRoles_AndReturnsNotFoundWhenRepeated()
     {
-        QuorumScope scope = TextScope();
-        QuorumConfiguration configuration = (
-            await _store.RegisterAsync(scope, QuorumProportion.Create(0.5m).Value, CancellationToken.None)
-        ).Value.Configuration.AddRole(10);
-        await _store.SaveAsync(configuration, CancellationToken.None);
+        await _store.RegisterAsync(_ch, 0.5m, CancellationToken.None);
+        await _store.UpdateRoleAsync(_ch.GuildId, _ch.Id, 10, true, CancellationToken.None);
 
-        ErrorOr<Deleted> firstResult = await _store.DeleteAsync(scope, CancellationToken.None);
-        ErrorOr<Deleted> secondResult = await _store.DeleteAsync(scope, CancellationToken.None);
+        ErrorOr<Deleted> firstResult = await _store.DeleteAsync(_ch.GuildId, _ch.Id, CancellationToken.None);
+        ErrorOr<Deleted> secondResult = await _store.DeleteAsync(_ch.GuildId, _ch.Id, CancellationToken.None);
 
         await using NpgsqlConnection connection = new NpgsqlConnection(PostgresDatabaseFixture.ConnectionString);
         int roleCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM quorum_voter_roles");
 
         firstResult.IsError.ShouldBeFalse();
-        secondResult.IsError.ShouldBeTrue();
         secondResult.FirstError.ShouldBe(QuorumErrors.ConfigurationNotFound);
         roleCount.ShouldBe(0);
     }
 
     [Test]
-    public async Task GetAsync_ShouldRehydrateForumScope()
+    public async Task GetAsync_PreservesForumKindAndGuildChannelIdentity()
     {
-        QuorumScope scope = new QuorumScope.ForumChannel(123, 456);
-        QuorumProportion proportion = QuorumProportion.Create(0.5m).Value;
-        await _store.RegisterAsync(scope, proportion, CancellationToken.None);
+        IForumChannel forum = Substitute.For<IForumChannel>();
+        forum.GuildId.Returns(123UL);
+        forum.Id.Returns(456UL);
+        await _store.RegisterAsync(forum, 0.5m, CancellationToken.None);
 
-        ErrorOr<QuorumConfiguration> result = await _store.GetAsync(scope, CancellationToken.None);
+        QuorumConfiguration result = (await _store.GetAsync(123, 456, CancellationToken.None)).Value;
 
-        result.IsError.ShouldBeFalse();
-        result.Value.Scope.ShouldBeOfType<QuorumScope.ForumChannel>();
-        result.Value.Scope.GuildId.ShouldBe(123UL);
-        result.Value.Scope.ChannelId.ShouldBe(456UL);
+        result.ChannelKind.ShouldBe("forum");
+        result.GuildId.ShouldBe(123UL);
+        result.ChannelId.ShouldBe(456UL);
     }
 
     [Test]
-    public async Task GetAsync_ShouldReturnNotFound_WhenConfigurationIsMissing()
+    public async Task GetAsync_ReturnsNotFoundWhenMissing()
     {
-        ErrorOr<QuorumConfiguration> result = await _store.GetAsync(TextScope(), CancellationToken.None);
+        ErrorOr<QuorumConfiguration> result = await _store.GetAsync(123, 456, CancellationToken.None);
 
-        result.IsError.ShouldBeTrue();
         result.FirstError.ShouldBe(QuorumErrors.ConfigurationNotFound);
     }
 
@@ -65,95 +68,156 @@ public sealed class QuorumConfigurationStoreTests
     {
         await using NpgsqlConnection connection = new NpgsqlConnection(PostgresDatabaseFixture.ConnectionString);
 
-        string[] configurationColumns = (
-            await connection.QueryAsync<string>(
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'public' AND table_name = 'quorum_configurations'
-                ORDER BY ordinal_position
-                """
-            )
-        ).ToArray();
+        string[] configurationColumns = (await connection.QueryAsync<string>(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'quorum_configurations'
+            ORDER BY ordinal_position
+            """)).ToArray();
 
-        string[] roleColumns = (
-            await connection.QueryAsync<string>(
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'public' AND table_name = 'quorum_voter_roles'
-                ORDER BY ordinal_position
-                """
-            )
-        ).ToArray();
+        string[] roleColumns = (await connection.QueryAsync<string>(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'quorum_voter_roles'
+            ORDER BY ordinal_position
+            """)).ToArray();
 
         configurationColumns.ShouldBe(["id", "guild_id", "channel_id", "channel_kind", "proportion"]);
         roleColumns.ShouldBe(["quorum_configuration_id", "role_id"]);
     }
 
     [Test]
-    public async Task RegisterAsync_ShouldCreateThenUpdateConfiguration_WhilePreservingIdAndRoles()
+    public async Task RegisterAsync_UpdatesProportionWhilePreservingIdAndRoles()
     {
-        QuorumScope scope = TextScope();
-        QuorumProportion initialProportion = QuorumProportion.Create(0.5m).Value;
-        QuorumProportion updatedProportion = QuorumProportion.Create(0.75m).Value;
+        var firstResult = await _store.RegisterAsync(_ch, 0.5m, CancellationToken.None);
+        Guid id = (await _store.GetAsync(123, 456, CancellationToken.None)).Value.Id;
+        await _store.UpdateRoleAsync(123, 456, 20, true, CancellationToken.None);
+        await _store.UpdateRoleAsync(123, 456, 10, true, CancellationToken.None);
 
-        ErrorOr<QuorumRegistration> firstResult =
-            await _store.RegisterAsync(scope, initialProportion, CancellationToken.None);
-        firstResult.IsError.ShouldBeFalse();
-        firstResult.Value.Created.ShouldBeTrue();
+        var secondResult = await _store.RegisterAsync(_ch, 0.75m, CancellationToken.None);
+        QuorumConfiguration stored = (await _store.GetAsync(123, 456, CancellationToken.None)).Value;
 
-        QuorumConfiguration withRoles = firstResult.Value.Configuration.AddRole(20).AddRole(10);
-        ErrorOr<QuorumConfiguration> saveResult = await _store.SaveAsync(withRoles, CancellationToken.None);
-        saveResult.IsError.ShouldBeFalse();
-
-        ErrorOr<QuorumRegistration> secondResult =
-            await _store.RegisterAsync(scope, updatedProportion, CancellationToken.None);
-
-        secondResult.IsError.ShouldBeFalse();
-        secondResult.Value.Created.ShouldBeFalse();
-        secondResult.Value.Configuration.Id.ShouldBe(firstResult.Value.Configuration.Id);
-        secondResult.Value.Configuration.Proportion.ShouldBe(updatedProportion);
-        secondResult.Value.Configuration.VoterRoles.RoleIds.Order().ShouldBe([10UL, 20UL]);
+        firstResult.Value.ShouldBeTrue();
+        secondResult.Value.ShouldBeFalse();
+        stored.Id.ShouldBe(id);
+        stored.Proportion.ShouldBe(0.75m);
+        stored.RoleIds.Order().ShouldBe([10UL, 20UL]);
     }
 
     [Test]
-    public async Task SaveAsync_ShouldReplaceProportionAndDeduplicatedRoles()
+    public async Task UpdateRoleAsync_ConcurrentIndependentEditsAndRegistration_PreserveEveryChange()
     {
-        QuorumScope scope = TextScope();
-        QuorumProportion initialProportion = QuorumProportion.Create(0.5m).Value;
-        QuorumProportion updatedProportion = QuorumProportion.Create(0.8m).Value;
-        QuorumConfiguration configuration =
-            (await _store.RegisterAsync(scope, initialProportion, CancellationToken.None)).Value.Configuration;
+        // Arrange: hold the parent row so all three role edits and registration overlap.
+        await _store.RegisterAsync(_ch, 0.5m, CancellationToken.None);
+        Guid id = (await _store.GetAsync(123, 456, CancellationToken.None)).Value.Id;
+        await _store.UpdateRoleAsync(123, 456, 30, true, CancellationToken.None);
+        await _store.UpdateRoleAsync(123, 456, 40, true, CancellationToken.None);
+        await using NpgsqlConnection connection = new NpgsqlConnection(PostgresDatabaseFixture.ConnectionString);
+        await connection.OpenAsync();
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync();
+        await connection.ExecuteAsync("SELECT id FROM quorum_configurations WHERE id = @Id FOR UPDATE",
+            new { Id = id }, transaction);
 
-        QuorumConfiguration updated =
-            configuration.WithProportion(updatedProportion).AddRole(10).AddRole(10).AddRole(20);
+        // Act
+        Task<ErrorOr<Success>> addFirst = _store.UpdateRoleAsync(123, 456, 10, true, CancellationToken.None);
+        Task<ErrorOr<Success>> addSecond = _store.UpdateRoleAsync(123, 456, 20, true, CancellationToken.None);
+        Task<ErrorOr<Success>> remove = _store.UpdateRoleAsync(123, 456, 30, false, CancellationToken.None);
+        var registration = _store.RegisterAsync(_ch, 0.8m, CancellationToken.None);
+        await WaitForBlockedEditsAsync(4);
+        await transaction.CommitAsync();
+        await Task.WhenAll(addFirst, addSecond, remove, registration);
 
-        ErrorOr<QuorumConfiguration> saveResult = await _store.SaveAsync(updated, CancellationToken.None);
-        ErrorOr<QuorumConfiguration> getResult = await _store.GetAsync(scope, CancellationToken.None);
+        // Assert
+        addFirst.Result.IsError.ShouldBeFalse();
+        addSecond.Result.IsError.ShouldBeFalse();
+        remove.Result.IsError.ShouldBeFalse();
+        registration.Result.IsError.ShouldBeFalse();
+        QuorumConfiguration stored = (await _store.GetAsync(123, 456, CancellationToken.None)).Value;
+        stored.Id.ShouldBe(id);
+        stored.Proportion.ShouldBe(0.8m);
+        stored.RoleIds.Order().ShouldBe([10UL, 20UL, 40UL]);
+    }
 
-        saveResult.IsError.ShouldBeFalse();
-        getResult.IsError.ShouldBeFalse();
-        getResult.Value.Proportion.ShouldBe(updatedProportion);
-        getResult.Value.VoterRoles.RoleIds.Order().ShouldBe([10UL, 20UL]);
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task UpdateRoleAsync_ConflictingEditsToSameRole_FollowDatabaseOrder(bool addFirst)
+    {
+        await _store.RegisterAsync(_ch, 0.5m, CancellationToken.None);
+        Guid id = (await _store.GetAsync(123, 456, CancellationToken.None)).Value.Id;
+        await using NpgsqlConnection connection = new NpgsqlConnection(PostgresDatabaseFixture.ConnectionString);
+        await connection.OpenAsync();
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync();
+        await connection.ExecuteAsync("SELECT id FROM quorum_configurations WHERE id = @Id FOR UPDATE",
+            new { Id = id }, transaction);
+
+        Task<ErrorOr<Success>> first = _store.UpdateRoleAsync(123, 456, 10, addFirst, CancellationToken.None);
+        await WaitForBlockedEditsAsync(1);
+        Task<ErrorOr<Success>> second = _store.UpdateRoleAsync(123, 456, 10, !addFirst, CancellationToken.None);
+        await WaitForBlockedEditsAsync(2);
+        await transaction.CommitAsync();
+        await Task.WhenAll(first, second);
+
+        first.Result.IsError.ShouldBeFalse();
+        second.Result.IsError.ShouldBeFalse();
+        (await _store.GetAsync(123, 456, CancellationToken.None)).Value.RoleIds.Contains(10).ShouldBe(!addFirst);
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public async Task UpdateRoleAsync_WhenRemovalWins_ReturnsNotFound(bool shouldAdd)
+    {
+        await _store.RegisterAsync(_ch, 0.5m, CancellationToken.None);
+        Guid id = (await _store.GetAsync(123, 456, CancellationToken.None)).Value.Id;
+        await using NpgsqlConnection connection = new NpgsqlConnection(PostgresDatabaseFixture.ConnectionString);
+        await connection.OpenAsync();
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync();
+        await connection.ExecuteAsync("DELETE FROM quorum_configurations WHERE id = @Id", new { Id = id }, transaction);
+
+        Task<ErrorOr<Success>> edit = _store.UpdateRoleAsync(123, 456, 10, shouldAdd, CancellationToken.None);
+        await WaitForBlockedEditsAsync(1);
+        await transaction.CommitAsync();
+
+        (await edit).FirstError.ShouldBe(QuorumErrors.ConfigurationNotFound);
     }
 
     [Test]
-    public async Task SaveAsync_ShouldReturnNotFound_WhenConfigurationIdIsMissing()
+    public async Task UpdateRoleAsync_EditsAreIdempotentAndScopedToGuildAndChannel()
     {
-        QuorumConfiguration configuration =
-            QuorumConfiguration.Create(TextScope(), QuorumProportion.Create(0.5m).Value);
+        await _store.RegisterAsync(_ch, 0.5m, CancellationToken.None);
+        ITextChannel otherGuildChannel = Substitute.For<ITextChannel>();
+        otherGuildChannel.GuildId.Returns(124UL);
+        otherGuildChannel.Id.Returns(456UL);
+        await _store.RegisterAsync(otherGuildChannel, 0.75m, CancellationToken.None);
 
-        ErrorOr<QuorumConfiguration> result = await _store.SaveAsync(configuration, CancellationToken.None);
+        await _store.UpdateRoleAsync(123, 456, 10, true, CancellationToken.None);
+        await _store.UpdateRoleAsync(123, 456, 10, true, CancellationToken.None);
+        (await _store.GetAsync(123, 456, CancellationToken.None)).Value.RoleIds.ShouldBe([10UL]);
+        (await _store.GetAsync(124, 456, CancellationToken.None)).Value.RoleIds.ShouldBeEmpty();
+        (await _store.UpdateRoleAsync(123, 457, 10, true, CancellationToken.None)).FirstError
+            .ShouldBe(QuorumErrors.ConfigurationNotFound);
 
-        result.IsError.ShouldBeTrue();
-        result.FirstError.ShouldBe(QuorumErrors.ConfigurationNotFound);
+        await _store.UpdateRoleAsync(123, 456, 10, false, CancellationToken.None);
+        await _store.UpdateRoleAsync(123, 456, 10, false, CancellationToken.None);
+        (await _store.GetAsync(123, 456, CancellationToken.None)).Value.RoleIds.ShouldBeEmpty();
     }
 
-    [SetUp]
-    public async Task SetUp()
+    private static async Task WaitForBlockedEditsAsync(int count)
     {
-        await PostgresDatabaseFixture.ResetAsync();
-        _store = PostgresDatabaseFixture.CreateQuorumConfigurationStore();
+        using CancellationTokenSource timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using NpgsqlConnection connection = new NpgsqlConnection(PostgresDatabaseFixture.ConnectionString);
+        await connection.OpenAsync(timeout.Token);
+
+        while (await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+                   """
+                   SELECT COUNT(*) FROM pg_stat_activity
+                   WHERE datname = current_database()
+                     AND wait_event_type = 'Lock'
+                     AND query ILIKE '%quorum_configurations%'
+                   """, cancellationToken: timeout.Token)) < count)
+        {
+            await Task.Delay(25, timeout.Token);
+        }
     }
 }
