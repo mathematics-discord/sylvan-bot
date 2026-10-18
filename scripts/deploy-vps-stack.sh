@@ -66,6 +66,11 @@ if [[ -z "$project" || -z "$remote_dir" ]]; then
   exit 1
 fi
 
+if [[ "$project" == staging ]]; then
+  local_compose="$repo_root/docker-compose.staging.yml"
+  local_env_example="$repo_root/env/staging.env.example"
+fi
+
 if [[ ! -f "$local_compose" ]]; then
   echo "Local compose file not found: $local_compose" >&2
   exit 1
@@ -159,7 +164,7 @@ docker compose "${compose_args[@]}" pull
 docker compose "${compose_args[@]}" up -d --remove-orphans
 
 if [[ -n "${IMAGE_REF}" ]]; then
-  tmp_env_file=".env.tmp"
+  tmp_env_file="$(mktemp .env.XXXXXX)"
   awk -v image_ref="$IMAGE_REF" '
     BEGIN { updated = 0 }
     /^RATBOT_IMAGE=/ {

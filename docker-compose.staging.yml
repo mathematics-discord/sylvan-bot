@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB__DATABASE}
+      POSTGRES_USER: ${DB__USER}
+      POSTGRES_PASSWORD: ${DB__PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB__USER} -d ${DB__DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  bot:
+    image: ${RATBOT_IMAGE:?RATBOT_IMAGE is required}
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      DOTNET_ENVIRONMENT: Staging
+      ASPNETCORE_ENVIRONMENT: Staging
+      DISCORD__TOKEN: ${DISCORD__TOKEN}
+      DB__HOST: postgres
+      DB__PORT: "5432"
+      DB__DATABASE: ${DB__DATABASE}
+      DB__USER: ${DB__USER}
+      DB__PASSWORD: ${DB__PASSWORD}
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
