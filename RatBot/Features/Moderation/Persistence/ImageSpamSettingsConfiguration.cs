@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore;
-using RatBot.Features.Moderation;
 
 namespace RatBot.Features.Moderation.Persistence;
 

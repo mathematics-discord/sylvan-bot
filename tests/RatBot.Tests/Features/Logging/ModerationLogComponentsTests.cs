@@ -1,7 +1,6 @@
 using Discord;
 using DownloadedAttachment = RatBot.Features.Logging.ModerationLogComponents.DownloadedAttachment;
 using RatBot.Features.Logging;
-using Shouldly;
 
 namespace RatBot.Tests.Features.Logging;
 
@@ -16,7 +15,7 @@ public sealed class ModerationLogComponentsTests
         const string jumpUrl = "https://discord.com/channels/1/2/3";
 
         // Act
-        ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildEditLog(
+        var log = ModerationLogComponents.BuildEditLog(
             jumpUrl,
             2,
             4,
@@ -34,7 +33,7 @@ public sealed class ModerationLogComponentsTests
     [Test]
     public void BuildEditLog_RendersMessageDiffAsAnsiBlock()
     {
-        ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildEditLog(
+        var log = ModerationLogComponents.BuildEditLog(
             "https://discord.com/channels/1/2/3",
             2,
             4,
@@ -51,7 +50,7 @@ public sealed class ModerationLogComponentsTests
     [Test]
     public void BuildEditLog_RendersExactInlineHeader()
     {
-        ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildEditLog(
+        var log = ModerationLogComponents.BuildEditLog(
             "https://discord.com/channels/1/2/3",
             2,
             4,
@@ -66,7 +65,7 @@ public sealed class ModerationLogComponentsTests
     [Test]
     public void BuildDeleteLog_RendersExactInlineHeaderWithPrecedingMessage()
     {
-        ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
+        var log = ModerationLogComponents.BuildDeleteLog(
             2,
             3,
             4,
@@ -84,7 +83,7 @@ public sealed class ModerationLogComponentsTests
     [Test]
     public void BuildDeleteLog_RendersExactInlineHeaderWithoutPrecedingMessage()
     {
-        ModerationLogComponents.ModerationLogMessage log = BuildDeleteLogWithoutPrecedingMessage();
+        var log = BuildDeleteLogWithoutPrecedingMessage();
 
         TextDisplays(log).First().Content.ShouldBe("**Message Delete:** <@4> (`4`) in <#2>");
     }
@@ -139,7 +138,7 @@ public sealed class ModerationLogComponentsTests
     [Test]
     public void BuildDeleteLog_RendersUnavailableWhenContentIsMissing()
     {
-        ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
+        var log = ModerationLogComponents.BuildDeleteLog(
             2,
             3,
             4,
@@ -154,7 +153,7 @@ public sealed class ModerationLogComponentsTests
     [Test]
     public void BuildDeleteLog_OmitsAttachmentComponentsWhenEvidenceIsAbsent()
     {
-        ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
+        var log = ModerationLogComponents.BuildDeleteLog(
             2,
             3,
             4,
@@ -172,10 +171,10 @@ public sealed class ModerationLogComponentsTests
     [Test]
     public void BuildDeleteLog_RendersMediaAttachmentsAsGalleryItems()
     {
-        DownloadedAttachment image = new DownloadedAttachment("evidence-3.png", "image/png", new byte[] { 1 });
-        DownloadedAttachment video = new DownloadedAttachment("evidence-4.mp4", "video/mp4", new byte[] { 2 });
+        var image = new DownloadedAttachment("evidence-3.png", "image/png", new byte[] { 1 });
+        var video = new DownloadedAttachment("evidence-4.mp4", "video/mp4", new byte[] { 2 });
 
-        ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
+        var log = ModerationLogComponents.BuildDeleteLog(
             2,
             3,
             4,
@@ -184,7 +183,7 @@ public sealed class ModerationLogComponentsTests
             [image, video]
         );
 
-        MediaGalleryComponent gallery = ContainerComponents(log).OfType<MediaGalleryComponent>().Single();
+        var gallery = ContainerComponents(log).OfType<MediaGalleryComponent>().Single();
 
         log.Attachments.Select(attachment => attachment.FileName).ShouldBe(["evidence-3.png", "evidence-4.mp4"]);
         log.Attachments.Select(attachment => attachment.Url)
@@ -200,9 +199,9 @@ public sealed class ModerationLogComponentsTests
     [Test]
     public void BuildDeleteLog_RendersNonMediaAttachmentsAsFileComponents()
     {
-        DownloadedAttachment file = new DownloadedAttachment("evidence-4.bin", "text/plain", new byte[] { 2 });
+        var file = new DownloadedAttachment("evidence-4.bin", "text/plain", new byte[] { 2 });
 
-        ModerationLogComponents.ModerationLogMessage log = ModerationLogComponents.BuildDeleteLog(
+        var log = ModerationLogComponents.BuildDeleteLog(
             2,
             3,
             4,
@@ -211,7 +210,7 @@ public sealed class ModerationLogComponentsTests
             [file]
         );
 
-        FileComponent fileComponent = ContainerComponents(log).OfType<FileComponent>().Single();
+        var fileComponent = ContainerComponents(log).OfType<FileComponent>().Single();
 
         log.Attachments.Select(attachment => attachment.FileName).ShouldBe(["evidence-4.bin"]);
         log.Attachments.Select(attachment => attachment.Url).ShouldBe(["attachment://evidence-4.bin"]);
@@ -228,7 +227,7 @@ public sealed class ModerationLogComponentsTests
     private static IReadOnlyCollection<IMessageComponent> ContainerComponents(
         ModerationLogComponents.ModerationLogMessage log)
     {
-        ContainerComponent container =
+        var container =
             log.Components.Components.ShouldHaveSingleItem().ShouldBeOfType<ContainerComponent>();
 
         return container.Components;

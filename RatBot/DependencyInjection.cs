@@ -83,7 +83,7 @@ public static class DependencyInjection
 
         private void AddPersistence(IConfiguration configuration)
         {
-            string connectionString = PostgresConnectionStringBuilder.Build(configuration);
+            var connectionString = PostgresConnectionStringBuilder.Build(configuration);
 
             services.AddDbContextFactory<BotDbContext>(options => options.UseNpgsql(connectionString));
 
@@ -102,7 +102,7 @@ public static class DependencyInjection
 
             services.AddSingleton(sp =>
             {
-                DiscordOptions options = sp.GetRequiredService<IOptions<DiscordOptions>>().Value;
+                var options = sp.GetRequiredService<IOptions<DiscordOptions>>().Value;
 
                 return new DiscordSocketClient(
                     new DiscordSocketConfig

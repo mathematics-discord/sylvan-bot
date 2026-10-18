@@ -13,12 +13,12 @@ public sealed class QuorumConfigurationStore(string connectionString)
                                                proportion AS "Proportion"
                                                """;
 
-    public async Task<ErrorOr<QuorumConfiguration>> GetAsync(ulong guildId, ulong channelId, CancellationToken ct)
+    public async Task<QuorumConfiguration> GetAsync(ulong guildId, ulong channelId, CancellationToken ct)
     {
-        await using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+        await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(ct);
 
-        QuorumConfiguration? configuration = await connection.QuerySingleOrDefaultAsync<QuorumConfiguration>(
+        var configuration = await connection.QuerySingleOrDefaultAsync<QuorumConfiguration>(
             new CommandDefinition(
                 $"""
                  SELECT {ConfigurationColumns}
@@ -29,7 +29,7 @@ public sealed class QuorumConfigurationStore(string connectionString)
                 cancellationToken: ct));
 
         if (configuration is null)
-            return QuorumErrors.ConfigurationNotFound;
+            throw new KeyNotFoundException(QuorumMessages.ConfigurationNotFound);
 
         IEnumerable<long> roleIds = await connection.QueryAsync<long>(
             new CommandDefinition(
@@ -48,20 +48,20 @@ public sealed class QuorumConfigurationStore(string connectionString)
         return configuration;
     }
 
-    public async Task<ErrorOr<bool>> RegisterAsync(
+    public async Task<bool> RegisterAsync(
         IGuildChannel ch,
         decimal proportion,
         CancellationToken ct)
     {
         if (proportion is <= 0 or > 1)
-            return Error.Validation(description: "Quorum proportion must be greater than 0 and at most 1.");
+            throw new ArgumentOutOfRangeException(nameof(proportion), proportion, "Quorum proportion must be greater than 0 and at most 1.");
 
-        await using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+        await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(ct);
 
-        Guid id = Guid.CreateVersion7();
+        var id = Guid.CreateVersion7();
 
-        Guid configurationId = await connection.QuerySingleAsync<Guid>(
+        var configurationId = await connection.QuerySingleAsync<Guid>(
             new CommandDefinition(
                 """
                  INSERT INTO public.quorum_configurations (id, guild_id, channel_id, channel_kind, proportion)
@@ -83,30 +83,31 @@ public sealed class QuorumConfigurationStore(string connectionString)
         return configurationId == id;
     }
 
-    public async Task<ErrorOr<Deleted>> DeleteAsync(ulong guildId, ulong channelId, CancellationToken ct)
+    public async Task DeleteAsync(ulong guildId, ulong channelId, CancellationToken ct)
     {
-        await using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+        await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(ct);
 
-        int deleted = await connection.ExecuteAsync(
+        var deleted = await connection.ExecuteAsync(
             new CommandDefinition(
                 "DELETE FROM public.quorum_configurations WHERE guild_id = @GuildId AND channel_id = @ChannelId",
                 new { GuildId = checked((long)guildId), ChannelId = checked((long)channelId) },
                 cancellationToken: ct));
 
-        return deleted > 0 ? Result.Deleted : QuorumErrors.ConfigurationNotFound;
+        if (deleted == 0)
+            throw new KeyNotFoundException(QuorumMessages.ConfigurationNotFound);
     }
 
-    public async Task<ErrorOr<Success>> UpdateRoleAsync(
+    public async Task UpdateRoleAsync(
         ulong guildId,
         ulong channelId,
         ulong roleId,
         bool shouldAdd,
         CancellationToken ct)
     {
-        await using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+        await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(ct);
-        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
 
         // Lock the configuration row to order conflicting role edits and coordinate with removal.
         // No saved snapshot of its proportion or other voter roles is written back.
@@ -123,9 +124,9 @@ public sealed class QuorumConfigurationStore(string connectionString)
                 cancellationToken: ct));
 
         if (configurationId is null)
-            return QuorumErrors.ConfigurationNotFound;
+            throw new KeyNotFoundException(QuorumMessages.ConfigurationNotFound);
 
-        string sql = shouldAdd
+        var sql = shouldAdd
             ? """
               INSERT INTO public.quorum_voter_roles (quorum_configuration_id, role_id)
               VALUES (@ConfigurationId, @RoleId)
@@ -144,6 +145,5 @@ public sealed class QuorumConfigurationStore(string connectionString)
                 cancellationToken: ct));
 
         await transaction.CommitAsync(ct);
-        return Result.Success;
     }
 }

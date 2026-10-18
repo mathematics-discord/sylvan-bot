@@ -22,7 +22,7 @@ public sealed class EmojiAnalyticsWorker(
         {
             while (await buffer.Reader.WaitToReadAsync(stoppingToken))
             {
-                int count = await ProcessNextBatchAsync(stoppingToken);
+                var count = await ProcessNextBatchAsync(stoppingToken);
                 if (count < BatchSize)
                     await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
@@ -36,8 +36,8 @@ public sealed class EmojiAnalyticsWorker(
     internal async Task<int> ProcessNextBatchAsync(CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        List<EmojiUsageIncrement> batch = new List<EmojiUsageIncrement>(BatchSize);
-        while (batch.Count < BatchSize && buffer.Reader.TryRead(out EmojiUsageIncrement increment))
+        List<EmojiUsageIncrement> batch = new(BatchSize);
+        while (batch.Count < BatchSize && buffer.Reader.TryRead(out var increment))
             batch.Add(increment);
 
         foreach (IGrouping<ulong, EmojiUsageIncrement> guildBatch in batch.GroupBy(item => item.GuildId))
@@ -48,7 +48,7 @@ public sealed class EmojiAnalyticsWorker(
 
             try
             {
-                IGuild? guild = await discordClient.GetGuildAsync(guildBatch.Key, CacheMode.CacheOnly,
+                var guild = await discordClient.GetGuildAsync(guildBatch.Key, CacheMode.CacheOnly,
                     new RequestOptions { CancelToken = ct });
                 if (guild is null)
                     continue;
@@ -62,7 +62,7 @@ public sealed class EmojiAnalyticsWorker(
                         group.Sum(item => item.ReactionCount)
                     ))
                     .ToArray();
-                ulong[] trackedEmojiIds = guild.Emotes.Select(emote => emote.Id).ToArray();
+                var trackedEmojiIds = guild.Emotes.Select(emote => emote.Id).ToArray();
                 await store.RecordBatchAsync(guildBatch.Key, increments, trackedEmojiIds, ct);
                 _logger.Debug("Processed {Count} emoji usage increments for guild {GuildId}", guildBatch.Count(),
                     guildBatch.Key);

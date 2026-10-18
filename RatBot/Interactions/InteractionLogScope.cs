@@ -13,7 +13,7 @@ public sealed class InteractionLogScope : IDisposable
 
     public static InteractionLogScope Begin(InteractionLogScopeDetails details)
     {
-        List<IDisposable> properties = new List<IDisposable>
+        List<IDisposable> properties = new()
         {
             LogContext.PushProperty("log_area", "interaction"),
             LogContext.PushProperty("service_instance_id", details.ServiceInstanceId),
@@ -25,7 +25,7 @@ public sealed class InteractionLogScope : IDisposable
             LogContext.PushProperty("user_id", details.UserId),
             LogContext.PushProperty("guild_id", details.GuildId),
             LogContext.PushProperty("channel_id", details.ChannelId),
-            LogContext.PushProperty("command_name", details.CommandName)
+            LogContext.PushProperty("command_name", details.CommandName),
         };
 
         return new InteractionLogScope(properties);
@@ -33,7 +33,7 @@ public sealed class InteractionLogScope : IDisposable
 
     public void Dispose()
     {
-        for (int i = _properties.Count - 1; i >= 0; i--)
+        for (var i = _properties.Count - 1; i >= 0; i--)
             _properties[i].Dispose();
     }
 }

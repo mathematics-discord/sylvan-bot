@@ -1,4 +1,4 @@
 // Global using directives
 
-global using ErrorOr;
+global using RatBot.Common;
 global using Shouldly;

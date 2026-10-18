@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using RatBot.Features.Moderation;
 using RatBot.Infrastructure.Data;
-using Shouldly;
 
 namespace RatBot.Tests.Features.Moderation;
 
@@ -16,9 +15,9 @@ public sealed class SettingsInteractionRegistrationTests
     public async Task AddModuleAsync_SpamModule_PreservesImageSpamCommandContract()
     {
         // Arrange
-        await using DiscordSocketClient client = new DiscordSocketClient();
-        using InteractionService interactionService = new InteractionService(client);
-        await using ServiceProvider services = new ServiceCollection()
+        await using var client = new DiscordSocketClient();
+        using var interactionService = new InteractionService(client);
+        await using var services = new ServiceCollection()
             .AddSingleton<ImageBurstSpamDetectorSettings>()
             .AddDbContext<BotDbContext>(options =>
                 options.UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused"))
@@ -26,8 +25,8 @@ public sealed class SettingsInteractionRegistrationTests
             .BuildServiceProvider();
 
         // Act
-        ModuleInfo module = await interactionService.AddModuleAsync<SpamModule>(services);
-        SlashCommandInfo command = module.SlashCommands.Single();
+        var module = await interactionService.AddModuleAsync<SpamModule>(services);
+        var command = module.SlashCommands.Single();
 
         // Assert
         command.Name.ShouldBe("image-spam-config");
@@ -41,16 +40,16 @@ public sealed class SettingsInteractionRegistrationTests
     public void ImageSpamConfigAsync_HasExpectedSlashCommandMetadata()
     {
         // Arrange
-        MethodInfo method =
+        var method =
             typeof(SpamModule).GetMethod(nameof(SpamModule.ImageSpamConfigAsync))
             ?? throw new InvalidOperationException("Expected ImageSpamConfigAsync method.");
 
         // Act
-        GroupAttribute group =
+        var group =
             typeof(SpamModule).GetCustomAttribute<GroupAttribute>() ??
             throw new InvalidOperationException("Expected group attribute.");
 
-        SlashCommandAttribute slashCommand =
+        var slashCommand =
             method.GetCustomAttribute<SlashCommandAttribute>() ??
             throw new InvalidOperationException("Expected slash command attribute.");
 

@@ -13,7 +13,7 @@ internal static class QuorumCommandResponses
 
     public static string Inspection(QuorumConfiguration configuration)
     {
-        string roles = configuration.RoleIds.IsEmpty
+        var roles = configuration.RoleIds.IsEmpty
             ? "none"
             : string.Join(", ", configuration.RoleIds
                 .Order()

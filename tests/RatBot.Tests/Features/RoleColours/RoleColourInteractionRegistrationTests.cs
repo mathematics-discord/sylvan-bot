@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using RatBot.Features.RoleColours;
 using RatBot.Infrastructure.Data;
 using Serilog;
-using Shouldly;
 
 namespace RatBot.Tests.Features.RoleColours;
 
@@ -16,8 +15,8 @@ public sealed class RoleColourInteractionRegistrationTests
     public async Task RegisteringCommands()
     {
         // Arrange
-        await using DiscordSocketClient client = new DiscordSocketClient();
-        await using ServiceProvider services = new ServiceCollection()
+        await using var client = new DiscordSocketClient();
+        await using var services = new ServiceCollection()
             .AddDbContextFactory<BotDbContext>(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString()))
             .AddSingleton(Log.Logger)
             .AddSingleton(client)
@@ -25,12 +24,12 @@ public sealed class RoleColourInteractionRegistrationTests
             .AddSingleton<RoleColourReconciler>()
             .BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
 
-        using InteractionService interactions =
+        using var interactions =
             new InteractionService(client, new InteractionServiceConfig { AutoServiceScopes = true });
 
         // Act
-        ModuleInfo colour = await interactions.AddModuleAsync<ColourModule>(services);
-        ModuleInfo admin = await interactions.AddModuleAsync<RoleColourAdminModule>(services);
+        var colour = await interactions.AddModuleAsync<ColourModule>(services);
+        var admin = await interactions.AddModuleAsync<RoleColourAdminModule>(services);
 
         // Assert
         colour.SlashGroupName.ShouldBeNull();

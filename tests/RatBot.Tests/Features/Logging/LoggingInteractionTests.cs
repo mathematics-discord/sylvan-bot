@@ -6,7 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using RatBot.Features.Logging;
 using RatBot.Infrastructure.Data;
-using Shouldly;
 
 namespace RatBot.Tests.Features.Logging;
 

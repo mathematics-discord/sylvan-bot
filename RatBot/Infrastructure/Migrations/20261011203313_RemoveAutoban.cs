@@ -26,7 +26,7 @@ namespace RatBot.Infrastructure.Migrations
                     GuildId = table.Column<long>(type: "bigint", nullable: false),
                     BannedUser = table.Column<long>(type: "bigint", nullable: false),
                     Moderator = table.Column<long>(type: "bigint", nullable: false),
-                    RegisteredAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    RegisteredAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                 },
                 constraints: table =>
                 {

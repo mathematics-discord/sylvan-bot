@@ -1,12 +1,10 @@
-﻿using RatBot.Common;
-using RatBot.Features.Moderation;
-using Shouldly;
+﻿using RatBot.Features.Moderation;
 
 namespace RatBot.Tests.Features.Moderation;
 
 public sealed class ImageBurstSpamDetectorTests
 {
-    private static readonly DateTimeOffset BaseTimestamp = new DateTimeOffset(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset BaseTimestamp = new(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
 
     private static ImageBurstSpamDetector CreateDetector(TimeProvider timeProvider)
     {
@@ -17,7 +15,7 @@ public sealed class ImageBurstSpamDetectorTests
                 Window = 45,
                 DistinctChannelThreshold = 4,
                 RequiredAttachmentCount = 2,
-                HandlingLockDuration = TimeSpan.FromMinutes(5)
+                HandlingLockDuration = TimeSpan.FromMinutes(5),
             }
         );
     }
@@ -32,7 +30,7 @@ public sealed class ImageBurstSpamDetectorTests
             timestamp ?? BaseTimestamp,
             [
                 new ImageBurstAttachment("https://cdn.example/a.png"),
-                new ImageBurstAttachment("https://cdn.example/b.png")
+                new ImageBurstAttachment("https://cdn.example/b.png"),
             ]
         );
     }
@@ -41,8 +39,8 @@ public sealed class ImageBurstSpamDetectorTests
     public void Observe_AfterDetection_DoesNotTriggerAgainWhileHandlingLockIsActive()
     {
         // Arrange
-        TestTimeProvider timeProvider = new TestTimeProvider(BaseTimestamp);
-        ImageBurstSpamDetector detector = CreateDetector(timeProvider);
+        var timeProvider = new TestTimeProvider(BaseTimestamp);
+        var detector = CreateDetector(timeProvider);
 
         detector.Observe(CreateMessage(channelId: 10, timestamp: BaseTimestamp));
         detector.Observe(CreateMessage(channelId: 20, timestamp: BaseTimestamp.AddSeconds(1)));
@@ -63,8 +61,8 @@ public sealed class ImageBurstSpamDetectorTests
     public void Observe_WithFourDistinctChannelsInsideWindow_ReturnsDetection()
     {
         // Arrange
-        TestTimeProvider timeProvider = new TestTimeProvider(BaseTimestamp);
-        ImageBurstSpamDetector detector = CreateDetector(timeProvider);
+        var timeProvider = new TestTimeProvider(BaseTimestamp);
+        var detector = CreateDetector(timeProvider);
 
         detector.Observe(CreateMessage(channelId: 10, timestamp: BaseTimestamp));
         detector.Observe(CreateMessage(channelId: 20, timestamp: BaseTimestamp.AddSeconds(10)));
@@ -75,7 +73,7 @@ public sealed class ImageBurstSpamDetectorTests
             detector.Observe(CreateMessage(channelId: 40, timestamp: BaseTimestamp.AddSeconds(30)));
 
         // Assert
-        ImageBurstDetection detection = result.Value.ShouldBeOfType<Some<ImageBurstDetection>>().Value;
+        var detection = result.Value.ShouldBeOfType<Some<ImageBurstDetection>>().Value;
         detection.GuildId.ShouldBe(1UL);
         detection.UserId.ShouldBe(2UL);
         detection.ChannelIds.ShouldBe([10UL, 20UL, 30UL, 40UL]);
@@ -86,8 +84,8 @@ public sealed class ImageBurstSpamDetectorTests
     public void Observe_WithOldMessages_PrunesOutsideWindow()
     {
         // Arrange
-        TestTimeProvider timeProvider = new TestTimeProvider(BaseTimestamp);
-        ImageBurstSpamDetector detector = CreateDetector(timeProvider);
+        var timeProvider = new TestTimeProvider(BaseTimestamp);
+        var detector = CreateDetector(timeProvider);
 
         detector.Observe(CreateMessage(channelId: 10, timestamp: BaseTimestamp));
         detector.Observe(CreateMessage(channelId: 20, timestamp: BaseTimestamp.AddSeconds(1)));
@@ -105,8 +103,8 @@ public sealed class ImageBurstSpamDetectorTests
     public void Observe_WithRepeatedChannel_DoesNotIncreaseChannelCount()
     {
         // Arrange
-        TestTimeProvider timeProvider = new TestTimeProvider(BaseTimestamp);
-        ImageBurstSpamDetector detector = CreateDetector(timeProvider);
+        var timeProvider = new TestTimeProvider(BaseTimestamp);
+        var detector = CreateDetector(timeProvider);
 
         detector.Observe(CreateMessage(channelId: 10, timestamp: BaseTimestamp));
         detector.Observe(CreateMessage(channelId: 10, timestamp: BaseTimestamp.AddSeconds(5)));
@@ -124,8 +122,8 @@ public sealed class ImageBurstSpamDetectorTests
     public void Observe_WithSameUserInDifferentGuilds_DoesNotShareWindow()
     {
         // Arrange
-        TestTimeProvider timeProvider = new TestTimeProvider(BaseTimestamp);
-        ImageBurstSpamDetector detector = CreateDetector(timeProvider);
+        var timeProvider = new TestTimeProvider(BaseTimestamp);
+        var detector = CreateDetector(timeProvider);
 
         detector.Observe(CreateMessage(1, channelId: 10, timestamp: BaseTimestamp));
         detector.Observe(CreateMessage(1, channelId: 20, timestamp: BaseTimestamp.AddSeconds(1)));
@@ -143,9 +141,9 @@ public sealed class ImageBurstSpamDetectorTests
     public void Observe_GuildHasNoSettings_ReturnsNone()
     {
         // Arrange
-        TestTimeProvider timeProvider = new TestTimeProvider(BaseTimestamp);
-        ImageBurstSpamDetectorSettings settings = new ImageBurstSpamDetectorSettings();
-        ImageBurstSpamDetector detector = new ImageBurstSpamDetector(timeProvider, settings);
+        var timeProvider = new TestTimeProvider(BaseTimestamp);
+        var settings = new ImageBurstSpamDetectorSettings();
+        var detector = new ImageBurstSpamDetector(timeProvider, settings);
         detector.Observe(CreateMessage(channelId: 10));
         detector.Observe(CreateMessage(channelId: 20));
         detector.Observe(CreateMessage(channelId: 30));
@@ -161,11 +159,11 @@ public sealed class ImageBurstSpamDetectorTests
     public void Observe_GuildsHaveDifferentThresholds_UsesRequestedGuildThreshold()
     {
         // Arrange
-        TestTimeProvider timeProvider = new TestTimeProvider(BaseTimestamp);
-        ImageBurstSpamDetectorSettings settings = new ImageBurstSpamDetectorSettings();
+        var timeProvider = new TestTimeProvider(BaseTimestamp);
+        var settings = new ImageBurstSpamDetectorSettings();
         settings.Update(1, new ImageBurstSpamDetectorOptions { DistinctChannelThreshold = 4 });
         settings.Update(2, new ImageBurstSpamDetectorOptions { DistinctChannelThreshold = 2 });
-        ImageBurstSpamDetector detector = new ImageBurstSpamDetector(timeProvider, settings);
+        var detector = new ImageBurstSpamDetector(timeProvider, settings);
         detector.Observe(CreateMessage(guildId: 1, channelId: 10));
         detector.Observe(CreateMessage(guildId: 2, channelId: 10));
 
@@ -175,7 +173,7 @@ public sealed class ImageBurstSpamDetectorTests
 
         // Assert
         firstGuildResult.Value.ShouldBeOfType<None>();
-        ImageBurstDetection detection = secondGuildResult.Value.ShouldBeOfType<Some<ImageBurstDetection>>().Value;
+        var detection = secondGuildResult.Value.ShouldBeOfType<Some<ImageBurstDetection>>().Value;
         detection.GuildId.ShouldBe(2UL);
         detection.ChannelIds.ShouldBe([10UL, 20UL]);
     }
@@ -184,15 +182,15 @@ public sealed class ImageBurstSpamDetectorTests
     public void Observe_WithThreeQualifyingMessagesAcrossThreeChannelsInsideFifteenSeconds_ReturnsDetection()
     {
         // Arrange
-        TestTimeProvider timeProvider = new TestTimeProvider(BaseTimestamp);
-        ImageBurstSpamDetector detector = new ImageBurstSpamDetector(
+        var timeProvider = new TestTimeProvider(BaseTimestamp);
+        var detector = new ImageBurstSpamDetector(
             timeProvider,
             new ImageBurstSpamDetectorOptions
             {
                 Window = 15,
                 DistinctChannelThreshold = 3,
                 RequiredAttachmentCount = 2,
-                HandlingLockDuration = TimeSpan.FromMinutes(5)
+                HandlingLockDuration = TimeSpan.FromMinutes(5),
             }
         );
 
@@ -205,7 +203,7 @@ public sealed class ImageBurstSpamDetectorTests
         );
 
         // Assert
-        ImageBurstDetection detection = result.Value.ShouldBeOfType<Some<ImageBurstDetection>>().Value;
+        var detection = result.Value.ShouldBeOfType<Some<ImageBurstDetection>>().Value;
         detection.ChannelIds.ShouldBe([486841085210132490UL, 903481102591750184UL, 908076393198419988UL]);
         detection.Messages.Count.ShouldBe(3);
     }

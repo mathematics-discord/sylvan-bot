@@ -1,10 +1,8 @@
 using System.Net;
 using Discord;
-using ErrorOr;
 using NSubstitute;
 using RatBot.Features.EmojiYoink;
 using Serilog;
-using Shouldly;
 
 namespace RatBot.Tests.Features.EmojiYoink;
 
@@ -15,29 +13,28 @@ public sealed class EmojiYoinkTests
     [TestCase("rat~27", "rat")]
     public void EmojiName_normalises_terminal_disambiguation_suffix(string invokedName, string expected)
     {
-        ErrorOr<string> result = EmojiName.Normalize(invokedName);
+        var result = EmojiName.Normalize(invokedName);
 
-        result.IsError.ShouldBeFalse();
-        result.Value.ShouldBe(expected);
+        result.ShouldBe(expected);
     }
 
     [Test]
     public async Task ImportAsync_rejects_invalid_name_before_download_or_creation()
     {
-        using RecordingHandler handler = new RecordingHandler(HttpStatusCode.OK);
-        using HttpClient client = new HttpClient(handler);
+        using var handler = new RecordingHandler(HttpStatusCode.OK);
+        using var client = new HttpClient(handler);
 
-        DiscordGuildEmojiImporter importer =
+        var importer =
             new DiscordGuildEmojiImporter(client, new LoggerConfiguration().CreateLogger());
 
-        IGuild guild = Substitute.For<IGuild>();
-        IUser moderator = Substitute.For<IUser>();
-        Emote source = Emote.Parse("<:a~1:789>");
+        var guild = Substitute.For<IGuild>();
+        var moderator = Substitute.For<IUser>();
+        var source = Emote.Parse("<:a~1:789>");
 
-        ErrorOr<GuildEmote> result = await importer.ImportAsync(guild, moderator, source, CancellationToken.None);
+        var exception = await Should.ThrowAsync<ArgumentException>(() =>
+            importer.ImportAsync(guild, moderator, source, CancellationToken.None));
 
-        result.IsError.ShouldBeTrue();
-        result.FirstError.ShouldBe(EmojiYoinkErrors.InvalidDestinationName);
+        exception.ParamName.ShouldBe("invokedSourceName");
         handler.RequestUri.ShouldBeNull();
         await guild.DidNotReceiveWithAnyArgs().CreateEmoteAsync(null!, default);
     }
@@ -45,19 +42,19 @@ public sealed class EmojiYoinkTests
     [Test]
     public async Task ImportAsync_uses_source_emoji_for_animated_download_and_normalises_name()
     {
-        using RecordingHandler handler = new RecordingHandler(HttpStatusCode.OK);
-        using HttpClient client = new HttpClient(handler);
+        using var handler = new RecordingHandler(HttpStatusCode.OK);
+        using var client = new HttpClient(handler);
 
-        DiscordGuildEmojiImporter importer =
+        var importer =
             new DiscordGuildEmojiImporter(client, new LoggerConfiguration().CreateLogger());
 
-        IGuild guild = Substitute.For<IGuild>();
-        IUser moderator = Substitute.For<IUser>();
+        var guild = Substitute.For<IGuild>();
+        var moderator = Substitute.For<IUser>();
         moderator.Id.Returns(456UL);
         moderator.Username.Returns("moderator");
-        Emote source = Emote.Parse("<a:rat~27:789>");
+        var source = Emote.Parse("<a:rat~27:789>");
 
-        GuildEmote created = (GuildEmote)
+        var created = (GuildEmote)
             Activator.CreateInstance(
                 typeof(GuildEmote),
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
@@ -78,10 +75,9 @@ public sealed class EmojiYoinkTests
                 return created;
             });
 
-        ErrorOr<GuildEmote> result = await importer.ImportAsync(guild, moderator, source, CancellationToken.None);
+        var result = await importer.ImportAsync(guild, moderator, source, CancellationToken.None);
 
-        result.IsError.ShouldBeFalse();
-        result.Value.ShouldBe(created);
+        result.ShouldBe(created);
         handler.RequestUri.ShouldBe(new Uri("https://cdn.discordapp.com/emojis/789.webp?animated=true"));
         importedName.ShouldBe("rat");
         requestOptions.ShouldNotBeNull();
@@ -92,23 +88,145 @@ public sealed class EmojiYoinkTests
     [Test]
     public void Message_parser_extracts_one_custom_emoji_from_surrounding_text()
     {
-        ErrorOr<Emote> result = CustomEmojiMentionParser.ParseMessage("hello 😀,\n  <a:rat:789>! more words");
-
-        result.IsError.ShouldBeFalse();
-        result.Value.Id.ShouldBe(789UL);
-        result.Value.Animated.ShouldBeTrue();
+        var source = CustomEmojiMentionParser.ParseMessage("hello 😀,\n  <a:rat:789>! more words");
+        source.Id.ShouldBe(789UL);
+        source.Animated.ShouldBeTrue();
     }
 
     [Test]
     public void Message_parser_rejects_multiple_occurrences_of_same_emoji()
     {
-        ErrorOr<Emote> result = CustomEmojiMentionParser.ParseMessage("<:rat:789> and <:rat:789>");
-
-        result.IsError.ShouldBeTrue();
-        result.FirstError.ShouldBe(EmojiYoinkErrors.InvalidMessageEmoji);
+        Should.Throw<FormatException>(() =>
+            CustomEmojiMentionParser.ParseMessage("<:rat:789> and <:rat:789>"));
     }
 
-    private sealed class RecordingHandler(HttpStatusCode statusCode) : HttpMessageHandler
+    [TestCase(HttpStatusCode.NotFound)]
+    [TestCase(HttpStatusCode.ServiceUnavailable)]
+    public async Task ImportAsync_CdnFailure_PreservesStatusAndDoesNotUpload(HttpStatusCode statusCode)
+    {
+        // Arrange
+        using var handler = new RecordingHandler(statusCode);
+        using var client = new HttpClient(handler);
+        var importer = new DiscordGuildEmojiImporter(client, Log.Logger);
+        var guild = Substitute.For<IGuild>();
+
+        // Act
+        var exception = await Should.ThrowAsync<HttpRequestException>(() =>
+            importer.ImportAsync(guild, Substitute.For<IUser>(), Emote.Parse("<:rat:789>"), CancellationToken.None));
+
+        // Assert
+        exception.StatusCode.ShouldBe(statusCode);
+        await guild.DidNotReceiveWithAnyArgs().CreateEmoteAsync(default!, default, default, default);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ImportAsync_OversizedImage_DisposesDownloadAndDoesNotUpload(bool knownLength)
+    {
+        // Arrange
+        var content = new SizedContent(256 * 1024 + 1, knownLength);
+        using var handler = new RecordingHandler(HttpStatusCode.OK, content);
+        using var client = new HttpClient(handler);
+        var importer = new DiscordGuildEmojiImporter(client, Log.Logger);
+        var guild = Substitute.For<IGuild>();
+
+        // Act
+        await Should.ThrowAsync<InvalidDataException>(() =>
+            importer.ImportAsync(guild, Substitute.For<IUser>(), Emote.Parse("<:rat:789>"), CancellationToken.None));
+
+        // Assert
+        content.IsDisposed.ShouldBeTrue();
+        await guild.DidNotReceiveWithAnyArgs().CreateEmoteAsync(default!, default, default, default);
+    }
+
+    [Test]
+    public async Task ImportAsync_DownloadTimeout_ThrowsTimeoutWithoutUploading()
+    {
+        // Arrange
+        using var handler = new RecordingHandler(HttpStatusCode.OK,
+            failure: new OperationCanceledException("Download timed out"));
+        using var client = new HttpClient(handler);
+        var importer = new DiscordGuildEmojiImporter(client, Log.Logger);
+        var guild = Substitute.For<IGuild>();
+
+        // Act
+        await Should.ThrowAsync<TimeoutException>(() =>
+            importer.ImportAsync(guild, Substitute.For<IUser>(), Emote.Parse("<:rat:789>"), CancellationToken.None));
+
+        // Assert
+        await guild.DidNotReceiveWithAnyArgs().CreateEmoteAsync(default!, default, default, default);
+    }
+
+    [Test]
+    public async Task ImportAsync_CallerCancels_PropagatesCancellationWithoutUploading()
+    {
+        // Arrange
+        using var handler = new RecordingHandler(HttpStatusCode.OK);
+        using var client = new HttpClient(handler);
+        var importer = new DiscordGuildEmojiImporter(client, Log.Logger);
+        var guild = Substitute.For<IGuild>();
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync();
+
+        // Act
+        await Should.ThrowAsync<OperationCanceledException>(() =>
+            importer.ImportAsync(guild, Substitute.For<IUser>(), Emote.Parse("<:rat:789>"), cancellation.Token));
+
+        // Assert
+        await guild.DidNotReceiveWithAnyArgs().CreateEmoteAsync(default!, default, default, default);
+    }
+
+    [Test]
+    public async Task ImportAsync_UploadThrows_DisposesImageAndPreservesException()
+    {
+        // Arrange
+        using var handler = new RecordingHandler(HttpStatusCode.OK);
+        using var client = new HttpClient(handler);
+        var importer = new DiscordGuildEmojiImporter(client, Log.Logger);
+        var guild = Substitute.For<IGuild>();
+        var failure = new HttpRequestException("Upload failed");
+        Stream? uploadStream = null;
+        guild.CreateEmoteAsync(default!, default, default, default)
+            .ReturnsForAnyArgs(call =>
+            {
+                uploadStream = call.ArgAt<Image>(1).Stream;
+                return Task.FromException<GuildEmote>(failure);
+            });
+
+        // Act
+        var exception = await Should.ThrowAsync<HttpRequestException>(() =>
+            importer.ImportAsync(guild, Substitute.For<IUser>(), Emote.Parse("<:rat:789>"), CancellationToken.None));
+
+        // Assert
+        exception.ShouldBeSameAs(failure);
+        uploadStream.ShouldNotBeNull();
+        uploadStream.CanRead.ShouldBeFalse();
+    }
+
+    private sealed class SizedContent(int size, bool knownLength) : HttpContent
+    {
+        public bool IsDisposed { get; private set; }
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            return stream.WriteAsync(new byte[size]).AsTask();
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = size;
+            return knownLength;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            IsDisposed = true;
+            base.Dispose(disposing);
+        }
+    }
+
+    private sealed class RecordingHandler(HttpStatusCode statusCode, HttpContent? content = null, Exception? failure = null)
+        : HttpMessageHandler
     {
         public Uri? RequestUri { get; private set; }
 
@@ -116,7 +234,12 @@ public sealed class EmojiYoinkTests
             CancellationToken cancellationToken)
         {
             RequestUri = request.RequestUri;
-            return Task.FromResult(new HttpResponseMessage(statusCode) { Content = new ByteArrayContent([1, 2, 3]) });
+            return failure is not null
+                ? Task.FromException<HttpResponseMessage>(failure)
+                : Task.FromResult(new HttpResponseMessage(statusCode)
+                {
+                    Content = content ?? new ByteArrayContent([1, 2, 3]),
+                });
         }
     }
 }

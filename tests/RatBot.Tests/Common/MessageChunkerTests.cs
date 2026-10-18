@@ -1,7 +1,3 @@
-using ErrorOr;
-using RatBot.Common;
-using Shouldly;
-
 namespace RatBot.Tests.Common;
 
 public sealed class MessageChunkerTests
@@ -10,36 +6,38 @@ public sealed class MessageChunkerTests
     public void SplitMessageIntoChunks_WithExactLimit_ReturnsOneChunk()
     {
         // Arrange
-        string message = new string('a', 2000);
+        var message = new string('a', 2000);
 
         // Act
-        string[] chunks = MessageChunker.SplitMessageIntoChunks(message).Value;
+        var chunks = MessageChunker.SplitMessageIntoChunks(message);
 
         // Assert
         chunks.ShouldBe([message]);
     }
 
-    [Test]
-    public void SplitMessageIntoChunks_WithInvalidChunkSize_ReturnsValidationError()
+    [TestCase(0)]
+    [TestCase(-1)]
+    public void SplitMessageIntoChunks_InvalidChunkSize_ThrowsArgumentOutOfRange(int chunkSize)
     {
         // Arrange
 
         // Act
-        ErrorOr<string[]> result = MessageChunker.SplitMessageIntoChunks("message", 0);
+        var exception = Should.Throw<ArgumentOutOfRangeException>(() =>
+            MessageChunker.SplitMessageIntoChunks("message", chunkSize));
 
         // Assert
-        result.IsError.ShouldBeTrue();
-        result.FirstError.Type.ShouldBe(ErrorType.Validation);
+        exception.ParamName.ShouldBe("chunkSize");
+        exception.ActualValue.ShouldBe(chunkSize);
     }
 
     [Test]
     public void SplitMessageIntoChunks_WithMessageOverLimit_ReturnsTwoChunks()
     {
         // Arrange
-        string message = new string('a', 2001);
+        var message = new string('a', 2001);
 
         // Act
-        string[] chunks = MessageChunker.SplitMessageIntoChunks(message).Value;
+        var chunks = MessageChunker.SplitMessageIntoChunks(message);
 
         // Assert
         chunks.Length.ShouldBe(2);
@@ -51,12 +49,12 @@ public sealed class MessageChunkerTests
     public void SplitMessageIntoChunks_WithNewlineBeforeLimit_SplitsAtNewline()
     {
         // Arrange
-        string firstLine = new string('a', 10);
-        string secondLine = new string('b', 10);
-        string message = $"{firstLine}\n{secondLine}";
+        var firstLine = new string('a', 10);
+        var secondLine = new string('b', 10);
+        var message = $"{firstLine}\n{secondLine}";
 
         // Act
-        string[] chunks = MessageChunker.SplitMessageIntoChunks(message, 12).Value;
+        var chunks = MessageChunker.SplitMessageIntoChunks(message, 12);
 
         // Assert
         chunks.ShouldBe([$"{firstLine}\n", secondLine]);
@@ -66,10 +64,10 @@ public sealed class MessageChunkerTests
     public void SplitMessageIntoChunks_WithNoNewlineBeforeLimit_SplitsAtLimit()
     {
         // Arrange
-        string message = "abcdef";
+        var message = "abcdef";
 
         // Act
-        string[] chunks = MessageChunker.SplitMessageIntoChunks(message, 3).Value;
+        var chunks = MessageChunker.SplitMessageIntoChunks(message, 3);
 
         // Assert
         chunks.ShouldBe(["abc", "def"]);
