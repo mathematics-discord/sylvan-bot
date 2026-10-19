@@ -12,16 +12,16 @@ public static class PostgresConnectionStringBuilder
     /// <returns>The PostgreSQL connection string.</returns>
     public static string Build(IConfiguration config)
     {
-        string? connectionString = config["DB:ConnectionString"];
+        var connectionString = config["DB:ConnectionString"];
 
         if (!string.IsNullOrWhiteSpace(connectionString))
             return connectionString;
 
-        string host = config["DB:Host"] ?? throw new InvalidOperationException("DB:Host not configured");
-        string port = config["DB:Port"] ?? "5432";
-        string database = config["DB:Database"] ?? throw new InvalidOperationException("DB:Database not configured");
-        string user = config["DB:User"] ?? throw new InvalidOperationException("DB:User not configured");
-        string password = config["DB:Password"] ?? throw new InvalidOperationException("DB:Password not configured");
+        var host = config["DB:Host"] ?? throw new InvalidOperationException("DB:Host not configured");
+        var port = config["DB:Port"] ?? "5432";
+        var database = config["DB:Database"] ?? throw new InvalidOperationException("DB:Database not configured");
+        var user = config["DB:User"] ?? throw new InvalidOperationException("DB:User not configured");
+        var password = config["DB:Password"] ?? throw new InvalidOperationException("DB:Password not configured");
 
         return $"Host={host};Port={port};Database={database};Username={user};Password={password};SSL Mode=Disable";
     }

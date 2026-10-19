@@ -11,7 +11,7 @@ internal static class MessageEditDiffer
     private const string Red = "\e[1;31m";
     private const string Green = "\e[1;32m";
     private const string Reset = "\e[0m";
-    private static readonly CustomFunctionChunker TokenChunker = new CustomFunctionChunker(ChunkTokens);
+    private static readonly CustomFunctionChunker TokenChunker = new(ChunkTokens);
 
     public static (string Before, string After) BuildDiff(string before, string after)
     {

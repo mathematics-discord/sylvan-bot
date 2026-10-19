@@ -2,7 +2,6 @@ using System.Reflection;
 using Discord.Interactions;
 using Discord;
 using RatBot.Features.RoleColours;
-using Shouldly;
 
 namespace RatBot.Tests.Features.RoleColours;
 
@@ -13,15 +12,15 @@ public sealed class RoleColourAdminModuleTests
     public void AdminCommands()
     {
         // Arrange
-        Type moduleType = typeof(RoleColourAdminModule);
+        var moduleType = typeof(RoleColourAdminModule);
 
         // Act
-        GroupAttribute group = moduleType.GetCustomAttribute<GroupAttribute>() ??
-                               throw new InvalidOperationException("Expected group attribute.");
-        DefaultMemberPermissionsAttribute permissions =
+        var group = moduleType.GetCustomAttribute<GroupAttribute>() ??
+                    throw new InvalidOperationException("Expected group attribute.");
+        var permissions =
             moduleType.GetCustomAttribute<DefaultMemberPermissionsAttribute>()
             ?? throw new InvalidOperationException("Expected default permissions attribute.");
-        string[] commandNames = moduleType
+        var commandNames = moduleType
             .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
             .Select(method => method.GetCustomAttribute<SlashCommandAttribute>())
             .Where(attribute => attribute is not null)

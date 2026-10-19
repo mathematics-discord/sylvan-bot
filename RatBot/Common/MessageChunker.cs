@@ -4,18 +4,18 @@ public static class MessageChunker
 {
     private const int DefaultMessageCharacterLimit = 2000;
 
-    public static ErrorOr<string[]> SplitMessageIntoChunks(string message, int chunkSize = DefaultMessageCharacterLimit)
+    public static string[] SplitMessageIntoChunks(string message, int chunkSize = DefaultMessageCharacterLimit)
     {
         if (chunkSize <= 0)
-            return Error.Validation("Chunk size must be greater than zero.");
+            throw new ArgumentOutOfRangeException(nameof(chunkSize), chunkSize, "Chunk size must be greater than zero.");
 
-        Queue<string> chunks = new Queue<string>(message.Length / chunkSize + 1);
+        Queue<string> chunks = new(message.Length / chunkSize + 1);
 
-        int index = 0;
+        var index = 0;
 
         while (index < message.Length)
         {
-            int remainingLength = message.Length - index;
+            var remainingLength = message.Length - index;
 
             if (remainingLength <= chunkSize)
             {
@@ -23,10 +23,10 @@ public static class MessageChunker
                 break;
             }
 
-            string window = message.Substring(index, chunkSize);
-            int splitAt = window.LastIndexOf('\n');
+            var window = message.Substring(index, chunkSize);
+            var splitAt = window.LastIndexOf('\n');
 
-            int chunkLength = splitAt > 0 ? splitAt + 1 : chunkSize;
+            var chunkLength = splitAt > 0 ? splitAt + 1 : chunkSize;
 
             chunks.Enqueue(message.Substring(index, chunkLength));
             index += chunkLength;

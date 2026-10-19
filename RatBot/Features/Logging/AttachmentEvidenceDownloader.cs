@@ -8,18 +8,18 @@ internal static class AttachmentEvidenceDownloader
     {
         try
         {
-            using HttpResponseMessage response = await httpClient
+            using var response = await httpClient
                 .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
 
             if (!response.IsSuccessStatusCode)
                 return new None();
 
-            long? contentLength = response.Content.Headers.ContentLength;
+            var contentLength = response.Content.Headers.ContentLength;
 
             if (contentLength > maxBytes)
                 return new None();
 
-            await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
             return await ReadLimitedAsync(stream, maxBytes, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -40,17 +40,17 @@ internal static class AttachmentEvidenceDownloader
 
         const int maxReadBufferBytes = 81920;
 
-        long bufferedByteLimit = maxBytes == long.MaxValue ? long.MaxValue : maxBytes + 1;
-        long bytesRemaining = bufferedByteLimit;
-        int readBufferBytes = (int)Math.Min(maxReadBufferBytes, Math.Max(1, bytesRemaining));
-        byte[] readBuffer = new byte[readBufferBytes];
+        var bufferedByteLimit = maxBytes == long.MaxValue ? long.MaxValue : maxBytes + 1;
+        var bytesRemaining = bufferedByteLimit;
+        var readBufferBytes = (int)Math.Min(maxReadBufferBytes, Math.Max(1, bytesRemaining));
+        var readBuffer = new byte[readBufferBytes];
 
-        await using MemoryStream buffer = new MemoryStream(readBufferBytes);
+        await using var buffer = new MemoryStream(readBufferBytes);
 
         while (bytesRemaining > 0)
         {
-            int bytesToRead = (int)Math.Min(readBuffer.Length, bytesRemaining);
-            int bytesRead = await stream.ReadAsync(readBuffer.AsMemory(0, bytesToRead), ct);
+            var bytesToRead = (int)Math.Min(readBuffer.Length, bytesRemaining);
+            var bytesRead = await stream.ReadAsync(readBuffer.AsMemory(0, bytesToRead), ct);
 
             if (bytesRead == 0)
                 return new Some<byte[]>(buffer.ToArray());

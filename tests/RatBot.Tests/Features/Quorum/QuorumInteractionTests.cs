@@ -4,10 +4,10 @@ using NSubstitute;
 using RatBot.Features.Quorum;
 using RatBot.Features.Quorum.Commands;
 using RatBot.Features.Quorum.Persistence;
+using RatBot.Tests.Integration;
 using Serilog;
-using Shouldly;
 
-namespace RatBot.Tests.Integration.Quorum;
+namespace RatBot.Tests.Features.Quorum;
 
 [TestFixture]
 public sealed class QuorumInteractionTests
@@ -37,7 +37,7 @@ public sealed class QuorumInteractionTests
         _interaction.ModifyOriginalResponseAsync(Arg.Any<Action<MessageProperties>>())
             .Returns(call =>
             {
-                MessageProperties properties = new MessageProperties();
+                var properties = new MessageProperties();
                 Action<MessageProperties> modify = call.Arg<Action<MessageProperties>>()
                                                    ?? throw new InvalidOperationException("Expected a response edit.");
                 modify(properties);
@@ -45,7 +45,7 @@ public sealed class QuorumInteractionTests
                 return Task.FromResult(Substitute.For<IUserMessage>());
             });
 
-        IInteractionContext context = Substitute.For<IInteractionContext>();
+        var context = Substitute.For<IInteractionContext>();
         context.Guild.Returns(_gld);
         context.Channel.Returns(_ch);
         context.Interaction.Returns(_interaction);
@@ -64,7 +64,7 @@ public sealed class QuorumInteractionTests
         _gld.GetUsersAsync(CacheMode.AllowDownload, Arg.Any<RequestOptions>()).Returns(members.Task);
 
         // Act
-        Task calculation = _quorum.CalculateAsync();
+        var calculation = _quorum.CalculateAsync();
 
         // The acknowledgement precedes the unfinished member fetch.
         await _interaction.Received(1).RespondAsync("Calculating quorum…", ephemeral: true);
@@ -89,7 +89,7 @@ public sealed class QuorumInteractionTests
 
         await _quorum.CalculateAsync(_ch);
 
-        _responses.ShouldBe([QuorumErrors.ConfigurationIncomplete.Description]);
+        _responses.ShouldBe([QuorumMessages.ConfigurationIncomplete]);
         await _interaction.Received(1).RespondAsync("Calculating quorum…", ephemeral: true);
         await _interaction.DidNotReceiveWithAnyArgs().FollowupAsync();
         await _gld.DidNotReceiveWithAnyArgs().GetUsersAsync();
@@ -104,7 +104,7 @@ public sealed class QuorumInteractionTests
 
         await _quorum.CalculateAsync(_ch);
 
-        _responses.ShouldBe([QuorumErrors.NoEligibleVoters.Description]);
+        _responses.ShouldBe([QuorumMessages.NoEligibleVoters]);
         await _interaction.DidNotReceiveWithAnyArgs().FollowupAsync();
     }
 
@@ -117,7 +117,7 @@ public sealed class QuorumInteractionTests
 
         await _quorum.CalculateAsync(_ch);
 
-        _responses.ShouldBe([QuorumErrors.MemberDataUnavailable.Description]);
+        _responses.ShouldBe([QuorumMessages.MemberDataUnavailable]);
         await _interaction.DidNotReceiveWithAnyArgs().FollowupAsync();
     }
 
@@ -140,18 +140,18 @@ public sealed class QuorumInteractionTests
     {
         await _quorum.InspectAsync(_ch);
 
-        _responses.ShouldBe([QuorumErrors.ConfigurationNotFound.Description]);
+        _responses.ShouldBe([QuorumMessages.ConfigurationNotFound]);
         await _interaction.DidNotReceiveWithAnyArgs().FollowupAsync();
     }
 
     [Test]
     public async Task RegisterAsync_RegistersForumAndRespondsEphemerally()
     {
-        IForumChannel ch = CreateChannel<IForumChannel>(GuildId, ChannelId);
+        var ch = CreateChannel<IForumChannel>(GuildId, ChannelId);
 
         await _admin.RegisterAsync(ch, 0.6);
 
-        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).Value.ChannelKind.ShouldBe("forum");
+        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).ChannelKind.ShouldBe("forum");
         _responses.ShouldBe([$"Registered quorum for <#{ChannelId}> at 60%."]);
         await _interaction.Received(1).DeferAsync(ephemeral: true);
     }
@@ -164,7 +164,8 @@ public sealed class QuorumInteractionTests
 
         await _interaction.Received(1).RespondAsync("Choose a guild text channel or forum channel.", ephemeral: true);
         await _interaction.Received(1).RespondAsync("That channel does not belong to this guild.", ephemeral: true);
-        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).IsError.ShouldBeTrue();
+        await Should.ThrowAsync<KeyNotFoundException>(() =>
+            _store.GetAsync(GuildId, ChannelId, CancellationToken.None));
     }
 
     [TestCase(0)]
@@ -178,7 +179,8 @@ public sealed class QuorumInteractionTests
 
         await _interaction.Received(1)
             .RespondAsync("Quorum proportion must be greater than 0 and at most 1.", ephemeral: true);
-        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).IsError.ShouldBeTrue();
+        await Should.ThrowAsync<KeyNotFoundException>(() =>
+            _store.GetAsync(GuildId, ChannelId, CancellationToken.None));
     }
 
     [Test]
@@ -188,7 +190,7 @@ public sealed class QuorumInteractionTests
 
         await _admin.RegisterAsync(_ch, 0.75);
 
-        QuorumConfiguration configuration = (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).Value;
+        var configuration = await _store.GetAsync(GuildId, ChannelId, CancellationToken.None);
         configuration.Proportion.ShouldBe(0.75m);
         configuration.RoleIds.ShouldContain(RoleId);
         _responses.ShouldBe([$"Updated quorum for <#{ChannelId}> at 75%."]);
@@ -198,16 +200,16 @@ public sealed class QuorumInteractionTests
     public async Task RoleAsync_AddAndRemoveAreIdempotent()
     {
         await _store.RegisterAsync(_ch, 0.5m, CancellationToken.None);
-        IRole role = CreateRole(_gld);
+        var role = CreateRole(_gld);
 
         await _admin.RoleAsync(_ch, role);
         await _admin.RoleAsync(_ch, role);
-        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).Value.RoleIds.ShouldBe([RoleId]);
+        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).RoleIds.ShouldBe([RoleId]);
 
         await _admin.RoleAsync(_ch, role, false);
         await _admin.RoleAsync(_ch, role, false);
 
-        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).Value.RoleIds.ShouldBeEmpty();
+        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).RoleIds.ShouldBeEmpty();
         await _interaction.Received(4).DeferAsync(ephemeral: true);
         _responses.Count.ShouldBe(4);
     }
@@ -215,7 +217,7 @@ public sealed class QuorumInteractionTests
     [Test]
     public async Task RoleAsync_RejectsRoleFromAnotherGuild()
     {
-        IGuild otherGuild = Substitute.For<IGuild>();
+        var otherGuild = Substitute.For<IGuild>();
         otherGuild.Id.Returns(GuildId + 1);
 
         await _admin.RoleAsync(_ch, CreateRole(otherGuild));
@@ -231,7 +233,8 @@ public sealed class QuorumInteractionTests
 
         await _admin.RemoveAsync(_ch);
 
-        (await _store.GetAsync(GuildId, ChannelId, CancellationToken.None)).IsError.ShouldBeTrue();
+        await Should.ThrowAsync<KeyNotFoundException>(() =>
+            _store.GetAsync(GuildId, ChannelId, CancellationToken.None));
         _responses.ShouldBe([$"Removed quorum configuration for <#{ChannelId}>."]);
         await _interaction.Received(1).DeferAsync(ephemeral: true);
     }
@@ -244,7 +247,7 @@ public sealed class QuorumInteractionTests
 
     private static T CreateChannel<T>(ulong guildId, ulong channelId) where T : class, IGuildChannel
     {
-        T ch = Substitute.For<T>();
+        var ch = Substitute.For<T>();
         ch.GuildId.Returns(guildId);
         ch.Id.Returns(channelId);
         return ch;
@@ -252,7 +255,7 @@ public sealed class QuorumInteractionTests
 
     private static IGuildUser CreateMember(ulong id)
     {
-        IGuildUser member = Substitute.For<IGuildUser>();
+        var member = Substitute.For<IGuildUser>();
         member.Id.Returns(id);
         member.RoleIds.Returns(new[] { RoleId });
         return member;
@@ -260,7 +263,7 @@ public sealed class QuorumInteractionTests
 
     private static IRole CreateRole(IGuild gld)
     {
-        IRole role = Substitute.For<IRole>();
+        var role = Substitute.For<IRole>();
         role.Id.Returns(RoleId);
         role.Guild.Returns(gld);
         role.Mention.Returns($"<@&{RoleId}>");

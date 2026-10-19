@@ -22,34 +22,7 @@ namespace RatBot.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("RatBot.Features.Moderation.ImageSpamSettings", b =>
-                {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("BurstDurationSeconds")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("RequiredAttachmentCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("RequiredChannelCount")
-                        .HasColumnType("integer");
-
-                    b.HasKey("GuildId");
-
-                    b.ToTable("ImageSpamSettings", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ImageSpamSettings_BurstDurationSeconds_Positive", "\"BurstDurationSeconds\" > 0");
-
-                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredAttachmentCount_Positive", "\"RequiredAttachmentCount\" > 0");
-
-                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredChannelCount_Positive", "\"RequiredChannelCount\" > 0");
-                        });
-                });
+            modelBuilder.HasSequence("ticket_numbers");
 
             modelBuilder.Entity("RatBot.Features.EmojiAnalytics.EmojiUsageCount", b =>
                 {
@@ -116,6 +89,35 @@ namespace RatBot.Infrastructure.Migrations
                     b.ToTable("logging_excluded_channels", (string)null);
                 });
 
+            modelBuilder.Entity("RatBot.Features.Moderation.ImageSpamSettings", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("BurstDurationSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("RequiredAttachmentCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RequiredChannelCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("ImageSpamSettings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ImageSpamSettings_BurstDurationSeconds_Positive", "\"BurstDurationSeconds\" > 0");
+
+                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredAttachmentCount_Positive", "\"RequiredAttachmentCount\" > 0");
+
+                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredChannelCount_Positive", "\"RequiredChannelCount\" > 0");
+                        });
+                });
+
             modelBuilder.Entity("RatBot.Features.RoleColours.RoleColourOption", b =>
                 {
                     b.Property<long>("OptionId")
@@ -148,6 +150,108 @@ namespace RatBot.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\"");
                         });
+                });
+
+            modelBuilder.Entity("RatBot.Features.Tickets.Ticket", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long?>("ChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("DurationSeconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("LastModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifiedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("MessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ModeratorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Number")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PreviousChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PreviousMessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("PublicationPending")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .HasColumnType("text");
+
+                    b.Property<long?>("SubjectUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GuildId", "Number")
+                        .IsUnique();
+
+                    b.HasIndex("GuildId", "ChannelId", "MessageId");
+
+                    b.HasIndex("GuildId", "PreviousChannelId", "PreviousMessageId");
+
+                    b.HasIndex("GuildId", "SubjectUserId", "Hidden", "Id");
+
+                    b.ToTable("tickets", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_tickets_note_duration", "\"Action\" <> 'Note' OR \"DurationSeconds\" IS NULL");
+
+                            t.HasCheckConstraint("CK_tickets_number", "\"Number\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("RatBot.Features.Tickets.TicketConfiguration", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("DestinationChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("ticket_configurations", (string)null);
                 });
 #pragma warning restore 612, 618
         }

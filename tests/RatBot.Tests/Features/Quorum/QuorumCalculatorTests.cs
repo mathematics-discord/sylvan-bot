@@ -1,9 +1,6 @@
 ﻿using Discord;
-using ErrorOr;
 using NSubstitute;
 using RatBot.Features.Quorum;
-using Serilog;
-using Shouldly;
 
 namespace RatBot.Tests.Features.Quorum;
 
@@ -14,58 +11,56 @@ public sealed class QuorumCalculatorTests
     public async Task CalculateAsync_UsesCompletePopulation_ExcludesBotsAndCountsOverlappingRolesOnce()
     {
         // Arrange
-        IGuild gld = Substitute.For<IGuild>();
-        IGuildUser first = Member(1, false, 10, 20);
-        IGuildUser second = Member(2, false, 20);
-        IGuildUser bot = Member(3, true, 10);
-        IGuildUser unrelated = Member(4, false, 30);
+        var gld = Substitute.For<IGuild>();
+        var first = Member(1, false, 10, 20);
+        var second = Member(2, false, 20);
+        var bot = Member(3, true, 10);
+        var unrelated = Member(4, false, 30);
         gld.GetUsersAsync(CacheMode.CacheOnly, Arg.Any<RequestOptions>())
             .Returns(Task.FromResult<IReadOnlyCollection<IGuildUser>>([first]));
         gld.GetUsersAsync(CacheMode.AllowDownload, Arg.Any<RequestOptions>())
             .Returns(Task.FromResult<IReadOnlyCollection<IGuildUser>>([first, second, bot, unrelated, first]));
-        QuorumConfiguration configuration = new QuorumConfiguration { Proportion = 0.5m, RoleIds = [10, 20] };
+        var configuration = new QuorumConfiguration { Proportion = 0.5m, RoleIds = [10, 20] };
 
         // Act
         var result = await QuorumCalculator.CalculateAsync(
-            gld, configuration, new LoggerConfiguration().CreateLogger(), CancellationToken.None);
+            gld, configuration, CancellationToken.None);
 
         // Assert
-        result.Value.ShouldBe((2, 1));
+        result.ShouldBe((2, 1));
         await gld.DidNotReceive().GetUsersAsync(CacheMode.CacheOnly, Arg.Any<RequestOptions>());
     }
 
     [Test]
     public async Task CalculateAsync_FailedFetch_DoesNotFallBackToPartialCache()
     {
-        IGuild gld = Substitute.For<IGuild>();
-        IGuildUser cachedMember = Member(1, false, 10);
+        var gld = Substitute.For<IGuild>();
+        var cachedMember = Member(1, false, 10);
         gld.GetUsersAsync(CacheMode.CacheOnly, Arg.Any<RequestOptions>())
             .Returns(Task.FromResult<IReadOnlyCollection<IGuildUser>>([cachedMember]));
         Task<IReadOnlyCollection<IGuildUser>> failedFetch =
             Task.FromException<IReadOnlyCollection<IGuildUser>>(new HttpRequestException("Page fetch failed"));
 
         gld.GetUsersAsync(CacheMode.AllowDownload, Arg.Any<RequestOptions>()).Returns(failedFetch);
-        QuorumConfiguration configuration = new QuorumConfiguration { RoleIds = [10] };
+        var configuration = new QuorumConfiguration { RoleIds = [10] };
 
-        var result = await QuorumCalculator.CalculateAsync(
-            gld, configuration, new LoggerConfiguration().CreateLogger(), CancellationToken.None);
-
-        result.FirstError.ShouldBe(QuorumErrors.MemberDataUnavailable);
+        await Should.ThrowAsync<HttpRequestException>(() =>
+            QuorumCalculator.CalculateAsync(gld, configuration, CancellationToken.None));
         await gld.DidNotReceive().GetUsersAsync(CacheMode.CacheOnly, Arg.Any<RequestOptions>());
     }
 
     [Test]
     public async Task CalculateAsync_PropagatesCancellation()
     {
-        using CancellationTokenSource cancellation = new CancellationTokenSource();
+        using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
-        IGuild gld = Substitute.For<IGuild>();
+        var gld = Substitute.For<IGuild>();
         gld.GetUsersAsync(CacheMode.AllowDownload, Arg.Any<RequestOptions>())
             .Returns(Task.FromCanceled<IReadOnlyCollection<IGuildUser>>(cancellation.Token));
 
         await Should.ThrowAsync<OperationCanceledException>(() => QuorumCalculator.CalculateAsync(
             gld, new QuorumConfiguration { RoleIds = [10] },
-            new LoggerConfiguration().CreateLogger(), cancellation.Token));
+            cancellation.Token));
     }
 
     [TestCase(3, "0.5", 2)]
@@ -75,8 +70,8 @@ public sealed class QuorumCalculatorTests
     [TestCase(7, "1", 7)]
     public async Task CalculateAsync_RoundsRequiredVotesUpwards(int eligible, string proportion, int required)
     {
-        decimal value = decimal.Parse(proportion, System.Globalization.CultureInfo.InvariantCulture);
-        IGuild gld = Substitute.For<IGuild>();
+        var value = decimal.Parse(proportion, System.Globalization.CultureInfo.InvariantCulture);
+        var gld = Substitute.For<IGuild>();
         IGuildUser[] members = Enumerable.Range(1, eligible)
             .Select(id => Member((ulong)id, false, 10))
             .ToArray();
@@ -86,14 +81,14 @@ public sealed class QuorumCalculatorTests
 
         var result = await QuorumCalculator.CalculateAsync(
             gld, new QuorumConfiguration { Proportion = value, RoleIds = [10] },
-            new LoggerConfiguration().CreateLogger(), CancellationToken.None);
+            CancellationToken.None);
 
-        result.Value.ShouldBe((eligible, required));
+        result.ShouldBe((eligible, required));
     }
 
     private static IGuildUser Member(ulong id, bool isBot, params ulong[] roleIds)
     {
-        IGuildUser member = Substitute.For<IGuildUser>();
+        var member = Substitute.For<IGuildUser>();
         member.Id.Returns(id);
         member.IsBot.Returns(isBot);
         member.RoleIds.Returns(roleIds);

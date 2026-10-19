@@ -3,6 +3,7 @@ using RatBot.Features.EmojiAnalytics;
 using RatBot.Features.Logging;
 using RatBot.Features.Moderation;
 using RatBot.Features.RoleColours;
+using RatBot.Features.Tickets;
 
 namespace RatBot.Infrastructure.Data;
 
@@ -16,6 +17,8 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<LoggingConfiguration> LoggingConfigurations => Set<LoggingConfiguration>();
     public DbSet<LoggingExcludedChannel> LoggingExcludedChannels => Set<LoggingExcludedChannel>();
     public DbSet<RoleColourOption> RoleColourOptions => Set<RoleColourOption>();
+    public DbSet<TicketConfiguration> TicketConfigurations => Set<TicketConfiguration>();
+    public DbSet<Ticket> Tickets => Set<Ticket>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -25,6 +28,7 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasSequence<long>("ticket_numbers");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BotDbContext).Assembly);
     }
 }

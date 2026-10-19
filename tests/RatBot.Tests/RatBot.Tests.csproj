@@ -10,7 +10,6 @@
         </PackageReference>
         <PackageReference Include="Discord.Net.Interactions"/>
         <PackageReference Include="Discord.Net.WebSocket"/>
-        <PackageReference Include="ErrorOr"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
         <PackageReference Include="Microsoft.NET.Test.Sdk"/>

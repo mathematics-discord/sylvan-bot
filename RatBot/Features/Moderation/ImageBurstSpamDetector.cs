@@ -4,16 +4,13 @@ namespace RatBot.Features.Moderation;
 
 public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurstSpamDetectorSettings settings)
 {
-    private readonly Dictionary<ImageBurstBufferKey, Queue<ImageBurstMessage>> _buffers =
-        new Dictionary<ImageBurstBufferKey, Queue<ImageBurstMessage>>();
+    private readonly Dictionary<ImageBurstBufferKey, Queue<ImageBurstMessage>> _buffers = new();
 
-    private readonly Lock _gate = new Lock();
+    private readonly Lock _gate = new();
 
-    private readonly Dictionary<ImageBurstBufferKey, DateTimeOffset> _handlingLocks =
-        new Dictionary<ImageBurstBufferKey, DateTimeOffset>();
+    private readonly Dictionary<ImageBurstBufferKey, DateTimeOffset> _handlingLocks = new();
 
-    public ImageBurstSpamDetector()
-        : this(TimeProvider.System, new ImageBurstSpamDetectorOptions())
+    public ImageBurstSpamDetector() : this(TimeProvider.System, new ImageBurstSpamDetectorOptions())
     {
     }
 
@@ -24,7 +21,7 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
 
     private static ImageBurstSpamDetectorSettings CreateSettings(ImageBurstSpamDetectorOptions options)
     {
-        ImageBurstSpamDetectorSettings settings = new ImageBurstSpamDetectorSettings(options);
+        var settings = new ImageBurstSpamDetectorSettings(options);
         settings.Update(1, options);
         return settings;
     }
@@ -37,15 +34,15 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
 
     public Option<ImageBurstDetection> Observe(ImageBurstMessage message)
     {
-        ImageBurstBufferKey key = new ImageBurstBufferKey(message.GuildId, message.UserId);
-        DateTimeOffset now = timeProvider.GetUtcNow();
+        var key = new ImageBurstBufferKey(message.GuildId, message.UserId);
+        var now = timeProvider.GetUtcNow();
 
         lock (_gate)
         {
             PruneExpiredLocks(now);
 
-            bool isLocked = _handlingLocks.TryGetValue(key, out DateTimeOffset lockedUntil) && lockedUntil > now;
-            bool optionsUnavailable = !settings.TryGet(message.GuildId, out ImageBurstSpamDetectorOptions options);
+            var isLocked = _handlingLocks.TryGetValue(key, out var lockedUntil) && lockedUntil > now;
+            var optionsUnavailable = !settings.TryGet(message.GuildId, out var options);
 
             if (isLocked || optionsUnavailable)
                 return new None();
@@ -55,7 +52,7 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
             buffer.Enqueue(message);
             PruneOldMessages(buffer, message.Timestamp - TimeSpan.FromSeconds(options.Window));
 
-            ulong[] channelIds = buffer.Select(x => x.ChannelId).Distinct().Order().ToArray();
+            var channelIds = buffer.Select(x => x.ChannelId).Distinct().Order().ToArray();
 
             if (channelIds.Length < options.DistinctChannelThreshold)
                 return new None();
@@ -76,7 +73,7 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
         if (_buffers.TryGetValue(key, out Queue<ImageBurstMessage>? buffer))
             return buffer;
 
-        Queue<ImageBurstMessage> newBuffer = new Queue<ImageBurstMessage>();
+        Queue<ImageBurstMessage> newBuffer = new();
         _buffers[key] = newBuffer;
 
         return newBuffer;
@@ -86,7 +83,7 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
     {
         ImageBurstBufferKey[] expiredKeys = _handlingLocks.Where(x => x.Value <= now).Select(x => x.Key).ToArray();
 
-        foreach (ImageBurstBufferKey key in expiredKeys)
+        foreach (var key in expiredKeys)
             _handlingLocks.Remove(key);
     }
 

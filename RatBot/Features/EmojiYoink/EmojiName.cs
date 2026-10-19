@@ -2,9 +2,9 @@ namespace RatBot.Features.EmojiYoink;
 
 public static class EmojiName
 {
-    public static ErrorOr<string> Normalize(string invokedSourceName)
+    public static string Normalize(string invokedSourceName)
     {
-        int suffixStart = invokedSourceName.LastIndexOf('~');
+        var suffixStart = invokedSourceName.LastIndexOf('~', StringComparison.Ordinal);
 
         if (
             suffixStart >= 0
@@ -14,9 +14,11 @@ public static class EmojiName
         )
             invokedSourceName = invokedSourceName[..suffixStart];
 
-        return invokedSourceName.Length is >= 2 and <= 32 && invokedSourceName.All(IsValidCharacter)
-            ? invokedSourceName
-            : EmojiYoinkErrors.InvalidDestinationName;
+        var validName = invokedSourceName.Length is >= 2 and <= 32 && invokedSourceName.All(IsValidCharacter);
+
+        return !validName
+            ? throw new ArgumentException(EmojiYoinkMessages.InvalidDestinationName, nameof(invokedSourceName))
+            : invokedSourceName;
     }
 
     private static bool IsValidCharacter(char character)

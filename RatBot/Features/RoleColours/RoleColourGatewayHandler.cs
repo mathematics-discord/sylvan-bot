@@ -2,7 +2,8 @@ using RatBot.Gateway;
 
 namespace RatBot.Features.RoleColours;
 
-public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, RoleColourReconciler colours)
+public sealed class RoleColourGatewayHandler(
+    DiscordSocketClient discordClient, RoleColourReconciler colours, ILogger logger)
     : IDiscordGatewayHandler
 {
     public Task InitializeAsync(CancellationToken ct)
@@ -23,11 +24,28 @@ public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, 
         IReadOnlyCollection<ulong>? previous = before.HasValue ? ((IGuildUser)before.Value).RoleIds : null;
         if (previous is not null && previous.ToHashSet().SetEquals(((IGuildUser)after).RoleIds))
             return;
-        await colours.ReconcileUserRolesAsync(after.Guild, after.Id, CancellationToken.None, previous);
+        await ReconcileMemberAsync(after, previous);
     }
 
     private Task HandleMemberJoinedAsync(SocketGuildUser member)
     {
-        return colours.ReconcileUserRolesAsync(member.Guild, member.Id, CancellationToken.None);
+        return ReconcileMemberAsync(member, null);
+    }
+
+    private async Task ReconcileMemberAsync(SocketGuildUser member, IReadOnlyCollection<ulong>? previous)
+    {
+        try
+        {
+            await colours.ReconcileUserRolesAsync(member.Guild, member.Id, CancellationToken.None, previous);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Role colour gateway update incomplete for guild {GuildId}, member {MemberId}",
+                member.Guild.Id, member.Id);
+        }
     }
 }

@@ -12,7 +12,7 @@ public sealed class EmojiAnalyticsGatewayHandler(
     ILogger logger
 ) : IDiscordGatewayHandler
 {
-    private static readonly Regex EmojiRegex = new Regex(
+    private static readonly Regex EmojiRegex = new(
         @"<a?:\w{2,32}:(?<id>\d{17,21})>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant,
         TimeSpan.FromMilliseconds(100)
@@ -44,7 +44,7 @@ public sealed class EmojiAnalyticsGatewayHandler(
     {
         return EmojiRegex.Matches(content)
             .Select(match =>
-                ulong.TryParse(match.Groups["id"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out ulong id)
+                ulong.TryParse(match.Groups["id"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var id)
                     ? (ulong?)id
                     : null)
             .Where(id => id.HasValue)
@@ -72,7 +72,7 @@ public sealed class EmojiAnalyticsGatewayHandler(
             return;
         }
 
-        foreach (EmojiUsageIncrement increment in increments)
+        foreach (var increment in increments)
             if (!buffer.Writer.TryWrite(increment))
                 await buffer.Writer.WriteAsync(increment);
 
@@ -105,7 +105,7 @@ public sealed class EmojiAnalyticsGatewayHandler(
 
         LogReactionEvent("added", reaction.Emote, guildChannel.GuildId);
 
-        EmojiUsageIncrement item = new EmojiUsageIncrement(guildChannel.GuildId, customEmote.Id, 0, 1);
+        var item = new EmojiUsageIncrement(guildChannel.GuildId, customEmote.Id, 0, 1);
 
         if (!buffer.Writer.TryWrite(item))
             await buffer.Writer.WriteAsync(item);

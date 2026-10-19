@@ -5,7 +5,6 @@ using Discord;
 using Microsoft.Extensions.DependencyInjection;
 using RatBot.Features.Quorum.Commands;
 using RatBot.Features.Quorum.Persistence;
-using Shouldly;
 
 namespace RatBot.Tests.Features.Quorum;
 
@@ -14,10 +13,10 @@ public sealed class QuorumInteractionRegistrationTests
 {
     private static void AssertGroup(Type moduleType, string expectedName, GuildPermission expectedPermission)
     {
-        GroupAttribute group = moduleType.GetCustomAttribute<GroupAttribute>() ??
-                               throw new InvalidOperationException("Expected group attribute.");
+        var group = moduleType.GetCustomAttribute<GroupAttribute>() ??
+                    throw new InvalidOperationException("Expected group attribute.");
 
-        DefaultMemberPermissionsAttribute permissions =
+        var permissions =
             moduleType.GetCustomAttribute<DefaultMemberPermissionsAttribute>()
             ?? throw new InvalidOperationException("Expected default permissions attribute.");
 
@@ -28,18 +27,18 @@ public sealed class QuorumInteractionRegistrationTests
     [Test]
     public async Task InteractionService_RegistersFinalQuorumCommandSurface()
     {
-        ServiceProvider services = new ServiceCollection()
+        var services = new ServiceCollection()
             .AddSingleton(new QuorumConfigurationStore("unused"))
             .AddSingleton<Serilog.ILogger>(new Serilog.LoggerConfiguration().CreateLogger())
             .BuildServiceProvider();
 
-        InteractionService interactionService = new InteractionService(
+        var interactionService = new InteractionService(
             new DiscordSocketClient(),
             new InteractionServiceConfig { AutoServiceScopes = true }
         );
 
-        ModuleInfo admin = await interactionService.AddModuleAsync<QuorumAdminModule>(services);
-        ModuleInfo quorum = await interactionService.AddModuleAsync<QuorumModule>(services);
+        var admin = await interactionService.AddModuleAsync<QuorumAdminModule>(services);
+        var quorum = await interactionService.AddModuleAsync<QuorumModule>(services);
 
         admin.SlashGroupName.ShouldBe("quorum-admin");
         admin.SlashCommands
@@ -62,7 +61,7 @@ public sealed class QuorumInteractionRegistrationTests
     [Test]
     public void RoleAsync_UsesDiscordRoleAndDefaultsShouldAddToTrue()
     {
-        MethodInfo method =
+        var method =
             typeof(QuorumAdminModule).GetMethod(nameof(QuorumAdminModule.RoleAsync))
             ?? throw new InvalidOperationException("Expected RoleAsync method.");
 

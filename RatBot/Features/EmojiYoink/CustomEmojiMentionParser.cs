@@ -8,29 +8,29 @@ public static partial class CustomEmojiMentionParser
     [GeneratedRegex(@"<a?:[^<>\s:]+:[0-9]+>", Compiled, 500)]
     private static partial Regex MentionPattern { get; }
 
-    public static ErrorOr<Emote> ParseStrict(string input)
+    public static Emote ParseStrict(string input)
     {
-        string candidate = input.Trim();
+        var candidate = input.Trim();
 
-        return ParseMention(candidate, EmojiYoinkErrors.InvalidCustomEmoji);
+        return ParseMention(candidate, EmojiYoinkMessages.InvalidCustomEmoji);
     }
 
-    public static ErrorOr<Emote> ParseMessage(string content)
+    public static Emote ParseMessage(string content)
     {
-        MatchCollection matches = MentionPattern.Matches(content);
+        var matches = MentionPattern.Matches(content);
 
         if (matches.Count != 1)
-            return EmojiYoinkErrors.InvalidMessageEmoji;
+            throw new FormatException(EmojiYoinkMessages.InvalidMessageEmoji);
 
-        return ParseMention(matches[0].Value, EmojiYoinkErrors.InvalidMessageEmoji);
+        return ParseMention(matches[0].Value, EmojiYoinkMessages.InvalidMessageEmoji);
     }
 
-    private static ErrorOr<Emote> ParseMention(string candidate, Error error)
+    private static Emote ParseMention(string candidate, string message)
     {
-        if (!Emote.TryParse(candidate, out Emote? emote)
+        if (!Emote.TryParse(candidate, out var emote)
             || emote.Id == 0
             || !string.Equals(candidate, emote.ToString(), StringComparison.Ordinal))
-            return error;
+            throw new FormatException(message);
 
         return emote;
     }

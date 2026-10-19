@@ -26,9 +26,9 @@ internal static class CommandRegistrationTool
 
         List<ulong> ids = [];
 
-        foreach (string argument in args[2..])
+        foreach (var argument in args[2..])
         {
-            if (!ulong.TryParse(argument, out ulong id) || id == 0 || ids.Contains(id))
+            if (!ulong.TryParse(argument, out var id) || id == 0 || ids.Contains(id))
                 return false;
 
             ids.Add(id);
@@ -40,7 +40,7 @@ internal static class CommandRegistrationTool
 
     internal static async Task<int> RunAsync(string[] args)
     {
-        if (!TryParse(args, out string action, out bool global, out ulong[] guildIds))
+        if (!TryParse(args, out var action, out var global, out var guildIds))
         {
             await Console.Error.WriteLineAsync(
                 "Usage: commands <inspect|clear> global | commands <inspect|clear> guild <guild-id> [guild-id ...]");
@@ -48,7 +48,7 @@ internal static class CommandRegistrationTool
             return 2;
         }
 
-        string? token = Environment.GetEnvironmentVariable("DISCORD__TOKEN");
+        var token = Environment.GetEnvironmentVariable("DISCORD__TOKEN");
 
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -60,7 +60,7 @@ internal static class CommandRegistrationTool
 
         try
         {
-            await using DiscordRestClient client = new DiscordRestClient();
+            await using var client = new DiscordRestClient();
             await client.LoginAsync(TokenType.Bot, token);
             Console.WriteLine($"Authenticated as {client.CurrentUser.Username} ({client.CurrentUser.Id}).");
 
@@ -92,9 +92,9 @@ internal static class CommandRegistrationTool
                     return 1;
                 }
 
-            bool failed = false;
+            var failed = false;
 
-            foreach (ulong guildId in guildIds)
+            foreach (var guildId in guildIds)
             {
                 try
                 {
@@ -140,7 +140,7 @@ internal static class CommandRegistrationTool
     {
         Console.WriteLine($"{scope}: {commands.Count} application commands.");
 
-        foreach (IApplicationCommand command in commands.OrderBy(command => command.Name, StringComparer.Ordinal))
+        foreach (var command in commands.OrderBy(command => command.Name, StringComparer.Ordinal))
         {
             Console.WriteLine($"  {command.Type} {command.Name} ({command.Id}): {command.Description}");
             Console.WriteLine(
@@ -151,7 +151,7 @@ internal static class CommandRegistrationTool
 
     private static void PrintOptions(IEnumerable<IApplicationCommandOption> options, string indent)
     {
-        foreach (IApplicationCommandOption option in options)
+        foreach (var option in options)
         {
             Console.WriteLine(
                 $"{indent}{option.Type} {option.Name} (required: {option.IsRequired}): {option.Description}");

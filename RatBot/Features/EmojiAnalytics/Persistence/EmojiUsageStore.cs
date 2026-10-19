@@ -47,7 +47,7 @@ public sealed class EmojiUsageStore(IDbContextFactory<BotDbContext> dbContextFac
         await db.SaveChangesAsync(ct);
     }
 
-    public async Task<ErrorOr<EmojiUsagePage>> GetUsagePageAsync(
+    public async Task<Option<EmojiUsagePage>> GetUsagePageAsync(
         ulong guildId,
         IReadOnlyCollection<ulong> trackedEmojiIds,
         int page,
@@ -64,7 +64,7 @@ public sealed class EmojiUsageStore(IDbContextFactory<BotDbContext> dbContextFac
         var totalCount = await query.CountAsync(ct);
 
         if (totalCount == 0)
-            return Error.NotFound(description: "No emoji usage has been recorded yet.");
+            return new None();
 
         var clampedPageSize = Math.Clamp(pageSize, 1, 100);
         var totalPages = (int)Math.Ceiling((double)totalCount / clampedPageSize);
@@ -82,6 +82,6 @@ public sealed class EmojiUsageStore(IDbContextFactory<BotDbContext> dbContextFac
         await foreach (var item in items.AsAsyncEnumerable().WithCancellation(ct))
             builder.Add(item);
 
-        return new EmojiUsagePage(builder.ToImmutable(), clampedPage, totalPages);
+        return new Some<EmojiUsagePage>(new EmojiUsagePage(builder.ToImmutable(), clampedPage, totalPages));
     }
 }

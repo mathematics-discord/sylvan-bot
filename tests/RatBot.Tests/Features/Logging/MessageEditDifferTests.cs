@@ -1,5 +1,4 @@
 using RatBot.Features.Logging;
-using Shouldly;
 
 namespace RatBot.Tests.Features.Logging;
 

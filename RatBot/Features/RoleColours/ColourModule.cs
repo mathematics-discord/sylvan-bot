@@ -1,6 +1,6 @@
 ﻿namespace RatBot.Features.RoleColours;
 
-public sealed class ColourModule(RoleColourReconciler colours) : InteractionModuleBase<IInteractionContext>
+public sealed class ColourModule(RoleColourReconciler colours, ILogger logger) : InteractionModuleBase<IInteractionContext>
 {
     private const string SwapPrefix = "colour-swap";
 
@@ -10,7 +10,7 @@ public sealed class ColourModule(RoleColourReconciler colours) : InteractionModu
         if (!await CanUseMenuAsync(ownerUserId))
             return;
 
-        if (values.Length != 1 || !ulong.TryParse(values[0], out ulong selected))
+        if (values.Length != 1 || !ulong.TryParse(values[0], out var selected))
         {
             await RespondAsync("Invalid selection.", ephemeral: true);
             return;
@@ -56,7 +56,7 @@ public sealed class ColourModule(RoleColourReconciler colours) : InteractionModu
             return;
         }
 
-        string prompt = eligible.IsEmpty
+        var prompt = eligible.IsEmpty
             ? "You do not currently have any colours to select. Use Reset to remove your display colour."
             : "Select a colour to apply it, or use Reset to remove your display colour.";
 
@@ -65,17 +65,17 @@ public sealed class ColourModule(RoleColourReconciler colours) : InteractionModu
 
     internal static MessageComponent BuildMenu(ulong ownerUserId, ImmutableArray<IRole> eligible)
     {
-        ComponentBuilder components = new ComponentBuilder();
+        var components = new ComponentBuilder();
 
         if (!eligible.IsEmpty)
         {
-            SelectMenuBuilder menu = new SelectMenuBuilder()
+            var menu = new SelectMenuBuilder()
                 .WithCustomId($"{SwapPrefix}:select:{ownerUserId}")
                 .WithPlaceholder("Choose a colour…")
                 .WithMinValues(1)
                 .WithMaxValues(1);
 
-            foreach (IRole role in eligible)
+            foreach (var role in eligible)
                 menu.AddOption(role.Name, role.Id.ToString());
 
             components.WithSelectMenu(menu);
@@ -88,24 +88,44 @@ public sealed class ColourModule(RoleColourReconciler colours) : InteractionModu
     {
         await DeferAsync(true);
 
-        ErrorOr<Option<ulong>> result =
-            await colours.TrySetUserColourAsync(Context.Guild, Context.User.Id, selected, CancellationToken.None);
+        string response;
+        try
+        {
+            Option<ulong> colour = await colours.TrySetUserColourAsync(
+                Context.Guild, Context.User.Id, selected, CancellationToken.None);
 
-        await FollowupAsync(ResultMessage(result), ephemeral: true);
+            response = colour.Value is Some<ulong>(var colourId)
+                ? $"You are now wearing <@&{colourId}>."
+                : "Your display colour has been removed.";
+        }
+        catch (ArgumentException ex) when (ex.ParamName == "colourId")
+        {
+            response = "That colour is no longer available to you.";
+        }
+        catch (KeyNotFoundException)
+        {
+            response = "The member is no longer in this guild.";
+        }
+        catch (InvalidDataException)
+        {
+            response = RoleColourReconciler.RolesChangedMessage;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.Error(ex, "Role colour update incomplete for guild {GuildId}, member {MemberId}",
+                Context.Guild.Id, Context.User.Id);
+
+            response = "Discord could not complete the colour update. Your roles may have changed; please try again.";
+        }
+
+        await FollowupAsync(response, ephemeral: true);
 
         if (Context.Interaction is SocketMessageComponent component)
             await component.ModifyOriginalResponseAsync(message => message.Components = new ComponentBuilder().Build());
-    }
-
-    private static string ResultMessage(ErrorOr<Option<ulong>> result)
-    {
-        if (result.IsError)
-            return result.FirstError.Description;
-
-        if (result.Value.Value is Some<ulong>(var colourId))
-            return $"You are now wearing <@&{colourId}>.";
-
-        return "Your display colour has been removed.";
     }
 
     private async Task<bool> CanUseMenuAsync(ulong ownerUserId)

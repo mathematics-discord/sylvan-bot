@@ -31,7 +31,7 @@ public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<Rol
             {
                 x.GuildId,
                 x.SourceRoleId,
-                x.DisplayRoleId
+                x.DisplayRoleId,
             })
             .IsUnique();
     }

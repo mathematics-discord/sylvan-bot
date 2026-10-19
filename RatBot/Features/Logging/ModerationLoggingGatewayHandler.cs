@@ -21,7 +21,7 @@ public sealed class ModerationLoggingGatewayHandler(
 
     private readonly ILogger _logger = logger.ForContext<ModerationLoggingGatewayHandler>();
     private readonly LoggingOptions _options = options.Value;
-    private readonly CancellationTokenSource _shutdown = new CancellationTokenSource();
+    private readonly CancellationTokenSource _shutdown = new();
     private CancellationToken _shutdownToken;
 
     public Task InitializeAsync(CancellationToken ct)

@@ -1,14 +1,12 @@
 ﻿using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using Discord.WebSocket;
 using Discord;
-using ErrorOr;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
-using RatBot.Common;
 using RatBot.Features.RoleColours;
 using RatBot.Infrastructure.Data;
 using Serilog;
-using Shouldly;
 
 namespace RatBot.Tests.Features.RoleColours;
 
@@ -29,8 +27,8 @@ public sealed class RoleColourReconcilerTests
     private IGuildUser _member = null!;
     private RoleColourReconciler _colours = null!;
     private readonly HashSet<ulong> _memberRoles = [];
-    private readonly Dictionary<ulong, IRole> _guildRoles = new Dictionary<ulong, IRole>();
-    private readonly Queue<string> _changes = new Queue<string>();
+    private readonly Dictionary<ulong, IRole> _guildRoles = new();
+    private readonly Queue<string> _changes = new();
 
     [SetUp]
     public async Task SetUp()
@@ -41,10 +39,10 @@ public sealed class RoleColourReconcilerTests
         _guild.Id.Returns(1UL);
         _guildRoles.Clear();
 
-        foreach (ulong id in new[] { 1UL, SourceA, SourceB, Uncoloured })
+        foreach (var id in new[] { 1UL, SourceA, SourceB, Uncoloured })
             AddRole(id, Color.Default);
 
-        foreach (ulong id in new[] { Blue, Red, OutsideColour })
+        foreach (var id in new[] { Blue, Red, OutsideColour })
             AddRole(id, Color.Blue);
 
         _guild.GetRole(Arg.Any<ulong>()).Returns(call => _guildRoles.GetValueOrDefault(call.Arg<ulong>())!);
@@ -64,7 +62,7 @@ public sealed class RoleColourReconcilerTests
 
         _colours = new RoleColourReconciler(factory, Log.Logger, _client);
 
-        await using BotDbContext db = new BotDbContext(_database);
+        await using var db = new BotDbContext(_database);
 
         db.RoleColourOptions.AddRange(Grant(SourceA, Blue), Grant(SourceA, Red), Grant(SourceB, Blue));
 
@@ -87,9 +85,9 @@ public sealed class RoleColourReconcilerTests
         ImmutableArray<IRole> available =
             await _colours.ListEligibleColoursAsync(_guild, MemberId, CancellationToken.None);
 
-        MessageComponent menu = ColourModule.BuildMenu(MemberId, available);
+        var menu = ColourModule.BuildMenu(MemberId, available);
 
-        SelectMenuComponent choices = menu
+        var choices = menu
             .Components.OfType<ActionRowComponent>()
             .SelectMany(row => row.Components)
             .OfType<SelectMenuComponent>()
@@ -98,7 +96,7 @@ public sealed class RoleColourReconcilerTests
         // Assert
         available.Select(role => role.Id).ShouldBe([Blue, Red], true);
         choices.Options.Select(option => option.Value).ShouldBe(["20", "21"], true);
-        ButtonComponent reset = menu.Components.SelectMany(row => ((ActionRowComponent)row).Components)
+        var reset = menu.Components.SelectMany(row => ((ActionRowComponent)row).Components)
             .OfType<ButtonComponent>().Single();
         reset.Label.ShouldBe("Reset");
         reset.CustomId.ShouldBe($"colour-swap:reset:{MemberId}");
@@ -112,12 +110,12 @@ public sealed class RoleColourReconcilerTests
         ImmutableArray<IRole> available = [];
 
         // Act
-        MessageComponent menu = ColourModule.BuildMenu(MemberId, available);
+        var menu = ColourModule.BuildMenu(MemberId, available);
         ActionRowComponent[] rows = menu.Components.OfType<ActionRowComponent>().ToArray();
 
         // Assert
         rows.SelectMany(row => row.Components).OfType<SelectMenuComponent>().ShouldBeEmpty();
-        ButtonComponent reset = rows.SelectMany(row => row.Components).OfType<ButtonComponent>().Single();
+        var reset = rows.SelectMany(row => row.Components).OfType<ButtonComponent>().Single();
         reset.Label.ShouldBe("Reset");
         reset.Style.ShouldBe(ButtonStyle.Danger);
     }
@@ -129,11 +127,11 @@ public sealed class RoleColourReconcilerTests
         _memberRoles.Add(OutsideColour);
 
         // Act
-        ErrorOr<Option<ulong>> result = await EquipAsync(Red);
+        Option<ulong> result = await EquipAsync(Red);
 
         // Assert
-        result.IsError.ShouldBeFalse();
-        result.Value.Value.ShouldBeOfType<Some<ulong>>().Value.ShouldBe(Red);
+        Option<ulong> colour = result;
+        colour.Value.ShouldBeOfType<Some<ulong>>().Value.ShouldBe(Red);
         _memberRoles.ShouldBe([SourceA, Uncoloured, Red, OutsideColour], true);
         _changes.ShouldBe(["remove:20", "add:21"]);
     }
@@ -145,12 +143,11 @@ public sealed class RoleColourReconcilerTests
         _memberRoles.Add(OutsideColour);
 
         // Act
-        ErrorOr<Option<ulong>> result = await EquipAsync(null);
+        Option<ulong> result = await EquipAsync(null);
         await CheckMemberAsync();
 
         // Assert
-        result.IsError.ShouldBeFalse();
-        result.Value.Value.ShouldBeOfType<None>();
+        result.Value.ShouldBeOfType<None>();
         _memberRoles.ShouldBe([SourceA, Uncoloured, OutsideColour], true);
         _changes.ShouldBe(["remove:20"]);
     }
@@ -162,10 +159,10 @@ public sealed class RoleColourReconcilerTests
         _memberRoles.Add(OutsideColour);
 
         // Act
-        ErrorOr<Option<ulong>> result = await EquipAsync(OutsideColour);
+        var exception = await Should.ThrowAsync<ArgumentException>(() => EquipAsync(OutsideColour));
 
         // Assert
-        result.IsError.ShouldBeTrue();
+        exception.ParamName.ShouldBe("colourId");
         _changes.ShouldBeEmpty();
         _memberRoles.ShouldBe([SourceA, Uncoloured, Blue, OutsideColour], true);
     }
@@ -257,10 +254,9 @@ public sealed class RoleColourReconcilerTests
             .Returns(_ => Task.FromException(new TimeoutException()));
 
         // Act
-        ErrorOr<Option<ulong>> result = await EquipAsync(Red);
+        await Should.ThrowAsync<TimeoutException>(() => EquipAsync(Red));
 
         // Assert
-        result.IsError.ShouldBeTrue();
         _changes.ShouldBeEmpty();
         _memberRoles.ShouldBe([SourceA, Uncoloured, Blue], true);
     }
@@ -269,19 +265,17 @@ public sealed class RoleColourReconcilerTests
     public async Task BrokenGrant()
     {
         // Arrange: a colour role was deleted after its grant was configured.
-        await using BotDbContext db = new BotDbContext(_database);
+        await using var db = new BotDbContext(_database);
         db.RoleColourOptions.Add(Grant(SourceB, OutsideColour));
         await db.SaveChangesAsync();
         _guildRoles.Remove(OutsideColour);
         _memberRoles.Add(SourceB);
 
         // Act
-        ErrorOr<Option<ulong>> selection = await EquipAsync(Red);
-        ErrorOr<Option<ulong>> removal = await EquipAsync(null);
+        Option<ulong> selection = await EquipAsync(Red);
+        Option<ulong> removal = await EquipAsync(null);
 
         // Assert
-        selection.IsError.ShouldBeFalse();
-        removal.IsError.ShouldBeFalse();
         _memberRoles.ShouldNotContain(Red);
     }
 
@@ -290,16 +284,15 @@ public sealed class RoleColourReconcilerTests
     {
         // Arrange
         _memberRoles.Clear();
-        await using BotDbContext db = new BotDbContext(_database);
+        await using var db = new BotDbContext(_database);
         db.RoleColourOptions.Add(Grant(1, OutsideColour));
         await db.SaveChangesAsync();
 
         // Act
-        ErrorOr<Option<ulong>> result = await EquipAsync(OutsideColour);
+        Option<ulong> result = await EquipAsync(OutsideColour);
         await CheckMemberAsync();
 
         // Assert
-        result.IsError.ShouldBeFalse();
         _memberRoles.ShouldBe([OutsideColour]);
     }
 
@@ -307,7 +300,7 @@ public sealed class RoleColourReconcilerTests
     public async Task DeletedGrant()
     {
         // Arrange
-        await using BotDbContext db = new BotDbContext(_database);
+        await using var db = new BotDbContext(_database);
 
         ImmutableArray<RoleColourOption> oldGrants =
             (await db.RoleColourOptions.AsNoTracking().ToArrayAsync()).ToImmutableArray();
@@ -316,7 +309,7 @@ public sealed class RoleColourReconcilerTests
         await db.SaveChangesAsync();
 
         // Act
-        int incomplete = await _colours.ReconcileGuildAsync(_guild, CancellationToken.None, oldGrants);
+        var incomplete = await _colours.ReconcileGuildAsync(_guild, CancellationToken.None, oldGrants);
 
         // Assert
         incomplete.ShouldBe(0);
@@ -326,10 +319,10 @@ public sealed class RoleColourReconcilerTests
     [Test]
     public async Task ChangesInDifferentGuildsProceedIndependently()
     {
-        TaskCompletionSource removalStarted =
+        var removalStarted =
             new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        TaskCompletionSource finishRemoval =
+        var finishRemoval =
             new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         _member
@@ -341,12 +334,12 @@ public sealed class RoleColourReconcilerTests
                 _memberRoles.Remove(Blue);
             });
 
-        IGuild otherGuild = Substitute.For<IGuild>();
+        var otherGuild = Substitute.For<IGuild>();
         otherGuild.Id.Returns(2UL);
 
-        foreach (ulong id in new[] { SourceA, Red })
+        foreach (var id in new[] { SourceA, Red })
         {
-            IRole role = Substitute.For<IRole>();
+            var role = Substitute.For<IRole>();
             role.Id.Returns(id);
             role.Guild.Returns(otherGuild);
             role.Name.Returns($"Role {id}");
@@ -355,22 +348,21 @@ public sealed class RoleColourReconcilerTests
         }
 
         HashSet<ulong> otherRoles = [SourceA];
-        IGuildUser otherMember = MakeMember(MemberId, otherRoles);
+        var otherMember = MakeMember(MemberId, otherRoles);
         otherGuild.GetUserAsync(MemberId, Arg.Any<CacheMode>(), Arg.Any<RequestOptions>()).Returns(otherMember);
-        await using BotDbContext db = new BotDbContext(_database);
-        db.RoleColourOptions.Add(RoleColourOption.Create(2, SourceA, Red).Value);
+        await using var db = new BotDbContext(_database);
+        db.RoleColourOptions.Add(RoleColourOption.Create(2, SourceA, Red));
         await db.SaveChangesAsync();
 
-        Task<ErrorOr<Option<ulong>>> firstChange = EquipAsync(Red);
+        Task<Option<ulong>> firstChange = EquipAsync(Red);
         await removalStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         try
         {
-            ErrorOr<Option<ulong>> otherResult = await _colours
+            Option<ulong> otherResult = await _colours
                 .TrySetUserColourAsync(otherGuild, MemberId, Red, CancellationToken.None)
                 .WaitAsync(TimeSpan.FromSeconds(5));
 
-            otherResult.IsError.ShouldBeFalse();
             otherRoles.ShouldBe([SourceA, Red], true);
             firstChange.IsCompleted.ShouldBeFalse();
         }
@@ -379,16 +371,18 @@ public sealed class RoleColourReconcilerTests
             finishRemoval.TrySetResult();
         }
 
-        (await firstChange.WaitAsync(TimeSpan.FromSeconds(5))).IsError.ShouldBeFalse();
+        await firstChange.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
+#pragma warning disable MA0040
     [Test]
+    [SuppressMessage("ReSharper", "MethodSupportsCancellation")]
     public async Task CancellingWaitingUpdatesLeavesTheGuildGateUsable()
     {
-        TaskCompletionSource removalStarted =
+        var removalStarted =
             new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        TaskCompletionSource finishRemoval =
+        var finishRemoval =
             new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         _member
@@ -400,15 +394,22 @@ public sealed class RoleColourReconcilerTests
                 _memberRoles.Remove(Blue);
             });
 
-        using CancellationTokenSource cancellation = new CancellationTokenSource();
+        using var cancellation = new CancellationTokenSource();
 
-        Task<ErrorOr<Option<ulong>>> firstChange = EquipAsync(Red);
+        Task<Option<ulong>> firstChange = EquipAsync(Red);
         await removalStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellation.Token);
 
-        Task<ErrorOr<Option<ulong>>> waitingEquip = _colours.TrySetUserColourAsync(_guild, MemberId, Blue, cancellation.Token);
+        Task<Option<ulong>> waitingEquip = _colours.TrySetUserColourAsync(
+            _guild,
+            MemberId,
+            Blue,
+            cancellation.Token);
 
-        Task<ErrorOr<Option<ulong>>> waitingCheck = _colours.ReconcileUserRolesAsync(_guild, MemberId, cancellation.Token);
-        Task<ErrorOr<Option<ulong>>> nextChange = EquipAsync(Blue);
+        Task<Option<ulong>> waitingCheck = _colours.ReconcileUserRolesAsync(
+            _guild,
+            MemberId,
+            cancellation.Token);
+        Task<Option<ulong>> nextChange = EquipAsync(Blue);
 
         try
         {
@@ -427,10 +428,11 @@ public sealed class RoleColourReconcilerTests
             finishRemoval.TrySetResult();
         }
 
-        (await firstChange.WaitAsync(TimeSpan.FromSeconds(5))).IsError.ShouldBeFalse();
-        (await nextChange.WaitAsync(TimeSpan.FromSeconds(5))).IsError.ShouldBeFalse();
-        _memberRoles.ShouldBe([SourceA, Uncoloured, Blue], true);
+        await firstChange.WaitAsync(TimeSpan.FromSeconds(5));
+        await nextChange.WaitAsync(TimeSpan.FromSeconds(5));
+        _memberRoles.ShouldBe([SourceA, Uncoloured, Blue], ignoreOrder: true);
     }
+#pragma warning restore MA0040
 
     [TestCase(false)]
     [TestCase(true)]
@@ -442,10 +444,10 @@ public sealed class RoleColourReconcilerTests
         if (automaticCheck)
             _memberRoles.Add(Red);
 
-        ErrorOr<Option<ulong>> result = automaticCheck ? await CheckMemberAsync() : await EquipAsync(Red);
+        var exception = await Should.ThrowAsync<InvalidDataException>(() =>
+            automaticCheck ? CheckMemberAsync() : EquipAsync(Red));
 
-        result.IsError.ShouldBeTrue();
-        result.FirstError.Description.ShouldContain("Discord roles changed");
+        exception.Message.ShouldContain("Discord roles changed");
     }
 
     [TestCase(false)]
@@ -457,10 +459,10 @@ public sealed class RoleColourReconcilerTests
         if (automaticCheck)
             _memberRoles.Add(Red);
 
-        ErrorOr<Option<ulong>> result = automaticCheck ? await CheckMemberAsync() : await EquipAsync(Red);
+        var exception = await Should.ThrowAsync<InvalidDataException>(() =>
+            automaticCheck ? CheckMemberAsync() : EquipAsync(Red));
 
-        result.IsError.ShouldBeTrue();
-        result.FirstError.Description.ShouldContain("Discord roles changed");
+        exception.Message.ShouldContain("Discord roles changed");
         _memberRoles.ShouldContain(Blue);
     }
 
@@ -481,11 +483,16 @@ public sealed class RoleColourReconcilerTests
                 return Task.CompletedTask;
             });
 
-        ErrorOr<Option<ulong>> result = await EquipAsync(Red);
-
-        result.IsError.ShouldBe(extraColour);
         if (extraColour)
-            result.FirstError.Description.ShouldContain("Discord roles changed");
+        {
+            var exception = await Should.ThrowAsync<InvalidDataException>(() => EquipAsync(Red));
+            exception.Message.ShouldContain("Discord roles changed");
+        }
+        else
+        {
+            await EquipAsync(Red);
+        }
+
         _memberRoles.ShouldContain(OutsideColour);
     }
 
@@ -502,9 +509,9 @@ public sealed class RoleColourReconcilerTests
                 return Task.CompletedTask;
             });
 
-        ErrorOr<Option<ulong>> result = await EquipAsync(null);
+        var exception = await Should.ThrowAsync<InvalidDataException>(() => EquipAsync(null));
 
-        result.IsError.ShouldBeTrue();
+        exception.Message.ShouldContain("Discord roles changed");
         _memberRoles.ShouldContain(OutsideColour);
     }
 
@@ -516,32 +523,75 @@ public sealed class RoleColourReconcilerTests
         _memberRoles.UnionWith([Red, OutsideColour]);
 
         // Act
-        ErrorOr<Option<ulong>> result = await CheckMemberAsync([SourceA, Uncoloured, Blue]);
+        Option<ulong> result = await CheckMemberAsync([SourceA, Uncoloured, Blue]);
 
         // Assert
-        result.IsError.ShouldBeFalse();
-        result.Value.Value.ShouldBeOfType<None>();
+        result.Value.ShouldBeOfType<None>();
         _memberRoles.ShouldBe([Uncoloured, OutsideColour], true);
     }
 
-    private Task<ErrorOr<Option<ulong>>> EquipAsync(ulong? colour)
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ReconcileGuildAsync_MemberFails_CountsFailureAndContinues(bool missingMember)
+    {
+        // Arrange
+        _memberRoles.Add(Red);
+        HashSet<ulong> laterRoles = [SourceA, Blue, Red];
+        var laterMember = MakeMember(MemberId + 1, laterRoles);
+        _guild.GetUsersAsync(Arg.Any<CacheMode>(), Arg.Any<RequestOptions>()).Returns([_member, laterMember]);
+        _guild.GetUserAsync(MemberId + 1, Arg.Any<CacheMode>(), Arg.Any<RequestOptions>()).Returns(laterMember);
+
+        if (missingMember)
+        {
+            _guild.GetUserAsync(MemberId, Arg.Any<CacheMode>(), Arg.Any<RequestOptions>())
+                .Returns((IGuildUser)null!);
+        }
+        else
+        {
+            _member.RemoveRoleAsync(Arg.Any<ulong>(), Arg.Any<RequestOptions>())
+                .Returns(Task.FromException(new TimeoutException("Role removal failed")));
+        }
+
+        // Act
+        var incomplete = await _colours.ReconcileGuildAsync(_guild, CancellationToken.None);
+
+        // Assert
+        incomplete.ShouldBe(1);
+        _memberRoles.ShouldContain(Blue);
+        laterRoles.ShouldBe([SourceA]);
+    }
+
+    [Test]
+    public async Task TrySetUserColourAsync_MissingMember_ThrowsBeforeChangingRoles()
+    {
+        // Arrange
+        _guild.GetUserAsync(MemberId, Arg.Any<CacheMode>(), Arg.Any<RequestOptions>()).Returns((IGuildUser)null!);
+
+        // Act
+        await Should.ThrowAsync<KeyNotFoundException>(() => EquipAsync(Red));
+
+        // Assert
+        _changes.ShouldBeEmpty();
+    }
+
+    private Task<Option<ulong>> EquipAsync(ulong? colour)
     {
         return _colours.TrySetUserColourAsync(_guild, MemberId, colour, CancellationToken.None);
     }
 
-    private Task<ErrorOr<Option<ulong>>> CheckMemberAsync(IReadOnlyCollection<ulong>? before = null)
+    private Task<Option<ulong>> CheckMemberAsync(IReadOnlyCollection<ulong>? before = null)
     {
         return _colours.ReconcileUserRolesAsync(_guild, MemberId, CancellationToken.None, before);
     }
 
     private static RoleColourOption Grant(ulong source, ulong colour)
     {
-        return RoleColourOption.Create(1, source, colour).Value;
+        return RoleColourOption.Create(1, source, colour);
     }
 
     private void AddRole(ulong id, Color colour)
     {
-        IRole role = Substitute.For<IRole>();
+        var role = Substitute.For<IRole>();
         role.Id.Returns(id);
         role.Guild.Returns(_guild);
 
@@ -550,7 +600,7 @@ public sealed class RoleColourReconcilerTests
             {
                 Blue => "Blue",
                 Red => "Red",
-                _ => $"Role {id}"
+                _ => $"Role {id}",
             }
         );
 
@@ -560,7 +610,7 @@ public sealed class RoleColourReconcilerTests
 
     private IGuildUser MakeMember(ulong id, HashSet<ulong> roles)
     {
-        IGuildUser member = Substitute.For<IGuildUser>();
+        var member = Substitute.For<IGuildUser>();
         member.Id.Returns(id);
         member.RoleIds.Returns(_ => roles.ToArray());
 
@@ -568,7 +618,7 @@ public sealed class RoleColourReconcilerTests
             .RemoveRoleAsync(Arg.Any<ulong>(), Arg.Any<RequestOptions>())
             .Returns(call =>
             {
-                ulong role = call.Arg<ulong>();
+                var role = call.Arg<ulong>();
                 roles.Remove(role);
                 _changes.Enqueue($"remove:{role}");
                 return Task.CompletedTask;
@@ -578,7 +628,7 @@ public sealed class RoleColourReconcilerTests
             .AddRoleAsync(Arg.Any<ulong>(), Arg.Any<RequestOptions>())
             .Returns(call =>
             {
-                ulong role = call.Arg<ulong>();
+                var role = call.Arg<ulong>();
                 roles.Add(role);
                 _changes.Enqueue($"add:{role}");
                 return Task.CompletedTask;

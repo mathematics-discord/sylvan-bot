@@ -26,11 +26,11 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
             return;
         }
 
-        ErrorOr<Success> roleValidation = RoleColourReconciler.ValidateMapping(Context.Guild, source.Id, display.Id);
+        var validationMessage = RoleColourReconciler.MappingValidationMessage(Context.Guild, source.Id, display.Id);
 
-        if (roleValidation.IsError)
+        if (validationMessage is not null)
         {
-            await RespondAsync(roleValidation.FirstError.Description, ephemeral: true);
+            await RespondAsync(validationMessage, ephemeral: true);
             return;
         }
 
@@ -39,23 +39,32 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
         ImmutableArray<RoleColourOption> previous =
             await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
 
-        ErrorOr<(RoleColourOption Option, bool Created)> result = await operations.UpsertMappingAsync(
-            Context.Guild.Id,
-            id,
-            source.Id,
-            display.Id,
-            CancellationToken.None
-        );
-
-        if (result.IsError)
+        if (id is <= 0)
         {
-            await FollowupAsync(result.FirstError.Description, ephemeral: true);
+            await FollowupAsync("Mapping ID must be positive.", ephemeral: true);
             return;
         }
 
-        (RoleColourOption option, bool created) = result.Value;
-        int incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None, previous);
-        string action = created ? "Registered" : "Updated";
+        RoleColourOption option;
+        bool created;
+        try
+        {
+            (option, created) = await operations.UpsertMappingAsync(
+                Context.Guild.Id, id, source.Id, display.Id, CancellationToken.None);
+        }
+        catch (KeyNotFoundException)
+        {
+            await FollowupAsync($"Colour mapping {id} was not found in this guild.", ephemeral: true);
+            return;
+        }
+        catch (ArgumentException ex) when (ex.ParamName == "sourceRoleId")
+        {
+            await FollowupAsync("That source already grants this colour.", ephemeral: true);
+            return;
+        }
+
+        var incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None, previous);
+        var action = created ? "Registered" : "Updated";
         await FollowupAsync(
             $"{action} colour mapping `{option.OptionId}`: {source.Mention} -> {display.Mention}.{CheckSummary(incomplete)}",
             ephemeral: true
@@ -77,17 +86,25 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
         ImmutableArray<RoleColourOption> previous =
             await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
 
-        ErrorOr<RoleColourOption> result =
-            await operations.DeleteMappingAsync(Context.Guild.Id, id, CancellationToken.None);
-
-        if (result.IsError)
+        if (id <= 0)
         {
-            await FollowupAsync(result.FirstError.Description, ephemeral: true);
+            await FollowupAsync("Mapping ID must be positive.", ephemeral: true);
             return;
         }
 
-        int incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None, previous);
-        await FollowupAsync($"Deleted colour mapping `{result.Value.OptionId}`.{CheckSummary(incomplete)}",
+        RoleColourOption deletedOption;
+        try
+        {
+            deletedOption = await operations.DeleteMappingAsync(Context.Guild.Id, id, CancellationToken.None);
+        }
+        catch (KeyNotFoundException)
+        {
+            await FollowupAsync($"Colour mapping {id} was not found in this guild.", ephemeral: true);
+            return;
+        }
+
+        var incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None, previous);
+        await FollowupAsync($"Deleted colour mapping `{deletedOption.OptionId}`.{CheckSummary(incomplete)}",
             ephemeral: true);
     }
 
@@ -134,7 +151,7 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
             return;
         }
 
-        int incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None);
+        var incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None);
         await FollowupAsync($"Role colour check completed.{CheckSummary(incomplete)}", ephemeral: true);
     }
 
@@ -145,9 +162,9 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
 
     private static string BuildListResponse(IReadOnlyList<RoleColourOption> options)
     {
-        StringBuilder builder = new StringBuilder("Configured colour options:");
+        var builder = new StringBuilder("Configured colour options:");
 
-        foreach (RoleColourOption option in options)
+        foreach (var option in options)
             builder.AppendLine()
                 .Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
 
