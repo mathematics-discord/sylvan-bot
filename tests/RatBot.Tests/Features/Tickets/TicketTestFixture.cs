@@ -45,7 +45,9 @@ internal sealed class TicketTestFixture : IAsyncDisposable
         bool hidden = false,
         ulong guildId = 100,
         TicketStatus? status = null,
-        string? comment = "Stored comment")
+        string? comment = "Stored comment",
+        TicketMessage? publication = null,
+        TicketMessage? previousPublication = null)
     {
         await using var dbContext = await Factory.CreateDbContextAsync();
         var ticket = new Ticket
@@ -53,6 +55,8 @@ internal sealed class TicketTestFixture : IAsyncDisposable
             GuildId = guildId, Number = number, Action = action, Hidden = hidden,
             SubjectUserId = 123, ModeratorUserId = null, Comment = comment,
             CreatedAtUtc = DateTimeOffset.UtcNow, Status = status,
+            ChannelId = publication?.ChannelId, MessageId = publication?.MessageId,
+            PreviousChannelId = previousPublication?.ChannelId, PreviousMessageId = previousPublication?.MessageId,
         };
 
         dbContext.Tickets.Add(ticket);

@@ -42,6 +42,39 @@ internal static class TicketPresentation
         _ => "Unknown action",
     };
 
+    internal static MessageComponent ChannelMessage(Ticket ticket)
+    {
+        var description = Describe(ticket);
+        var container = new ContainerBuilder()
+            .WithTextDisplay(new TextDisplayBuilder().WithContent($"## {description.Title}"))
+            .WithTextDisplay(new TextDisplayBuilder().WithContent(description.Description));
+
+        if (ticket.Comment?.Length > InlineCommentLimit)
+        {
+            container.WithFile(new FileComponentBuilder()
+                .WithFile(new UnfurledMediaItemProperties($"attachment://{ticket.Number}-comment.txt")));
+        }
+
+        var fields = description.Fields
+            .Select(field => $"**{field.Name}:** {field.Value}")
+            .ToArray();
+
+        if (fields.Length > 0)
+        {
+            container
+                .WithSeparator(new SeparatorBuilder())
+                .WithTextDisplay(new TextDisplayBuilder().WithContent(string.Join('\n', fields)));
+        }
+
+        var rows = Buttons(ticket).Components
+            .OfType<ActionRowComponent>();
+
+        foreach (var row in rows)
+            container.WithActionRow(row.ToBuilder());
+
+        return new ComponentBuilderV2(container).Build();
+    }
+
     internal static Embed Describe(Ticket ticket)
     {
         var subject = ticket.SubjectUserId is null ? "unknown user" : $"<@{ticket.SubjectUserId}>";

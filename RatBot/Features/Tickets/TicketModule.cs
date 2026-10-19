@@ -26,6 +26,14 @@ public sealed class TicketModule(
         => ExecuteAsync((actor, cancellationToken) =>
             ShowHistoryAsync(actor, user.Id, page: 1, hidden: false, cancellationToken));
 
+    [MessageCommand("Edit Ticket")]
+    [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
+    [RequireUserPermission(GuildPermission.ModerateMembers)]
+    [CommandContextType(InteractionContextType.Guild)]
+    public Task EditTicketAsync(IMessage msg)
+        => OpenEditorAsync((actor, cancellationToken) => workflow.PrepareEditAsync(
+            actor, new TicketMessage(msg.Channel.Id, msg.Id), cancellationToken));
+
     [SlashCommand("note", "Save a moderator note and publish it to the staff tickets channel.")]
     public Task NoteAsync(
         [Summary("user", "Subject's mention or user ID, including departed users.")] string user,
@@ -100,23 +108,23 @@ public sealed class TicketModule(
 
     [SlashCommand("edit", "Open a note's existing comment in an editor.")]
     public Task EditAsync([Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id)
-        => OpenEditorAsync(id);
+        => OpenEditorAsync((actor, cancellationToken) => workflow.PrepareEditAsync(actor, id, cancellationToken));
 
     [ComponentInteraction("ticket:edit:*", true)]
-    public Task EditButtonAsync(long id) => OpenEditorAsync(id);
+    public Task EditButtonAsync(long id) => EditAsync(id);
 
-    private Task OpenEditorAsync(long number)
+    private Task OpenEditorAsync(Func<TicketActor, CancellationToken, Task<Ticket>> prepareEdit)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
             // Opening a modal must be the initial response; it cannot follow a deferral.
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             deadline.CancelAfter(TimeSpan.FromSeconds(2));
-            var ticket = await workflow.PrepareEditAsync(actor, number, deadline.Token);
+            var ticket = await prepareEdit(actor, deadline.Token);
 
             if (ticket.Comment?.Length > TicketWorkflow.CommentLimit)
             {
                 await ReplyAsync("This stored comment exceeds the 2,000-character limit and has been left intact. "
-                    + $"Use /ticket set id:{number} comment: to replace it with a comment of at most 2,000 characters.");
+                    + $"Use /ticket set id:{ticket.Number} comment: to replace it with a comment of at most 2,000 characters.");
                 return;
             }
 

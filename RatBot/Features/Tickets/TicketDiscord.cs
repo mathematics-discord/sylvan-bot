@@ -79,21 +79,20 @@ public sealed class TicketDiscord(IDiscordClient client) : ITicketDiscord
     public async Task<TicketMessage> PublishAsync(Ticket ticket, ulong channelId, CancellationToken cancellationToken)
     {
         var ch = await GetChannelAsync(ticket.GuildId, channelId, cancellationToken);
-        var embed = TicketPresentation.Describe(ticket);
+        var components = TicketPresentation.ChannelMessage(ticket);
         IUserMessage msg;
 
         if (ticket.Comment?.Length > TicketPresentation.InlineCommentLimit)
         {
             await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(ticket.Comment));
-            msg = await ch.SendFileAsync(stream, $"{ticket.Number}-comment.txt", embed: embed,
-                allowedMentions: AllowedMentions.None, components: TicketPresentation.Buttons(ticket),
-                options: Options(cancellationToken));
+            msg = await ch.SendFileAsync(stream, $"{ticket.Number}-comment.txt",
+                allowedMentions: AllowedMentions.None, components: components,
+                flags: MessageFlags.ComponentsV2, options: Options(cancellationToken));
         }
         else
         {
-            msg = await ch.SendMessageAsync(embed: embed, allowedMentions: AllowedMentions.None,
-                components: TicketPresentation.Buttons(ticket),
-                options: Options(cancellationToken));
+            msg = await ch.SendMessageAsync(allowedMentions: AllowedMentions.None,
+                components: components, flags: MessageFlags.ComponentsV2, options: Options(cancellationToken));
         }
 
         return new TicketMessage(ch.Id, msg.Id);
@@ -117,8 +116,9 @@ public sealed class TicketDiscord(IDiscordClient client) : ITicketDiscord
         await ch.ModifyMessageAsync(publication.MessageId, properties =>
         {
             properties.Content = string.Empty;
-            properties.Embed = TicketPresentation.Describe(ticket);
-            properties.Components = TicketPresentation.Buttons(ticket);
+            properties.Embeds = Array.Empty<Embed>();
+            properties.Flags = (msg.Flags ?? MessageFlags.None) | MessageFlags.ComponentsV2;
+            properties.Components = TicketPresentation.ChannelMessage(ticket);
             properties.Attachments = attachments;
             properties.AllowedMentions = AllowedMentions.None;
         }, Options(cancellationToken));

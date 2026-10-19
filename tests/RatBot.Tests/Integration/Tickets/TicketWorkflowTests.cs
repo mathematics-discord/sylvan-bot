@@ -899,6 +899,8 @@ public sealed class TicketWorkflowTests
     [TestCase("slash", true)]
     [TestCase("button", false)]
     [TestCase("button", true)]
+    [TestCase("message", false)]
+    [TestCase("message", true)]
     public async Task EditAsync_CommandOrButton_PrefillsCommentAndHiddenCheckbox(string entryPoint, bool hidden)
     {
         // Arrange
@@ -911,7 +913,12 @@ public sealed class TicketWorkflowTests
             interactions.AddModalInfo<TicketEditModal>();
 
         await using var fixture = new TicketTestFixture();
-        await fixture.StoreAsync(hidden: hidden);
+        await fixture.StoreAsync(hidden: hidden, publication: new TicketMessage(200, 400));
+        var ch = Substitute.For<IMessageChannel>();
+        ch.Id.Returns(200UL);
+        var msg = Substitute.For<IMessage>();
+        msg.Channel.Returns(ch);
+        msg.Id.Returns(400UL);
         var context = Substitute.For<IInteractionContext>();
         var interaction = Substitute.For<IDiscordInteraction>();
         var gld = Substitute.For<IGuild>();
@@ -932,7 +939,9 @@ public sealed class TicketWorkflowTests
         ((IInteractionModuleBase)module).SetContext(context);
 
         // Act
-        if (entryPoint is "button")
+        if (entryPoint is "message")
+            await module.EditTicketAsync(msg);
+        else if (entryPoint is "button")
             await module.EditButtonAsync(32702);
         else
             await module.EditAsync(32702);
@@ -951,6 +960,55 @@ public sealed class TicketWorkflowTests
         inputs
             .OfType<CheckboxComponent>()
             .ShouldHaveSingleItem().DefaultState.ShouldBe(hidden);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task PrepareEditAsync_RecordedMessage_ResolvesCurrentAndPreviousPosts(bool previous)
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        var ticket = await fixture.StoreAsync(
+            publication: new TicketMessage(200, 400), previousPublication: new TicketMessage(201, 401));
+
+        var publication = previous ? new TicketMessage(201, 401) : new TicketMessage(200, 400);
+
+        // Act
+        var opened = await fixture.Workflow.PrepareEditAsync(TicketTestFixture.Moderator, publication);
+
+        // Assert
+        opened.Number.ShouldBe(ticket.Number);
+        opened.Comment.ShouldBe("Stored comment");
+    }
+
+    [TestCase("hidden")]
+    [TestCase("other-guild")]
+    [TestCase("unrelated-message")]
+    [TestCase("unreadable-channel")]
+    public async Task PrepareEditAsync_MessageWithoutAccess_RejectsLookup(string scenario)
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.StoreAsync(hidden: scenario is "hidden", publication: new TicketMessage(200, 400));
+        var actor = TicketTestFixture.Moderator;
+
+        if (scenario is "other-guild")
+            actor = actor with { GuildId = 101 };
+
+        fixture.Discord.DenyRead = scenario is "unreadable-channel";
+        var publication = new TicketMessage(200, scenario is "unrelated-message" ? 999UL : 400UL);
+
+        // Act / Assert
+        if (scenario is "hidden" or "unreadable-channel")
+        {
+            await Should.ThrowAsync<UnauthorizedAccessException>(() =>
+                fixture.Workflow.PrepareEditAsync(actor, publication));
+        }
+        else
+        {
+            await Should.ThrowAsync<KeyNotFoundException>(() =>
+                fixture.Workflow.PrepareEditAsync(actor, publication));
+        }
     }
 
     [Test]

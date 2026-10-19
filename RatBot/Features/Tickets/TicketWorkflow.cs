@@ -186,6 +186,26 @@ public sealed class TicketWorkflow(
         return ticket;
     }
 
+    public async Task<Ticket> PrepareEditAsync(
+        TicketActor actor, TicketMessage publication, CancellationToken cancellationToken = default)
+    {
+        RequireStaff(actor);
+        await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var ticket = await dbContext.Tickets
+            .AsNoTracking()
+            .Where(ticket => ticket.GuildId == actor.GuildId)
+            .SingleOrDefaultAsync(ticket =>
+                (ticket.ChannelId == publication.ChannelId && ticket.MessageId == publication.MessageId)
+                || (ticket.PreviousChannelId == publication.ChannelId && ticket.PreviousMessageId == publication.MessageId),
+                cancellationToken)
+            ?? throw new KeyNotFoundException();
+
+        RequireMutation(actor, ticket);
+        await discord.CheckChannelAsync(actor, publication.ChannelId, publishing: false, cancellationToken);
+        await CheckReadAsync(dbContext, actor, ticket, cancellationToken);
+        return ticket;
+    }
+
     public Task<TicketChange> SetAsync(
         TicketActor actor, long number, string? duration = null, string? comment = null,
         bool? hidden = null, int? expectedVersion = null, CancellationToken cancellationToken = default)
