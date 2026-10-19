@@ -1,28 +1,36 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace RatBot.Features.Tickets;
 
 public sealed class TicketPersistence :
-    IEntityTypeConfiguration<TicketNote>,
+    IEntityTypeConfiguration<Ticket>,
     IEntityTypeConfiguration<TicketConfiguration>
 {
-    public void Configure(EntityTypeBuilder<TicketNote> builder)
+    public void Configure(EntityTypeBuilder<Ticket> builder)
     {
-        builder.ToTable("ticket_notes", table =>
-            table.HasCheckConstraint("CK_ticket_notes_positive_number", "\"TicketNumber\" > 0"));
+        builder.ToTable("tickets", table =>
+        {
+            table.HasCheckConstraint("CK_tickets_number", "\"Number\" > 0");
+            table.HasCheckConstraint("CK_tickets_note_duration", "\"Action\" <> 'Note' OR \"DurationSeconds\" IS NULL");
+        });
 
-        builder.HasKey(note => note.TicketNumber);
-        builder.Property(note => note.TicketNumber)
-            .UseIdentityAlwaysColumn()
-            .HasIdentityOptions(startValue: 1, minValue: 1);
+        builder.HasKey(ticket => ticket.Id);
+        builder.Property(ticket => ticket.Action)
+            .HasConversion<string>();
 
-        builder.Property(note => note.Text)
-            .HasMaxLength(2000)
-            .IsRequired();
+        builder.Property(ticket => ticket.Status)
+            .HasConversion<string>();
 
-        builder.HasIndex(note => new { note.GuildId, note.LegacyTicketNumber })
+        builder.Property(ticket => ticket.Version)
+            .IsConcurrencyToken();
+
+        builder.HasIndex(ticket => new { ticket.GuildId, ticket.Number })
             .IsUnique();
+
+        builder.HasIndex(ticket => new { ticket.GuildId, ticket.SubjectUserId, ticket.Hidden, ticket.Id });
+        builder.HasIndex(ticket => new { ticket.GuildId, ticket.ChannelId, ticket.MessageId });
+        builder.HasIndex(ticket => new { ticket.GuildId, ticket.PreviousChannelId, ticket.PreviousMessageId });
     }
 
     public void Configure(EntityTypeBuilder<TicketConfiguration> builder)

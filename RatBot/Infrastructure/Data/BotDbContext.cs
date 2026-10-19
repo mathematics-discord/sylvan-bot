@@ -18,7 +18,7 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<LoggingExcludedChannel> LoggingExcludedChannels => Set<LoggingExcludedChannel>();
     public DbSet<RoleColourOption> RoleColourOptions => Set<RoleColourOption>();
     public DbSet<TicketConfiguration> TicketConfigurations => Set<TicketConfiguration>();
-    public DbSet<TicketNote> TicketNotes => Set<TicketNote>();
+    public DbSet<Ticket> Tickets => Set<Ticket>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -28,6 +28,7 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasSequence<long>("ticket_numbers");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BotDbContext).Assembly);
     }
 }

@@ -12,8 +12,8 @@ using RatBot.Infrastructure.Data;
 namespace RatBot.Infrastructure.Migrations
 {
     [DbContext(typeof(BotDbContext))]
-    [Migration("20261017192451_AddTicketNotes")]
-    partial class AddTicketNotes
+    [Migration("20261018224225_AddTickets")]
+    partial class AddTickets
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,8 @@ namespace RatBot.Infrastructure.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.HasSequence("ticket_reference_numbers");
 
             modelBuilder.Entity("RatBot.Features.EmojiAnalytics.EmojiUsageCount", b =>
                 {
@@ -153,6 +155,94 @@ namespace RatBot.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("RatBot.Features.Tickets.Ticket", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long?>("ChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("DurationSeconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("LastModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LastModifiedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("MessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ModeratorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PreviousChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PreviousMessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("PublicationPending")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<long?>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .HasColumnType("text");
+
+                    b.Property<long?>("SubjectUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GuildId", "Reference")
+                        .IsUnique();
+
+                    b.HasIndex("GuildId", "ChannelId", "MessageId");
+
+                    b.HasIndex("GuildId", "PreviousChannelId", "PreviousMessageId");
+
+                    b.HasIndex("GuildId", "SubjectUserId", "Hidden", "Id");
+
+                    b.ToTable("tickets", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_tickets_note_duration", "\"Action\" <> 'Note' OR \"DurationSeconds\" IS NULL");
+
+                            t.HasCheckConstraint("CK_tickets_reference", "\"Reference\" ~ '^(T-[0-9]{4,}|[0-9]+)$'");
+                        });
+                });
+
             modelBuilder.Entity("RatBot.Features.Tickets.TicketConfiguration", b =>
                 {
                     b.Property<long>("GuildId")
@@ -167,52 +257,6 @@ namespace RatBot.Infrastructure.Migrations
                     b.HasKey("GuildId");
 
                     b.ToTable("ticket_configurations", (string)null);
-                });
-
-            modelBuilder.Entity("RatBot.Features.Tickets.TicketNote", b =>
-                {
-                    b.Property<long>("TicketNumber")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("TicketNumber"));
-                    NpgsqlPropertyBuilderExtensions.HasIdentityOptions(b.Property<long>("TicketNumber"), 1L, null, 1L, null, null, null);
-
-                    b.Property<long>("AuthorUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("LegacyTicketNumber")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("PublishedChannelId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("PublishedMessageId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("SubjectUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Text")
-                        .IsRequired()
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.HasKey("TicketNumber");
-
-                    b.HasIndex("GuildId", "LegacyTicketNumber")
-                        .IsUnique();
-
-                    b.ToTable("ticket_notes", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ticket_notes_positive_number", "\"TicketNumber\" > 0");
-                        });
                 });
 #pragma warning restore 612, 618
         }

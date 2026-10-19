@@ -8,6 +8,7 @@ using RatBot.Features.Logging;
 using RatBot.Features.Moderation;
 using RatBot.Features.Quorum.Persistence;
 using RatBot.Features.RoleColours;
+using RatBot.Features.Tickets;
 using RatBot.Gateway;
 using RatBot.Infrastructure.Data;
 using RatBot.Interactions;
@@ -30,6 +31,9 @@ public static class DependencyInjection
 
         private void AddFeatures(IConfiguration configuration)
         {
+            services.AddSingleton<ITicketDiscord, TicketDiscord>();
+            services.AddSingleton<TicketWorkflow>();
+
             services.AddSingleton<ImageBurstSpamDetectorSettings>();
             services.AddSingleton(sp =>
                 new ImageBurstSpamDetector(TimeProvider.System,
