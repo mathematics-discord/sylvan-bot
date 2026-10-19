@@ -1,4 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Discord;
+using Discord.Interactions;
+using Discord.WebSocket;
+using Microsoft.Extensions.Hosting;
+using NSubstitute;
 using RatBot.Features.Tickets;
 using RatBot.Tests.Features.Tickets;
 
@@ -115,7 +120,7 @@ public sealed class TicketWorkflowTests
 
         // Assert
         (await fixture.Workflow.ShowAsync(TicketTestFixture.Moderator, 3)).Value.ShouldBeOfType<None>();
-        var hidden = await fixture.Workflow.ShowAsync(TicketTestFixture.Moderator, 3, hidden: true);
+        var hidden = await fixture.Workflow.ShowAsync(TicketTestFixture.SeniorModerator, 3, hidden: true);
         hidden.Value.ShouldBeOfType<Some<Ticket>>().Value.Comment.ShouldBe("Edited");
         var foreign = await fixture.Workflow.ShowAsync(TicketTestFixture.Moderator with { GuildId = 999 }, 3);
         foreign.Value.ShouldBeOfType<Some<Ticket>>().Value.Comment.ShouldBe("Other guild");
@@ -354,7 +359,7 @@ public sealed class TicketWorkflowTests
 
         // Act / Assert
         await Should.ThrowAsync<UnauthorizedAccessException>(() => fixture.Workflow.ListAsync(
-            TicketTestFixture.Moderator, 123));
+            TicketTestFixture.SeniorModerator, 123));
     }
 
     [Test]
@@ -454,9 +459,9 @@ public sealed class TicketWorkflowTests
         // Act
         var numeric = await fixture.Workflow.ShowAsync(TicketTestFixture.Moderator, 32702);
         var numbered = await fixture.Workflow.ShowAsync(TicketTestFixture.Moderator, created.Ticket.Number);
-        var hidden = await fixture.Workflow.ShowAsync(TicketTestFixture.Moderator, 32703, hidden: true);
-        var normal = await fixture.Workflow.ListAsync(TicketTestFixture.Moderator, 123);
-        var hiddenPage = await fixture.Workflow.ListAsync(TicketTestFixture.Moderator, 123, hidden: true);
+        var hidden = await fixture.Workflow.ShowAsync(TicketTestFixture.SeniorModerator, 32703, hidden: true);
+        var normal = await fixture.Workflow.ListAsync(TicketTestFixture.SeniorModerator, 123);
+        var hiddenPage = await fixture.Workflow.ListAsync(TicketTestFixture.SeniorModerator, 123, hidden: true);
 
         // Assert
         numeric.Value.ShouldBeOfType<Some<Ticket>>().Value.Comment.ShouldBe("Stored comment");
@@ -491,8 +496,8 @@ public sealed class TicketWorkflowTests
         }
 
         // Act
-        var first = await fixture.Workflow.ListAsync(TicketTestFixture.Moderator, 123);
-        var second = await fixture.Workflow.ListAsync(TicketTestFixture.Moderator, 123, page: 2);
+        var first = await fixture.Workflow.ListAsync(TicketTestFixture.SeniorModerator, 123);
+        var second = await fixture.Workflow.ListAsync(TicketTestFixture.SeniorModerator, 123, page: 2);
 
         // Assert
         first.Items.Length.ShouldBe(10);
@@ -607,11 +612,12 @@ public sealed class TicketWorkflowTests
 
         // Act
         await Should.ThrowAsync<DbUpdateConcurrencyException>(() => fixture.Workflow.SetAsync(
-            TicketTestFixture.Moderator, created.Ticket.Number, comment: "Stale", expectedVersion: opened.Version));
+            TicketTestFixture.Moderator, created.Ticket.Number, comment: "Stale", hidden: true, expectedVersion: opened.Version));
 
         // Assert
         var current = await fixture.Workflow.PrepareEditAsync(TicketTestFixture.Moderator, created.Ticket.Number);
         current.Comment.ShouldBe("Original\nnewer");
+        current.Hidden.ShouldBeFalse();
         fixture.Discord.Updates.ShouldBe(1);
     }
 
@@ -675,6 +681,276 @@ public sealed class TicketWorkflowTests
         fixture.Discord.Updates.ShouldBe(1);
         linkLookup.Value.ShouldBeOfType<Some<Ticket>>();
         hidden.LinkedCopyRemains.ShouldBeTrue();
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task HiddenReads_TrialOrCommunityModerator_AreDenied(bool communityModerator)
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.EnableAsync();
+        var created = await fixture.Workflow.CreateAsync(TicketTestFixture.Moderator, 123, "Private note");
+        await fixture.Workflow.HideAsync(TicketTestFixture.Moderator, created.Ticket.Number);
+        var actor = TicketTestFixture.Moderator with { CanBanMembers = communityModerator };
+
+        // Act / Assert
+        await Should.ThrowAsync<UnauthorizedAccessException>(() =>
+            fixture.Workflow.ShowAsync(actor, created.Ticket.Number, hidden: true));
+        await Should.ThrowAsync<UnauthorizedAccessException>(() =>
+            fixture.Workflow.ShowMessageAsync(actor, "https://discord.com/channels/100/200/401", hidden: true));
+        await Should.ThrowAsync<UnauthorizedAccessException>(() =>
+            fixture.Workflow.ListAsync(actor, 123, hidden: true));
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task HiddenReads_SeniorModeratorOrAdministrator_AreAllowed(bool administrator)
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.EnableAsync();
+        var created = await fixture.Workflow.CreateAsync(TicketTestFixture.Moderator, 123, "Private note");
+        await fixture.Workflow.HideAsync(TicketTestFixture.Moderator, created.Ticket.Number);
+        var actor = new TicketActor(100, 302, IsAdministrator: administrator,
+            CanTimeoutMembers: false, CanViewAuditLog: !administrator);
+
+        // Act
+        var numbered = await fixture.Workflow.ShowAsync(actor, created.Ticket.Number, hidden: true);
+        var linked = await fixture.Workflow.ShowMessageAsync(actor,
+            "https://discord.com/channels/100/200/401", hidden: true);
+
+        var listed = await fixture.Workflow.ListAsync(actor, 123, hidden: true);
+
+        // Assert
+        numbered.Value.ShouldBeOfType<Some<Ticket>>().Value.Comment.ShouldBe("Private note");
+        linked.Value.ShouldBeOfType<Some<Ticket>>().Value.Comment.ShouldBe("Private note");
+        listed.Items.ShouldHaveSingleItem().Comment.ShouldBe("Private note");
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task ListAsync_TrialOrCommunityModerator_FiltersHiddenTicketsBeforePagination(bool communityModerator)
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        var actor = TicketTestFixture.Moderator with { CanBanMembers = communityModerator };
+
+        for (var number = 1; number <= 22; number++)
+            await fixture.StoreAsync(number, hidden: number > 11);
+
+        // Act
+        var first = await fixture.Workflow.ListAsync(actor, 123);
+        var second = await fixture.Workflow.ListAsync(actor, 123, page: 2);
+
+        // Assert
+        first.Items.Length.ShouldBe(10);
+        first.HasMore.ShouldBeTrue();
+        second.Items.Length.ShouldBe(1);
+        second.HasMore.ShouldBeFalse();
+        first.Items
+            .Concat(second.Items)
+            .ShouldAllBe(ticket => !ticket.Hidden && ticket.Number <= 11);
+    }
+
+    [TestCase("edit")]
+    [TestCase("set")]
+    [TestCase("append")]
+    [TestCase("hide")]
+    [TestCase("submit")]
+    [TestCase("unhide")]
+    public async Task HiddenMutation_AuditLogPermissionRevoked_DoesNotExposeOrChangeNote(string operation)
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.StoreAsync(hidden: true);
+        var opened = await fixture.Workflow.PrepareEditAsync(TicketTestFixture.SeniorModerator, 32702);
+        var actor = TicketTestFixture.SeniorModerator with { CanViewAuditLog = false };
+
+        // Act
+        Task Act() => operation switch
+        {
+            "edit" => fixture.Workflow.PrepareEditAsync(actor, 32702),
+            "set" => fixture.Workflow.SetAsync(actor, 32702, comment: "Denied"),
+            "append" => fixture.Workflow.AppendAsync(actor, 32702, "Denied"),
+            "hide" => fixture.Workflow.HideAsync(actor, 32702),
+            "submit" => fixture.Workflow.SetAsync(actor, 32702, comment: "Denied", hidden: false, expectedVersion: opened.Version),
+            "unhide" => fixture.Workflow.SetAsync(actor, 32702, hidden: false),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation)),
+        };
+
+        await Should.ThrowAsync<UnauthorizedAccessException>(Act);
+
+        // Assert
+        await using var dbContext = await fixture.Factory.CreateDbContextAsync();
+        var stored = await dbContext.Tickets
+            .SingleAsync();
+
+        stored.Comment.ShouldBe("Stored comment");
+        stored.Hidden.ShouldBeTrue();
+        stored.Version.ShouldBe(0);
+        fixture.Discord.Publications.ShouldBe(0);
+        fixture.Discord.Updates.ShouldBe(0);
+    }
+
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public async Task SetAsync_CommentAndVisibility_SavesBothTogether(bool initiallyHidden, bool hidden)
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.EnableAsync();
+        var created = await fixture.Workflow.CreateAsync(TicketTestFixture.Moderator, 123, "Original");
+
+        if (initiallyHidden)
+            await fixture.Workflow.HideAsync(TicketTestFixture.Moderator, created.Ticket.Number);
+
+        var actor = TicketTestFixture.SeniorModerator with { UserId = 302 };
+        var opened = await fixture.Workflow.PrepareEditAsync(actor, created.Ticket.Number);
+
+        // Act
+        var changed = await fixture.Workflow.SetAsync(actor, created.Ticket.Number,
+            comment: "Edited", hidden: hidden, expectedVersion: opened.Version);
+
+        // Assert
+        await using var dbContext = await fixture.Factory.CreateDbContextAsync();
+        var stored = await dbContext.Tickets
+            .SingleAsync();
+
+        stored.Comment.ShouldBe("Edited");
+        stored.Hidden.ShouldBe(hidden);
+        stored.Version.ShouldBe(opened.Version + 1);
+        stored.ModeratorUserId.ShouldBe(300UL);
+        stored.LastModifiedByUserId.ShouldBe(302UL);
+
+        if (!hidden)
+        {
+            changed.ConfirmedPublication.ShouldNotBeNull();
+            fixture.Discord.PublishedComments
+                .Last()
+                .ShouldBe("Edited");
+        }
+        else
+        {
+            fixture.Discord.PublishedComments.ShouldBe(["Original"]);
+        }
+    }
+
+    [Test]
+    public async Task SetAsync_RepeatedHideAndUnhide_RestoresPublicationAndPreservesEarlierLink()
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.EnableAsync();
+        await fixture.StoreAsync();
+        await using var dbContext = await fixture.Factory.CreateDbContextAsync();
+        var record = await dbContext.Tickets
+            .SingleAsync();
+
+        record.ChannelId = 200;
+        record.MessageId = 900;
+        await dbContext.SaveChangesAsync();
+        await fixture.Workflow.SetAsync(TicketTestFixture.Moderator, 32702, comment: "First");
+
+        // Act
+        await fixture.Workflow.HideAsync(TicketTestFixture.Moderator, 32702);
+        await fixture.Workflow.SetAsync(TicketTestFixture.SeniorModerator, 32702, hidden: false);
+        await fixture.Workflow.HideAsync(TicketTestFixture.Moderator, 32702);
+        var restored = await fixture.Workflow.SetAsync(TicketTestFixture.SeniorModerator, 32702,
+            comment: "Restored", hidden: false);
+
+        // Assert
+        restored.Ticket.Hidden.ShouldBeFalse();
+        restored.Ticket.PreviousMessageId.ShouldBe(900UL);
+        restored.Ticket.MessageId.ShouldBe(403UL);
+        restored.PublicationUncertain.ShouldBeFalse();
+        fixture.Discord.Publications.ShouldBe(3);
+        fixture.Discord.PublishedComments.ShouldBe(["First", "First", "Restored"]);
+    }
+
+    [Test]
+    public async Task SetAsync_UnhideWithoutPublishingAccess_LeavesCommentAndVisibilityIntact()
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.EnableAsync();
+        var created = await fixture.Workflow.CreateAsync(TicketTestFixture.Moderator, 123, "Original");
+        await fixture.Workflow.HideAsync(TicketTestFixture.Moderator, created.Ticket.Number);
+        fixture.Discord.DenyPublication = true;
+
+        // Act
+        await Should.ThrowAsync<UnauthorizedAccessException>(() => fixture.Workflow.SetAsync(
+            TicketTestFixture.SeniorModerator, created.Ticket.Number, comment: "Denied", hidden: false));
+
+        // Assert
+        await using var dbContext = await fixture.Factory.CreateDbContextAsync();
+        var stored = await dbContext.Tickets
+            .SingleAsync();
+
+        stored.Hidden.ShouldBeTrue();
+        stored.Comment.ShouldBe("Original");
+        stored.Version.ShouldBe(1);
+        fixture.Discord.Publications.ShouldBe(1);
+    }
+
+    [TestCase("slash", false)]
+    [TestCase("slash", true)]
+    [TestCase("button", false)]
+    [TestCase("button", true)]
+    public async Task EditAsync_CommandOrButton_PrefillsCommentAndHiddenCheckbox(string entryPoint, bool hidden)
+    {
+        // Arrange
+        await using var client = new DiscordSocketClient();
+        using var interactions = new InteractionService(client);
+        var modalRegistered = interactions.Modals
+            .Any(modal => modal.Type == typeof(TicketEditModal));
+
+        if (!modalRegistered)
+            interactions.AddModalInfo<TicketEditModal>();
+
+        await using var fixture = new TicketTestFixture();
+        await fixture.StoreAsync(hidden: hidden);
+        var context = Substitute.For<IInteractionContext>();
+        var interaction = Substitute.For<IDiscordInteraction>();
+        var gld = Substitute.For<IGuild>();
+        var moderator = Substitute.For<IGuildUser>();
+        gld.Id.Returns(100UL);
+        moderator.Id.Returns(301UL);
+        moderator.GuildPermissions.Returns(GuildPermissions.All);
+        context.Guild.Returns(gld);
+        context.User.Returns(moderator);
+        context.Interaction.Returns(interaction);
+        Modal? response = null;
+        interaction.RespondWithModalAsync(Arg.Do<Modal>(modal => response = modal), Arg.Any<RequestOptions>())
+            .Returns(Task.CompletedTask);
+
+        var module = new TicketModule(fixture.Workflow, fixture.Discord,
+            Serilog.Core.Logger.None, Substitute.For<IHostApplicationLifetime>());
+
+        ((IInteractionModuleBase)module).SetContext(context);
+
+        // Act
+        if (entryPoint is "button")
+            await module.EditButtonAsync(32702);
+        else
+            await module.EditAsync(32702);
+
+        // Assert
+        response.ShouldNotBeNull();
+        var inputs = response.Component.Components
+            .OfType<LabelComponent>()
+            .Select(label => label.Component)
+            .ToArray();
+
+        inputs
+            .OfType<TextInputComponent>()
+            .ShouldHaveSingleItem().Value.ShouldBe("Stored comment");
+
+        inputs
+            .OfType<CheckboxComponent>()
+            .ShouldHaveSingleItem().DefaultState.ShouldBe(hidden);
     }
 
     [Test]

@@ -109,6 +109,7 @@ public sealed class TicketWorkflow(
         TicketActor actor, long number, bool hidden = false, CancellationToken cancellationToken = default)
     {
         RequireStaff(actor);
+        RequireHiddenAccess(actor, hidden);
         await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
         var ticket = await FindAsync(dbContext, actor.GuildId, number, tracking: false, cancellationToken);
 
@@ -123,6 +124,7 @@ public sealed class TicketWorkflow(
         TicketActor actor, string messageLink, bool hidden = false, CancellationToken cancellationToken = default)
     {
         RequireStaff(actor);
+        RequireHiddenAccess(actor, hidden);
         var msg = TicketReference.ParseMessageLink(messageLink, actor.GuildId);
         await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
         var ticket = await dbContext.Tickets
@@ -145,15 +147,17 @@ public sealed class TicketWorkflow(
         CancellationToken cancellationToken = default)
     {
         RequireStaff(actor);
+        RequireHiddenAccess(actor, hidden);
 
         if (subjectUserId == 0 || page is < 1 or > 1_000_000)
             throw new ArgumentOutOfRangeException(nameof(page));
 
+        var canViewHidden = actor.IsAdministrator || actor.CanViewAuditLog;
         await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
         var tickets = await dbContext.Tickets
             .AsNoTracking()
             .Where(ticket => ticket.GuildId == actor.GuildId && ticket.SubjectUserId == subjectUserId
-                && (!hidden || ticket.Hidden))
+                && (!hidden || ticket.Hidden) && (canViewHidden || !ticket.Hidden))
             .OrderByDescending(ticket => ticket.CreatedAtUtc)
             .ThenByDescending(ticket => ticket.Id)
             .Skip((page - 1) * 10)
@@ -184,21 +188,21 @@ public sealed class TicketWorkflow(
 
     public Task<TicketChange> SetAsync(
         TicketActor actor, long number, string? duration = null, string? comment = null,
-        int? expectedVersion = null, CancellationToken cancellationToken = default)
-        => CorrectAsync(actor, number, comment, duration, append: false, hide: false, expectedVersion, cancellationToken);
+        bool? hidden = null, int? expectedVersion = null, CancellationToken cancellationToken = default)
+        => CorrectAsync(actor, number, comment, duration, append: false, hidden, expectedVersion, cancellationToken);
 
     public Task<TicketChange> AppendAsync(
         TicketActor actor, long number, string comment, CancellationToken cancellationToken = default)
-        => CorrectAsync(actor, number, comment, duration: null, append: true, hide: false,
+        => CorrectAsync(actor, number, comment, duration: null, append: true, hidden: null,
             expectedVersion: null, cancellationToken);
 
     public Task<TicketChange> HideAsync(
         TicketActor actor, long number, CancellationToken cancellationToken = default)
-        => CorrectAsync(actor, number, comment: null, duration: null, append: false, hide: true,
+        => CorrectAsync(actor, number, comment: null, duration: null, append: false, hidden: true,
             expectedVersion: null, cancellationToken);
 
     private async Task<TicketChange> CorrectAsync(
-        TicketActor actor, long number, string? comment, string? duration, bool append, bool hide,
+        TicketActor actor, long number, string? comment, string? duration, bool append, bool? hidden,
         int? expectedVersion, CancellationToken cancellationToken)
     {
         await _corrections.WaitAsync(cancellationToken);
@@ -218,7 +222,7 @@ public sealed class TicketWorkflow(
             if (expectedVersion is not null && ticket.Version != expectedVersion)
                 throw new DbUpdateConcurrencyException();
 
-            if (!hide && comment is null)
+            if (hidden is null && comment is null)
                 return new TicketChange(ticket, NoChange: true);
 
             if (append && !string.IsNullOrEmpty(ticket.Comment))
@@ -227,34 +231,31 @@ public sealed class TicketWorkflow(
             if (comment is not null)
                 ValidateComment(comment, existingComment: append ? ticket.Comment : null);
 
+            var updatedHidden = hidden ?? ticket.Hidden;
+            var unhiding = ticket.Hidden && !updatedHidden;
             ulong? channelId = null;
 
-            if (!hide && !ticket.Hidden)
+            if (!updatedHidden)
             {
                 channelId = await CorrectionChannelAsync(dbContext, actor, ticket, cancellationToken);
             }
 
-            if (hide)
-            {
-                ticket.Hidden = true;
-            }
-            else
-            {
+            if (comment is not null)
                 ticket.Comment = append ? ticket.Comment + comment : comment;
-            }
 
+            ticket.Hidden = updatedHidden;
             ticket.Version++;
             ticket.LastModifiedByUserId = actor.UserId;
             ticket.LastModifiedAtUtc = DateTimeOffset.UtcNow;
             await dbContext.SaveChangesAsync(cancellationToken);
 
-            if (hide)
+            if (hidden == true)
                 return await RemoveCopiesAsync(ticket, cancellationToken);
 
             if (ticket.Hidden)
                 return new TicketChange(ticket);
 
-            return await PublishCorrectionAsync(dbContext, ticket, channelId!.Value, cancellationToken);
+            return await PublishCorrectionAsync(dbContext, ticket, channelId!.Value, unhiding, cancellationToken);
         }
         finally
         {
@@ -279,7 +280,7 @@ public sealed class TicketWorkflow(
     }
 
     private async Task<TicketChange> PublishCorrectionAsync(
-        BotDbContext dbContext, Ticket ticket, ulong channelId, CancellationToken cancellationToken)
+        BotDbContext dbContext, Ticket ticket, ulong channelId, bool unhiding, CancellationToken cancellationToken)
     {
         if (ticket.PublicationPending)
             return new TicketChange(ticket, ReferenceSaved: false, PublicationUncertain: true);
@@ -300,11 +301,14 @@ public sealed class TicketWorkflow(
             }
 
             // Keep the earlier link when the current bot cannot edit the linked message.
-            if (ticket.PreviousMessageId is not null)
+            if (ticket.PreviousMessageId is not null && !unhiding)
                 return new TicketChange(ticket, PublicationUncertain: true);
 
-            ticket.PreviousChannelId = ticket.ChannelId;
-            ticket.PreviousMessageId = ticket.MessageId;
+            if (ticket.PreviousMessageId is null)
+            {
+                ticket.PreviousChannelId = ticket.ChannelId;
+                ticket.PreviousMessageId = ticket.MessageId;
+            }
         }
 
         // Persist intent before sending. An uncertain send or failed reference save cannot cause
@@ -406,7 +410,7 @@ public sealed class TicketWorkflow(
     private static void RequireStaff(TicketActor actor)
     {
         var staff = actor.IsAdministrator || actor.CanTimeoutMembers || actor.CanBanMembers || actor.CanKickMembers
-            || actor.CanMuteMembers || actor.CanDeafenMembers || actor.CanManageRoles;
+            || actor.CanMuteMembers || actor.CanDeafenMembers || actor.CanManageRoles || actor.CanViewAuditLog;
 
         if (actor.GuildId == 0 || actor.UserId == 0 || !staff)
             throw new UnauthorizedAccessException();
@@ -424,11 +428,18 @@ public sealed class TicketWorkflow(
     private static void RequireMutation(TicketActor actor, Ticket ticket)
     {
         RequireStaff(actor);
+        RequireHiddenAccess(actor, ticket.Hidden);
 
         if (ticket.Action != TicketAction.Note)
             throw new NotSupportedException("This action type is read-only.");
 
         RequireNotePermission(actor);
+    }
+
+    private static void RequireHiddenAccess(TicketActor actor, bool hidden)
+    {
+        if (hidden && !actor.IsAdministrator && !actor.CanViewAuditLog)
+            throw new UnauthorizedAccessException();
     }
 
     private static void ValidateComment(string comment, string? existingComment = null)

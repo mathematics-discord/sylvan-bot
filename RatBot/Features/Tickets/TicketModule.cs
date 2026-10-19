@@ -61,7 +61,7 @@ public sealed class TicketModule(
             await ReplyAsync(TicketPresentation.Change(change));
         });
 
-    [SlashCommand("show", "Look up user tickets, including hidden IDs, or one visible ticket number.")]
+    [SlashCommand("show", "Look up a user's tickets or one visible ticket number.")]
     public Task ShowAsync(
         [Summary("user", "User mention or ID, including departed users.")] string? user = null,
         [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long? id = null,
@@ -122,20 +122,25 @@ public sealed class TicketModule(
 
             await RespondWithModalAsync(
                 $"ticket-edit:{actor.GuildId}:{actor.UserId}:{ticket.Number}:{ticket.Version}",
-                new TicketCommentModal { Title = $"Edit Ticket #{ticket.Number}", Comment = ticket.Comment ?? string.Empty });
+                new TicketEditModal
+                {
+                    Title = $"Edit Ticket #{ticket.Number}",
+                    Comment = ticket.Comment ?? string.Empty,
+                    Hidden = ticket.Hidden,
+                });
         }, defer: false);
 
     [ModalInteraction("ticket-edit:*:*:*:*", true)]
-    public Task SubmitEditAsync(ulong guildId, ulong ownerId, long number, int version, TicketCommentModal modal)
+    public Task SubmitEditAsync(ulong guildId, ulong ownerId, long number, int version, TicketEditModal modal)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
             if (actor.GuildId != guildId || actor.UserId != ownerId)
                 throw new UnauthorizedAccessException();
 
-            var change = await workflow.SetAsync(actor, number, comment: modal.Comment,
+            var change = await workflow.SetAsync(actor, number, comment: modal.Comment, hidden: modal.Hidden,
                 expectedVersion: version, cancellationToken: cancellationToken);
 
-            await ReplyAsync(TicketPresentation.Change(change));
+            await ReplyAsync(TicketPresentation.Change(change, hiding: modal.Hidden));
         });
 
     [SlashCommand("hide", "Hide a note and remove its Sylvan-authored publication where possible.")]
@@ -155,11 +160,14 @@ public sealed class TicketModule(
 
             if (interaction.Message.Flags?.HasFlag(MessageFlags.Ephemeral) == true)
             {
+                var canViewHidden = actor.IsAdministrator || actor.CanViewAuditLog;
                 await ModifyOriginalResponseAsync(properties =>
                 {
                     properties.Content = TicketPresentation.Change(change, hiding: true);
-                    properties.Embed = TicketPresentation.Describe(change.Ticket);
-                    properties.Components = TicketPresentation.Buttons(change.Ticket);
+                    properties.Embed = canViewHidden ? TicketPresentation.Describe(change.Ticket) : null;
+                    properties.Components = canViewHidden
+                        ? TicketPresentation.Buttons(change.Ticket)
+                        : new ComponentBuilder().Build();
                     properties.AllowedMentions = AllowedMentions.None;
                 });
             }
@@ -317,7 +325,7 @@ public sealed class TicketModule(
         var permissions = moderator.GuildPermissions;
         var actor = new TicketActor(Context.Guild.Id, moderator.Id, permissions.Administrator,
             permissions.ModerateMembers, permissions.BanMembers, permissions.KickMembers,
-            permissions.MuteMembers, permissions.DeafenMembers, permissions.ManageRoles);
+            permissions.MuteMembers, permissions.DeafenMembers, permissions.ManageRoles, permissions.ViewAuditLog);
 
         try
         {
@@ -329,7 +337,8 @@ public sealed class TicketModule(
             {
                 DbUpdateConcurrencyException => "This ticket changed since you opened it. Read it again before editing.",
                 UnauthorizedAccessException => "Staff access and channel visibility are required. "
-                    + "Changing notes requires Moderate Members or Administrator; Mute Members alone is insufficient.",
+                    + "Changing notes requires Moderate Members or Administrator; Mute Members alone is insufficient. "
+                    + "Viewing hidden tickets requires View Audit Log or Administrator.",
                 NotSupportedException => "This ticket type is read-only. Only notes can be changed or hidden.",
                 KeyNotFoundException => "No matching ticket in this server.",
                 ArgumentException => "Check the user ID, ticket number, message link, page and comment. "

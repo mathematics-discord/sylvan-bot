@@ -11,6 +11,7 @@ internal sealed class TicketTestFixture : IAsyncDisposable
 {
     private readonly ServiceProvider _services;
     internal static TicketActor Moderator => new(100, 300, IsAdministrator: false, CanTimeoutMembers: true);
+    internal static TicketActor SeniorModerator => Moderator with { CanViewAuditLog = true };
     internal static TicketActor Administrator => new(100, 301, IsAdministrator: true, CanTimeoutMembers: false);
 
     internal TicketTestFixture(EntityState? failSaveState = null)

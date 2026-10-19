@@ -15,11 +15,16 @@ internal static class TicketPresentation
     {
         var builder = new ComponentBuilder();
 
-        if (ticket.Action == TicketAction.Note && !ticket.Hidden)
+        if (ticket.Action == TicketAction.Note)
         {
             builder
-                .WithButton("Edit", $"ticket:edit:{ticket.Number}", ButtonStyle.Primary)
-                .WithButton("Hide", $"ticket:hide:{ticket.Number}", ButtonStyle.Danger);
+                .WithButton("Edit", $"ticket:edit:{ticket.Number}", ButtonStyle.Primary);
+
+            if (!ticket.Hidden)
+            {
+                builder
+                    .WithButton("Hide", $"ticket:hide:{ticket.Number}", ButtonStyle.Danger);
+            }
         }
 
         return builder.Build();

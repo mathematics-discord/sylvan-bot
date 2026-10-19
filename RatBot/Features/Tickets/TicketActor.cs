@@ -9,4 +9,5 @@ public sealed record TicketActor(
     bool CanKickMembers = false,
     bool CanMuteMembers = false,
     bool CanDeafenMembers = false,
-    bool CanManageRoles = false);
+    bool CanManageRoles = false,
+    bool CanViewAuditLog = false);
