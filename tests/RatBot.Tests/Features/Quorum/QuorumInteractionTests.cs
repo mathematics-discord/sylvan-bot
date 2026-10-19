@@ -4,9 +4,10 @@ using NSubstitute;
 using RatBot.Features.Quorum;
 using RatBot.Features.Quorum.Commands;
 using RatBot.Features.Quorum.Persistence;
+using RatBot.Tests.Integration;
 using Serilog;
 
-namespace RatBot.Tests.Integration.Quorum;
+namespace RatBot.Tests.Features.Quorum;
 
 [TestFixture]
 public sealed class QuorumInteractionTests
