@@ -221,6 +221,9 @@ public sealed class TicketWorkflow(
             if (!hide && comment is null)
                 return new TicketChange(ticket, NoChange: true);
 
+            if (append && !string.IsNullOrEmpty(ticket.Comment))
+                comment = "\n" + comment;
+
             if (comment is not null)
                 ValidateComment(comment, existingComment: append ? ticket.Comment : null);
 

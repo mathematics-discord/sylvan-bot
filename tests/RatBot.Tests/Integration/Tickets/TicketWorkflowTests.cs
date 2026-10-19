@@ -247,7 +247,7 @@ public sealed class TicketWorkflowTests
         await using var fixture = new TicketTestFixture();
         await fixture.EnableAsync();
         var created = await fixture.Workflow.CreateAsync(TicketTestFixture.Moderator, 123, "Original");
-        var comment = new string('x', append ? length - "Original".Length : length);
+        var comment = new string('x', append ? length - "Original\n".Length : length);
         Func<Task<TicketChange>> correct = () => append
             ? fixture.Workflow.AppendAsync(TicketTestFixture.Moderator, created.Ticket.Number, comment)
             : fixture.Workflow.SetAsync(TicketTestFixture.Moderator, created.Ticket.Number, comment: comment);
@@ -263,10 +263,32 @@ public sealed class TicketWorkflowTests
         var stored = await dbContext.Tickets
             .SingleAsync();
 
-        var expected = append ? "Original" + comment : comment;
+        var expected = append ? "Original\n" + comment : comment;
         stored.Comment.ShouldBe(length > 2000 ? "Original" : expected);
         stored.Version.ShouldBe(length > 2000 ? 0 : 1);
         fixture.Discord.Updates.ShouldBe(length > 2000 ? 0 : 1);
+    }
+
+    [TestCase(null, "More")]
+    [TestCase("", "More")]
+    [TestCase("Original", "Original\nMore")]
+    public async Task AppendAsync_NewText_StartsOnANewLineAfterExistingComment(string? original, string expected)
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.EnableAsync();
+        await fixture.StoreAsync(comment: original);
+
+        // Act
+        await fixture.Workflow.AppendAsync(TicketTestFixture.Moderator, 32702, "More");
+
+        // Assert
+        await using var dbContext = await fixture.Factory.CreateDbContextAsync();
+        var stored = await dbContext.Tickets
+            .SingleAsync();
+
+        stored.Comment.ShouldBe(expected);
+        fixture.Discord.PublishedComments.ShouldBe([expected]);
     }
 
     [Test]
@@ -525,7 +547,7 @@ public sealed class TicketWorkflowTests
 
         // Act
         await fixture.Workflow.SetAsync(actor, created.Ticket.Number, comment: "Replacement");
-        var appended = await fixture.Workflow.AppendAsync(actor, created.Ticket.Number, "\nMore");
+        var appended = await fixture.Workflow.AppendAsync(actor, created.Ticket.Number, "More");
         var hidden = await fixture.Workflow.HideAsync(actor, created.Ticket.Number);
 
         // Assert
@@ -581,7 +603,7 @@ public sealed class TicketWorkflowTests
         await fixture.EnableAsync();
         var created = await fixture.Workflow.CreateAsync(TicketTestFixture.Moderator, 123, "Original");
         var opened = await fixture.Workflow.PrepareEditAsync(TicketTestFixture.Moderator, created.Ticket.Number);
-        await fixture.Workflow.AppendAsync(TicketTestFixture.Moderator, created.Ticket.Number, " newer");
+        await fixture.Workflow.AppendAsync(TicketTestFixture.Moderator, created.Ticket.Number, "newer");
 
         // Act
         await Should.ThrowAsync<DbUpdateConcurrencyException>(() => fixture.Workflow.SetAsync(
@@ -589,7 +611,7 @@ public sealed class TicketWorkflowTests
 
         // Assert
         var current = await fixture.Workflow.PrepareEditAsync(TicketTestFixture.Moderator, created.Ticket.Number);
-        current.Comment.ShouldBe("Original newer");
+        current.Comment.ShouldBe("Original\nnewer");
         fixture.Discord.Updates.ShouldBe(1);
     }
 
