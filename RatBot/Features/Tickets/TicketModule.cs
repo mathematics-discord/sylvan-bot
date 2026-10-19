@@ -20,7 +20,7 @@ public sealed class TicketModule(
             await ReplyAsync(TicketPresentation.Change(change));
         });
 
-    [SlashCommand("show", "Look up visible tickets for a user or one ticket number.")]
+    [SlashCommand("show", "Look up user tickets, including hidden IDs, or one visible ticket number.")]
     public Task ShowAsync(
         [Summary("user", "User mention or ID, including departed users.")] string? user = null,
         [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long? id = null,
@@ -152,11 +152,19 @@ public sealed class TicketModule(
             return;
         }
 
-        var subjectId = TicketReference.ParseUser(user!);
+        await ShowHistoryAsync(actor, TicketReference.ParseUser(user!), page, hidden, cancellationToken);
+    }
+
+    private async Task ShowHistoryAsync(
+        TicketActor actor, ulong subjectId, int page, bool hidden, CancellationToken cancellationToken)
+    {
         var resultPage = await workflow.ListAsync(actor, subjectId, page, hidden, cancellationToken);
         var text = new StringBuilder();
 
-        foreach (var ticket in resultPage.Items)
+        var detailedTickets = resultPage.Items
+            .Where(ticket => hidden || !ticket.Hidden);
+
+        foreach (var ticket in detailedTickets)
         {
             var line = $"**#{ticket.Number}** | {TicketPresentation.ActionName(ticket.Action)}";
 
@@ -169,6 +177,22 @@ public sealed class TicketModule(
                 line += $" | {jumpLink}";
 
             text.AppendLine(line);
+        }
+
+        if (!hidden)
+        {
+            var hiddenIds = resultPage.Items
+                .Where(ticket => ticket.Hidden)
+                .Select(ticket => $"#{ticket.Number}")
+                .ToArray();
+
+            if (hiddenIds.Length > 0)
+            {
+                text.AppendLine();
+                text.AppendLine("**Hidden**");
+                text.AppendLine(string.Join(", ", hiddenIds));
+                text.AppendLine();
+            }
         }
 
         if (resultPage.Items.IsEmpty)

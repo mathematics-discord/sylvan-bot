@@ -219,6 +219,20 @@ public sealed class TicketWorkflowTests
     }
 
     [Test]
+    public async Task ListAsync_HiddenTicketChannelUnavailable_DoesNotExposeHiddenIds()
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.EnableAsync();
+        await fixture.StoreAsync(hidden: true);
+        fixture.Discord.DenyRead = true;
+
+        // Act / Assert
+        await Should.ThrowAsync<UnauthorizedAccessException>(() => fixture.Workflow.ListAsync(
+            TicketTestFixture.Moderator, 123));
+    }
+
+    [Test]
     public async Task CreateAsync_SaveFails_DoesNotPublish()
     {
         // Arrange
@@ -308,6 +322,7 @@ public sealed class TicketWorkflowTests
         await fixture.StoreAsync();
         await fixture.StoreAsync(32703, hidden: true);
         await fixture.StoreAsync(32702, guildId: 999, comment: "Other guild");
+        await fixture.StoreAsync(32704, guildId: 999, hidden: true);
         var created = await fixture.Workflow.CreateAsync(TicketTestFixture.Moderator, 123, "New");
         await fixture.Workflow.ConfigureAsync(TicketTestFixture.Administrator, false, null);
 
@@ -323,7 +338,12 @@ public sealed class TicketWorkflowTests
         numbered.Value.ShouldBeOfType<Some<Ticket>>().Value.Comment.ShouldBe("New");
         hidden.Value.ShouldBeOfType<Some<Ticket>>().Value.Hidden.ShouldBeTrue();
         (await fixture.Workflow.ShowAsync(TicketTestFixture.Moderator, 32703)).Value.ShouldBeOfType<None>();
-        normal.Items.Length.ShouldBe(2);
+        normal.Items.Length.ShouldBe(3);
+        normal.Items
+            .Where(ticket => ticket.Hidden)
+            .Select(ticket => ticket.Number)
+            .ShouldBe([32703L]);
+
         hiddenPage.Items.Length.ShouldBe(1);
         var foreign = await fixture.Workflow.ShowAsync(
             TicketTestFixture.Moderator with { GuildId = 999 }, created.Ticket.Number);
@@ -340,6 +360,7 @@ public sealed class TicketWorkflowTests
         for (var index = 0; index < 13; index++)
         {
             await fixture.StoreAsync(index + 1, actions[index % actions.Length],
+                hidden: index % 2 == 0,
                 status: index % 2 == 0 ? TicketStatus.Expired : TicketStatus.Reverted,
                 comment: new string('x', 5000));
         }
@@ -354,6 +375,10 @@ public sealed class TicketWorkflowTests
         second.Items.Length.ShouldBe(3);
         second.HasMore.ShouldBeFalse();
         first.Items[0].Comment!.Length.ShouldBe(5000);
+        first.Items
+            .Concat(second.Items)
+            .Count(ticket => ticket.Hidden)
+            .ShouldBe(7);
     }
 
     [TestCase("set")]

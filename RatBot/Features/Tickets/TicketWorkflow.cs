@@ -143,7 +143,7 @@ public sealed class TicketWorkflow(
         var tickets = await dbContext.Tickets
             .AsNoTracking()
             .Where(ticket => ticket.GuildId == actor.GuildId && ticket.SubjectUserId == subjectUserId
-                && ticket.Hidden == hidden)
+                && (!hidden || ticket.Hidden))
             .OrderByDescending(ticket => ticket.CreatedAtUtc)
             .ThenByDescending(ticket => ticket.Id)
             .Skip((page - 1) * 10)
