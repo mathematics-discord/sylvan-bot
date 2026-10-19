@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Globalization;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace RatBot.Features.Tickets;
@@ -10,6 +11,21 @@ public sealed class TicketModule(
     TicketWorkflow workflow, ITicketDiscord discord, ILogger logger, IHostApplicationLifetime lifetime)
     : InteractionModuleBase<IInteractionContext>
 {
+    [UserCommand("Add Moderation Note")]
+    [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
+    [RequireUserPermission(GuildPermission.ModerateMembers)]
+    [CommandContextType(InteractionContextType.Guild)]
+    public Task AddModerationNoteAsync(IUser user)
+        => NoteAsync(user.Id.ToString(CultureInfo.InvariantCulture));
+
+    [UserCommand("List Tickets")]
+    [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
+    [RequireUserPermission(GuildPermission.ModerateMembers)]
+    [CommandContextType(InteractionContextType.Guild)]
+    public Task ListTicketsAsync(IUser user)
+        => ExecuteAsync((actor, cancellationToken) =>
+            ShowHistoryAsync(actor, user.Id, page: 1, hidden: false, cancellationToken));
+
     [SlashCommand("note", "Save a moderator note and publish it to the staff tickets channel.")]
     public Task NoteAsync(
         [Summary("user", "Subject's mention or user ID, including departed users.")] string user,
