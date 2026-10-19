@@ -8,6 +8,8 @@ public sealed class TicketWorkflow(
     ITicketDiscord discord,
     ILogger logger) : IDisposable
 {
+    public const int CommentLimit = 2000;
+
     // A single bot serialises saves through publication, including initial creation.
     // The database token also detects changes made outside this process.
     private readonly SemaphoreSlim _corrections = new(1, 1);
@@ -47,28 +49,36 @@ public sealed class TicketWorkflow(
         return configuration;
     }
 
-    public async Task<TicketChange> CreateAsync(
-        TicketActor actor, ulong subjectUserId, string comment, CancellationToken cancellationToken = default)
+    public async Task<ulong> PrepareCreateAsync(
+        TicketActor actor, ulong subjectUserId, CancellationToken cancellationToken = default)
     {
         RequireNotePermission(actor);
-        ValidateComment(comment);
 
         if (subjectUserId == 0)
             throw new ArgumentException("A nonzero subject ID is required.", nameof(subjectUserId));
 
+        await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var configuration = await dbContext.TicketConfigurations
+            .AsNoTracking()
+            .SingleOrDefaultAsync(configuration => configuration.GuildId == actor.GuildId, cancellationToken);
+
+        if (configuration is not { Enabled: true, DestinationChannelId: not null })
+            throw new InvalidOperationException("Ticket notes are disabled or have no destination.");
+
+        await discord.CheckChannelAsync(actor, configuration.DestinationChannelId.Value, publishing: true, cancellationToken);
+        return configuration.DestinationChannelId.Value;
+    }
+
+    public async Task<TicketChange> CreateAsync(
+        TicketActor actor, ulong subjectUserId, string comment, CancellationToken cancellationToken = default)
+    {
+        ValidateComment(comment);
         await _corrections.WaitAsync(cancellationToken);
 
         try
         {
+            var channelId = await PrepareCreateAsync(actor, subjectUserId, cancellationToken);
             await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
-            var configuration = await dbContext.TicketConfigurations
-                .AsNoTracking()
-                .SingleOrDefaultAsync(configuration => configuration.GuildId == actor.GuildId, cancellationToken);
-
-            if (configuration is not { Enabled: true, DestinationChannelId: not null })
-                throw new InvalidOperationException("Ticket notes are disabled or have no destination.");
-
-            await discord.CheckChannelAsync(actor, configuration.DestinationChannelId.Value, publishing: true, cancellationToken);
             var number = await dbContext.Database
                 .SqlQuery<long>($"SELECT nextval('ticket_numbers') AS \"Value\"")
                 .SingleAsync(cancellationToken);
@@ -87,7 +97,7 @@ public sealed class TicketWorkflow(
 
             dbContext.Tickets.Add(ticket);
             await dbContext.SaveChangesAsync(cancellationToken);
-            return await PublishAsync(dbContext, ticket, configuration.DestinationChannelId.Value, cancellationToken);
+            return await PublishAsync(dbContext, ticket, channelId, cancellationToken);
         }
         finally
         {
@@ -212,7 +222,7 @@ public sealed class TicketWorkflow(
                 return new TicketChange(ticket, NoChange: true);
 
             if (comment is not null)
-                ValidateComment(comment);
+                ValidateComment(comment, existingComment: append ? ticket.Comment : null);
 
             ulong? channelId = null;
 
@@ -418,10 +428,13 @@ public sealed class TicketWorkflow(
         RequireNotePermission(actor);
     }
 
-    private static void ValidateComment(string comment)
+    private static void ValidateComment(string comment, string? existingComment = null)
     {
         if (string.IsNullOrWhiteSpace(comment))
             throw new ArgumentException("A comment must contain non-whitespace content.", nameof(comment));
+
+        if (comment.Length > CommentLimit - (existingComment?.Length ?? 0))
+            throw new ArgumentException("Comments cannot exceed 2,000 characters.", nameof(comment));
     }
 
     private void LogFailure(Ticket ticket, string operation, Exception exception)

@@ -160,7 +160,7 @@ public sealed class TicketWorkflowTests
         await using var fixture = new TicketTestFixture();
         await fixture.EnableAsync();
         var actor = administrator ? TicketTestFixture.Administrator : TicketTestFixture.Moderator;
-        var comment = "  @everyone <@123>\n" + new string('x', 5000);
+        var comment = "  @everyone <@123>\n".PadRight(2000, 'x');
         fixture.Discord.BeforePublish = async ticket =>
         {
             await using var dbContext = await fixture.Factory.CreateDbContextAsync();
@@ -215,6 +215,109 @@ public sealed class TicketWorkflowTests
             .CountAsync();
 
         count.ShouldBe(0);
+        fixture.Discord.Publications.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task CreateAsync_CommentTooLong_DoesNotSaveOrPublish()
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.EnableAsync();
+
+        // Act
+        await Should.ThrowAsync<ArgumentException>(() => fixture.Workflow.CreateAsync(
+            TicketTestFixture.Moderator, 123, new string('x', 2001)));
+
+        // Assert
+        await using var dbContext = await fixture.Factory.CreateDbContextAsync();
+        (await dbContext.Tickets
+            .CountAsync()).ShouldBe(0);
+
+        fixture.Discord.Publications.ShouldBe(0);
+    }
+
+    [TestCase(false, 2000)]
+    [TestCase(false, 2001)]
+    [TestCase(true, 2000)]
+    [TestCase(true, 2001)]
+    public async Task CorrectAsync_CommentLimit_AppliesToCompleteComment(bool append, int length)
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.EnableAsync();
+        var created = await fixture.Workflow.CreateAsync(TicketTestFixture.Moderator, 123, "Original");
+        var comment = new string('x', append ? length - "Original".Length : length);
+        Func<Task<TicketChange>> correct = () => append
+            ? fixture.Workflow.AppendAsync(TicketTestFixture.Moderator, created.Ticket.Number, comment)
+            : fixture.Workflow.SetAsync(TicketTestFixture.Moderator, created.Ticket.Number, comment: comment);
+
+        // Act
+        if (length > 2000)
+            await Should.ThrowAsync<ArgumentException>(correct);
+        else
+            await correct();
+
+        // Assert
+        await using var dbContext = await fixture.Factory.CreateDbContextAsync();
+        var stored = await dbContext.Tickets
+            .SingleAsync();
+
+        var expected = append ? "Original" + comment : comment;
+        stored.Comment.ShouldBe(length > 2000 ? "Original" : expected);
+        stored.Version.ShouldBe(length > 2000 ? 0 : 1);
+        fixture.Discord.Updates.ShouldBe(length > 2000 ? 0 : 1);
+    }
+
+    [Test]
+    public async Task AppendAsync_ExistingLongComment_IsPreservedAndCanBeReplacedExplicitly()
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.EnableAsync();
+        var original = new string('x', 5000);
+        await fixture.StoreAsync(comment: original);
+
+        // Act
+        await Should.ThrowAsync<ArgumentException>(() => fixture.Workflow.AppendAsync(
+            TicketTestFixture.Moderator, 32702, "More"));
+
+        var unchanged = await fixture.Workflow.PrepareEditAsync(TicketTestFixture.Moderator, 32702);
+        var replaced = await fixture.Workflow.SetAsync(TicketTestFixture.Moderator, 32702, comment: "Replacement");
+
+        // Assert
+        unchanged.Comment.ShouldBe(original);
+        unchanged.Version.ShouldBe(0);
+        replaced.Ticket.Comment.ShouldBe("Replacement");
+        fixture.Discord.Publications.ShouldBe(1);
+    }
+
+    [TestCase("permission")]
+    [TestCase("channel")]
+    [TestCase("disabled")]
+    public async Task CreateAsync_AccessChangesAfterModalPreparation_DoesNotSaveOrPublish(string change)
+    {
+        // Arrange
+        await using var fixture = new TicketTestFixture();
+        await fixture.EnableAsync();
+        var actor = TicketTestFixture.Moderator;
+        await fixture.Workflow.PrepareCreateAsync(actor, 123);
+
+        if (string.Equals(change, "permission", StringComparison.Ordinal))
+            actor = actor with { CanTimeoutMembers = false };
+        else if (string.Equals(change, "channel", StringComparison.Ordinal))
+            fixture.Discord.DenyPublication = true;
+        else
+            await fixture.Workflow.ConfigureAsync(TicketTestFixture.Administrator, false, null);
+
+        // Act
+        await Should.ThrowAsync<Exception>(() => fixture.Workflow.CreateAsync(actor, 123, "Comment"));
+
+        // Assert
+        await using var dbContext = await fixture.Factory.CreateDbContextAsync();
+        (await dbContext.Tickets
+            .CountAsync()).ShouldBe(0);
+
         fixture.Discord.Publications.ShouldBe(0);
     }
 

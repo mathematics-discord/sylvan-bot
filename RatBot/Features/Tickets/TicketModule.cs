@@ -13,10 +13,35 @@ public sealed class TicketModule(
     [SlashCommand("note", "Save a moderator note and publish it to the staff tickets channel.")]
     public Task NoteAsync(
         [Summary("user", "Subject's mention or user ID, including departed users.")] string user,
-        [Summary("comment", "Moderator note.")] string comment)
+        [Summary("comment", "Moderator note; omit to open an editor.")] [MaxLength(TicketWorkflow.CommentLimit)] string? comment = null)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
-            var change = await workflow.CreateAsync(actor, TicketReference.ParseUser(user), comment, cancellationToken);
+            var subjectId = TicketReference.ParseUser(user);
+
+            if (comment is null)
+            {
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                deadline.CancelAfter(TimeSpan.FromSeconds(2));
+                await workflow.PrepareCreateAsync(actor, subjectId, deadline.Token);
+                await RespondWithModalAsync(
+                    $"ticket-note:{actor.GuildId}:{actor.UserId}:{subjectId}",
+                    new TicketCommentModal { Title = "Add ticket note" });
+
+                return;
+            }
+
+            var change = await workflow.CreateAsync(actor, subjectId, comment, cancellationToken);
+            await ReplyAsync(TicketPresentation.Change(change));
+        }, defer: comment is not null);
+
+    [ModalInteraction("ticket-note:*:*:*", true)]
+    public Task SubmitNoteAsync(ulong guildId, ulong ownerId, ulong subjectId, TicketCommentModal modal)
+        => ExecuteAsync(async (actor, cancellationToken) =>
+        {
+            if (actor.GuildId != guildId || actor.UserId != ownerId)
+                throw new UnauthorizedAccessException();
+
+            var change = await workflow.CreateAsync(actor, subjectId, modal.Comment, cancellationToken);
             await ReplyAsync(TicketPresentation.Change(change));
         });
 
@@ -40,7 +65,7 @@ public sealed class TicketModule(
     public Task SetAsync(
         [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id,
         [Summary("duration", "Notes do not accept a duration.")] string? duration = null,
-        [Summary("comment", "Replacement comment; omitted means unchanged.")] string? comment = null)
+        [Summary("comment", "Replacement comment; omitted means unchanged.")] [MaxLength(TicketWorkflow.CommentLimit)] string? comment = null)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
             var change = await workflow.SetAsync(actor, id, duration, comment, cancellationToken: cancellationToken);
@@ -50,7 +75,7 @@ public sealed class TicketModule(
     [SlashCommand("append", "Append text to a note, preserving the existing comment.")]
     public Task AppendAsync(
         [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id,
-        [Summary("comment", "Text to append, including any desired separator.")] string comment)
+        [Summary("comment", "Text to append; the complete comment must fit within 2,000 characters.")] [MaxLength(TicketWorkflow.CommentLimit)] string comment)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
             var change = await workflow.AppendAsync(actor, id, comment, cancellationToken);
@@ -72,11 +97,10 @@ public sealed class TicketModule(
             deadline.CancelAfter(TimeSpan.FromSeconds(2));
             var ticket = await workflow.PrepareEditAsync(actor, number, deadline.Token);
 
-            if (ticket.Comment?.Length > TicketPresentation.ModalCommentLimit)
+            if (ticket.Comment?.Length > TicketWorkflow.CommentLimit)
             {
-                await ReplyAsync("This comment exceeds the editor's 4,000-character capacity. "
-                    + $"Use /ticket set id:{number} comment: to replace it, "
-                    + $"or /ticket append id:{number} comment: to preserve it and add text.");
+                await ReplyAsync("This stored comment exceeds the 2,000-character limit and has been left intact. "
+                    + $"Use /ticket set id:{number} comment: to replace it with a comment of at most 2,000 characters.");
                 return;
             }
 
@@ -293,7 +317,7 @@ public sealed class TicketModule(
                 NotSupportedException => "This ticket type is read-only. Only notes can be changed or hidden.",
                 KeyNotFoundException => "No matching ticket in this server.",
                 ArgumentException => "Check the user ID, ticket number, message link, page and comment. "
-                    + "Comments cannot be blank; notes do not accept duration changes.",
+                    + "Comments must contain text and total at most 2,000 characters, including appended text; notes do not accept duration changes.",
                 InvalidOperationException => "The operation is unavailable. Check ticket configuration and the channel. "
                     + "Sylvan needs View Channel, Read Message History, Send Messages, Embed Links and Attach Files.",
                 OperationCanceledException => "The operation was interrupted. Check the ticket before retrying.",

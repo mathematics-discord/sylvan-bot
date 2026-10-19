@@ -5,7 +5,6 @@ namespace RatBot.Features.Tickets;
 internal static class TicketPresentation
 {
     internal const int InlineCommentLimit = 3500;
-    internal const int ModalCommentLimit = 4000;
 
     internal static string? Link(ulong guildId, ulong? channelId, ulong? msgId) =>
         channelId is not null && msgId is not null
