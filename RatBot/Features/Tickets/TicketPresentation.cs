@@ -49,6 +49,9 @@ internal static class TicketPresentation
             .WithTextDisplay(new TextDisplayBuilder().WithContent($"## {description.Title}"))
             .WithTextDisplay(new TextDisplayBuilder().WithContent(description.Description));
 
+        if (ticket.Action == TicketAction.Note)
+            container.WithAccentColor(new Color(0x808080));
+
         if (ticket.Comment?.Length > InlineCommentLimit)
         {
             container.WithFile(new FileComponentBuilder()
