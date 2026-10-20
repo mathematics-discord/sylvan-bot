@@ -1,7 +1,7 @@
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.EntityFrameworkCore;
+﻿namespace RatBot.Features.Logging.Persistence;
 
-namespace RatBot.Features.Logging.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 public sealed class LoggingPersistence :
     IEntityTypeConfiguration<LoggingConfiguration>,

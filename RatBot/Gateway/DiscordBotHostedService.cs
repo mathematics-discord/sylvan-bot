@@ -1,6 +1,6 @@
-using Serilog.Events;
-
 namespace RatBot.Gateway;
+
+using Serilog.Events;
 
 public sealed class DiscordBotHostedService : IHostedService
 {
@@ -30,7 +30,8 @@ public sealed class DiscordBotHostedService : IHostedService
 
         interactionService.Log += message =>
         {
-            LogDiscordMessage("Interactions", message);
+            if (message.Exception is not Discord.Interactions.InteractionException)
+                LogDiscordMessage("Interactions", message);
             return Task.CompletedTask;
         };
     }
@@ -41,7 +42,7 @@ public sealed class DiscordBotHostedService : IHostedService
         _discordClient.Disconnected += OnDisconnectedAsync;
         _discordClient.GuildMembersDownloaded += OnGuildMembersDownloadedAsync;
 
-        foreach (IDiscordGatewayHandler handler in _gatewayHandlers)
+        foreach (var handler in _gatewayHandlers)
             await handler.InitializeAsync(cancellationToken);
 
         await _discordClient.LoginAsync(TokenType.Bot, _options.Token);
@@ -50,7 +51,7 @@ public sealed class DiscordBotHostedService : IHostedService
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
-        foreach (IDiscordGatewayHandler handler in _gatewayHandlers.Reverse())
+        foreach (var handler in _gatewayHandlers.Reverse())
             handler.Unsubscribe();
 
         _discordClient.Connected -= OnConnectedAsync;
@@ -63,7 +64,7 @@ public sealed class DiscordBotHostedService : IHostedService
 
     private void LogDiscordMessage(string category, LogMessage message)
     {
-        LogEventLevel level = message.Severity switch
+        var level = message.Severity switch
         {
             LogSeverity.Critical => LogEventLevel.Fatal,
             LogSeverity.Error => LogEventLevel.Error,
@@ -73,7 +74,7 @@ public sealed class DiscordBotHostedService : IHostedService
             _ => LogEventLevel.Debug
         };
 
-        string source = string.IsNullOrWhiteSpace(message.Source) ? "Unknown" : message.Source;
+        var source = string.IsNullOrWhiteSpace(message.Source) ? "Unknown" : message.Source;
 
         if (message.Exception is not null)
         {

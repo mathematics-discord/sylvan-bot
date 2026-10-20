@@ -1,20 +1,20 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿namespace RatBot;
+
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
-using RatBot.Features.EmojiAnalytics.Persistence;
+using RatBot.Application.Features.Quorum;
 using RatBot.Features.EmojiAnalytics;
+using RatBot.Features.EmojiAnalytics.Persistence;
 using RatBot.Features.EmojiYoink;
 using RatBot.Features.Logging;
 using RatBot.Features.Moderation;
-using RatBot.Features.Quorum.Persistence;
+using RatBot.Features.Quorum;
 using RatBot.Features.RoleColours;
 using RatBot.Gateway;
 using RatBot.Infrastructure.Data;
 using RatBot.Interactions;
 
-namespace RatBot;
-
-[SuppressMessage("Design", "MA0051:Method is too long")]
 public static class DependencyInjection
 {
     extension(IServiceCollection services)
@@ -30,10 +30,13 @@ public static class DependencyInjection
 
         private void AddFeatures(IConfiguration configuration)
         {
-            services.AddSingleton<ImageBurstSpamDetectorSettings>();
+            services.AddSingleton<IQuorumMembers, DiscordQuorumMembers>();
+            services.AddScoped<QuorumOperations>();
+
+            services.AddSingleton<ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>>();
             services.AddSingleton(sp =>
                 new ImageBurstSpamDetector(TimeProvider.System,
-                    sp.GetRequiredService<ImageBurstSpamDetectorSettings>()));
+                    sp.GetRequiredService<ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>>()));
 
             services.AddScoped<ImageSpamSettingsService>();
 
@@ -83,11 +86,10 @@ public static class DependencyInjection
 
         private void AddPersistence(IConfiguration configuration)
         {
-            string connectionString = PostgresConnectionStringBuilder.Build(configuration);
+            var connectionString = PostgresConnectionStringBuilder.Build(configuration);
 
-            services.AddDbContextFactory<BotDbContext>(options => options.UseNpgsql(connectionString));
-
-            services.AddScoped(_ => new QuorumConfigurationStore(connectionString));
+            services.AddDbContextFactory<BotDbContext>(options =>
+                options.UseNpgsql(connectionString, postgres => postgres.MigrationsAssembly("RatBot")));
         }
 
         private void AddDiscord(IConfiguration configuration)
@@ -102,7 +104,7 @@ public static class DependencyInjection
 
             services.AddSingleton(sp =>
             {
-                DiscordOptions options = sp.GetRequiredService<IOptions<DiscordOptions>>().Value;
+                var options = sp.GetRequiredService<IOptions<DiscordOptions>>().Value;
 
                 return new DiscordSocketClient(
                     new DiscordSocketConfig
@@ -120,7 +122,7 @@ public static class DependencyInjection
 
             services.AddSingleton(sp => new InteractionService(
                 discordProvider: sp.GetRequiredService<DiscordSocketClient>(),
-                config: new InteractionServiceConfig { AutoServiceScopes = true }));
+                config: new InteractionServiceConfig { AutoServiceScopes = true, ThrowOnError = false }));
 
             services.AddSingleton<DiscordInteractionHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordInteractionHandler>());

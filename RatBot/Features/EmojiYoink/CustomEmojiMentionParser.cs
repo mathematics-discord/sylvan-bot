@@ -1,7 +1,7 @@
+namespace RatBot.Features.EmojiYoink;
+
 using System.Text.RegularExpressions;
 using static System.Text.RegularExpressions.RegexOptions;
-
-namespace RatBot.Features.EmojiYoink;
 
 public static partial class CustomEmojiMentionParser
 {
@@ -10,14 +10,14 @@ public static partial class CustomEmojiMentionParser
 
     public static ErrorOr<Emote> ParseStrict(string input)
     {
-        string candidate = input.Trim();
+        var candidate = input.Trim();
 
         return ParseMention(candidate, EmojiYoinkErrors.InvalidCustomEmoji);
     }
 
     public static ErrorOr<Emote> ParseMessage(string content)
     {
-        MatchCollection matches = MentionPattern.Matches(content);
+        var matches = MentionPattern.Matches(content);
 
         if (matches.Count != 1)
             return EmojiYoinkErrors.InvalidMessageEmoji;
@@ -27,7 +27,7 @@ public static partial class CustomEmojiMentionParser
 
     private static ErrorOr<Emote> ParseMention(string candidate, Error error)
     {
-        if (!Emote.TryParse(candidate, out Emote? emote)
+        if (!Emote.TryParse(candidate, out var emote)
             || emote.Id == 0
             || !string.Equals(candidate, emote.ToString(), StringComparison.Ordinal))
             return error;

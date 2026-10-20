@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace RatBot.Gateway;
+
+using System.ComponentModel.DataAnnotations;
 
 public sealed class DiscordOptions
 {

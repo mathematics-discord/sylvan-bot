@@ -1,4 +1,4 @@
-namespace RatBot.Features.RoleColours;
+﻿namespace RatBot.Features.RoleColours;
 
 public sealed class RoleColourOption
 {
@@ -23,7 +23,7 @@ public sealed class RoleColourOption
             return Error.Validation("RoleColourOption.RolesMustDiffer",
                 "Source and display role IDs must be different.");
 
-        DateTimeOffset now = DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.UtcNow;
         return new RoleColourOption
         {
             GuildId = guildId,

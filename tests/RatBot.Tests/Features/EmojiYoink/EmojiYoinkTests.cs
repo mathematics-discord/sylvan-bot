@@ -1,12 +1,10 @@
+namespace RatBot.Tests.Features.EmojiYoink;
+
 using System.Net;
 using Discord;
-using ErrorOr;
 using NSubstitute;
 using RatBot.Features.EmojiYoink;
 using Serilog;
-using Shouldly;
-
-namespace RatBot.Tests.Features.EmojiYoink;
 
 public sealed class EmojiYoinkTests
 {
@@ -24,15 +22,14 @@ public sealed class EmojiYoinkTests
     [Test]
     public async Task ImportAsync_rejects_invalid_name_before_download_or_creation()
     {
-        using RecordingHandler handler = new RecordingHandler(HttpStatusCode.OK);
-        using HttpClient client = new HttpClient(handler);
+        using var handler = new RecordingHandler(HttpStatusCode.OK);
+        using var client = new HttpClient(handler);
 
-        DiscordGuildEmojiImporter importer =
-            new DiscordGuildEmojiImporter(client, new LoggerConfiguration().CreateLogger());
+        var importer = new DiscordGuildEmojiImporter(client, new LoggerConfiguration().CreateLogger());
 
-        IGuild guild = Substitute.For<IGuild>();
-        IUser moderator = Substitute.For<IUser>();
-        Emote source = Emote.Parse("<:a~1:789>");
+        var guild = Substitute.For<IGuild>();
+        var moderator = Substitute.For<IUser>();
+        var source = Emote.Parse("<:a~1:789>");
 
         ErrorOr<GuildEmote> result = await importer.ImportAsync(guild, moderator, source, CancellationToken.None);
 
@@ -45,26 +42,25 @@ public sealed class EmojiYoinkTests
     [Test]
     public async Task ImportAsync_uses_source_emoji_for_animated_download_and_normalises_name()
     {
-        using RecordingHandler handler = new RecordingHandler(HttpStatusCode.OK);
-        using HttpClient client = new HttpClient(handler);
+        using var handler = new RecordingHandler(HttpStatusCode.OK);
+        using var client = new HttpClient(handler);
 
-        DiscordGuildEmojiImporter importer =
+        var importer =
             new DiscordGuildEmojiImporter(client, new LoggerConfiguration().CreateLogger());
 
-        IGuild guild = Substitute.For<IGuild>();
-        IUser moderator = Substitute.For<IUser>();
+        var guild = Substitute.For<IGuild>();
+        var moderator = Substitute.For<IUser>();
         moderator.Id.Returns(456UL);
         moderator.Username.Returns("moderator");
-        Emote source = Emote.Parse("<a:rat~27:789>");
+        var source = Emote.Parse("<a:rat~27:789>");
 
-        GuildEmote created = (GuildEmote)
+        var created = (GuildEmote)
             Activator.CreateInstance(
                 typeof(GuildEmote),
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
                 null,
                 [987UL, "rat", true, false, true, Array.Empty<ulong>(), null!, true],
-                null
-            )!;
+                null)!;
 
         string? importedName = null;
         RequestOptions? requestOptions = null;
@@ -75,6 +71,7 @@ public sealed class EmojiYoinkTests
             {
                 importedName = call.ArgAt<string>(0);
                 requestOptions = call.ArgAt<RequestOptions>(3);
+
                 return created;
             });
 
@@ -112,10 +109,12 @@ public sealed class EmojiYoinkTests
     {
         public Uri? RequestUri { get; private set; }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             RequestUri = request.RequestUri;
+
             return Task.FromResult(new HttpResponseMessage(statusCode) { Content = new ByteArrayContent([1, 2, 3]) });
         }
     }

@@ -1,7 +1,7 @@
-﻿using System.Net;
-using Discord.Net;
+﻿namespace RatBot.Features.EmojiYoink;
 
-namespace RatBot.Features.EmojiYoink;
+using System.Net;
+using Discord.Net;
 
 public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger logger)
 {
@@ -16,7 +16,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
         if (nameResult.IsError)
             return nameResult.Errors;
 
-        string destinationName = nameResult.Value;
+        var destinationName = nameResult.Value;
         _logger.Debug(
             "Importing emoji in guild {GuildId} for moderator {ModeratorUserId} ({ModeratorUsername}) from source {SourceEmojiId} "
             + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}",
@@ -37,9 +37,9 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
             return downloadResult.Errors;
         }
 
-        await using MemoryStream imageStream = downloadResult.Value;
-        using Image image = new Image(imageStream);
-        RequestOptions options = new RequestOptions
+        await using var imageStream = downloadResult.Value;
+        using var image = new Image(imageStream);
+        var options = new RequestOptions
         {
             CancelToken = ct,
             AuditLogReason = $"Emoji yoink by moderator {moderator.Id}; source emoji {source.Id}"
@@ -61,7 +61,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
             return result.Errors;
         }
 
-        GuildEmote created = result.Value;
+        var created = result.Value;
         _logger.Information(
             "Moderator {ModeratorUsername} ({ModeratorUserId}) added emoji {EmojiName} ({CreatedEmojiId}) to guild {GuildId} "
             + "from source {SourceEmojiId}; animated={IsAnimated}",
@@ -95,13 +95,13 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
 
     private async Task<ErrorOr<MemoryStream>> DownloadAsync(Emote source, CancellationToken ct)
     {
-        string animatedQuery = source.Animated ? "?animated=true" : string.Empty;
-        Uri cdnUri = new Uri($"https://cdn.discordapp.com/emojis/{source.Id}.webp{animatedQuery}");
+        var animatedQuery = source.Animated ? "?animated=true" : string.Empty;
+        var cdnUri = new Uri($"https://cdn.discordapp.com/emojis/{source.Id}.webp{animatedQuery}");
         MemoryStream? imageStream = null;
 
         try
         {
-            using HttpResponseMessage response = await httpClient
+            using var response = await httpClient
                 .GetAsync(cdnUri, HttpCompletionOption.ResponseHeadersRead, ct)
                 .ConfigureAwait(false);
 
@@ -114,13 +114,13 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
             if (response.Content.Headers.ContentLength > MaximumEmojiBytes)
                 return EmojiYoinkErrors.ImageTooLarge;
 
-            await using Stream responseStream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            await using var responseStream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             imageStream = new MemoryStream(MaximumEmojiBytes);
-            byte[] buffer = new byte[81920];
+            var buffer = new byte[81920];
 
             while (true)
             {
-                int bytesRead = await responseStream.ReadAsync(buffer, ct).ConfigureAwait(false);
+                var bytesRead = await responseStream.ReadAsync(buffer, ct).ConfigureAwait(false);
 
                 if (bytesRead == 0)
                     break;
@@ -132,7 +132,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
             }
 
             imageStream.Position = 0;
-            MemoryStream completedStream = imageStream;
+            var completedStream = imageStream;
             imageStream = null;
             return completedStream;
         }
@@ -150,11 +150,8 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
         }
         finally
         {
-            // it aint needed nor APPROPRIATE here SHUT UP analyzers GRRRFRRRR
             // ReSharper disable once MethodHasAsyncOverload
-#pragma warning disable MA0042
             imageStream?.Dispose();
-#pragma warning restore MA0042
         }
     }
 

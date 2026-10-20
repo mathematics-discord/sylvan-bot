@@ -1,6 +1,6 @@
-using RatBot.Interactions;
-
 namespace RatBot.Features.EmojiYoink;
+
+using RatBot.Interactions;
 
 [DefaultMemberPermissions(GuildPermission.ManageEmojisAndStickers)]
 [RequireUserPermission(GuildPermission.ManageEmojisAndStickers)]
@@ -26,7 +26,7 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
 
     private async Task ExecuteAsync(ErrorOr<Emote> sourceResult, bool rejectLocalSource)
     {
-        SocketGuild? guild = Context.Guild;
+        var guild = Context.Guild;
 
         if (guild is null)
         {
@@ -40,7 +40,7 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
             return;
         }
 
-        Emote source = sourceResult.Value;
+        var source = sourceResult.Value;
 
         if (rejectLocalSource && guild.Emotes.Any(emote => emote.Id == source.Id))
         {

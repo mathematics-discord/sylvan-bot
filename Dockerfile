@@ -5,6 +5,7 @@ COPY Directory.Build.props ./
 COPY Directory.Packages.props ./
 COPY global.json ./
 COPY RatBot/RatBot.csproj RatBot/
+COPY RatBot.Application/RatBot.Application.csproj RatBot.Application/
 
 RUN dotnet restore RatBot/RatBot.csproj
 

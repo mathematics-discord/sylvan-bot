@@ -1,3 +1,5 @@
+namespace RatBot.Tests;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -7,9 +9,6 @@ using RatBot.Features.Moderation;
 using RatBot.Features.RoleColours;
 using RatBot.Gateway;
 using Serilog;
-using Shouldly;
-
-namespace RatBot.Tests;
 
 public sealed class DependencyInjectionTests
 {
@@ -28,19 +27,19 @@ public sealed class DependencyInjectionTests
             )
             .Build();
 
-        ServiceCollection services = new ServiceCollection();
+        var services = new ServiceCollection();
         services.AddSingleton(configuration);
         services.AddSingleton<ILogger>(new LoggerConfiguration().CreateLogger());
         services.AddRatBot(configuration);
 
         // Act
-        await using ServiceProvider provider = services.BuildServiceProvider(
+        await using var provider = services.BuildServiceProvider(
             new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true }
         );
 
         IDiscordGatewayHandler[] gatewayHandlers = provider.GetServices<IDiscordGatewayHandler>().ToArray();
-        await using AsyncServiceScope scope = provider.CreateAsyncScope();
-        ImageSpamSettingsService settingsService = scope.ServiceProvider.GetRequiredService<ImageSpamSettingsService>();
+        await using var scope = provider.CreateAsyncScope();
+        var settingsService = scope.ServiceProvider.GetRequiredService<ImageSpamSettingsService>();
 
         // Assert
         settingsService.ShouldNotBeNull();
@@ -61,11 +60,11 @@ public sealed class DependencyInjectionTests
                 }
             )
             .Build();
-        ServiceCollection services = new ServiceCollection();
+        var services = new ServiceCollection();
         services.AddOptions<DiscordOptions>().Bind(configuration.GetSection(DiscordOptions.SectionName));
 
-        using ServiceProvider provider = services.BuildServiceProvider();
-        DiscordOptions options = provider.GetRequiredService<IOptions<DiscordOptions>>().Value;
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<DiscordOptions>>().Value;
 
         options.Token.ShouldBe("inert-test-token");
         typeof(DiscordOptions).GetProperty("CommandRegistrationGuildIds").ShouldBeNull();

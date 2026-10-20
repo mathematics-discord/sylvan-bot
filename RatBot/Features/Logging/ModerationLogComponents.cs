@@ -1,6 +1,6 @@
-using System.Globalization;
-
 namespace RatBot.Features.Logging;
+
+using System.Globalization;
 
 internal static class ModerationLogComponents
 {

@@ -1,25 +1,32 @@
 ﻿namespace RatBot.Features.Quorum.Commands;
 
+using RatBot.Application.Common;
+
 public static class QuorumChannelResolver
 {
-    public static ErrorOr<IGuildChannel> ResolveChannel(IGuild? currentGuild, IChannel ch)
+    public static IGuildChannel ResolveChannel(IGuild? currentGuild, IChannel channel)
     {
         if (currentGuild is null)
-            return Error.Validation(description: "This command can only be used in a guild.");
+            throw new BotCommandException("This command can only be used in a guild.");
 
-        if (ch is not IGuildChannel guildChannel || guildChannel.GuildId != currentGuild.Id)
-            return Error.Validation(description: "That channel does not belong to this guild.");
+        if (channel is not IGuildChannel guildChannel || guildChannel.GuildId != currentGuild.Id)
+            throw new BotCommandException("That channel does not belong to this guild.");
 
-        if (ch is SocketThreadChannel thread)
-            ch = thread.ParentChannel;
-        else if (ch is IThreadChannel)
-            return Error.Validation(description: "The thread's parent channel could not be resolved.");
-
-        return ch switch
+        if (channel is SocketThreadChannel thread)
         {
-            IForumChannel forum => ErrorOrFactory.From<IGuildChannel>(forum),
-            ITextChannel text => ErrorOrFactory.From<IGuildChannel>(text),
-            _ => Error.Validation(description: "Choose a guild text channel or forum channel."),
+            if (thread.ParentChannel is null)
+                throw new BotCommandException("The thread's parent channel could not be resolved.");
+
+            channel = thread.ParentChannel;
+        }
+        else if (channel is IThreadChannel)
+            throw new BotCommandException("The thread's parent channel could not be resolved.");
+
+        return channel switch
+        {
+            IForumChannel forum => forum,
+            ITextChannel text => text,
+            _ => throw new BotCommandException("Choose a guild text channel or forum channel."),
         };
     }
 }

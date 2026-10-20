@@ -1,7 +1,6 @@
-using RatBot.Features.Logging;
-using Shouldly;
-
 namespace RatBot.Tests.Features.Logging;
+
+using RatBot.Features.Logging;
 
 [TestFixture]
 public sealed class MessageEditDifferTests

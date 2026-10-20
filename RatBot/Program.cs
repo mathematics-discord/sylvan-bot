@@ -1,9 +1,9 @@
-﻿using DotNetEnv;
+﻿namespace RatBot;
+
+using DotNetEnv;
 using RatBot.Interactions;
 using Serilog.Debugging;
 using Serilog.Events;
-
-namespace RatBot;
 
 public static class Program
 {
@@ -15,7 +15,7 @@ public static class Program
         Env.TraversePath().Load();
         EnableSerilogSelfDiagnostics();
 
-        using IHost host = Host.CreateDefaultBuilder(args)
+        using var host = Host.CreateDefaultBuilder(args)
             .ConfigureAppConfiguration((_, configurationBuilder) => configurationBuilder.AddEnvironmentVariables())
             .UseSerilog((ctx, _, loggerConfiguration) => ConfigureSerilog(ctx.Configuration, loggerConfiguration))
             .ConfigureServices((ctx, services) => services.AddRatBot(ctx.Configuration))
@@ -27,7 +27,7 @@ public static class Program
 
     private static void ConfigureSerilog(IConfiguration config, LoggerConfiguration loggerConfiguration)
     {
-        string serviceInstanceId = Environment.MachineName;
+        var serviceInstanceId = Environment.MachineName;
 
         loggerConfiguration
             .MinimumLevel.Verbose()

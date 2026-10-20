@@ -1,25 +1,44 @@
 namespace RatBot.Features.Logging;
 
+using RatBot.Application.Common;
+
+/// <summary>
+/// Downloads attachment evidence while enforcing a maximum response size.
+/// </summary>
 internal static class AttachmentEvidenceDownloader
 {
+    /// <summary>
+    /// Downloads a successful response body if it does not exceed <paramref name="maxBytes"/>.
+    /// Returns none for unsuccessful responses, oversized bodies, or download failures.
+    /// </summary>
+    /// <param name="httpClient">The client used to request the attachment.</param>
+    /// <param name="url">The attachment URL.</param>
+    /// <param name="maxBytes">The maximum number of response bytes to return.</param>
+    /// <param name="logger">The logger used to record download failures.</param>
+    /// <param name="ct">A token that cancels the request and response read.</param>
+    /// <returns>The downloaded bytes, or none if the response cannot be used.</returns>
     public static async Task<Option<byte[]>> TryDownloadAsync(
-        HttpClient httpClient, string url, long maxBytes, ILogger logger,
+        HttpClient httpClient,
+        string url,
+        long maxBytes,
+        ILogger logger,
         CancellationToken ct)
     {
         try
         {
-            using HttpResponseMessage response = await httpClient
+            using var response = await httpClient
                 .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
 
             if (!response.IsSuccessStatusCode)
                 return new None();
 
-            long? contentLength = response.Content.Headers.ContentLength;
+            var contentLength = response.Content.Headers.ContentLength;
 
             if (contentLength > maxBytes)
                 return new None();
 
-            await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+
             return await ReadLimitedAsync(stream, maxBytes, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -29,10 +48,19 @@ internal static class AttachmentEvidenceDownloader
         catch (Exception ex)
         {
             logger.Debug(ex, "Failed to download moderation logging attachment evidence");
+
             return new None();
         }
     }
 
+    /// <summary>
+    /// Reads a stream up to the limit, returning none if it contains more than <paramref name="maxBytes"/>.
+    /// </summary>
+    /// <param name="stream">The response stream to read.</param>
+    /// <param name="maxBytes">The maximum number of bytes to return.</param>
+    /// <param name="ct">A token that cancels the read.</param>
+    /// <returns>The bytes read, or none if the stream exceeds the limit.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxBytes"/> is negative.</exception>
     internal static async Task<Option<byte[]>> ReadLimitedAsync(Stream stream, long maxBytes, CancellationToken ct)
     {
         if (maxBytes < 0)
@@ -40,17 +68,17 @@ internal static class AttachmentEvidenceDownloader
 
         const int maxReadBufferBytes = 81920;
 
-        long bufferedByteLimit = maxBytes == long.MaxValue ? long.MaxValue : maxBytes + 1;
-        long bytesRemaining = bufferedByteLimit;
-        int readBufferBytes = (int)Math.Min(maxReadBufferBytes, Math.Max(1, bytesRemaining));
-        byte[] readBuffer = new byte[readBufferBytes];
+        var bufferedByteLimit = maxBytes == long.MaxValue ? long.MaxValue : maxBytes + 1;
+        var bytesRemaining = bufferedByteLimit;
+        var readBufferBytes = (int)Math.Min(maxReadBufferBytes, Math.Max(1, bytesRemaining));
+        var readBuffer = new byte[readBufferBytes];
 
-        await using MemoryStream buffer = new MemoryStream(readBufferBytes);
+        await using var buffer = new MemoryStream(readBufferBytes);
 
         while (bytesRemaining > 0)
         {
-            int bytesToRead = (int)Math.Min(readBuffer.Length, bytesRemaining);
-            int bytesRead = await stream.ReadAsync(readBuffer.AsMemory(0, bytesToRead), ct);
+            var bytesToRead = (int)Math.Min(readBuffer.Length, bytesRemaining);
+            var bytesRead = await stream.ReadAsync(readBuffer.AsMemory(0, bytesToRead), ct);
 
             if (bytesRead == 0)
                 return new Some<byte[]>(buffer.ToArray());
@@ -60,6 +88,8 @@ internal static class AttachmentEvidenceDownloader
             bytesRemaining -= bytesRead;
         }
 
-        return buffer.Length > maxBytes ? new None() : new Some<byte[]>(buffer.ToArray());
+        return buffer.Length > maxBytes
+            ? new None()
+            : new Some<byte[]>(buffer.ToArray());
     }
 }

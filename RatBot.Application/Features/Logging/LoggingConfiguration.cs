@@ -1,4 +1,4 @@
-namespace RatBot.Features.Logging;
+﻿namespace RatBot.Features.Logging;
 
 public sealed class LoggingConfiguration
 {

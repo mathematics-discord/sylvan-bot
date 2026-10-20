@@ -1,5 +1,6 @@
-using RatBot.Interactions;
 namespace RatBot.Features.Hello;
+
+using RatBot.Interactions;
 
 [DefaultMemberPermissions(GuildPermission.SendMessages)]
 public sealed class HelloModule(ILogger logger) : SlashCommandBase

@@ -1,7 +1,7 @@
+namespace RatBot.Features.EmojiAnalytics.Persistence;
+
 using Microsoft.EntityFrameworkCore;
 using RatBot.Infrastructure.Data;
-
-namespace RatBot.Features.EmojiAnalytics.Persistence;
 
 public sealed class EmojiUsageStore(IDbContextFactory<BotDbContext> dbContextFactory)
 {

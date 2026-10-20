@@ -1,11 +1,10 @@
+namespace RatBot.Tests.Features.RoleColours;
+
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.EntityFrameworkCore;
 using RatBot.Infrastructure.Data;
-using Shouldly;
-
-namespace RatBot.Tests.Features.RoleColours;
 
 [TestFixture]
 public sealed class RoleColourSchemaCompatibilityTests
@@ -14,20 +13,20 @@ public sealed class RoleColourSchemaCompatibilityTests
     public void MigrationMatchesCurrentModel()
     {
         // Arrange
-        using BotDbContext db = new BotDbContext(
+        using var db = new BotDbContext(
             new DbContextOptionsBuilder<BotDbContext>()
-                .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused").Options
+                .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused", postgres => postgres.MigrationsAssembly("RatBot")).Options
         );
 
-        IMigrationsAssembly migrations = db.GetService<IMigrationsAssembly>();
+        var migrations = db.GetService<IMigrationsAssembly>();
 
         // Act
-        Migration latestMigration =
+        var latestMigration =
             migrations.CreateMigration(migrations.Migrations.Last().Value, db.Database.ProviderName!);
 
-        IModel migrationModel = db.GetService<IModelRuntimeInitializer>().Initialize(latestMigration.TargetModel, true);
+        var migrationModel = db.GetService<IModelRuntimeInitializer>().Initialize(latestMigration.TargetModel, true);
 
-        IModel currentModel = db.GetService<IDesignTimeModel>().Model;
+        var currentModel = db.GetService<IDesignTimeModel>().Model;
 
         // Assert
         db.GetService<IMigrationsModelDiffer>()

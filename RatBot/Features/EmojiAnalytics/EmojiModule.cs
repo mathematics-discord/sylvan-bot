@@ -1,7 +1,7 @@
+namespace RatBot.Features.EmojiAnalytics;
+
 using System.Text;
 using RatBot.Features.EmojiAnalytics.Persistence;
-
-namespace RatBot.Features.EmojiAnalytics;
 
 [Group("emoji", "Emoji analytics commands.")]
 [DefaultMemberPermissions(GuildPermission.SendMessages)]
@@ -58,9 +58,9 @@ public sealed class EmojiModule(EmojiUsageStore store, IOptions<EmojiAnalyticsOp
 
     private string BuildUsagePageText(ImmutableArray<EmojiUsageEntry> rows)
     {
-        StringBuilder text = new StringBuilder();
+        var text = new StringBuilder();
 
-        foreach (EmojiUsageEntry row in rows)
+        foreach (var row in rows)
             text.AppendLine($"{FormatEmojiForDisplay(row.EmojiId)}: {row.ReactionUsageCount + row.MessageUsageCount}");
 
         return text.ToString();
@@ -68,14 +68,14 @@ public sealed class EmojiModule(EmojiUsageStore store, IOptions<EmojiAnalyticsOp
 
     private string FormatEmojiForDisplay(ulong emojiId)
     {
-        GuildEmote? guildEmote = Context.Guild?.Emotes.FirstOrDefault(x => x.Id == emojiId);
+        var guildEmote = Context.Guild?.Emotes.FirstOrDefault(x => x.Id == emojiId);
 
         return guildEmote is not null ? guildEmote.ToString() : $"[custom:{emojiId}]";
     }
 
     private async Task<ErrorOr<EmojiUsagePage>> GetUsagePageAsync(int page)
     {
-        IGuild? guild = await Context.Client.GetGuildAsync(Context.Guild.Id, CacheMode.CacheOnly);
+        var guild = await Context.Client.GetGuildAsync(Context.Guild.Id, CacheMode.CacheOnly);
         if (guild is null)
             return Error.Unexpected(description: "Tracked guild emoji are not available yet.");
 
@@ -105,7 +105,7 @@ public sealed class EmojiModule(EmojiUsageStore store, IOptions<EmojiAnalyticsOp
             return;
         }
 
-        ComponentBuilderV2 components = BuildUsagePageComponents(pageResult.Value, Context.User.Id);
+        var components = BuildUsagePageComponents(pageResult.Value, Context.User.Id);
 
         await RespondAsync(ephemeral: true, components: components.Build()).ConfigureAwait(false);
     }
@@ -133,7 +133,7 @@ public sealed class EmojiModule(EmojiUsageStore store, IOptions<EmojiAnalyticsOp
             return;
         }
 
-        ComponentBuilderV2 components = BuildUsagePageComponents(pageResult.Value, Context.User.Id);
+        var components = BuildUsagePageComponents(pageResult.Value, Context.User.Id);
 
         if (Context.Interaction is SocketMessageComponent component)
         {

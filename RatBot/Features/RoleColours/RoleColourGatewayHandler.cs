@@ -1,6 +1,6 @@
-using RatBot.Gateway;
-
 namespace RatBot.Features.RoleColours;
+
+using RatBot.Gateway;
 
 public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, RoleColourReconciler colours)
     : IDiscordGatewayHandler

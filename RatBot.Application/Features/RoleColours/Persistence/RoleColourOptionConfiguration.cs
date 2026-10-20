@@ -1,7 +1,7 @@
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.EntityFrameworkCore;
+﻿namespace RatBot.Features.RoleColours.Persistence;
 
-namespace RatBot.Features.RoleColours.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<RoleColourOption>
 {

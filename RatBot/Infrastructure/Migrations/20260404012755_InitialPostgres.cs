@@ -1,9 +1,9 @@
-#nullable disable
-
-using Microsoft.EntityFrameworkCore.Migrations;
-
 namespace RatBot.Infrastructure.Migrations
 {
+#nullable disable
+
+    using Microsoft.EntityFrameworkCore.Migrations;
+
     /// <inheritdoc />
     public partial class InitialPostgres : Migration
     {

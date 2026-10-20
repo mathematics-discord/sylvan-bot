@@ -1,10 +1,11 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿namespace RatBot.Infrastructure.Data;
+
+using Microsoft.EntityFrameworkCore;
+using RatBot.Application.Features.Quorum;
 using RatBot.Features.EmojiAnalytics;
 using RatBot.Features.Logging;
 using RatBot.Features.Moderation;
 using RatBot.Features.RoleColours;
-
-namespace RatBot.Infrastructure.Data;
 
 /// <summary>
 ///     Entity Framework Core database context for RatBot persistence.
@@ -16,6 +17,9 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<LoggingConfiguration> LoggingConfigurations => Set<LoggingConfiguration>();
     public DbSet<LoggingExcludedChannel> LoggingExcludedChannels => Set<LoggingExcludedChannel>();
     public DbSet<RoleColourOption> RoleColourOptions => Set<RoleColourOption>();
+
+    public DbSet<QuorumConfiguration> QuorumConfigurations => Set<QuorumConfiguration>();
+    public DbSet<QuorumVoterRole> QuorumVoterRoles => Set<QuorumVoterRole>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

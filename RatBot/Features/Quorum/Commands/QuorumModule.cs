@@ -1,52 +1,30 @@
-﻿using RatBot.Features.Quorum.Persistence;
+﻿namespace RatBot.Features.Quorum.Commands;
 
-namespace RatBot.Features.Quorum.Commands;
+using RatBot.Application.Common;
+using RatBot.Application.Features.Quorum;
 
 [Group("quorum", "Quorum commands.")]
 [DefaultMemberPermissions(GuildPermission.MuteMembers)]
-public sealed class QuorumModule(QuorumConfigurationStore configurations, ILogger logger)
+public sealed class QuorumModule(QuorumOperations operations)
     : InteractionModuleBase<IInteractionContext>
 {
-    [SlashCommand("calculate", "Calculate required quorum for a channel.")]
+    [SlashCommand("calculate", "Calculate required quorum for a channel.", runMode: RunMode.Async)]
     public async Task CalculateAsync(
         [Summary("channel", "The guild text channel, forum channel, or a thread under one.")]
         [ChannelTypes(ChannelType.Text, ChannelType.Forum, ChannelType.NewsThread, ChannelType.PublicThread,
             ChannelType.PrivateThread)]
         IChannel? channel = null)
     {
-        ErrorOr<IGuildChannel> channelResult =
+        var resolvedChannel =
             QuorumChannelResolver.ResolveChannel(Context.Guild, channel ?? Context.Channel);
-
-        if (channelResult.IsError)
-        {
-            await RespondAsync(channelResult.FirstError.Description, ephemeral: true);
-            return;
-        }
 
         // A real ephemeral acknowledgement leaves followup visibility independent of a deferred response.
         await RespondAsync("Calculating quorum…", ephemeral: true);
 
-        IGuildChannel ch = channelResult.Value;
-        ErrorOr<QuorumConfiguration> configuration =
-            await configurations.GetAsync(ch.GuildId, ch.Id, CancellationToken.None);
+        var calculation = await operations.CalculateAsync(
+            resolvedChannel.GuildId, resolvedChannel.Id, CancellationToken.None);
 
-        if (configuration.IsError)
-        {
-            await ModifyOriginalResponseAsync(properties => properties.Content = configuration.FirstError.Description);
-            return;
-        }
-
-        ErrorOr<(int EligibleVoterCount, int RequiredVotes)> calculation = await QuorumCalculator.CalculateAsync(
-            Context.Guild, configuration.Value, logger, CancellationToken.None);
-
-        if (calculation.IsError)
-        {
-            await ModifyOriginalResponseAsync(properties => properties.Content = calculation.FirstError.Description);
-            return;
-        }
-
-        await SendPublicResponseAsync(QuorumCommandResponses.Calculation(
-            calculation.Value.EligibleVoterCount, configuration.Value.Proportion, calculation.Value.RequiredVotes));
+        await SendPublicResponseAsync(QuorumCommandResponses.Calculation(calculation));
     }
 
     [SlashCommand("inspect", "Inspect quorum configuration for a channel.")]
@@ -56,28 +34,21 @@ public sealed class QuorumModule(QuorumConfigurationStore configurations, ILogge
             ChannelType.PrivateThread)]
         IChannel? channel = null)
     {
-        ErrorOr<IGuildChannel> channelResult =
+        var resolvedChannel =
             QuorumChannelResolver.ResolveChannel(Context.Guild, channel ?? Context.Channel);
-
-        if (channelResult.IsError)
-        {
-            await RespondAsync(channelResult.FirstError.Description, ephemeral: true);
-            return;
-        }
 
         await RespondAsync("Loading quorum configuration…", ephemeral: true);
 
-        IGuildChannel ch = channelResult.Value;
-        ErrorOr<QuorumConfiguration> configuration =
-            await configurations.GetAsync(ch.GuildId, ch.Id, CancellationToken.None);
+        Option<QuorumConfiguration> configuration = await operations.InspectAsync(
+            resolvedChannel.GuildId, resolvedChannel.Id, CancellationToken.None);
 
-        if (configuration.IsError)
+        if (configuration.Value is not Some<QuorumConfiguration>(var configured))
         {
-            await ModifyOriginalResponseAsync(properties => properties.Content = configuration.FirstError.Description);
+            await ModifyOriginalResponseAsync(properties => properties.Content = QuorumMessages.ConfigurationNotFound);
             return;
         }
 
-        await SendPublicResponseAsync(QuorumCommandResponses.Inspection(configuration.Value));
+        await SendPublicResponseAsync(QuorumCommandResponses.Inspection(configured));
     }
 
     private async Task SendPublicResponseAsync(string content)

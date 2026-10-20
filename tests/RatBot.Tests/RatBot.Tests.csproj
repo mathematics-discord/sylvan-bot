@@ -8,8 +8,8 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Discord.Net.Interactions"/>
-        <PackageReference Include="Discord.Net.WebSocket"/>
+        <PackageReference Include="Discord.Net.Interactions" />
+        <PackageReference Include="Discord.Net.WebSocket" />
         <PackageReference Include="ErrorOr"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
@@ -23,6 +23,10 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
+        <PackageReference Include="StyleCop.Analyzers">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
         <PackageReference Include="Testcontainers"/>
         <PackageReference Include="Testcontainers.PostgreSql"/>
     </ItemGroup>
@@ -33,5 +37,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\RatBot\RatBot.csproj"/>
+        <ProjectReference Include="..\..\RatBot.Application\RatBot.Application.csproj"/>
     </ItemGroup>
 </Project>

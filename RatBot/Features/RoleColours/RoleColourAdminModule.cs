@@ -1,6 +1,6 @@
-using System.Text;
-
 namespace RatBot.Features.RoleColours;
+
+using System.Text;
 
 [Group("colour-admin", "Administrative role colour commands.")]
 [DefaultMemberPermissions(GuildPermission.Administrator)]
@@ -53,9 +53,9 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
             return;
         }
 
-        (RoleColourOption option, bool created) = result.Value;
-        int incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None, previous);
-        string action = created ? "Registered" : "Updated";
+        (var option, var created) = result.Value;
+        var incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None, previous);
+        var action = created ? "Registered" : "Updated";
         await FollowupAsync(
             $"{action} colour mapping `{option.OptionId}`: {source.Mention} -> {display.Mention}.{CheckSummary(incomplete)}",
             ephemeral: true
@@ -86,7 +86,7 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
             return;
         }
 
-        int incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None, previous);
+        var incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None, previous);
         await FollowupAsync($"Deleted colour mapping `{result.Value.OptionId}`.{CheckSummary(incomplete)}",
             ephemeral: true);
     }
@@ -134,7 +134,7 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
             return;
         }
 
-        int incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None);
+        var incomplete = await reconciler.ReconcileGuildAsync(Context.Guild, CancellationToken.None);
         await FollowupAsync($"Role colour check completed.{CheckSummary(incomplete)}", ephemeral: true);
     }
 
@@ -145,9 +145,9 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
 
     private static string BuildListResponse(IReadOnlyList<RoleColourOption> options)
     {
-        StringBuilder builder = new StringBuilder("Configured colour options:");
+        var builder = new StringBuilder("Configured colour options:");
 
-        foreach (RoleColourOption option in options)
+        foreach (var option in options)
             builder.AppendLine()
                 .Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
 

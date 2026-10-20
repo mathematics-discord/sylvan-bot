@@ -1,4 +1,4 @@
-namespace RatBot.Features.EmojiAnalytics;
+﻿namespace RatBot.Features.EmojiAnalytics;
 
 /// <summary>
 ///     Represents persisted usage metrics for an emoji in a guild.

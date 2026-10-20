@@ -5,7 +5,7 @@ public static class ErrorOrExtensions
     public static async Task<ErrorOr<T>> ToErrorOr<T>(this Task<T?> task, Error error)
         where T : class
     {
-        T? value = await task;
+        var value = await task;
 
         return value is not null ? value : error;
     }

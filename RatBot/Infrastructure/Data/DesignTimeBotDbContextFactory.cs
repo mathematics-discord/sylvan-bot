@@ -1,8 +1,9 @@
-﻿using DotNetEnv;
+﻿namespace RatBot.Infrastructure.Data;
+
+using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-
-namespace RatBot.Infrastructure.Data;
+using RatBot.Application.Common;
 
 /// <summary>
 ///     Creates <see cref="BotDbContext" /> instances for design-time tooling such as EF Core migrations.
@@ -11,17 +12,17 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
 {
     private static Option<string> BuildFromDiscrete(IConfiguration c)
     {
-        string? host = c["DB:Host"] ?? c["Database:Host"] ?? Environment.GetEnvironmentVariable("DB__HOST");
-        string? port = c["DB:Port"] ?? c["Database:Port"] ?? Environment.GetEnvironmentVariable("DB__PORT");
-        string? db = c["DB:Database"] ?? c["Database:Name"] ?? Environment.GetEnvironmentVariable("DB__DATABASE");
-        string? user = c["DB:User"] ?? c["Database:User"] ?? Environment.GetEnvironmentVariable("DB__USER");
-        string? pwd = c["DB:Password"] ?? c["Database:Password"] ?? Environment.GetEnvironmentVariable("DB__PASSWORD");
+        var host = c["DB:Host"] ?? c["Database:Host"] ?? Environment.GetEnvironmentVariable("DB__HOST");
+        var port = c["DB:Port"] ?? c["Database:Port"] ?? Environment.GetEnvironmentVariable("DB__PORT");
+        var db = c["DB:Database"] ?? c["Database:Name"] ?? Environment.GetEnvironmentVariable("DB__DATABASE");
+        var user = c["DB:User"] ?? c["Database:User"] ?? Environment.GetEnvironmentVariable("DB__USER");
+        var pwd = c["DB:Password"] ?? c["Database:Password"] ?? Environment.GetEnvironmentVariable("DB__PASSWORD");
 
         if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(db) || string.IsNullOrWhiteSpace(user) ||
             string.IsNullOrWhiteSpace(pwd))
             return new None();
 
-        string resolvedPort = string.IsNullOrWhiteSpace(port) ? "5432" : port;
+        var resolvedPort = string.IsNullOrWhiteSpace(port) ? "5432" : port;
 
         return new Some<string>(
             $"Host={host};Port={resolvedPort};Database={db};Username={user};Password={pwd};SSL Mode=Prefer");
@@ -36,9 +37,9 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
     {
         Env.TraversePath().Load();
 
-        IConfigurationRoot configurationRoot = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+        var configurationRoot = new ConfigurationBuilder().AddEnvironmentVariables().Build();
 
-        string? connectionString =
+        var connectionString =
             configurationRoot.GetConnectionString("BotDb")
             ?? configurationRoot["DB:ConnectionString"]
             ?? Environment.GetEnvironmentVariable("DB__CONNECTION_STRING");
@@ -52,7 +53,9 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
                 "Design-time connection string missing. Set DB__CONNECTION_STRING or discrete DB__* vars.");
 
         DbContextOptions<BotDbContext> options =
-            new DbContextOptionsBuilder<BotDbContext>().UseNpgsql(connectionString).Options;
+            new DbContextOptionsBuilder<BotDbContext>()
+                .UseNpgsql(connectionString, postgres => postgres.MigrationsAssembly("RatBot"))
+                .Options;
 
         return new BotDbContext(options);
     }

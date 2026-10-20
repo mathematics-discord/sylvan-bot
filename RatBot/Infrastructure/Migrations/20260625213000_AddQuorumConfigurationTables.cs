@@ -1,10 +1,10 @@
+namespace RatBot.Infrastructure.Migrations;
+
 #nullable disable
 
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using RatBot.Infrastructure.Data;
-
-namespace RatBot.Infrastructure.Migrations;
 
 [DbContext(typeof(BotDbContext))]
 [Migration("20260625213000_AddQuorumConfigurationTables")]

@@ -1,8 +1,7 @@
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.EntityFrameworkCore;
-using RatBot.Features.Moderation;
+﻿namespace RatBot.Features.Moderation.Persistence;
 
-namespace RatBot.Features.Moderation.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 public sealed class ImageSpamSettingsConfiguration : IEntityTypeConfiguration<ImageSpamSettings>
 {

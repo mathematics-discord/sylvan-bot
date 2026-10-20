@@ -1,4 +1,4 @@
-namespace RatBot.Features.Moderation;
+﻿namespace RatBot.Features.Moderation;
 
 public sealed class ImageSpamSettings
 {

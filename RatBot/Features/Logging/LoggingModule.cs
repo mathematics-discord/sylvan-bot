@@ -1,24 +1,24 @@
+namespace RatBot.Features.Logging;
+
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using RatBot.Infrastructure.Data;
-
-namespace RatBot.Features.Logging;
 
 [Group("logging", "Moderation logging commands.")]
 [DefaultMemberPermissions(GuildPermission.Administrator)]
 [RequireContext(ContextType.Guild)]
 [RequireUserPermission(GuildPermission.Administrator)]
+[SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements should be documented")]
 public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory)
     : InteractionModuleBase<IInteractionContext>
 {
     [SlashCommand("config", "View or update moderation logging configuration.")]
     public async Task ConfigAsync(
-        [Summary("enabled", "Whether moderation logging is enabled.")]
-        bool? enabled = null,
+        [Summary("enabled", "Whether moderation logging is enabled.")] bool? enabled = null,
         [Summary("delete-log-channel", "Channel for delete and bulk-delete logs.")]
         [ChannelTypes(ChannelType.Text, ChannelType.News)]
         IChannel? deleteLogChannel = null,
-        [Summary("edit-log-channel", "Channel for edit logs.")]
-        [ChannelTypes(ChannelType.Text, ChannelType.News)]
+        [Summary("edit-log-channel", "Channel for edit logs.")] [ChannelTypes(ChannelType.Text, ChannelType.News)]
         IChannel? editLogChannel = null)
     {
         if (!await ValidateTextContextAsync())
@@ -26,6 +26,7 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
 
         await DeferAsync(ephemeral: true);
         await using var dbContext = await contextFactory.CreateDbContextAsync();
+
         var configuration = await dbContext.LoggingConfigurations
             .SingleOrDefaultAsync(configuration => configuration.GuildId == Context.Guild.Id);
 
@@ -38,9 +39,10 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
             var updatedEnabled = enabled ?? configuration.Enabled;
             var deleteLogChannelId = deleteLogChannel?.Id ?? configuration.DeleteLogChannelId;
             var editLogChannelId = editLogChannel?.Id ?? configuration.EditLogChannelId;
+
             var enablingWithoutDestination = updatedEnabled
-                && deleteLogChannelId is null
-                && editLogChannelId is null;
+                                             && deleteLogChannelId is null
+                                             && editLogChannelId is null;
 
             if (enablingWithoutDestination)
             {
@@ -82,6 +84,7 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
         await DeferAsync(ephemeral: true);
         var targetChannel = channel ?? Context.Channel;
         await using var dbContext = await contextFactory.CreateDbContextAsync();
+
         var isExcluded = await dbContext.LoggingExcludedChannels
             .AnyAsync(excluded => excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
 
@@ -93,15 +96,18 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
             return;
         }
 
-        dbContext.LoggingExcludedChannels.Add(new LoggingExcludedChannel
-        {
-            GuildId = Context.Guild.Id,
-            ChannelId = targetChannel.Id,
-            ExcludedAtUtc = DateTimeOffset.UtcNow,
-        });
+        dbContext.LoggingExcludedChannels.Add(
+            new LoggingExcludedChannel
+            {
+                GuildId = Context.Guild.Id,
+                ChannelId = targetChannel.Id,
+                ExcludedAtUtc = DateTimeOffset.UtcNow,
+            });
 
         await dbContext.SaveChangesAsync();
-        await ModifyOriginalResponseAsync(response => response.Content = $"Logging is now excluded in <#{targetChannel.Id}>.");
+
+        await ModifyOriginalResponseAsync(response =>
+            response.Content = $"Logging is now excluded in <#{targetChannel.Id}>.");
     }
 
     [SlashCommand("include", "Enable moderation logging again for a channel.")]
@@ -123,8 +129,10 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
         await DeferAsync(ephemeral: true);
         var targetChannel = channel ?? Context.Channel;
         await using var dbContext = await contextFactory.CreateDbContextAsync();
+
         var exclusion = await dbContext.LoggingExcludedChannels
-            .SingleOrDefaultAsync(excluded => excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
+            .SingleOrDefaultAsync(excluded =>
+                excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
 
         if (exclusion is null)
         {
@@ -136,7 +144,9 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
 
         dbContext.LoggingExcludedChannels.Remove(exclusion);
         await dbContext.SaveChangesAsync();
-        await ModifyOriginalResponseAsync(response => response.Content = $"Logging is enabled again in <#{targetChannel.Id}>.");
+
+        await ModifyOriginalResponseAsync(response =>
+            response.Content = $"Logging is enabled again in <#{targetChannel.Id}>.");
     }
 
     [SlashCommand("exclusions", "List channels excluded from moderation logging.")]
@@ -147,6 +157,7 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
 
         await DeferAsync(ephemeral: true);
         await using var dbContext = await contextFactory.CreateDbContextAsync();
+
         var channelIds = await dbContext.LoggingExcludedChannels
             .AsNoTracking()
             .Where(exclusion => exclusion.GuildId == Context.Guild.Id)
@@ -157,11 +168,12 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
         if (channelIds.Length == 0)
         {
             await ModifyOriginalResponseAsync(response => response.Content = "No channels are excluded from logging.");
+
             return;
         }
 
         const string heading = "Excluded logging channels:";
-        var responses = new List<string>();
+        List<string> responses = [];
         var content = heading;
 
         foreach (var channelId in channelIds)
@@ -180,22 +192,11 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
         responses.Add(content);
         await ModifyOriginalResponseAsync(response => response.Content = responses[0]);
 
-        var followups = responses
+        IEnumerable<string> followups = responses
             .Skip(1);
 
         foreach (var followup in followups)
             await FollowupAsync(followup, ephemeral: true);
-    }
-
-    private async Task<bool> ValidateTextContextAsync()
-    {
-        var isTextContext = Context.Channel is ITextChannel or IThreadChannel;
-
-        if (isTextContext)
-            return true;
-
-        await RespondAsync("This command can only be used in a text channel.", ephemeral: true);
-        return false;
     }
 
     private static string FormatConfiguration(LoggingConfiguration configuration)
@@ -209,8 +210,20 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
             : $"<#{configuration.EditLogChannelId.Value}>";
 
         return "Logging configuration:\n"
-            + $"- Enabled: {configuration.Enabled}\n"
-            + $"- Delete log channel: {deleteLogChannel}\n"
-            + $"- Edit log channel: {editLogChannel}";
+               + $"- Enabled: {configuration.Enabled}\n"
+               + $"- Delete log channel: {deleteLogChannel}\n"
+               + $"- Edit log channel: {editLogChannel}";
+    }
+
+    private async Task<bool> ValidateTextContextAsync()
+    {
+        var isTextContext = Context.Channel is ITextChannel or IThreadChannel;
+
+        if (isTextContext)
+            return true;
+
+        await RespondAsync("This command can only be used in a text channel.", ephemeral: true);
+
+        return false;
     }
 }

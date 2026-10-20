@@ -4,7 +4,7 @@ public static class EmojiName
 {
     public static ErrorOr<string> Normalize(string invokedSourceName)
     {
-        int suffixStart = invokedSourceName.LastIndexOf('~');
+        var suffixStart = invokedSourceName.LastIndexOf('~');
 
         if (
             suffixStart >= 0

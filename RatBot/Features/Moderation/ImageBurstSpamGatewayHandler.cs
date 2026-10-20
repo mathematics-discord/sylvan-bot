@@ -1,11 +1,13 @@
-﻿using RatBot.Gateway;
+﻿namespace RatBot.Features.Moderation;
 
-namespace RatBot.Features.Moderation;
+using System.Collections.Concurrent;
+using RatBot.Application.Common;
+using RatBot.Gateway;
 
 public sealed class ImageBurstSpamGatewayHandler(
     DiscordSocketClient discordClient,
     ImageBurstSpamDetector detector,
-    ImageBurstSpamDetectorSettings detectorSettings,
+    ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild,
     IServiceScopeFactory scopeFactory,
     IOptions<DiscordOptions> options,
     ILogger logger
@@ -26,8 +28,8 @@ public sealed class ImageBurstSpamGatewayHandler(
 
     public async Task InitializeAsync(CancellationToken ct)
     {
-        using IServiceScope scope = scopeFactory.CreateScope();
-        ImageSpamSettingsService settingsService = scope.ServiceProvider.GetRequiredService<ImageSpamSettingsService>();
+        using var scope = scopeFactory.CreateScope();
+        var settingsService = scope.ServiceProvider.GetRequiredService<ImageSpamSettingsService>();
         await settingsService.LoadEnabledSettingsAsync(ct).ConfigureAwait(false);
 
         Subscribe();
@@ -40,12 +42,12 @@ public sealed class ImageBurstSpamGatewayHandler(
 
     private async Task HandleDetectionAsync(ImageBurstDetection detection)
     {
-        SocketGuild guild = discordClient.GetGuild(detection.GuildId);
+        var guild = discordClient.GetGuild(detection.GuildId);
 
-        if (!detectorSettings.TryGet(detection.GuildId, out ImageBurstSpamDetectorOptions currentSettings))
+        if (!settingsByGuild.TryGetValue(detection.GuildId, out var currentSettings))
             return;
 
-        string reason =
+        var reason =
             "Automatic image-burst spam detection: "
             + $"{detection.ChannelIds.Count} channels with {currentSettings.RequiredAttachmentCount}+ attachments "
             + $"in {currentSettings.Window} seconds.";
@@ -108,7 +110,7 @@ public sealed class ImageBurstSpamGatewayHandler(
         if (userMessage.Author is not SocketGuildUser guildUser)
             return new None();
 
-        if (!detectorSettings.TryGet(channel.Guild.Id, out ImageBurstSpamDetectorOptions currentSettings))
+        if (!settingsByGuild.TryGetValue(channel.Guild.Id, out var currentSettings))
             return new None();
 
         if (userMessage.Attachments.Count < currentSettings.RequiredAttachmentCount)

@@ -1,7 +1,7 @@
+namespace RatBot.Features.RoleColours;
+
 using Microsoft.EntityFrameworkCore;
 using RatBot.Infrastructure.Data;
-
-namespace RatBot.Features.RoleColours;
 
 public sealed class RoleColourOperations(BotDbContext db)
 {
@@ -24,7 +24,7 @@ public sealed class RoleColourOperations(BotDbContext db)
         if (optionId is <= 0)
             return Error.Validation(description: "Mapping ID must be positive.");
 
-        RoleColourOption? option = optionId.HasValue
+        var option = optionId.HasValue
             ? await db.RoleColourOptions.SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId.Value,
                 ct)
             : null;
@@ -44,7 +44,7 @@ public sealed class RoleColourOperations(BotDbContext db)
         )
             return Error.Conflict(description: "That source already grants this colour.");
 
-        bool created = option is null;
+        var created = option is null;
         if (option is null)
         {
             ErrorOr<RoleColourOption> result = RoleColourOption.Create(guildId, sourceRoleId, displayRoleId);
@@ -70,7 +70,7 @@ public sealed class RoleColourOperations(BotDbContext db)
         if (optionId <= 0)
             return Error.Validation(description: "Mapping ID must be positive.");
 
-        RoleColourOption? option =
+        var option =
             await db.RoleColourOptions.SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId, ct);
         if (option is null)
             return Error.NotFound(description: $"Colour mapping {optionId} was not found in this guild.");
