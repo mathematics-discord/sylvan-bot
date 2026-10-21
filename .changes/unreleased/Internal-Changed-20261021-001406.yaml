@@ -1,0 +1,4 @@
+component: Internal
+kind: Changed
+body: Replaced Meziantou.Analyzer with StyleCop, updated Roslynator and standardised C# formatting across the codebase.
+time: 2026-10-21T00:14:06.5439077+01:00
