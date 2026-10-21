@@ -1,4 +1,0 @@
-component: Internal
-kind: Changed
-body: Mapped existing quorum tables in EF Core and replaced the Dapper configuration store.
-time: 2026-10-21T00:14:03.0538676+01:00

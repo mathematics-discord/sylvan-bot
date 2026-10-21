@@ -1,4 +1,0 @@
-component: Moderation
-kind: Fixed
-body: Quorum commands now acknowledge requests before database queries and member lookups, reducing interaction timeouts during slow operations.
-time: 2026-10-21T00:13:59.5672985+01:00

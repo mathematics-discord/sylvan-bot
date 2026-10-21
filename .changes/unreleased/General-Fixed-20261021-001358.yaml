@@ -1,4 +1,0 @@
-component: General
-kind: Fixed
-body: Failed commands now complete pending responses where possible, explain expected failures, and show a generic message for unexpected errors.
-time: 2026-10-21T00:13:58.1154453+01:00
