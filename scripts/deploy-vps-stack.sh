@@ -13,7 +13,7 @@ Usage:
 Behavior:
   - Syncs non-secret compose/config assets from the repository to the VPS
   - Leaves server-side .env files in place
-  - Persists the deployed RATBOT_IMAGE back to the server-side .env for bot stacks
+  - Persists the deployed SYLVAN_BOT_IMAGE back to the server-side .env for bot stacks
   - Runs docker compose pull/up on the remote host
 EOF
 }
@@ -151,7 +151,7 @@ else
 fi
 
 if [[ -n "${IMAGE_REF}" ]]; then
-  export RATBOT_IMAGE="$IMAGE_REF"
+  export SYLVAN_BOT_IMAGE="$IMAGE_REF"
 fi
 
 docker compose "${compose_args[@]}" config >/dev/null
@@ -162,15 +162,15 @@ if [[ -n "${IMAGE_REF}" ]]; then
   tmp_env_file=".env.tmp"
   awk -v image_ref="$IMAGE_REF" '
     BEGIN { updated = 0 }
-    /^RATBOT_IMAGE=/ {
-      print "RATBOT_IMAGE=" image_ref
+    /^SYLVAN_BOT_IMAGE=/ {
+      print "SYLVAN_BOT_IMAGE=" image_ref
       updated = 1
       next
     }
     { print }
     END {
       if (!updated) {
-        print "RATBOT_IMAGE=" image_ref
+        print "SYLVAN_BOT_IMAGE=" image_ref
       }
     }
   ' .env > "$tmp_env_file"

@@ -19,7 +19,7 @@ services:
       - app_internal
 
   bot:
-    image: ${RATBOT_IMAGE:-ratbot:production}
+    image: ${SYLVAN_BOT_IMAGE:-sylvan-bot:production}
     pull_policy: always
     restart: unless-stopped
     environment:
@@ -41,8 +41,8 @@ services:
 
 volumes:
   postgres_data:
-    name: ratbot_production_postgres_data
+    name: sylvan-bot-production-postgres-data
 
 networks:
   app_internal:
-    name: ratbot_production_internal
+    name: sylvan-bot-production-internal
