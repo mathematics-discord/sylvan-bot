@@ -1,10 +1,15 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿namespace RatBot.Tests.Integration;
+
+using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using RatBot.Application.Common;
+using RatBot.Common;
 using RatBot.Features.Moderation;
 
-namespace RatBot.Tests.Integration;
-
 [TestFixture]
+[SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements should be documented")]
 public sealed class ImageSpamSettingsServiceTests
 {
     [SetUp]
@@ -18,8 +23,8 @@ public sealed class ImageSpamSettingsServiceTests
     {
         // Arrange
         await using var db = PostgresDatabaseFixture.CreateDbContext();
-        var detectorSettings = new ImageBurstSpamDetectorSettings();
-        var service = new ImageSpamSettingsService(db, detectorSettings);
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
+        var service = new ImageSpamSettingsService(db, settingsByGuild);
 
         // Act
         var result = await service.UpsertAsync(1, null, null, null, CancellationToken.None);
@@ -27,11 +32,12 @@ public sealed class ImageSpamSettingsServiceTests
         // Assert
         await using var readback = PostgresDatabaseFixture.CreateDbContext();
         var persisted = await readback.ImageSpamSettings.SingleAsync(x => x.GuildId == 1);
+
         (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds)
             .ShouldBe((4, 2, 45));
         persisted.IsEnabled.ShouldBeTrue();
         (result.DistinctChannelThreshold, result.RequiredAttachmentCount, result.Window).ShouldBe((4, 2, 45));
-        detectorSettings.TryGet(1, out var published).ShouldBeTrue();
+        settingsByGuild.TryGetValue(1, out var published).ShouldBeTrue();
         published.ShouldBe(result);
     }
 
@@ -39,7 +45,11 @@ public sealed class ImageSpamSettingsServiceTests
     [TestCase(null, 7, null, 5, 7, 60)]
     [TestCase(null, null, 90, 5, 3, 90)]
     public async Task UpsertAsync_OneValueProvided_PreservesOtherValuesAndEnablesDetection(
-        int? channels, int? attachments, int? seconds, int expectedChannels, int expectedAttachments,
+        int? channels,
+        int? attachments,
+        int? seconds,
+        int expectedChannels,
+        int expectedAttachments,
         int expectedSeconds)
     {
         // Arrange
@@ -49,8 +59,8 @@ public sealed class ImageSpamSettingsServiceTests
         settings.Disable();
         db.ImageSpamSettings.Add(settings);
         await db.SaveChangesAsync();
-        var detectorSettings = new ImageBurstSpamDetectorSettings();
-        var service = new ImageSpamSettingsService(db, detectorSettings);
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
+        var service = new ImageSpamSettingsService(db, settingsByGuild);
 
         // Act
         var result =
@@ -59,12 +69,14 @@ public sealed class ImageSpamSettingsServiceTests
         // Assert
         await using var readback = PostgresDatabaseFixture.CreateDbContext();
         var persisted = await readback.ImageSpamSettings.SingleAsync(x => x.GuildId == 1);
+
         (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds)
             .ShouldBe((expectedChannels, expectedAttachments, expectedSeconds));
         persisted.IsEnabled.ShouldBeTrue();
+
         (result.DistinctChannelThreshold, result.RequiredAttachmentCount, result.Window)
             .ShouldBe((expectedChannels, expectedAttachments, expectedSeconds));
-        detectorSettings.TryGet(1, out var published).ShouldBeTrue();
+        settingsByGuild.TryGetValue(1, out var published).ShouldBeTrue();
         published.ShouldBe(result);
     }
 
@@ -77,9 +89,9 @@ public sealed class ImageSpamSettingsServiceTests
         settings.Update(6, 3, 90);
         db.ImageSpamSettings.Add(settings);
         await db.SaveChangesAsync();
-        var detectorSettings = new ImageBurstSpamDetectorSettings();
-        detectorSettings.Update(1, new ImageBurstSpamDetectorOptions());
-        var service = new ImageSpamSettingsService(db, detectorSettings);
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
+        settingsByGuild[1] = new ImageBurstSpamDetectorOptions();
+        var service = new ImageSpamSettingsService(db, settingsByGuild);
 
         // Act
         Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(1, CancellationToken.None);
@@ -89,7 +101,7 @@ public sealed class ImageSpamSettingsServiceTests
         current.DistinctChannelThreshold.ShouldBe(6);
         current.RequiredAttachmentCount.ShouldBe(3);
         current.Window.ShouldBe(90);
-        detectorSettings.TryGet(1, out var published).ShouldBeTrue();
+        settingsByGuild.TryGetValue(1, out var published).ShouldBeTrue();
         published.ShouldBe(current);
     }
 
@@ -99,19 +111,19 @@ public sealed class ImageSpamSettingsServiceTests
         // Arrange
         await using var db = PostgresDatabaseFixture.CreateDbContext();
 
-        var detectorSettings = new ImageBurstSpamDetectorSettings();
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
         var otherGuildOptions = new ImageBurstSpamDetectorOptions { Window = 90 };
-        detectorSettings.Update(1, new ImageBurstSpamDetectorOptions());
-        detectorSettings.Update(2, otherGuildOptions);
-        var service = new ImageSpamSettingsService(db, detectorSettings);
+        settingsByGuild[1] = new ImageBurstSpamDetectorOptions();
+        settingsByGuild[2] = otherGuildOptions;
+        var service = new ImageSpamSettingsService(db, settingsByGuild);
 
         // Act
         Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(1, CancellationToken.None);
 
         // Assert
         result.Value.ShouldBeOfType<None>();
-        detectorSettings.TryGet(1, out _).ShouldBeFalse();
-        detectorSettings.TryGet(2, out var otherGuild).ShouldBeTrue();
+        settingsByGuild.TryGetValue(1, out _).ShouldBeFalse();
+        settingsByGuild.TryGetValue(2, out var otherGuild).ShouldBeTrue();
         otherGuild.ShouldBe(otherGuildOptions);
     }
 
@@ -125,19 +137,19 @@ public sealed class ImageSpamSettingsServiceTests
         db.ImageSpamSettings.Add(settings);
         await db.SaveChangesAsync();
 
-        var detectorSettings = new ImageBurstSpamDetectorSettings();
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
         var otherGuildOptions = new ImageBurstSpamDetectorOptions { Window = 90 };
-        detectorSettings.Update(1, new ImageBurstSpamDetectorOptions());
-        detectorSettings.Update(2, otherGuildOptions);
-        var service = new ImageSpamSettingsService(db, detectorSettings);
+        settingsByGuild[1] = new ImageBurstSpamDetectorOptions();
+        settingsByGuild[2] = otherGuildOptions;
+        var service = new ImageSpamSettingsService(db, settingsByGuild);
 
         // Act
         Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(1, CancellationToken.None);
 
         // Assert
         result.Value.ShouldBeOfType<None>();
-        detectorSettings.TryGet(1, out _).ShouldBeFalse();
-        detectorSettings.TryGet(2, out var otherGuild).ShouldBeTrue();
+        settingsByGuild.TryGetValue(1, out _).ShouldBeFalse();
+        settingsByGuild.TryGetValue(2, out var otherGuild).ShouldBeTrue();
         otherGuild.ShouldBe(otherGuildOptions);
     }
 
@@ -153,17 +165,19 @@ public sealed class ImageSpamSettingsServiceTests
         thirdGuild.Update(6, 3, 90);
         db.ImageSpamSettings.AddRange(firstGuild, disabledGuild, thirdGuild);
         await db.SaveChangesAsync();
-        var detectorSettings = new ImageBurstSpamDetectorSettings();
-        var service = new ImageSpamSettingsService(db, detectorSettings);
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
+        var service = new ImageSpamSettingsService(db, settingsByGuild);
 
         // Act
         await service.LoadEnabledSettingsAsync(CancellationToken.None);
 
         // Assert
-        detectorSettings.TryGet(1, out var first).ShouldBeTrue();
+        settingsByGuild.TryGetValue(1, out var first).ShouldBeTrue();
+        first.ShouldNotBeNull();
         (first.DistinctChannelThreshold, first.RequiredAttachmentCount, first.Window).ShouldBe((4, 2, 45));
-        detectorSettings.TryGet(2, out _).ShouldBeFalse();
-        detectorSettings.TryGet(3, out var third).ShouldBeTrue();
+        settingsByGuild.TryGetValue(2, out _).ShouldBeFalse();
+        settingsByGuild.TryGetValue(3, out var third).ShouldBeTrue();
+        third.ShouldNotBeNull();
         (third.DistinctChannelThreshold, third.RequiredAttachmentCount, third.Window).ShouldBe((6, 3, 90));
     }
 
@@ -173,15 +187,16 @@ public sealed class ImageSpamSettingsServiceTests
     {
         // Arrange
         await using var db = PostgresDatabaseFixture.CreateDbContext();
-        var detectorSettings = new ImageBurstSpamDetectorSettings();
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
+
         if (hasExistingSettings)
         {
             db.ImageSpamSettings.Add(ImageSpamSettings.CreateDefault(1));
             await db.SaveChangesAsync();
-            detectorSettings.Update(1, new ImageBurstSpamDetectorOptions());
+            settingsByGuild[1] = new ImageBurstSpamDetectorOptions();
         }
 
-        var service = new ImageSpamSettingsService(db, detectorSettings);
+        var service = new ImageSpamSettingsService(db, settingsByGuild);
 
         // Act
         var exception = await Should.ThrowAsync<DbUpdateException>(() =>
@@ -193,13 +208,17 @@ public sealed class ImageSpamSettingsServiceTests
         postgresException.ConstraintName.ShouldBe("CK_ImageSpamSettings_RequiredChannelCount_Positive");
         await using var readback = PostgresDatabaseFixture.CreateDbContext();
         var persisted = await readback.ImageSpamSettings.SingleOrDefaultAsync(x => x.GuildId == 1);
-        detectorSettings.TryGet(1, out var published).ShouldBe(hasExistingSettings);
+        settingsByGuild.TryGetValue(1, out var published).ShouldBe(hasExistingSettings);
+
         if (hasExistingSettings)
         {
             persisted.ShouldNotBeNull();
+
             (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds)
                 .ShouldBe((4, 2, 45));
             persisted.IsEnabled.ShouldBeTrue();
+            published.ShouldNotBeNull();
+
             (published.DistinctChannelThreshold, published.RequiredAttachmentCount, published.Window)
                 .ShouldBe((4, 2, 45));
         }

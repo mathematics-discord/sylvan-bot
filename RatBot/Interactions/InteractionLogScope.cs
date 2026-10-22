@@ -1,6 +1,6 @@
-using Serilog.Context;
-
 namespace RatBot.Interactions;
+
+using Serilog.Context;
 
 public sealed class InteractionLogScope : IDisposable
 {
@@ -13,20 +13,20 @@ public sealed class InteractionLogScope : IDisposable
 
     public static InteractionLogScope Begin(InteractionLogScopeDetails details)
     {
-        List<IDisposable> properties = new()
-        {
-            LogContext.PushProperty("log_area", "interaction"),
-            LogContext.PushProperty("service_instance_id", details.ServiceInstanceId),
-            LogContext.PushProperty("process_id", details.ProcessId),
-            LogContext.PushProperty("interaction_id", details.InteractionId),
-            LogContext.PushProperty("interaction_type", details.InteractionType),
-            LogContext.PushProperty("interaction_name", details.InteractionName),
-            LogContext.PushProperty("interaction_created_at_utc", details.InteractionCreatedAtUtc),
-            LogContext.PushProperty("user_id", details.UserId),
-            LogContext.PushProperty("guild_id", details.GuildId),
-            LogContext.PushProperty("channel_id", details.ChannelId),
-            LogContext.PushProperty("command_name", details.CommandName),
-        };
+        List<IDisposable> properties =
+        [
+            LogContext.PushProperty("LogArea", "interaction"),
+            LogContext.PushProperty("ServiceInstanceId", details.ServiceInstanceId),
+            LogContext.PushProperty("ProcessId", details.ProcessId),
+            LogContext.PushProperty("InteractionId", details.InteractionId),
+            LogContext.PushProperty("InteractionType", details.InteractionType),
+            LogContext.PushProperty("InteractionName", details.InteractionName),
+            LogContext.PushProperty("InteractionCreatedAtUtc", details.InteractionCreatedAtUtc),
+            LogContext.PushProperty("UserId", details.UserId),
+            LogContext.PushProperty("GuildId", details.GuildId),
+            LogContext.PushProperty("ChannelId", details.ChannelId),
+            LogContext.PushProperty("CommandName", details.CommandName),
+        ];
 
         return new InteractionLogScope(properties);
     }

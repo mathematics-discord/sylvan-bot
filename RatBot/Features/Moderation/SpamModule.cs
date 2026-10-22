@@ -1,6 +1,7 @@
-﻿using RatBot.Interactions;
+﻿namespace RatBot.Features.Moderation;
 
-namespace RatBot.Features.Moderation;
+using RatBot.Application.Common;
+using RatBot.Interactions;
 
 [Group("spam", "Spam moderation commands.")]
 [DefaultMemberPermissions(GuildPermission.Administrator)]

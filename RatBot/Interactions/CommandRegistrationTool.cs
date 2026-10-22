@@ -1,6 +1,6 @@
-using Discord.Rest;
-
 namespace RatBot.Interactions;
+
+using Discord.Rest;
 
 internal static class CommandRegistrationTool
 {

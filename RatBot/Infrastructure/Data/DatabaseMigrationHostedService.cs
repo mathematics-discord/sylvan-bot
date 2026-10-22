@@ -1,6 +1,6 @@
-using Microsoft.EntityFrameworkCore;
-
 namespace RatBot.Infrastructure.Data;
+
+using Microsoft.EntityFrameworkCore;
 
 public sealed class DatabaseMigrationHostedService(IServiceScopeFactory scopeFactory, ILogger logger) : IHostedService
 {

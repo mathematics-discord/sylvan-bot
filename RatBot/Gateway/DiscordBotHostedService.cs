@@ -1,6 +1,6 @@
-using Serilog.Events;
-
 namespace RatBot.Gateway;
+
+using Serilog.Events;
 
 public sealed class DiscordBotHostedService : IHostedService
 {
@@ -30,7 +30,8 @@ public sealed class DiscordBotHostedService : IHostedService
 
         interactionService.Log += message =>
         {
-            LogDiscordMessage("Interactions", message);
+            if (message.Exception is not Discord.Interactions.InteractionException)
+                LogDiscordMessage("Interactions", message);
             return Task.CompletedTask;
         };
     }

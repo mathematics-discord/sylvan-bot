@@ -1,11 +1,10 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using Microsoft.EntityFrameworkCore.Diagnostics;
+namespace RatBot.Tests.Integration;
+
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
-using RatBot.Features.Quorum.Persistence;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using RatBot.Infrastructure.Data;
 using Testcontainers.PostgreSql;
-
-namespace RatBot.Tests.Integration;
 
 [SetUpFixture]
 [SuppressMessage("Structure", "NUnit1028:The non-test method is public")]
@@ -18,7 +17,7 @@ public sealed class PostgresDatabaseFixture
     public static BotDbContext CreateDbContext()
     {
         DbContextOptions<BotDbContext> options = new DbContextOptionsBuilder<BotDbContext>()
-            .UseNpgsql(ConnectionString)
+            .UseNpgsql(ConnectionString, postgres => postgres.MigrationsAssembly("RatBot"))
             .EnableSensitiveDataLogging()
             .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
@@ -26,15 +25,22 @@ public sealed class PostgresDatabaseFixture
         return new BotDbContext(options);
     }
 
-    public static QuorumConfigurationStore CreateQuorumConfigurationStore() => new(ConnectionString);
+    internal static IDbContextFactory<BotDbContext> CreateContextFactory()
+    {
+        return new Microsoft.EntityFrameworkCore.Infrastructure.PooledDbContextFactory<BotDbContext>(
+            new DbContextOptionsBuilder<BotDbContext>()
+                .UseNpgsql(ConnectionString, postgres => postgres.MigrationsAssembly("RatBot"))
+                .Options);
+    }
 
     public static async Task ResetAsync()
     {
         await using var db = CreateDbContext();
 
+        await db.QuorumConfigurations.ExecuteDeleteAsync();
+
         await db.Database.ExecuteSqlRawAsync("DELETE FROM logging_excluded_channels").ConfigureAwait(false);
         await db.Database.ExecuteSqlRawAsync("DELETE FROM logging_configurations").ConfigureAwait(false);
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM quorum_configurations").ConfigureAwait(false);
         await db.RoleColourOptions.ExecuteDeleteAsync().ConfigureAwait(false);
         await db.ImageSpamSettings.ExecuteDeleteAsync().ConfigureAwait(false);
         await db.EmojiUsageCounts.ExecuteDeleteAsync().ConfigureAwait(false);

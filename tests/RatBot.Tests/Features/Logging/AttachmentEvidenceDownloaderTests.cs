@@ -1,8 +1,10 @@
-﻿using System.Net;
+﻿namespace RatBot.Tests.Features.Logging;
+
+using System.Net;
+using RatBot.Application.Common;
+using RatBot.Common;
 using RatBot.Features.Logging;
 using Serilog.Core;
-
-namespace RatBot.Tests.Features.Logging;
 
 [TestFixture]
 public sealed class AttachmentEvidenceDownloaderTests

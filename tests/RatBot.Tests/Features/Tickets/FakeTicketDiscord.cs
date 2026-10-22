@@ -1,4 +1,5 @@
-﻿using RatBot.Features.Tickets;
+using RatBot.Application.Common;
+using RatBot.Features.Tickets;
 
 namespace RatBot.Tests.Features.Tickets;
 

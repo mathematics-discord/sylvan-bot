@@ -1,9 +1,9 @@
-﻿using DotNetEnv;
+﻿namespace RatBot;
+
+using DotNetEnv;
 using RatBot.Interactions;
 using Serilog.Debugging;
 using Serilog.Events;
-
-namespace RatBot;
 
 public static class Program
 {

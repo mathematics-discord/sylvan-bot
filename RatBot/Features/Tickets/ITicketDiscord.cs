@@ -1,4 +1,4 @@
-﻿namespace RatBot.Features.Tickets;
+namespace RatBot.Features.Tickets;
 
 public interface ITicketDiscord
 {

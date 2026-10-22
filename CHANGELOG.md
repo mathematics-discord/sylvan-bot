@@ -2,6 +2,20 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.5 - 2026-10-21
+## General
+### Fixed
+- Failed commands now complete pending responses where possible, explain expected failures, and show a generic message for unexpected errors.
+## Moderation
+### Fixed
+- Concurrent quorum voter-role edits now preserve other roles and proportion changes.
+- Quorum commands now acknowledge requests before database queries and member lookups, reducing interaction timeouts during slow operations.
+## Internal
+### Changed
+- Simplified quorum commands, configuration and member counting using Discord.NET member access.
+- Moved shared persistence models, the database context, and quorum logic into a separate application project, keeping Discord integration in the bot project.
+- Mapped existing quorum tables in EF Core and replaced the Dapper configuration store.
+- Replaced Meziantou.Analyzer with StyleCop, updated Roslynator and standardised C# formatting across the codebase.
 # v0.1.4 - 2026-10-16
 ## Moderation
 ### Changed

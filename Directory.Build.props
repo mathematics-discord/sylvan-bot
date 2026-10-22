@@ -11,10 +11,5 @@
                 Include="Roslynator.Analyzers"
                 PrivateAssets="all"
                 IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"/>
-
-        <PackageReference
-                Include="Meziantou.Analyzer"
-                PrivateAssets="all"
-                IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"/>
     </ItemGroup>
 </Project>

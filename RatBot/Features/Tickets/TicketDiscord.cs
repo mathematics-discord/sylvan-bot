@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using Discord.Net;
 
 namespace RatBot.Features.Tickets;

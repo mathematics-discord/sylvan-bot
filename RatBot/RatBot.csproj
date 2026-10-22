@@ -13,10 +13,12 @@
     <Target Name="StartLocalDatabase" BeforeTargets="Build"
             Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(Configuration)' == 'Debug' and '$(DesignTimeBuild)' != 'true'">
         <Exec Command="docker compose --env-file .env -f docker-compose.yml up -d --wait db"
-              WorkingDirectory="$(MSBuildProjectDirectory)/.." />
+              WorkingDirectory="$(MSBuildProjectDirectory)/.."/>
     </Target>
     <ItemGroup>
-        <PackageReference Include="Dapper"/>
+        <ProjectReference Include="..\RatBot.Application\RatBot.Application.csproj"/>
+    </ItemGroup>
+    <ItemGroup>
         <PackageReference Include="DiffPlex"/>
         <PackageReference Include="Discord.Net.Interactions"/>
         <PackageReference Include="Discord.Net.WebSocket"/>
@@ -34,5 +36,9 @@
         <PackageReference Include="Serilog.Extensions.Hosting"/>
         <PackageReference Include="Serilog.Sinks.Console"/>
         <PackageReference Include="Serilog.Sinks.File"/>
+        <PackageReference Include="StyleCop.Analyzers">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
     </ItemGroup>
 </Project>

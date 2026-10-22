@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 
 namespace RatBot.Features.EmojiYoink;
 
@@ -102,11 +102,8 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
         }
         finally
         {
-            // it aint needed nor APPROPRIATE here SHUT UP analyzers GRRRFRRRR
             // ReSharper disable once MethodHasAsyncOverload
-#pragma warning disable MA0042
             imageStream?.Dispose();
-#pragma warning restore MA0042
         }
     }
 }

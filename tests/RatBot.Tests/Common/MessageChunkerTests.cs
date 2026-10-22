@@ -1,5 +1,7 @@
 namespace RatBot.Tests.Common;
 
+using RatBot.Common;
+
 public sealed class MessageChunkerTests
 {
     [Test]

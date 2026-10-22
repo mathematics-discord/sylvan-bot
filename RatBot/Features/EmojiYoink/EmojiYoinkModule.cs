@@ -1,8 +1,8 @@
+namespace RatBot.Features.EmojiYoink;
+
 using System.Net;
 using Discord.Net;
 using RatBot.Interactions;
-
-namespace RatBot.Features.EmojiYoink;
 
 [DefaultMemberPermissions(GuildPermission.ManageEmojisAndStickers)]
 [RequireUserPermission(GuildPermission.ManageEmojisAndStickers)]

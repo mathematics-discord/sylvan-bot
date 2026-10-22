@@ -1,4 +1,0 @@
-component: Internal
-kind: Changed
-body: Simplified quorum commands, configuration and member counting using Discord.NET member access.
-time: 2026-10-16T22:19:51.4688869+01:00

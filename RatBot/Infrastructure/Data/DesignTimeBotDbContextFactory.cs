@@ -1,8 +1,9 @@
-﻿using DotNetEnv;
+﻿namespace RatBot.Infrastructure.Data;
+
+using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-
-namespace RatBot.Infrastructure.Data;
+using RatBot.Application.Common;
 
 /// <summary>
 ///     Creates <see cref="BotDbContext" /> instances for design-time tooling such as EF Core migrations.
@@ -52,7 +53,9 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
                 "Design-time connection string missing. Set DB__CONNECTION_STRING or discrete DB__* vars.");
 
         DbContextOptions<BotDbContext> options =
-            new DbContextOptionsBuilder<BotDbContext>().UseNpgsql(connectionString).Options;
+            new DbContextOptionsBuilder<BotDbContext>()
+                .UseNpgsql(connectionString, postgres => postgres.MigrationsAssembly("RatBot"))
+                .Options;
 
         return new BotDbContext(options);
     }

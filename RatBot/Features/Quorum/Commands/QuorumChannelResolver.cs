@@ -1,30 +1,32 @@
 ﻿namespace RatBot.Features.Quorum.Commands;
 
+using RatBot.Application.Common;
+
 public static class QuorumChannelResolver
 {
-    public static IGuildChannel ResolveChannel(IGuild? currentGuild, IChannel ch)
-    {
-        var validationMessage = ValidationMessage(currentGuild, ch);
-
-        if (validationMessage is not null)
-            throw new ArgumentException(validationMessage, nameof(ch));
-
-        return ch is SocketThreadChannel thread ? thread.ParentChannel : (IGuildChannel)ch;
-    }
-
-    internal static string? ValidationMessage(IGuild? currentGuild, IChannel ch)
+    public static IGuildChannel ResolveChannel(IGuild? currentGuild, IChannel channel)
     {
         if (currentGuild is null)
-            return "This command can only be used in a guild.";
+            throw new BotCommandException("This command can only be used in a guild.");
 
-        if (ch is not IGuildChannel guildChannel || guildChannel.GuildId != currentGuild.Id)
-            return "That channel does not belong to this guild.";
+        if (channel is not IGuildChannel guildChannel || guildChannel.GuildId != currentGuild.Id)
+            throw new BotCommandException("That channel does not belong to this guild.");
 
-        if (ch is SocketThreadChannel thread)
-            ch = thread.ParentChannel;
-        else if (ch is IThreadChannel)
-            return "The thread's parent channel could not be resolved.";
+        if (channel is SocketThreadChannel thread)
+        {
+            if (thread.ParentChannel is null)
+                throw new BotCommandException("The thread's parent channel could not be resolved.");
 
-        return ch is IForumChannel or ITextChannel ? null : "Choose a guild text channel or forum channel.";
+            channel = thread.ParentChannel;
+        }
+        else if (channel is IThreadChannel)
+            throw new BotCommandException("The thread's parent channel could not be resolved.");
+
+        return channel switch
+        {
+            IForumChannel forum => forum,
+            ITextChannel text => text,
+            _ => throw new BotCommandException("Choose a guild text channel or forum channel."),
+        };
     }
 }

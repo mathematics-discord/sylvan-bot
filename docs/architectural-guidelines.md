@@ -10,13 +10,13 @@ A settings command can check permissions, open a context, validate and update a 
 
 Start with ordinary code. Extract a method when a substantial step benefits from a name. Extract a concrete class when it owns meaningful shared behaviour, substantial independent logic, or state with its own lifetime. Introduce an interface for a real interchangeable implementation or useful external boundary. Being mockable is insufficient reason on its own.
 
-Use `RatBot/Features/<Feature>/` for feature-specific commands, event handling, models, formatting, and persistence mapping. Small features may fit in one file. Tiny supporting types may live with their owner. Keep genuinely shared hosting, dispatch, configuration, and `BotDbContext` infrastructure shared. Existing Application/Infrastructure/Domain folders do not impose layers; existing projects and namespaces need no incidental renaming.
+Keep feature-specific commands, event handling, formatting, and persistence implementations in `RatBot/Features/<Feature>/`. Application workflows, rules, values, and deliberate external contracts belong in `RatBot.Application/Features/<Feature>/` when a feature uses that boundary. The application project may use EF Core directly; Discord.NET stays in Discord-facing code, and the host implements its external contracts. Small features may fit in one file. Tiny supporting types may live with their owner. Keep genuinely shared hosting, dispatch, configuration, and `BotDbContext` infrastructure shared. Migrate other features only when requested.
 
 Do not build mediators, command buses, generic repositories, units of work, or chains of forwarding services. Extract abstractions when existing work demonstrates their value.
 
 ## Let the libraries work
 
-Use available Discord.NET objects directly. Do not convert a member into an ID simply to fetch it again, mirror library models, or duplicate a library cache. Use a bot-owned shape when it represents different information, such as a stored ticket or an audit observation.
+Use available Discord.NET objects directly inside Discord-facing implementations. Keep framework metadata, context validation, acknowledgement, and response formatting at that edge. Application workflows receive the values they need through deliberate external contracts; project SDK objects once at that boundary. Do not convert a member into an ID simply to fetch it again, mirror the entire library model, or duplicate a library cache.
 
 Keep dependency injection simple: declare concrete dependencies in constructors and register them explicitly in `RatBot/DependencyInjection.cs`. Resolve from a container at genuine framework or lifetime boundaries. Create a scope because a dependency needs one, not because an operation is asynchronous. An alternative container needs a specific benefit.
 
@@ -30,7 +30,7 @@ Do not compress code to hit a line target or manufacture helpers for obvious exp
 
 ## Preserve data and Discord behaviour
 
-Use EF Core directly for ordinary persistence. A scoped workflow may inject `BotDbContext`; a singleton or worker normally creates a context through `IDbContextFactory<BotDbContext>`. Dispose contexts you create and never share one across concurrent operations. Keep queries bounded, guild-scoped, and untracked when entity tracking is unnecessary. Retain useful existing Dapper/Npgsql code and parameterise SQL.
+Use EF Core directly for ordinary persistence without repository or unit-of-work wrappers. A scoped workflow may inject `BotDbContext`; a singleton or worker normally creates a context through `IDbContextFactory<BotDbContext>`. Dispose contexts you create and never share one across concurrent operations. Keep queries bounded, guild-scoped, and untracked when entity tracking is unnecessary. Retain useful existing Dapper/Npgsql code and parameterise SQL.
 
 Preserve deployed migration history and data. Use forward migrations for schema/model changes and review their actual effects. Retiring application use of a table does not authorise deleting its rows. Use transactions and constraints for concrete invariants. A Discord action and a database write cannot be made atomic by a database transaction; handle partial failure proportionately.
 

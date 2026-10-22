@@ -1,7 +1,7 @@
+namespace RatBot.Features.RoleColours;
+
 using Microsoft.EntityFrameworkCore;
 using RatBot.Infrastructure.Data;
-
-namespace RatBot.Features.RoleColours;
 
 public sealed class RoleColourOperations(BotDbContext db)
 {

@@ -17,9 +17,13 @@ ij_wrap_on_typing = false
 
 # ReSharper properties
 resharper_arguments_literal = named
+resharper_blank_lines_after_control_transfer_statements = 1
+resharper_blank_lines_before_control_transfer_statements = 1
+resharper_blank_lines_before_multiline_statements = 1
 resharper_csharp_wrap_after_declaration_lpar = true
 resharper_csharp_wrap_parameters_style = chop_if_long
 resharper_method_or_operator_body = expression_body
+resharper_place_simple_embedded_statement_on_same_line = false
 resharper_wrap_after_lambda_and_anonymous_function_declaration_lpar = false
 
 [*.css]
@@ -743,15 +747,11 @@ ij_yaml_space_before_colon = false
 ij_yaml_spaces_within_braces = true
 ij_yaml_spaces_within_brackets = true
 
-
 [*.cs]
 dotnet_diagnostic.rcs1123.severity = none
-
-dotnet_diagnostic.ma0007.severity = warning
-
 dotnet_diagnostic.rcs1261.severity = error
+dotnet_diagnostic.SA1503.severity = none
+dotnet_diagnostic.SA1309.severity = none
+dotnet_diagnostic.SA1101.severity = none
 
-dotnet_diagnostic.ma0076.severity = none
-
-
-dotnet_diagnostic.MA0004.severity = silent
+dotnet_diagnostic.SA1404.severity = none

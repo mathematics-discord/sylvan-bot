@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+using RatBot.Application.Common;
+using Microsoft.EntityFrameworkCore;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;

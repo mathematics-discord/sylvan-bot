@@ -1,11 +1,12 @@
-﻿using System.Collections.Concurrent;
+﻿namespace RatBot.Interactions;
+
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Discord.Net;
+using RatBot.Application.Common;
 using RatBot.Features.Hello;
 using RatBot.Gateway;
 using IResult = Discord.Interactions.IResult;
-
-namespace RatBot.Interactions;
 
 public sealed class DiscordInteractionHandler(
     DiscordSocketClient discordClient,
@@ -14,6 +15,7 @@ public sealed class DiscordInteractionHandler(
     ILogger logger) : IDiscordGatewayHandler
 {
     private const string DiagEventName = "interaction_diagnostics";
+    private const string GenericFailureMessage = "An error occurred while processing that command.";
     private readonly ConcurrentDictionary<ulong, Stopwatch> _interactionStopwatches = [];
     private readonly ILogger _logger = logger.ForContext<DiscordInteractionHandler>();
 
@@ -142,59 +144,6 @@ public sealed class DiscordInteractionHandler(
             .Debug("Command invoked");
     }
 
-    private static async Task TryRespondToCommandFailureAsync(IInteractionContext context, IResult result,
-        ILogger interactionLogger)
-    {
-        if (result.IsSuccess)
-            return;
-
-        if (result.Error == InteractionCommandError.UnmetPrecondition && context.Interaction.HasResponded)
-            return;
-
-        var commandException = result is ExecuteResult { Exception: not null }
-                               || result.Error == InteractionCommandError.Exception;
-
-        var preconditionFailure = result.Error == InteractionCommandError.UnmetPrecondition;
-        var defaultReason = preconditionFailure ? "Command precondition failed." : "Command execution failed.";
-        var reason = string.IsNullOrWhiteSpace(result.ErrorReason)
-            ? defaultReason
-            : result.ErrorReason;
-
-        var response = commandException
-            ? "An error occurred executing that command."
-            : $"Command failed: {reason}";
-
-        try
-        {
-            if (context.Interaction.HasResponded)
-                await context.Interaction.FollowupAsync(response, ephemeral: true);
-            else
-                await context.Interaction.RespondAsync(response, ephemeral: true);
-
-            interactionLogger
-                .ForContext("diag_stage", preconditionFailure ? "precondition_response" : "error_response")
-                .ForContext("diag_outcome", "success")
-                .ForContext("event_kind", preconditionFailure
-                    ? "interaction.precondition_response"
-                    : "interaction.error_response")
-                .ForContext("outcome", "success")
-                .Debug("interaction_diag has_responded={HasResponded}", context.Interaction.HasResponded);
-        }
-        catch (HttpException ex) when (ex.DiscordCode == (DiscordErrorCode)10062)
-        {
-            interactionLogger.Warning(ex, "Unknown interaction while responding to command failure");
-        }
-        catch (HttpException ex) when (ex.DiscordCode == (DiscordErrorCode)40060)
-        {
-            interactionLogger.Information(ex,
-                "Interaction was already acknowledged while responding to command failure");
-        }
-        catch (Exception ex)
-        {
-            interactionLogger.Warning(ex, "Failed to send command failure response");
-        }
-    }
-
     public async Task InitializeAsync(CancellationToken ct)
     {
         var interactionsAssembly = typeof(HelloModule).Assembly;
@@ -217,18 +166,6 @@ public sealed class DiscordInteractionHandler(
         discordClient.Ready -= RegisterCommandsAsync;
         discordClient.JoinedGuild -= RegisterCommandsToGuildAsync;
         interactionService.InteractionExecuted -= HandleInteractionExecutedAsync;
-    }
-
-    private ILogger CreateInteractionDiagnosticsLogger(SocketInteraction interaction)
-    {
-        return _logger
-            .ForContext("diag_event", DiagEventName)
-            .ForContext("service_instance_id", _serviceInstanceId)
-            .ForContext("process_id", Environment.ProcessId)
-            .ForContext("interaction_id", interaction.Id)
-            .ForContext("interaction_type", interaction.Type.ToString())
-            .ForContext("interaction_name", GetInteractionName(interaction))
-            .ForContext("interaction_created_at_utc", interaction.CreatedAt.UtcDateTime.ToString("O"));
     }
 
     private ILogger CreateInteractionDiagnosticsLogger(IInteractionContext context)
@@ -273,195 +210,164 @@ public sealed class DiscordInteractionHandler(
             or InteractionType.MessageComponent))
             return;
 
-        var totalStopwatch = Stopwatch.StartNew();
+        IInteractionContext context = new SocketInteractionContext(discordClient, interaction);
+        var usage = GetCommandUsageDetails(interaction);
+        using var scope =
+            InteractionLogScope.Begin(CreateInteractionLogScopeDetails(interaction, context, usage));
 
-        var interactionLogger = CreateInteractionDiagnosticsLogger(interaction)
-            .ForContext("diag_component", "interaction_dispatch")
-            .ForContext("component", "interaction_dispatch");
+        LogCommandUsage(CreateInteractionDiagnosticsLogger(context), context, usage);
+        await HandleInteractionAsync(context);
+    }
 
-        InteractionLogScope? interactionLogScope = null;
+    private async Task HandleInteractionAsync(IInteractionContext context)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        _interactionStopwatches[context.Interaction.Id] = stopwatch;
 
         try
         {
-            IInteractionContext context = new SocketInteractionContext(discordClient, interaction);
-            _interactionStopwatches[interaction.Id] = totalStopwatch;
-            var usage = GetCommandUsageDetails(interaction);
-
-            interactionLogScope =
-                InteractionLogScope.Begin(CreateInteractionLogScopeDetails(interaction, context, usage));
-
-            interactionLogger = interactionLogger
-                .ForContext("user_id", context.User.Id)
-                .ForContext("guild_id", context.Guild?.Id)
-                .ForContext("channel_id", context.Channel?.Id);
-
-            if (interaction.Type == InteractionType.ApplicationCommand)
-                LogCommandUsage(interactionLogger, context, usage);
-
             var result = await interactionService.ExecuteCommandAsync(context, services);
-
-            if (result.IsSuccess)
-            {
-                interactionLogger
-                    .ForContext("diag_stage", "dispatch")
-                    .ForContext("diag_outcome", "success")
-                    .ForContext("event_kind", "interaction.dispatch_completed")
-                    .ForContext("outcome", "success")
-                    .Debug(
-                        "interaction_diag dispatch_ms={DispatchMs} has_responded={HasResponded}",
-                        Math.Round(totalStopwatch.Elapsed.TotalMilliseconds, 2),
-                        interaction.HasResponded
-                    );
-
-                return;
-            }
-
-            // Command completion owns its response, including RunMode.Async execution.
-            // A failure before execution has no completion event and is handled here.
-            if (!_interactionStopwatches.TryRemove(interaction.Id, out _))
-                return;
-
-            interactionLogger
-                .ForContext("diag_stage", "dispatch")
-                .ForContext("diag_outcome", "failed")
+            CreateInteractionDiagnosticsLogger(context)
                 .ForContext("event_kind", "interaction.dispatch_completed")
-                .ForContext("outcome", "failed")
-                .Warning(
-                    "interaction_diag command_error={CommandError} command_reason={CommandReason}",
-                    result.Error?.ToString() ?? "None",
-                    result.ErrorReason ?? string.Empty
-                );
+                .Debug("Interaction dispatched in {DispatchMs} ms", stopwatch.Elapsed.TotalMilliseconds);
 
-            await TryRespondToCommandFailureAsync(context, result, interactionLogger);
-        }
-        catch (HttpException ex) when (ex.DiscordCode == (DiscordErrorCode)10062)
-        {
-            _interactionStopwatches.TryRemove(interaction.Id, out _);
-
-            interactionLogger
-                .ForContext("event_kind", "interaction.dispatch_failed")
-                .ForContext("diag_stage", "dispatch")
-                .ForContext("diag_outcome", "unknown_interaction")
-                .ForContext("outcome", "unknown_interaction")
-                .Warning(ex, "Unknown interaction received by dispatch pipeline");
-        }
-        catch (HttpException ex) when (ex.DiscordCode == (DiscordErrorCode)40060)
-        {
-            _interactionStopwatches.TryRemove(interaction.Id, out _);
-
-            interactionLogger
-                .ForContext("event_kind", "interaction.dispatch_failed")
-                .ForContext("diag_stage", "dispatch")
-                .ForContext("diag_outcome", "already_acknowledged")
-                .ForContext("outcome", "already_acknowledged")
-                .Information(ex, "Interaction was already acknowledged");
+            if (!result.IsSuccess)
+                await CompleteInteractionAsync(null, context, result);
         }
         catch (Exception ex)
         {
-            _interactionStopwatches.TryRemove(interaction.Id, out _);
-
-            interactionLogger
-                .ForContext("event_kind", "interaction.unhandled_exception")
-                .ForContext("diag_stage", "dispatch")
-                .ForContext("diag_outcome", "failed")
-                .ForContext("outcome", "failed")
-                .Error(ex, "Unhandled exception executing interaction");
-
-            try
-            {
-                if (!interaction.HasResponded)
-                    await interaction.RespondAsync("An error occurred executing that command.", ephemeral: true);
-                else
-                    await interaction.FollowupAsync("An error occurred executing that command.", ephemeral: true);
-            }
-            catch (Exception followupEx)
-            {
-                interactionLogger
-                    .ForContext("event_kind", "interaction.response_failed")
-                    .ForContext("diag_stage", "error_response")
-                    .ForContext("diag_outcome", "failed")
-                    .ForContext("outcome", "failed")
-                    .Warning(followupEx, "Failed to send interaction error response");
-            }
-        }
-        finally
-        {
-            interactionLogScope?.Dispose();
+            await CompleteInteractionAsync(null, context, ExecuteResult.FromError(ex));
         }
     }
 
-    private async Task HandleInteractionExecutedAsync(ICommandInfo command, IInteractionContext context, IResult result)
+    private Task HandleInteractionExecutedAsync(ICommandInfo? command, IInteractionContext context, IResult result)
     {
-        _interactionStopwatches.TryRemove(context.Interaction.Id, out var stopwatch);
+        return CompleteInteractionAsync(command, context, result);
+    }
 
-        double? totalMs = stopwatch is null ? null : Math.Round(stopwatch.Elapsed.TotalMilliseconds, 2);
+    private async Task CompleteInteractionAsync(ICommandInfo? command, IInteractionContext context, IResult result)
+    {
+        if (!_interactionStopwatches.TryRemove(context.Interaction.Id, out var stopwatch))
+            return;
 
-        var commandName = context.Interaction is SocketInteraction socketInteraction
-            ? GetInteractionName(socketInteraction)
-            : command.Name;
+        var interactionLogger = _logger;
 
-        var interactionLogger = CreateInteractionDiagnosticsLogger(context)
-            .ForContext("diag_component", "interaction_execution")
-            .ForContext("component", "interaction_execution")
-            .ForContext("command_module", command.Module.Name)
-            .ForContext("command_group", command.Module.SlashGroupName)
-            .ForContext("command_name", commandName)
-            .ForContext("command_leaf_name", command.Name)
-            .ForContext("command_method", command.MethodName)
-            .ForContext("command_run_mode", command.RunMode.ToString())
-            .ForContext("user_id", context.User.Id)
-            .ForContext("guild_id", context.Guild?.Id)
-            .ForContext("channel_id", context.Channel?.Id);
+        try
+        {
+            interactionLogger = CreateInteractionDiagnosticsLogger(context)
+                .ForContext("event_kind", "interaction.execution_completed")
+                .ForContext("command_module", command?.Module.Name)
+                .ForContext("command_group", command?.Module.SlashGroupName)
+                .ForContext("command_name", command?.Name)
+                .ForContext("user_id", context.User.Id)
+                .ForContext("guild_id", context.Guild?.Id)
+                .ForContext("channel_id", context.Channel?.Id)
+                .ForContext("total_ms", Math.Round(stopwatch.Elapsed.TotalMilliseconds, 2));
 
-        var exception = result is ExecuteResult executeResult ? executeResult.Exception : null;
+            if (result.IsSuccess)
+            {
+                interactionLogger.Debug("Interaction completed in {TotalMs} ms", stopwatch.Elapsed.TotalMilliseconds);
+                return;
+            }
 
-        if (result.IsSuccess)
+            var exception = result is ExecuteResult execution ? execution.Exception : null;
+
+            // The SDK's generated module callback wraps command faults once before reporting completion.
+            if (exception is Discord.Interactions.InteractionException { InnerException: not null } sdkException)
+                exception = sdkException.InnerException;
+
+            string message;
+
+            switch (exception)
+            {
+                case BotCommandException refusal:
+                    message = refusal.Message;
+                    if (refusal.InnerException is not null)
+                        interactionLogger.Warning(refusal, "Command operation failed");
+                    else
+                        interactionLogger.Information("Command refused: {Reason}", message);
+                    break;
+                case OperationCanceledException:
+                    message = "Command processing was cancelled.";
+                    interactionLogger.Information("Command processing was cancelled");
+                    break;
+                case not null:
+                    message = GenericFailureMessage;
+                    interactionLogger.Error(exception, "Unexpected command failure");
+                    break;
+                default:
+                    message = result.Error switch
+                    {
+                        InteractionCommandError.UnmetPrecondition => string.IsNullOrWhiteSpace(result.ErrorReason)
+                            ? "Command precondition failed."
+                            : $"Command failed: {result.ErrorReason}",
+                        InteractionCommandError.UnknownCommand => "That command is unavailable.",
+                        InteractionCommandError.BadArgs or InteractionCommandError.ParseFailed
+                            or InteractionCommandError.ConvertFailed => "The command arguments could not be understood.",
+                        _ => GenericFailureMessage
+                    };
+                    interactionLogger.Information("Command failed: {CommandError}", result.Error);
+                    break;
+            }
+
+            await RespondToFailureAsync(context.Interaction, message);
+        }
+        catch (Exception ex)
         {
             interactionLogger
-                .ForContext("diag_stage", "execute_complete")
-                .ForContext("diag_outcome", "success")
-                .ForContext("event_kind", "interaction.execution_completed")
-                .ForContext("outcome", "success")
-                .Debug("interaction_diag total_ms={TotalMs} has_responded={HasResponded}", totalMs,
-                    context.Interaction.HasResponded);
+                .ForContext("event_kind", "interaction.response_failed")
+                .Warning(ex, "Failed to complete interaction error handling");
+        }
+    }
 
+    private static async Task RespondToFailureAsync(IDiscordInteraction interaction, string message)
+    {
+        if (!interaction.HasResponded)
+        {
+            await interaction.RespondAsync(message, ephemeral: true, allowedMentions: AllowedMentions.None);
             return;
         }
 
-        if (exception is not null)
+        IUserMessage original;
+        try
         {
-            interactionLogger
-                .ForContext("diag_stage", "execute_complete")
-                .ForContext("diag_outcome", "failed")
-                .ForContext("event_kind", "interaction.execution_completed")
-                .ForContext("outcome", "failed")
-                .Error(
-                    exception,
-                    "interaction_diag total_ms={TotalMs} has_responded={HasResponded} command_error={CommandError} command_reason={CommandReason}",
-                    totalMs,
-                    context.Interaction.HasResponded,
-                    result.Error?.ToString() ?? "None",
-                    result.ErrorReason ?? string.Empty
-                );
-
-            await TryRespondToCommandFailureAsync(context, result, interactionLogger);
+            original = await interaction.GetOriginalResponseAsync();
+        }
+        catch (HttpException ex) when (ex.DiscordCode == DiscordErrorCode.UnknownMessage)
+        {
+            await interaction.FollowupAsync(GenericFailureMessage, ephemeral: true, allowedMentions: AllowedMentions.None);
             return;
         }
 
-        interactionLogger
-            .ForContext("diag_stage", "execute_complete")
-            .ForContext("diag_outcome", "failed")
-            .ForContext("event_kind", "interaction.execution_completed")
-            .ForContext("outcome", "failed")
-            .Warning(
-                "interaction_diag total_ms={TotalMs} has_responded={HasResponded} command_error={CommandError} command_reason={CommandReason}",
-                totalMs,
-                context.Interaction.HasResponded,
-                result.Error?.ToString() ?? "None",
-                result.ErrorReason ?? string.Empty
-            );
+        var sourceId = interaction switch
+        {
+            IComponentInteraction component => component.Message?.Id,
+            IModalInteraction modal => modal.Message?.Id,
+            _ => null
+        };
+        var requiresOwnershipCheck = interaction is IComponentInteraction or IModalInteraction;
+        var owned = !requiresOwnershipCheck || (sourceId.HasValue && sourceId.Value != original.Id);
+        var flags = original.Flags ?? MessageFlags.None;
+        var ephemeral = flags.HasFlag(MessageFlags.Ephemeral);
+        var loading = flags.HasFlag(MessageFlags.Loading);
+        var plainText = !flags.HasFlag(MessageFlags.ComponentsV2)
+                        && original.Components.Count == 0
+                        && original.Embeds.Count == 0
+                        && original.Attachments.Count == 0;
+        var canEdit = owned && (loading || (ephemeral && plainText));
 
-        await TryRespondToCommandFailureAsync(context, result, interactionLogger);
+        if (canEdit)
+        {
+            var content = ephemeral ? message : GenericFailureMessage;
+            await interaction.ModifyOriginalResponseAsync(properties =>
+            {
+                properties.Content = content;
+                properties.AllowedMentions = AllowedMentions.None;
+            });
+            return;
+        }
+
+        await interaction.FollowupAsync(message, ephemeral: true, allowedMentions: AllowedMentions.None);
     }
 
     private void LogRegisteredInteractionCommands()

@@ -1,10 +1,10 @@
+namespace RatBot.Tests.Features.RoleColours;
+
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
-using Microsoft.EntityFrameworkCore;
 using RatBot.Infrastructure.Data;
-
-namespace RatBot.Tests.Features.RoleColours;
 
 [TestFixture]
 public sealed class RoleColourSchemaCompatibilityTests
@@ -15,7 +15,7 @@ public sealed class RoleColourSchemaCompatibilityTests
         // Arrange
         using var db = new BotDbContext(
             new DbContextOptionsBuilder<BotDbContext>()
-                .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused").Options
+                .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused", postgres => postgres.MigrationsAssembly("RatBot")).Options
         );
 
         var migrations = db.GetService<IMigrationsAssembly>();

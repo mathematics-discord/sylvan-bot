@@ -1,7 +1,7 @@
+namespace RatBot.Features.EmojiYoink;
+
 using System.Text.RegularExpressions;
 using static System.Text.RegularExpressions.RegexOptions;
-
-namespace RatBot.Features.EmojiYoink;
 
 public static partial class CustomEmojiMentionParser
 {

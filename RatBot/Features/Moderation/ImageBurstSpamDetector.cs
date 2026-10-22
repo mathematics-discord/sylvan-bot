@@ -1,36 +1,17 @@
-﻿using System.Runtime.InteropServices;
+﻿namespace RatBot.Features.Moderation;
 
-namespace RatBot.Features.Moderation;
+using System.Collections.Concurrent;
+using RatBot.Application.Common;
 
-public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurstSpamDetectorSettings settings)
+public sealed class ImageBurstSpamDetector(
+    TimeProvider timeProvider,
+    ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild)
 {
     private readonly Dictionary<ImageBurstBufferKey, Queue<ImageBurstMessage>> _buffers = new();
 
     private readonly Lock _gate = new();
 
-    private readonly Dictionary<ImageBurstBufferKey, DateTimeOffset> _handlingLocks = new();
-
-    public ImageBurstSpamDetector() : this(TimeProvider.System, new ImageBurstSpamDetectorOptions())
-    {
-    }
-
-    public ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurstSpamDetectorOptions options)
-        : this(timeProvider, CreateSettings(options))
-    {
-    }
-
-    private static ImageBurstSpamDetectorSettings CreateSettings(ImageBurstSpamDetectorOptions options)
-    {
-        var settings = new ImageBurstSpamDetectorSettings(options);
-        settings.Update(1, options);
-        return settings;
-    }
-
-    private static void PruneOldMessages(Queue<ImageBurstMessage> buffer, DateTimeOffset cutoff)
-    {
-        while (buffer.Count > 0 && buffer.Peek().Timestamp < cutoff)
-            buffer.Dequeue();
-    }
+    private readonly Dictionary<ImageBurstBufferKey, DateTimeOffset> _handlingLocks = [];
 
     public Option<ImageBurstDetection> Observe(ImageBurstMessage message)
     {
@@ -42,9 +23,10 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
             PruneExpiredLocks(now);
 
             var isLocked = _handlingLocks.TryGetValue(key, out var lockedUntil) && lockedUntil > now;
-            var optionsUnavailable = !settings.TryGet(message.GuildId, out var options);
+            if (isLocked)
+                return new None();
 
-            if (isLocked || optionsUnavailable)
+            if (!settingsByGuild.TryGetValue(message.GuildId, out var options))
                 return new None();
 
             Queue<ImageBurstMessage> buffer = GetBuffer(key);
@@ -68,6 +50,12 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
         }
     }
 
+    private static void PruneOldMessages(Queue<ImageBurstMessage> buffer, DateTimeOffset cutoff)
+    {
+        while (buffer.Count > 0 && buffer.Peek().Timestamp < cutoff)
+            buffer.Dequeue();
+    }
+
     private Queue<ImageBurstMessage> GetBuffer(ImageBurstBufferKey key)
     {
         if (_buffers.TryGetValue(key, out Queue<ImageBurstMessage>? buffer))
@@ -87,6 +75,5 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider, ImageBurst
             _handlingLocks.Remove(key);
     }
 
-    [StructLayout(LayoutKind.Auto)]
     private readonly record struct ImageBurstBufferKey(ulong GuildId, ulong UserId);
 }

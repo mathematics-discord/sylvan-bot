@@ -17,12 +17,67 @@ namespace RatBot.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.HasSequence("ticket_numbers");
+
+            modelBuilder.Entity("RatBot.Application.Features.Quorum.QuorumConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("ChannelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("channel_id");
+
+                    b.Property<string>("ChannelKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("channel_kind");
+
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("guild_id");
+
+                    b.Property<decimal>("Proportion")
+                        .HasPrecision(9, 8)
+                        .HasColumnType("numeric(9,8)")
+                        .HasColumnName("proportion");
+
+                    b.HasKey("Id")
+                        .HasName("pk_quorum_configurations");
+
+                    b.HasAlternateKey("GuildId", "ChannelId")
+                        .HasName("ak_quorum_configurations_guild_id_channel_id");
+
+                    b.ToTable("quorum_configurations", "public", t =>
+                        {
+                            t.HasCheckConstraint("ck_quorum_configurations_channel_kind", "channel_kind IN ('text', 'forum')");
+
+                            t.HasCheckConstraint("ck_quorum_configurations_proportion", "proportion > 0 AND proportion <= 1");
+                        });
+                });
+
+            modelBuilder.Entity("RatBot.Application.Features.Quorum.QuorumVoterRole", b =>
+                {
+                    b.Property<Guid>("QuorumConfigurationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("quorum_configuration_id");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("role_id");
+
+                    b.HasKey("QuorumConfigurationId", "RoleId")
+                        .HasName("pk_quorum_voter_roles");
+
+                    b.ToTable("quorum_voter_roles", "public");
+                });
 
             modelBuilder.Entity("RatBot.Features.EmojiAnalytics.EmojiUsageCount", b =>
                 {
@@ -252,6 +307,21 @@ namespace RatBot.Infrastructure.Migrations
                     b.HasKey("GuildId");
 
                     b.ToTable("ticket_configurations", (string)null);
+                });
+
+            modelBuilder.Entity("RatBot.Application.Features.Quorum.QuorumVoterRole", b =>
+                {
+                    b.HasOne("RatBot.Application.Features.Quorum.QuorumConfiguration", null)
+                        .WithMany("VoterRoles")
+                        .HasForeignKey("QuorumConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_quorum_voter_roles_quorum_configurations");
+                });
+
+            modelBuilder.Entity("RatBot.Application.Features.Quorum.QuorumConfiguration", b =>
+                {
+                    b.Navigation("VoterRoles");
                 });
 #pragma warning restore 612, 618
         }

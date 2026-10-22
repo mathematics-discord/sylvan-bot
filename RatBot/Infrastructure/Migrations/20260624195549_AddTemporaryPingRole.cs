@@ -1,8 +1,8 @@
+namespace RatBot.Infrastructure.Migrations;
+
 #nullable disable
 
 using Microsoft.EntityFrameworkCore.Migrations;
-
-namespace RatBot.Infrastructure.Migrations;
 
 /// <inheritdoc />
 public partial class AddTemporaryPingRole : Migration

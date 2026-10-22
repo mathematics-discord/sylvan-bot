@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using RatBot.Infrastructure.Data;
 
 namespace RatBot.Features.Tickets;

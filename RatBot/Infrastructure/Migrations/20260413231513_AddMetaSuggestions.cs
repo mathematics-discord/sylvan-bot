@@ -1,10 +1,10 @@
-#nullable disable
-
-using Microsoft.EntityFrameworkCore.Migrations;
-using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-
 namespace RatBot.Infrastructure.Migrations
 {
+#nullable disable
+
+    using Microsoft.EntityFrameworkCore.Migrations;
+    using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+
     /// <inheritdoc />
     public partial class AddMetaSuggestions : Migration
     {
