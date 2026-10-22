@@ -33,7 +33,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-ratbot
+  group: deploy-sylvan-bot
   cancel-in-progress: false
 
 jobs:
@@ -185,7 +185,7 @@ jobs:
           IMAGE_REF: ghcr.io/${{ github.repository }}:sha-${{ needs.release.outputs.source_sha }}
         run: |
           bash scripts/deploy-vps-stack.sh \
-            --project production \
+            --project sylvan-bot-production \
             --remote-dir /opt/sylvan-bot/production \
             --image-ref "$IMAGE_REF"
 
@@ -250,6 +250,6 @@ jobs:
           IMAGE_REF: ${{ steps.image.outputs.image_ref }}
         run: |
           bash scripts/deploy-vps-stack.sh \
-            --project production \
+            --project sylvan-bot-production \
             --remote-dir /opt/sylvan-bot/production \
             --image-ref "$IMAGE_REF"

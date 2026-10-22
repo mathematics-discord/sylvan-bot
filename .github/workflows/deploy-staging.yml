@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-ratbot-staging
+  group: deploy-sylvan-bot-staging
   cancel-in-progress: false
   queue: max
 
@@ -53,6 +53,6 @@ jobs:
           IMAGE_REF: ghcr.io/${{ github.repository }}:staging-${{ github.sha }}
         run: |
           bash scripts/deploy-vps-stack.sh \
-            --project staging \
+            --project sylvan-bot-staging \
             --remote-dir /opt/sylvan-bot/staging \
             --image-ref "$IMAGE_REF"
