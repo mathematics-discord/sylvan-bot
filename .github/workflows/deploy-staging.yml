@@ -54,5 +54,5 @@ jobs:
         run: |
           bash scripts/deploy-vps-stack.sh \
             --project staging \
-            --remote-dir /opt/staging \
+            --remote-dir /opt/sylvan-bot/staging \
             --image-ref "$IMAGE_REF"

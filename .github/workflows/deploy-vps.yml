@@ -1,4 +1,4 @@
-name: Deploy RatBot to VPS
+name: Deploy Sylvan Bot to VPS
 
 on:
   workflow_dispatch:
@@ -186,7 +186,7 @@ jobs:
         run: |
           bash scripts/deploy-vps-stack.sh \
             --project production \
-            --remote-dir /opt/ratbot/production \
+            --remote-dir /opt/sylvan-bot/production \
             --image-ref "$IMAGE_REF"
 
   announce-release:
@@ -251,5 +251,5 @@ jobs:
         run: |
           bash scripts/deploy-vps-stack.sh \
             --project production \
-            --remote-dir /opt/ratbot/production \
+            --remote-dir /opt/sylvan-bot/production \
             --image-ref "$IMAGE_REF"
