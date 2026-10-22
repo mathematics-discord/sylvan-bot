@@ -1,5 +1,6 @@
 <Project>
     <PropertyGroup>
+        <Product>Sylvan Bot</Product>
         <TargetFramework>net11.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>

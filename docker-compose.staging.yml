@@ -15,7 +15,7 @@ services:
       retries: 5
 
   bot:
-    image: ${RATBOT_IMAGE:?RATBOT_IMAGE is required}
+    image: ${SYLVAN_BOT_IMAGE:?SYLVAN_BOT_IMAGE is required}
     pull_policy: always
     restart: unless-stopped
     environment:
@@ -35,3 +35,8 @@ services:
 
 volumes:
   postgres_data:
+    name: sylvan-bot-staging-postgres-data
+
+networks:
+  default:
+    name: sylvan-bot-staging-internal
