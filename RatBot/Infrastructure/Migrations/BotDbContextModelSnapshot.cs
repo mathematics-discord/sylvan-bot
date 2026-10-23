@@ -17,7 +17,7 @@ namespace RatBot.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -77,33 +77,19 @@ namespace RatBot.Infrastructure.Migrations
                     b.ToTable("quorum_voter_roles", "public");
                 });
 
-            modelBuilder.Entity("RatBot.Features.Moderation.ImageSpamSettings", b =>
+            modelBuilder.Entity("RatBot.Features.Bridge.BridgeChannel", b =>
                 {
                     b.Property<long>("GuildId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("bigint")
+                        .HasColumnName("guild_id");
 
-                    b.Property<int>("BurstDurationSeconds")
-                        .HasColumnType("integer");
+                    b.Property<long>("ChannelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("channel_id");
 
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
+                    b.HasKey("GuildId", "ChannelId");
 
-                    b.Property<int>("RequiredAttachmentCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("RequiredChannelCount")
-                        .HasColumnType("integer");
-
-                    b.HasKey("GuildId");
-
-                    b.ToTable("ImageSpamSettings", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ImageSpamSettings_BurstDurationSeconds_Positive", "\"BurstDurationSeconds\" > 0");
-
-                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredAttachmentCount_Positive", "\"RequiredAttachmentCount\" > 0");
-
-                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredChannelCount_Positive", "\"RequiredChannelCount\" > 0");
-                        });
+                    b.ToTable("bridge_channels", (string)null);
                 });
 
             modelBuilder.Entity("RatBot.Features.EmojiAnalytics.EmojiUsageCount", b =>
@@ -169,6 +155,35 @@ namespace RatBot.Infrastructure.Migrations
                     b.HasKey("GuildId", "ChannelId");
 
                     b.ToTable("logging_excluded_channels", (string)null);
+                });
+
+            modelBuilder.Entity("RatBot.Features.Moderation.ImageSpamSettings", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("BurstDurationSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("RequiredAttachmentCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RequiredChannelCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("ImageSpamSettings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ImageSpamSettings_BurstDurationSeconds_Positive", "\"BurstDurationSeconds\" > 0");
+
+                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredAttachmentCount_Positive", "\"RequiredAttachmentCount\" > 0");
+
+                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredChannelCount_Positive", "\"RequiredChannelCount\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("RatBot.Features.RoleColours.RoleColourOption", b =>

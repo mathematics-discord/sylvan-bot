@@ -6,6 +6,14 @@ public sealed class DiscordOptions
 {
     public const string SectionName = "Discord";
 
+    public bool AlwaysDownloadUsers { get; init; } = true;
+
+    public GatewayIntents GatewayIntents { get; init; } = GatewayIntents.Guilds
+        | GatewayIntents.GuildMembers
+        | GatewayIntents.GuildMessages
+        | GatewayIntents.GuildMessageReactions
+        | GatewayIntents.MessageContent;
+
     public ulong[] ImageBurstSpamAllowlistedRoleIds { get; init; } = [];
 
     public ulong[] ImageBurstSpamAllowlistedUserIds { get; init; } = [];

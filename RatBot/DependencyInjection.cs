@@ -1,9 +1,11 @@
 ﻿namespace RatBot;
 
 using System.Collections.Concurrent;
+using System.Net;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using RatBot.Application.Features.Quorum;
+using RatBot.Features.Bridge;
 using RatBot.Features.EmojiAnalytics;
 using RatBot.Features.EmojiAnalytics.Persistence;
 using RatBot.Features.EmojiYoink;
@@ -30,6 +32,22 @@ public static class DependencyInjection
 
         private void AddFeatures(IConfiguration configuration)
         {
+            services
+                .AddOptions<BridgeOptions>()
+                .Bind(configuration.GetSection(BridgeOptions.SectionName))
+                .Validate(options => IPAddress.TryParse(options.Address, out _), "Bridge address must be an IP address.")
+                .Validate(options => options.Port is > 0 and <= 65535, "Bridge port must be between 1 and 65535.")
+                .Validate(options => options.Credential.Length >= 32
+                    && options.Credential.All(character => character is >= '!' and <= '~'),
+                    "Bridge credential must contain at least 32 printable ASCII characters without spaces.")
+                .Validate(options => options.Credential != configuration["Discord:Token"],
+                    "Bridge requires a dedicated credential, separate from the Discord token.")
+                .ValidateOnStart();
+
+            services.AddSingleton<BridgeChannels>();
+            services.AddSingleton<BridgeEndpoint>();
+            services.AddSingleton<IDiscordGatewayHandler, BridgeGatewayHandler>();
+
             services.AddSingleton<IQuorumMembers, DiscordQuorumMembers>();
             services.AddScoped<QuorumOperations>();
 
@@ -100,6 +118,9 @@ public static class DependencyInjection
                 .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "Discord token is required.")
                 .Validate(options => options.MessageCacheSize >= 1000,
                     "Discord message cache size must be at least 1000.")
+                .Validate(options => !options.AlwaysDownloadUsers
+                    || options.GatewayIntents.HasFlag(GatewayIntents.GuildMembers),
+                    "Discord automatic member downloading requires the GuildMembers intent.")
                 .ValidateOnStart();
 
             services.AddSingleton(sp =>
@@ -109,13 +130,9 @@ public static class DependencyInjection
                 return new DiscordSocketClient(
                     new DiscordSocketConfig
                     {
-                        AlwaysDownloadUsers = true,
+                        AlwaysDownloadUsers = options.AlwaysDownloadUsers,
                         MessageCacheSize = options.MessageCacheSize,
-                        GatewayIntents = GatewayIntents.Guilds
-                                         | GatewayIntents.GuildMembers
-                                         | GatewayIntents.GuildMessages
-                                         | GatewayIntents.GuildMessageReactions
-                                         | GatewayIntents.MessageContent,
+                        GatewayIntents = options.GatewayIntents,
                     }
                 );
             });

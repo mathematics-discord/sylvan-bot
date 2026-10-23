@@ -25,12 +25,19 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       DISCORD__TOKEN: ${DISCORD__TOKEN}
+      DISCORD__GATEWAYINTENTS: ${DISCORD__GATEWAYINTENTS:-Guilds,GuildMembers,GuildMessages,GuildMessageReactions,MessageContent}
+      DISCORD__ALWAYSDOWNLOADUSERS: ${DISCORD__ALWAYSDOWNLOADUSERS:-true}
+      BRIDGE__CREDENTIAL: ${BRIDGE__CREDENTIAL:?Set a dedicated Bridge credential}
+      BRIDGE__ADDRESS: ${BRIDGE__ADDRESS:-0.0.0.0}
+      BRIDGE__PORT: "8765"
       EMOJIANALYTICS__ENABLEDGUILDIDS__0: ${EMOJIANALYTICS__ENABLEDGUILDIDS__0}
       DB__HOST: postgres
       DB__PORT: "5432"
       DB__DATABASE: ${DB__DATABASE}
       DB__USER: ${DB__USER}
       DB__PASSWORD: ${DB__PASSWORD}
+    ports:
+      - "127.0.0.1:${BRIDGE__PORT:-8765}:8765"
     volumes:
       - ./logs:/app/logs
     depends_on:
