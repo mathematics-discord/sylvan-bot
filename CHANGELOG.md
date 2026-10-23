@@ -2,6 +2,12 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.6 - 2026-10-23
+## Internal
+### Added
+- Add Bridge, an authenticated WebSocket API for explicitly bot-mentioned messages in configured channels, with scoped typing and replies. Manage channels using /bridge add, /bridge remove, and /bridge list. Set a dedicated BRIDGE__CREDENTIAL before starting the bot. Discord intents and automatic member downloading can now be configured for deployments without privileged intents.
+### Changed
+- Downversion SDK from net11.0-(preview) to net10.0
 # v0.1.5 - 2026-10-21
 ## General
 ### Fixed
