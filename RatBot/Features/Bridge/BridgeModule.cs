@@ -1,9 +1,9 @@
 ﻿namespace RatBot.Features.Bridge;
 
 [Group("bridge", "Manage Bridge channels.")]
-[DefaultMemberPermissions(GuildPermission.ManageGuild)]
+[DefaultMemberPermissions(GuildPermission.Administrator)]
 [RequireContext(ContextType.Guild)]
-[RequireUserPermission(GuildPermission.ManageGuild)]
+[RequireUserPermission(GuildPermission.Administrator)]
 public sealed class BridgeModule : InteractionModuleBase<SocketInteractionContext>
 {
     private readonly BridgeChannels _channels;

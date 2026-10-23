@@ -41,7 +41,7 @@ Exactly these management commands are provided:
 - `/bridge remove [channel]`: disable Bridge; defaults to the invoking channel.
 - `/bridge list`: show the invoking guild's configured channels.
 
-Commands are guild-only, advertise `ManageGuild`, and enforce it at execution using the existing permission precondition. Responses are ephemeral and database operations are deferred. Adding an existing membership or removing an absent membership succeeds and reports the resulting state. Changes update the in-memory filtering view immediately after persistence, without restart. Use these commands to change membership; external database edits are loaded on restart.
+Commands are guild-only, require `Administrator`, and enforce it both in their default member permissions and at execution using the existing permission precondition. `ManageGuild` alone does not grant access. Responses are ephemeral and database operations are deferred. Adding an existing membership or removing an absent membership succeeds and reports the resulting state. Changes update the in-memory filtering view immediately after persistence, without restart. Use these commands to change membership; external database edits are loaded on restart.
 
 Supported destinations are text channels, announcement channels, and public/private/announcement threads in the invoking guild. Forum containers, voice/stage channels, categories, and DMs are unsupported. A forum post's thread can be configured. Membership is the **exact channel ID**: adding a parent does not add its threads. List retains configured IDs even if Discord no longer resolves a deleted channel.
 
