@@ -1,0 +1,4 @@
+component: Internal
+kind: Changed
+body: Downversion SDK from net11.0-(preview) to net10.0
+time: 2026-10-23T21:51:41.0475942+01:00
