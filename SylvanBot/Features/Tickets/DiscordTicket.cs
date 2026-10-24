@@ -2,8 +2,9 @@ namespace SylvanBot.Features.Tickets;
 
 using System.Text;
 using Discord.Net;
+using SylvanBot.Application.Features.Tickets;
 
-public sealed class TicketDiscord(IDiscordClient client) : ITicketDiscord
+public sealed class DiscordTicket(IDiscordClient client) : IDiscordTicket
 {
     public async Task CheckChannelAsync(
         TicketActor actor,
@@ -96,18 +97,18 @@ public sealed class TicketDiscord(IDiscordClient client) : ITicketDiscord
             msg = await ch.SendFileAsync(
                 stream,
                 $"{ticket.Number}-comment.txt",
+                options: Options(cancellationToken),
                 allowedMentions: AllowedMentions.None,
                 components: components,
-                flags: MessageFlags.ComponentsV2,
-                options: Options(cancellationToken));
+                flags: MessageFlags.ComponentsV2);
         }
         else
         {
             msg = await ch.SendMessageAsync(
+                options: Options(cancellationToken),
                 allowedMentions: AllowedMentions.None,
                 components: components,
-                flags: MessageFlags.ComponentsV2,
-                options: Options(cancellationToken));
+                flags: MessageFlags.ComponentsV2);
         }
 
         return new TicketMessage(ch.Id, msg.Id);

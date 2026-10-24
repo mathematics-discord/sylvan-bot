@@ -1,5 +1,7 @@
 ﻿namespace SylvanBot.Features.Tickets;
 
+using SylvanBot.Application.Features.Tickets;
+
 [Group("ticket-admin", "Administrator ticket settings.")]
 [DefaultMemberPermissions(GuildPermission.Administrator)]
 [RequireUserPermission(GuildPermission.Administrator)]

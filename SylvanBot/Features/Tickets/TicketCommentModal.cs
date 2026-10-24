@@ -1,5 +1,7 @@
 ﻿namespace SylvanBot.Features.Tickets;
 
+using SylvanBot.Application.Features.Tickets;
+
 public sealed class TicketCommentModal : IModal
 {
     public string Title { get; set; } = "Edit ticket";

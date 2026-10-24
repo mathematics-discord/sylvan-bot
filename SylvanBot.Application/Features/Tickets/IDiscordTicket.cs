@@ -1,6 +1,8 @@
-namespace SylvanBot.Features.Tickets;
+namespace SylvanBot.Application.Features.Tickets;
 
-public interface ITicketDiscord
+using Common;
+
+public interface IDiscordTicket
 {
     Task CheckChannelAsync(TicketActor actor, ulong channelId, bool publishing, CancellationToken cancellationToken);
     Task<Option<TicketMessage>> FindMessageAsync(TicketActor actor, Ticket ticket, CancellationToken cancellationToken);

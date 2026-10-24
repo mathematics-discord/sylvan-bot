@@ -1,6 +1,7 @@
 ﻿namespace SylvanBot.Features.Tickets;
 
 using System.Globalization;
+using SylvanBot.Application.Features.Tickets;
 
 public static class TicketReference
 {

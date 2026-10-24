@@ -1,4 +1,4 @@
-﻿namespace SylvanBot.Features.Tickets;
+﻿namespace SylvanBot.Application.Features.Tickets;
 
 public sealed record TicketActor(
     ulong GuildId,

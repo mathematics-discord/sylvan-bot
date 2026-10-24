@@ -1,18 +1,20 @@
-﻿namespace SylvanBot.Features.Tickets;
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace SylvanBot.Application.Features.Tickets;
 
 public sealed class Ticket
 {
-    public long Id { get; set; }
-    public ulong GuildId { get; set; }
-    public long Number { get; set; }
-    public TicketAction Action { get; set; }
-    public ulong? SubjectUserId { get; set; }
-    public ulong? ModeratorUserId { get; set; }
-    public string? Comment { get; set; }
-    public DateTimeOffset? CreatedAtUtc { get; set; }
-    public TicketStatus? Status { get; set; }
-    public long? DurationSeconds { get; set; }
-    public ulong? RoleId { get; set; }
+    public long Id { get; init; }
+    public ulong GuildId { get; init; }
+    public long Number { get; init; }
+    public TicketAction Action { get; init; }
+    public ulong? SubjectUserId { get; init; }
+    public ulong? ModeratorUserId { get; init; }
+    [StringLength(1900)] public string? Comment { get; set; }
+    public DateTimeOffset? CreatedAtUtc { get; init; }
+    public TicketStatus? Status { get; init; }
+    public long? DurationSeconds { get; init; }
+    public ulong? RoleId { get; init; }
     public bool Hidden { get; set; }
     public ulong? ChannelId { get; set; }
     public ulong? MessageId { get; set; }

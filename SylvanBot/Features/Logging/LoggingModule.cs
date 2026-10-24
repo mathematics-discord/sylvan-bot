@@ -1,6 +1,5 @@
 namespace SylvanBot.Features.Logging;
 
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Infrastructure.Data;
 
@@ -8,7 +7,6 @@ using SylvanBot.Infrastructure.Data;
 [DefaultMemberPermissions(GuildPermission.Administrator)]
 [RequireContext(ContextType.Guild)]
 [RequireUserPermission(GuildPermission.Administrator)]
-[SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements should be documented")]
 public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory)
     : InteractionModuleBase<IInteractionContext>
 {

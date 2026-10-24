@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Quorum;
+using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Features.EmojiAnalytics;
 using SylvanBot.Features.EmojiAnalytics.Persistence;
 using SylvanBot.Features.EmojiYoink;
@@ -31,7 +32,7 @@ public static class DependencyInjection
 
         private void AddFeatures(IConfiguration configuration)
         {
-            services.AddSingleton<ITicketDiscord, TicketDiscord>();
+            services.AddSingleton<IDiscordTicket, DiscordTicket>();
             services.AddSingleton<TicketWorkflow>();
 
             services.AddSingleton<IQuorumMembers, DiscordQuorumMembers>();

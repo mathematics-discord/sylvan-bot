@@ -17,7 +17,6 @@
         <File Path="Directory.Packages.props" />
     </Folder>
     <Folder Name="/tests/">
-        <File Path="stylecop.json" />
         <Project Path="tests/SylvanBot.Tests/SylvanBot.Tests.csproj" />
     </Folder>
 </Solution>

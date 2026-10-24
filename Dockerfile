@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY Directory.Build.props ./
@@ -12,7 +12,7 @@ RUN dotnet restore SylvanBot/SylvanBot.csproj
 COPY . .
 RUN dotnet publish SylvanBot/SylvanBot.csproj -c Release -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/runtime:11.0
+FROM mcr.microsoft.com/dotnet/runtime:10.0
 WORKDIR /app
 
 RUN apt-get update \

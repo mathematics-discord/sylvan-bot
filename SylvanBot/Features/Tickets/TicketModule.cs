@@ -3,13 +3,14 @@
 using System.Globalization;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Features.Tickets;
 
 [Group("ticket", "Moderator tickets.")]
 [DefaultMemberPermissions(GuildPermission.UseApplicationCommands)]
 [RequireContext(ContextType.Guild)]
 public sealed class TicketModule(
     TicketWorkflow workflow,
-    ITicketDiscord discord,
+    IDiscordTicket discord,
     ILogger logger,
     IHostApplicationLifetime lifetime)
     : InteractionModuleBase<IInteractionContext>
@@ -257,7 +258,8 @@ public sealed class TicketModule(
         {
             Option<Ticket> result = number is not null
                 ? await workflow.ShowAsync(actor, number.Value, hidden, cancellationToken)
-                : await workflow.ShowMessageAsync(actor, message!, hidden, cancellationToken);
+                : await workflow.ShowMessageAsync(
+                    actor, TicketReference.ParseMessageLink(message!, actor.GuildId), hidden, cancellationToken);
 
             await ShowTicketAsync(actor, result, cancellationToken);
 

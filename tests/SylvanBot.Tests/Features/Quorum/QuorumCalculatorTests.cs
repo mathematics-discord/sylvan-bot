@@ -1,11 +1,9 @@
 ﻿namespace SylvanBot.Tests.Features.Quorum;
 
-using System.Diagnostics.CodeAnalysis;
 using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Quorum;
 
 [TestFixture]
-[SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements should be documented")]
 public sealed class QuorumCalculatorTests
 {
     [Test]

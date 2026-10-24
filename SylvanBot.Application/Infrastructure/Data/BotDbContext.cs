@@ -2,11 +2,11 @@
 
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Quorum;
+using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Features.EmojiAnalytics;
 using SylvanBot.Features.Logging;
 using SylvanBot.Features.Moderation;
 using SylvanBot.Features.RoleColours;
-using SylvanBot.Features.Tickets;
 
 /// <summary>
 ///     Entity Framework Core database context for SylvanBot persistence.
