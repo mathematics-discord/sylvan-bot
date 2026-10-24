@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for RatBot
+about: Suggest an idea for Sylvan Bot
 title: ''
 labels: ''
 assignees: ''

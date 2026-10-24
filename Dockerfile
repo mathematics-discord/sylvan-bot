@@ -4,12 +4,13 @@ WORKDIR /src
 COPY Directory.Build.props ./
 COPY Directory.Packages.props ./
 COPY global.json ./
-COPY RatBot/RatBot.csproj RatBot/
+COPY SylvanBot/SylvanBot.csproj SylvanBot/
+COPY SylvanBot.Application/SylvanBot.Application.csproj SylvanBot.Application/
 
-RUN dotnet restore RatBot/RatBot.csproj
+RUN dotnet restore SylvanBot/SylvanBot.csproj
 
 COPY . .
-RUN dotnet publish RatBot/RatBot.csproj -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish SylvanBot/SylvanBot.csproj -c Release -o /app/publish /p:UseAppHost=false
 
 FROM mcr.microsoft.com/dotnet/runtime:11.0
 WORKDIR /app
@@ -20,4 +21,4 @@ RUN apt-get update \
 
 COPY --from=build /app/publish ./
 
-ENTRYPOINT ["dotnet", "RatBot.dll"]
+ENTRYPOINT ["dotnet", "SylvanBot.dll"]

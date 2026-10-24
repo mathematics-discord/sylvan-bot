@@ -5,8 +5,8 @@
             "name": "dotnet-test",
             "group": "pre-push",
             "command": "dotnet",
-            "args": ["test", "RatBot.slnx", "--configuration", "Release"],
-            "include": ["**/*.cs", "**/*.csproj", "**/*.props", "**/*.targets", "RatBot.slnx"],
+            "args": ["test", "SylvanBot.slnx", "--configuration", "Release"],
+            "include": ["**/*.cs", "**/*.csproj", "**/*.props", "**/*.targets", "SylvanBot.slnx"],
             "output": "always"
         }
     ]

@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "RatBot Local with database",
+            "name": "Sylvan Bot Local with database",
             "type": "dotnet",
             "request": "launch",
-            "projectPath": "${workspaceFolder}/RatBot/RatBot.csproj",
+            "projectPath": "${workspaceFolder}/SylvanBot/SylvanBot.csproj",
             "preLaunchTask": "Start local database"
         }
     ]
