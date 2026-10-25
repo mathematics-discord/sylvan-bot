@@ -15,10 +15,11 @@ public sealed class DependencyInjectionTests
                 new Dictionary<string, string?>(StringComparer.Ordinal)
                 {
                     ["Discord:Token"] = "inert-test-token",
-                    ["Discord:MessageCacheSize"] = "1000"
+                    ["Discord:MessageCacheSize"] = "1000",
                 }
             )
             .Build();
+
         var services = new ServiceCollection();
         services.AddOptions<DiscordOptions>().Bind(configuration.GetSection(DiscordOptions.SectionName));
 

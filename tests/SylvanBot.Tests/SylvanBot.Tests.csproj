@@ -37,8 +37,4 @@
         <ProjectReference Include="..\..\SylvanBot\SylvanBot.csproj" />
         <ProjectReference Include="..\..\SylvanBot.Application\SylvanBot.Application.csproj" />
     </ItemGroup>
-
-    <ItemGroup>
-        <AdditionalFiles Include="stylecop.json" />
-    </ItemGroup>
 </Project>

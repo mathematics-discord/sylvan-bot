@@ -207,6 +207,17 @@ public sealed class DiscordInteractionHandler(
 
     private async Task HandleInteractionAsync(SocketInteraction interaction)
     {
+        if (interaction.Type == InteractionType.ApplicationCommandAutocomplete)
+        {
+            // Autocomplete has its own response shape; do not send ordinary command failure text.
+            var autocompleteContext = new SocketInteractionContext(discordClient, interaction);
+            var autocompleteResult = await interactionService.ExecuteCommandAsync(autocompleteContext, services);
+            if (!autocompleteResult.IsSuccess)
+                _logger.Warning("Autocomplete failed: {Reason}", autocompleteResult.ErrorReason);
+
+            return;
+        }
+
         if (interaction.Type is not (InteractionType.ApplicationCommand or InteractionType.ModalSubmit
             or InteractionType.MessageComponent))
             return;

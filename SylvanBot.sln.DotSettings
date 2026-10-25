@@ -6,4 +6,290 @@
     <s:String x:Key="/Default/CodeStyle/CSharpVarKeywordUsage/ForOtherTypes/@EntryValue">UseExplicitType</s:String>
 	<s:String x:Key="/Default/CodeStyle/Naming/CSharpNaming/Abbreviations/=SSL/@EntryIndexedValue">SSL</s:String>
 	<s:Boolean x:Key="/Default/CodeStyle/Naming/CSharpNaming/ApplyAutoDetectedRules/@EntryValue">False</s:Boolean>
-	<s:Boolean x:Key="/Default/UserDictionary/Words/=invokee/@EntryIndexedValue">True</s:Boolean></wpf:ResourceDictionary>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=invokee/@EntryIndexedValue">True</s:Boolean>
+    <!-- Keep layout/interop exclusions and specialised test patterns from Rider's defaults.
+         Strict field dependency checks may intentionally leave unsafe field moves unapplied. -->
+    <s:String x:Key="/Default/CodeStyle/CSharpFileLayoutPatterns/Pattern/@EntryValue"><![CDATA[
+<Patterns xmlns="urn:schemas-jetbrains-com:member-reordering-patterns" StaticFieldReorderingPolicy="Strict">
+  <TypePattern DisplayName="Non-reorderable types" Priority="99999999">
+    <TypePattern.Match>
+      <Or>
+        <And>
+          <Kind Is="Interface" />
+          <Or>
+            <HasAttribute Name="System.Runtime.InteropServices.InterfaceTypeAttribute" />
+            <HasAttribute Name="System.Runtime.InteropServices.ComImport" />
+          </Or>
+        </And>
+        <Kind Is="Struct" />
+        <HasAttribute Name="System.Runtime.InteropServices.StructLayoutAttribute" />
+        <HasAttribute Name="System.Runtime.InteropServices.ExtendedLayoutAttribute" />
+        <HasAttribute Name="JetBrains.Annotations.NoReorderAttribute" />
+      </Or>
+    </TypePattern.Match>
+  </TypePattern>
+  <TypePattern DisplayName="xUnit.net Test Classes">
+    <TypePattern.Match>
+      <And>
+        <Kind Is="Class" />
+        <HasMember>
+          <And>
+            <Kind Is="Method" />
+            <HasAttribute Name="Xunit.FactAttribute" Inherited="True" />
+            <HasAttribute Name="Xunit.TheoryAttribute" Inherited="True" />
+          </And>
+        </HasMember>
+      </And>
+    </TypePattern.Match>
+    <Entry DisplayName="Fields">
+      <Entry.Match>
+        <And>
+          <Kind Is="Field" />
+          <Not>
+            <Static />
+          </Not>
+        </And>
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Readonly />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Constructors">
+      <Entry.Match>
+        <Kind Is="Constructor" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Teardown Methods">
+      <Entry.Match>
+        <And>
+          <Kind Is="Method" />
+          <ImplementsInterface Name="System.IDisposable" />
+        </And>
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="All other members">
+      <Entry.SortBy>
+        <Kind Order="Constant Field Constructor Destructor Delegate Event Enum Interface ExtensionBlock Property Indexer Operator Method Struct Class Record" />
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Test Methods" Priority="100">
+      <Entry.Match>
+        <And>
+          <Kind Is="Method" />
+          <HasAttribute Name="Xunit.FactAttribute" Inherited="false" />
+          <HasAttribute Name="Xunit.TheoryAttribute" Inherited="false" />
+        </And>
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+      </Entry.SortBy>
+    </Entry>
+  </TypePattern>
+  <TypePattern DisplayName="NUnit Test Fixtures">
+    <TypePattern.Match>
+      <And>
+        <Kind Is="Class" />
+        <Or>
+          <HasAttribute Name="NUnit.Framework.TestFixtureAttribute" Inherited="true" />
+          <HasAttribute Name="NUnit.Framework.TestFixtureSourceAttribute" Inherited="true" />
+          <HasMember>
+            <And>
+              <Kind Is="Method" />
+              <HasAttribute Name="NUnit.Framework.TestAttribute" Inherited="false" />
+              <HasAttribute Name="NUnit.Framework.TestCaseAttribute" Inherited="false" />
+              <HasAttribute Name="NUnit.Framework.TestCaseSourceAttribute" Inherited="false" />
+            </And>
+          </HasMember>
+        </Or>
+      </And>
+    </TypePattern.Match>
+    <Entry DisplayName="Setup/Teardown Methods">
+      <Entry.Match>
+        <And>
+          <Kind Is="Method" />
+          <Or>
+            <HasAttribute Name="NUnit.Framework.SetUpAttribute" Inherited="true" />
+            <HasAttribute Name="NUnit.Framework.TearDownAttribute" Inherited="true" />
+            <HasAttribute Name="NUnit.Framework.TestFixtureSetUpAttribute" Inherited="true" />
+            <HasAttribute Name="NUnit.Framework.TestFixtureTearDownAttribute" Inherited="true" />
+            <HasAttribute Name="NUnit.Framework.OneTimeSetUpAttribute" Inherited="true" />
+            <HasAttribute Name="NUnit.Framework.OneTimeTearDownAttribute" Inherited="true" />
+          </Or>
+        </And>
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="All other members">
+      <Entry.SortBy>
+        <Kind Order="Constant Field Constructor Destructor Delegate Event Enum Interface ExtensionBlock Property Indexer Operator Method Struct Class Record" />
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Test Methods" Priority="100">
+      <Entry.Match>
+        <And>
+          <Kind Is="Method" />
+          <HasAttribute Name="NUnit.Framework.TestAttribute" Inherited="false" />
+          <HasAttribute Name="NUnit.Framework.TestCaseAttribute" Inherited="false" />
+          <HasAttribute Name="NUnit.Framework.TestCaseSourceAttribute" Inherited="false" />
+        </And>
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+      </Entry.SortBy>
+    </Entry>
+  </TypePattern>
+  <TypePattern DisplayName="StyleCop member order">
+    <Entry DisplayName="Fields and constants">
+      <Entry.Match>
+        <Or>
+          <Kind Is="Field" />
+          <Kind Is="Constant" />
+        </Or>
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Kind Order="Constant Field" />
+        <Static />
+        <Readonly />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Constructors">
+      <Entry.Match>
+        <Kind Is="Constructor" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Finalizers">
+      <Entry.Match>
+        <Kind Is="Destructor" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Delegates">
+      <Entry.Match>
+        <Kind Is="Delegate" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Events">
+      <Entry.Match>
+        <Kind Is="Event" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Enums">
+      <Entry.Match>
+        <Kind Is="Enum" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Interfaces">
+      <Entry.Match>
+        <Kind Is="Interface" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Extension blocks">
+      <Entry.Match>
+        <Kind Is="ExtensionBlock" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Properties">
+      <Entry.Match>
+        <Kind Is="Property" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Indexers">
+      <Entry.Match>
+        <Kind Is="Indexer" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Operators">
+      <Entry.Match>
+        <Kind Is="Operator" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Methods">
+      <Entry.Match>
+        <Kind Is="Method" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Nested structs">
+      <Entry.Match>
+        <Kind Is="Struct" />
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="Nested classes and records">
+      <Entry.Match>
+        <Or>
+          <Kind Is="Class" />
+          <Kind Is="Record" />
+        </Or>
+      </Entry.Match>
+      <Entry.SortBy>
+        <Access Order="Public Internal ProtectedInternal Protected PrivateProtected Private" />
+        <Static />
+      </Entry.SortBy>
+    </Entry>
+    <Entry DisplayName="All other members" />
+  </TypePattern>
+</Patterns>
+]]></s:String>
+    <s:String x:Key="/Default/CodeStyle/CodeCleanup/Profiles/=Reorder_0020members/@EntryIndexedValue">&lt;Profile name="Reorder members"&gt;&lt;CSReorderTypeMembers&gt;True&lt;/CSReorderTypeMembers&gt;&lt;/Profile&gt;</s:String>
+    <s:String x:Key="/Default/CodeStyle/CodeCleanup/SilentCleanupProfile/@EntryValue">Reorder members</s:String>
+	<s:Boolean x:Key="/Default/UserDictionary/Words/=TZDB/@EntryIndexedValue">True</s:Boolean>
+</wpf:ResourceDictionary>

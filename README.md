@@ -54,4 +54,6 @@ The PostgreSQL integration tests use Testcontainers and need Docker running. The
 
 See the [changelog](CHANGELOG.md) for release history.
 
+Administrators configure Working Hours with `/working-conditions`; staff save their recurring daily availability with `/working-hours`. See [Working Hours](docs/working-hours.md) for input modes, per-guild configuration, role defaults and recovery behaviour.
+
 Write changelog entries around what users will notice, need to do differently, or can no longer rely on. Use the `Internal` component for refactors, build tooling, and other changes without user-facing effects, with the usual Added/Changed/Fixed kinds. Internal entries remain in the full changelog; Discord announcements link to them in a small-text footer instead of listing them. Releases containing only internal changes are announced as maintenance releases with no user-facing changes.

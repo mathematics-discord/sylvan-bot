@@ -77,6 +77,83 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.ToTable("quorum_voter_roles", "public");
                 });
 
+            modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursEligibleRole", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsExempt")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("GuildId", "RoleId");
+
+                    b.ToTable("working_hours_eligible_roles", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_working_hours_eligible_roles_identity", "\"RoleId\" <> 0 AND \"RoleId\" <> \"GuildId\"");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursPreference", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("MemberId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("EndTime")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("OffsetMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StartTime")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ZoneId")
+                        .HasColumnType("text");
+
+                    b.HasKey("GuildId", "MemberId");
+
+                    b.ToTable("working_hours", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_working_hours_identity", "\"GuildId\" <> 0 AND \"MemberId\" <> 0");
+
+                            t.HasCheckConstraint("CK_working_hours_window", "(\"StartTime\" IS NULL AND \"EndTime\" IS NULL AND \"OffsetMinutes\" IS NULL AND \"ZoneId\" IS NULL AND NOT \"Enabled\") OR (\"StartTime\" IS NOT NULL AND \"EndTime\" IS NOT NULL AND ((\"OffsetMinutes\" IS NOT NULL AND \"OffsetMinutes\" BETWEEN -1439 AND 1439 AND \"ZoneId\" IS NULL) OR (\"OffsetMinutes\" IS NULL AND \"ZoneId\" IS NOT NULL AND length(\"ZoneId\") > 0)))");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursSettings", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<long?>("PingRoleId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("working_hours_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_working_hours_settings_enabled", "NOT \"Enabled\" OR \"PingRoleId\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_working_hours_settings_identity", "\"GuildId\" <> 0");
+
+                            t.HasCheckConstraint("CK_working_hours_settings_target", "\"PingRoleId\" IS NULL OR (\"PingRoleId\" <> 0 AND \"PingRoleId\" <> \"GuildId\")");
+                        });
+                });
+
             modelBuilder.Entity("SylvanBot.Features.EmojiAnalytics.EmojiUsageCount", b =>
                 {
                     b.Property<long>("GuildId")
@@ -215,9 +292,23 @@ namespace SylvanBot.Infrastructure.Migrations
                         .HasConstraintName("fk_quorum_voter_roles_quorum_configurations");
                 });
 
+            modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursEligibleRole", b =>
+                {
+                    b.HasOne("SylvanBot.Application.Features.WorkingHours.WorkingHoursSettings", null)
+                        .WithMany("EligibleRoles")
+                        .HasForeignKey("GuildId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SylvanBot.Application.Features.Quorum.QuorumConfiguration", b =>
                 {
                     b.Navigation("VoterRoles");
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursSettings", b =>
+                {
+                    b.Navigation("EligibleRoles");
                 });
 #pragma warning restore 612, 618
         }
