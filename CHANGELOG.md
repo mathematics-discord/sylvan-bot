@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.8 - 2026-10-25
+## Moderation
+### Added
+- Add /working-hours for recurring daily availability and administrator-only /working-conditions for persisted per-guild settings. Global disable restores ordinary staff ping-role defaults while exempt staff retain manual control; saved schedules resume when re-enabled. Changing the ping role requires disabling first and leaves old role assignments unchanged. Time input uses the documented [RFC 3339 time-only profile](https://www.rfc-editor.org/rfc/rfc3339.html#section-5.6), with fixed offsets or named zones from the [IANA Time Zone Database](https://www.iana.org/time-zones).
 # v0.1.7 - 2026-10-25
 ## Internal
 ### Removed
