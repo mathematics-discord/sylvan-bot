@@ -2,7 +2,7 @@
 
 using System.Globalization;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 
 [Group("ticket", "Moderator tickets.")]
@@ -35,7 +35,7 @@ public sealed class TicketModule(
     [RequireUserPermission(GuildPermission.ModerateMembers)]
     [CommandContextType(InteractionContextType.Guild)]
     public Task EditTicketAsync(IMessage msg)
-        => OpenEditorAsync((actor, cancellationToken) => workflow.PrepareEditAsync(
+        => OpenEditorAsync((actor, cancellationToken) => workflow.PrepareNoteEditAsync(
             actor,
             new TicketMessage(msg.Channel.Id, msg.Id),
             cancellationToken));
@@ -43,7 +43,7 @@ public sealed class TicketModule(
     [SlashCommand("note", "Save a moderator note and publish it to the staff tickets channel.")]
     public Task NoteAsync(
         [Summary("user", "Subject's mention or user ID, including departed users.")] string user,
-        [Summary("comment", "Moderator note; omit to open an editor.")] [MaxLength(TicketWorkflow.CommentLimit)]
+        [Summary("comment", "Moderator note; omit to open an editor.")] [MaxLength(TicketWorkflow.NoteCommentLimit)]
         string? comment = null)
         => ExecuteAsync(
             async (actor, cancellationToken) =>
@@ -54,7 +54,7 @@ public sealed class TicketModule(
                 {
                     using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     deadline.CancelAfter(TimeSpan.FromSeconds(2));
-                    await workflow.PrepareCreateAsync(actor, subjectId, deadline.Token);
+                    await workflow.PrepareCreateNoteAsync(actor, subjectId, deadline.Token);
 
                     await RespondWithModalAsync(
                         $"ticket-note:{actor.GuildId}:{actor.UserId}:{subjectId}",
@@ -63,8 +63,8 @@ public sealed class TicketModule(
                     return;
                 }
 
-                var change = await workflow.CreateAsync(actor, subjectId, comment, cancellationToken);
-                await ReplyAsync(TicketPresentation.Change(change));
+                var change = await workflow.CreateNoteAsync(actor, subjectId, comment, cancellationToken);
+                await ReplyToChangeAsync(change);
             },
             defer: comment is not null);
 
@@ -73,10 +73,10 @@ public sealed class TicketModule(
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
             if (actor.GuildId != guildId || actor.UserId != ownerId)
-                throw new UnauthorizedAccessException();
+                throw new BotCommandException("This note form belongs to another moderator or server. Nothing was changed.");
 
-            var change = await workflow.CreateAsync(actor, subjectId, modal.Comment, cancellationToken);
-            await ReplyAsync(TicketPresentation.Change(change));
+            var change = await workflow.CreateNoteAsync(actor, subjectId, modal.Comment, cancellationToken);
+            await ReplyToChangeAsync(change);
         });
 
     [SlashCommand("show", "Look up a user's tickets or one visible ticket number.")]
@@ -116,33 +116,41 @@ public sealed class TicketModule(
             cancellationToken));
 
     [SlashCommand("set", "Replace supplied ticket fields. Currently supports notes only.")]
-    public Task SetAsync(
+    public Task SetNoteAsync(
         [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id,
         [Summary("duration", "Notes do not accept a duration.")]
         string? duration = null,
-        [Summary("comment", "Replacement comment; omitted means unchanged.")] [MaxLength(TicketWorkflow.CommentLimit)]
-        string? comment = null)
+        [Summary("comment", "Replacement comment; omitted means unchanged.")] [MaxLength(TicketWorkflow.NoteCommentLimit)]
+        string? comment = null,
+        [Summary("hidden", "Whether to hide this note; omitted means unchanged.")] bool? hidden = null)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
-            var change = await workflow.SetAsync(actor, id, duration, comment, cancellationToken: cancellationToken);
-            await ReplyAsync(TicketPresentation.Change(change));
+            var change = await workflow.SetNoteAsync(
+                actor,
+                id,
+                duration,
+                comment,
+                hidden,
+                cancellationToken: cancellationToken);
+
+            await ReplyToChangeAsync(change, hiding: hidden == true);
         });
 
     [SlashCommand("append", "Append text to a note, preserving the existing comment.")]
-    public Task AppendAsync(
+    public Task AppendNoteAsync(
         [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id,
         [Summary("comment", "Text to append; the complete comment must fit within 2,000 characters.")]
-        [MaxLength(TicketWorkflow.CommentLimit)]
+        [MaxLength(TicketWorkflow.NoteCommentLimit)]
         string comment)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
-            var change = await workflow.AppendAsync(actor, id, comment, cancellationToken);
-            await ReplyAsync(TicketPresentation.Change(change));
+            var change = await workflow.AppendNoteAsync(actor, id, comment, cancellationToken);
+            await ReplyToChangeAsync(change);
         });
 
     [SlashCommand("edit", "Open a note's existing comment in an editor.")]
     public Task EditAsync([Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id)
-        => OpenEditorAsync((actor, cancellationToken) => workflow.PrepareEditAsync(actor, id, cancellationToken));
+        => OpenEditorAsync((actor, cancellationToken) => workflow.PrepareNoteEditAsync(actor, id, cancellationToken));
 
     [ComponentInteraction("ticket:edit:*", true)]
     public Task EditButtonAsync(long id) => EditAsync(id);
@@ -156,11 +164,12 @@ public sealed class TicketModule(
                 deadline.CancelAfter(TimeSpan.FromSeconds(2));
                 var ticket = await prepareEdit(actor, deadline.Token);
 
-                if (ticket.Comment?.Length > TicketWorkflow.CommentLimit)
+                if (ticket.Comment?.Length > TicketWorkflow.NoteCommentLimit)
                 {
                     await ReplyAsync(
                         "This stored comment exceeds the 2,000-character limit and has been left intact. "
-                        + $"Use /ticket set id:{ticket.Number} comment: to replace it with a comment of at most 2,000 characters.");
+                        + $"Use /ticket set id:{ticket.Number} comment: to replace it with a comment of at most 2,000 characters, "
+                        + "or set hidden: without supplying comment: to change visibility and retain the full text.");
 
                     return;
                 }
@@ -181,9 +190,9 @@ public sealed class TicketModule(
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
             if (actor.GuildId != guildId || actor.UserId != ownerId)
-                throw new UnauthorizedAccessException();
+                throw new BotCommandException("This note editor belongs to another moderator or server. Nothing was changed.");
 
-            var change = await workflow.SetAsync(
+            var change = await workflow.SetNoteAsync(
                 actor,
                 number,
                 comment: modal.Comment,
@@ -191,15 +200,15 @@ public sealed class TicketModule(
                 expectedVersion: version,
                 cancellationToken: cancellationToken);
 
-            await ReplyAsync(TicketPresentation.Change(change, hiding: modal.Hidden));
+            await ReplyToChangeAsync(change, hiding: modal.Hidden);
         });
 
     [SlashCommand("hide", "Hide a note and remove its Sylvan-authored publication where possible.")]
-    public Task HideAsync([Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id)
+    public Task HideNoteAsync([Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
-            var change = await workflow.HideAsync(actor, id, cancellationToken);
-            await ReplyAsync(TicketPresentation.Change(change, hiding: true));
+            var change = await workflow.HideNoteAsync(actor, id, cancellationToken);
+            await ReplyToChangeAsync(change, hiding: true);
         });
 
     [ComponentInteraction("ticket:hide:*", true)]
@@ -207,30 +216,41 @@ public sealed class TicketModule(
         => ExecuteAsync(
             async (actor, cancellationToken) =>
             {
-                var change = await workflow.HideAsync(actor, id, cancellationToken);
+                var change = await workflow.HideNoteAsync(actor, id, cancellationToken);
                 var interaction = (IComponentInteraction)Context.Interaction;
+                var response = TicketPresentation.Change(change, hiding: true);
 
-                if (interaction.Message.Flags?.HasFlag(MessageFlags.Ephemeral) == true)
+                try
                 {
-                    var canViewHidden = actor.IsAdministrator || actor.CanViewAuditLog;
-
-                    await ModifyOriginalResponseAsync(properties =>
+                    if (interaction.Message.Flags?.HasFlag(MessageFlags.Ephemeral) == true)
                     {
-                        properties.Content = TicketPresentation.Change(change, hiding: true);
-                        properties.Embed = canViewHidden ? TicketPresentation.Describe(change.Ticket) : null;
+                        var canViewHidden = actor.IsAdministrator || actor.CanViewAuditLog;
 
-                        properties.Components = canViewHidden
-                            ? TicketPresentation.Buttons(change.Ticket)
-                            : new ComponentBuilder().Build();
-                        properties.AllowedMentions = AllowedMentions.None;
-                    });
+                        await ModifyOriginalResponseAsync(properties =>
+                        {
+                            properties.Content = response;
+                            properties.Embed = canViewHidden ? TicketPresentation.Describe(change.Ticket) : null;
+
+                            properties.Components = canViewHidden
+                                ? TicketPresentation.Buttons(change.Ticket)
+                                : new ComponentBuilder().Build();
+                            properties.AllowedMentions = AllowedMentions.None;
+                        });
+                    }
+                    else
+                    {
+                        await FollowupAsync(response, ephemeral: true, allowedMentions: AllowedMentions.None);
+                    }
                 }
-                else
+                catch (Exception exception)
                 {
-                    await FollowupAsync(
-                        TicketPresentation.Change(change, hiding: true),
-                        ephemeral: true,
-                        allowedMentions: AllowedMentions.None);
+                    logger.Warning(
+                        "Ticket {Number} in guild {GuildId}: delivering the hidden outcome failed ({FailureType})",
+                        change.Ticket.Number,
+                        change.Ticket.GuildId,
+                        exception.GetType().Name);
+
+                    throw new BotCommandException(response);
                 }
             },
             updateMessage: true);
@@ -247,12 +267,8 @@ public sealed class TicketModule(
         var supplied = (user is null ? 0 : 1) + (number is null ? 0 : 1) + (message is null ? 0 : 1);
 
         if (supplied != 1)
-        {
-            await ReplyAsync(
+            throw new BotCommandException(
                 "Supply exactly one of user: (mention or user ID), id: (ticket number), or message: (message link).");
-
-            return;
-        }
 
         if (number is not null || message is not null)
         {
@@ -397,11 +413,7 @@ public sealed class TicketModule(
         }
 
         if (Context.User is not IGuildUser moderator || Context.Guild is null)
-        {
-            await ReplyAsync("Use this command in a server.");
-
-            return;
-        }
+            throw new BotCommandException("Use this command in a server.");
 
         var permissions = moderator.GuildPermissions;
 
@@ -417,40 +429,27 @@ public sealed class TicketModule(
             permissions.ManageRoles,
             permissions.ViewAuditLog);
 
+        await operation(actor, lifetime.ApplicationStopping);
+    }
+
+    private async Task ReplyToChangeAsync(TicketChange change, bool hiding = false)
+    {
+        var response = TicketPresentation.Change(change, hiding);
+
         try
         {
-            await operation(actor, lifetime.ApplicationStopping);
+            await ReplyAsync(response);
         }
         catch (Exception exception)
         {
-            var response = exception switch
-            {
-                DbUpdateConcurrencyException =>
-                    "This ticket changed since you opened it. Read it again before editing.",
-                UnauthorizedAccessException => "Staff access and channel visibility are required. "
-                                               + "Changing notes requires Moderate Members or Administrator; Mute Members alone is insufficient. "
-                                               + "Viewing hidden tickets requires View Audit Log or Administrator.",
-                NotSupportedException => "This ticket type is read-only. Only notes can be changed or hidden.",
-                KeyNotFoundException => "No matching ticket in this server.",
-                ArgumentException => "Check the user ID, ticket number, message link, page and comment. "
-                                     + "Comments must contain text and total at most 2,000 characters, including appended text; notes do not accept duration changes.",
-                InvalidOperationException =>
-                    "The operation is unavailable. Check ticket configuration and the channel. "
-                    + "Sylvan needs View Channel, Read Message History, Send Messages, Embed Links and Attach Files.",
-                OperationCanceledException => "The operation was interrupted. Check the ticket before retrying.",
-                _ => "The operation could not be completed. Check /ticket show and the channel before retrying.",
-            };
-
             logger.Warning(
-                "Ticket interaction failed in guild {GuildId}, moderator {ModeratorId}: {FailureType}",
-                actor.GuildId,
-                actor.UserId,
+                "Ticket {Number} in guild {GuildId}: delivering the saved outcome failed ({FailureType})",
+                change.Ticket.Number,
+                change.Ticket.GuildId,
                 exception.GetType().Name);
 
-            if (updateMessage)
-                await FollowupAsync(response, ephemeral: true, allowedMentions: AllowedMentions.None);
-            else
-                await ReplyAsync(response);
+            // The shared handler can try a private response without losing the completed operation's outcome.
+            throw new BotCommandException(response);
         }
     }
 

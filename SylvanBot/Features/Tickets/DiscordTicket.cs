@@ -2,6 +2,7 @@ namespace SylvanBot.Features.Tickets;
 
 using System.Text;
 using Discord.Net;
+using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 
 public sealed class DiscordTicket(IDiscordClient client) : IDiscordTicket
@@ -15,13 +16,13 @@ public sealed class DiscordTicket(IDiscordClient client) : IDiscordTicket
         var options = Options(cancellationToken);
 
         var gld = await client.GetGuildAsync(actor.GuildId, options: options)
-                  ?? throw new InvalidOperationException();
+                  ?? throw new BotCommandException("Sylvan could not access this server.");
 
         var ch = await GetChannelAsync(actor.GuildId, channelId, cancellationToken);
         var moderator = await gld.GetUserAsync(actor.UserId, options: options);
 
         if (moderator?.GetPermissions(ch).ViewChannel != true)
-            throw new UnauthorizedAccessException();
+            throw new BotCommandException("You must be able to view the tickets channel to access its records.");
 
         if (!publishing)
             return;
@@ -33,7 +34,9 @@ public sealed class DiscordTicket(IDiscordClient client) : IDiscordTicket
             { ViewChannel: true, SendMessages: true, EmbedLinks: true, AttachFiles: true, ReadMessageHistory: true };
 
         if (!canPublish)
-            throw new InvalidOperationException();
+            throw new BotCommandException(
+                "Sylvan needs View Channel, Read Message History, Send Messages, Embed Links and Attach Files "
+                + "in the tickets channel.");
     }
 
     public async Task<Option<TicketMessage>> FindMessageAsync(
@@ -42,7 +45,7 @@ public sealed class DiscordTicket(IDiscordClient client) : IDiscordTicket
         CancellationToken cancellationToken)
     {
         if (actor.GuildId != ticket.GuildId)
-            throw new UnauthorizedAccessException();
+            throw new BotCommandException("This ticket belongs to another server.");
 
         var options = Options(cancellationToken);
         var gld = await client.GetGuildAsync(actor.GuildId, options: options);
@@ -178,7 +181,7 @@ public sealed class DiscordTicket(IDiscordClient client) : IDiscordTicket
         var ch = gld is null ? null : await gld.GetTextChannelAsync(channelId, options: Options(cancellationToken));
 
         if (ch is null || ch.GuildId != guildId || ch.ChannelType != ChannelType.Text)
-            throw new InvalidOperationException();
+            throw new BotCommandException("The tickets channel is unavailable or is not a text channel in this server.");
 
         return ch;
     }

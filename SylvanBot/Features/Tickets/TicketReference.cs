@@ -1,6 +1,7 @@
 ﻿namespace SylvanBot.Features.Tickets;
 
 using System.Globalization;
+using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 
 public static class TicketReference
@@ -30,7 +31,7 @@ public static class TicketReference
             }
         }
 
-        throw new ArgumentException("Provide a Discord message link in this server.", nameof(value));
+        throw new BotCommandException("Provide a Discord message link in this server.");
     }
 
     public static ulong ParseUser(string value)
@@ -43,6 +44,6 @@ public static class TicketReference
         if (ulong.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id != 0)
             return id;
 
-        throw new ArgumentException("Provide a user mention or a Discord user ID.", nameof(value));
+        throw new BotCommandException("Provide a user mention or a nonzero Discord user ID.");
     }
 }

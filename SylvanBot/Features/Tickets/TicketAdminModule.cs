@@ -1,5 +1,6 @@
 ﻿namespace SylvanBot.Features.Tickets;
 
+using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 
 [Group("ticket-admin", "Administrator ticket settings.")]
@@ -15,38 +16,39 @@ public sealed class TicketAdminModule(TicketWorkflow workflow, ILogger logger, I
         [Summary("channel", "Staff tickets channel.")] [ChannelTypes(ChannelType.Text)] ITextChannel? channel = null)
     {
         await DeferAsync(ephemeral: true);
-        string response;
+
+        if (Context.User is not IGuildUser moderator || Context.Guild is null)
+            throw new BotCommandException("Use this command in a server.");
+
+        var actor = new TicketActor(
+            Context.Guild.Id,
+            moderator.Id,
+            moderator.GuildPermissions.Administrator,
+            moderator.GuildPermissions.ModerateMembers);
+
+        var configuration = await workflow.ConfigureAsync(actor, enabled, channel?.Id, lifetime.ApplicationStopping);
+        var destination = configuration.DestinationChannelId is null
+            ? "unset"
+            : $"<#{configuration.DestinationChannelId}>";
+
+        var response = $"Note creation: {(configuration.Enabled ? "enabled" : "disabled")}\nDestination: {destination}";
 
         try
         {
-            if (Context.User is not IGuildUser moderator || Context.Guild is null)
-                throw new UnauthorizedAccessException();
-
-            var actor = new TicketActor(Context.Guild.Id, moderator.Id,
-                moderator.GuildPermissions.Administrator, moderator.GuildPermissions.ModerateMembers);
-
-            var configuration = await workflow.ConfigureAsync(actor, enabled, channel?.Id, lifetime.ApplicationStopping);
-            var destination = configuration.DestinationChannelId is null
-                ? "unset"
-                : $"<#{configuration.DestinationChannelId}>";
-
-            response = $"Note creation: {(configuration.Enabled ? "enabled" : "disabled")}\nDestination: {destination}";
+            await ModifyOriginalResponseAsync(properties =>
+            {
+                properties.Content = response;
+                properties.AllowedMentions = AllowedMentions.None;
+            });
         }
         catch (Exception exception)
         {
-            response = exception is UnauthorizedAccessException
-                ? "Administrator permission and access to the selected channel are required."
-                : "Configuration could not be updated. Enabling notes or selecting a channel requires "
-                    + "a destination where Sylvan can view, read history, send messages, embed links and attach files.";
+            logger.Warning(
+                "Ticket configuration in guild {GuildId}: delivering the confirmed configuration failed ({FailureType})",
+                actor.GuildId,
+                exception.GetType().Name);
 
-            logger.Warning("Ticket configuration failed in guild {GuildId}: {FailureType}",
-                Context.Guild?.Id, exception.GetType().Name);
+            throw new BotCommandException(response);
         }
-
-        await ModifyOriginalResponseAsync(properties =>
-        {
-            properties.Content = response;
-            properties.AllowedMentions = AllowedMentions.None;
-        });
     }
 }

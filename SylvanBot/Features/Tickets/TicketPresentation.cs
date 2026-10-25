@@ -155,7 +155,8 @@ internal static class TicketPresentation
 
         if (change.PublicationUncertain)
             return $"{ticket} was saved, but publication/update could not be confirmed. "
-                   + "Check the channel before retrying. An uncertain new publication will not be reposted automatically.";
+                   + "Do not repeat the action. Check the saved ticket and the tickets channel. "
+                   + "An uncertain new publication will not be reposted automatically.";
 
         if (change.Ticket.Hidden)
             return $"Saved {ticket}. It remains hidden.";
@@ -168,7 +169,7 @@ internal static class TicketPresentation
 
         if (!change.ReferenceSaved)
             return $"{ticket} was saved and its post was confirmed.{publication}\n"
-                   + "Saving the message reference failed. Do not create it again.";
+                   + "Saving the message reference could not be confirmed. Do not create it again.";
 
         return $"Saved {ticket}.{publication}";
     }

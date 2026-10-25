@@ -7,6 +7,6 @@ public sealed class TicketCommentModal : IModal
     public string Title { get; set; } = "Edit ticket";
 
     [InputLabel("Comment")]
-    [ModalTextInput("comment", TextInputStyle.Paragraph, minLength: 1, maxLength: TicketWorkflow.CommentLimit)]
+    [ModalTextInput("comment", TextInputStyle.Paragraph, minLength: 1, maxLength: TicketWorkflow.NoteCommentLimit)]
     public string Comment { get; set; } = string.Empty;
 }

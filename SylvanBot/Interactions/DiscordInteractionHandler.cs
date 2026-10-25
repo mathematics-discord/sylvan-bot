@@ -335,7 +335,7 @@ public sealed class DiscordInteractionHandler(
         }
         catch (HttpException ex) when (ex.DiscordCode == DiscordErrorCode.UnknownMessage)
         {
-            await interaction.FollowupAsync(GenericFailureMessage, ephemeral: true, allowedMentions: AllowedMentions.None);
+            await interaction.FollowupAsync(message, ephemeral: true, allowedMentions: AllowedMentions.None);
             return;
         }
 

@@ -22,11 +22,20 @@ public sealed class TicketPersistence :
 
         builder.HasKey(ticket => ticket.Id);
 
-        builder.Property(ticket => ticket.Action).HasConversion<string>();
-        builder.Property(ticket => ticket.Status).HasConversion<string>();
-        builder.Property(ticket => ticket.Version).IsConcurrencyToken();
+        builder.Property(ticket => ticket.Action)
+            .HasConversion<string>();
 
-        builder.HasIndex(ticket => new { ticket.GuildId, ticket.Number }).IsUnique();
+        builder.Property(ticket => ticket.Status)
+            .HasConversion<string>();
+
+        builder.Property(ticket => ticket.Comment)
+            .HasColumnType("text");
+
+        builder.Property(ticket => ticket.Version)
+            .IsConcurrencyToken();
+
+        builder.HasIndex(ticket => new { ticket.GuildId, ticket.Number })
+            .IsUnique();
         builder.HasIndex(ticket => new { ticket.GuildId, ticket.SubjectUserId, ticket.Hidden, ticket.Id });
         builder.HasIndex(ticket => new { ticket.GuildId, ticket.ChannelId, ticket.MessageId });
         builder.HasIndex(ticket => new { ticket.GuildId, ticket.PreviousChannelId, ticket.PreviousMessageId });
@@ -38,6 +47,7 @@ public sealed class TicketPersistence :
 
         builder.HasKey(configuration => configuration.GuildId);
 
-        builder.Property(configuration => configuration.GuildId).ValueGeneratedNever();
+        builder.Property(configuration => configuration.GuildId)
+            .ValueGeneratedNever();
     }
 }
