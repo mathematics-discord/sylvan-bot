@@ -18,7 +18,7 @@ public sealed partial class TicketWorkflow
                 .AsNoTracking()
                 .SingleAsync(configuration => configuration.GuildId == guildId, cancellationToken);
 
-            if (configuration.CaptureFromUtc is null)
+            if (!configuration.Enabled || configuration.DestinationChannelId is null || configuration.CaptureFromUtc is null)
                 return false;
 
             var scanStartedUtc = DateTimeOffset.UtcNow;
@@ -73,10 +73,7 @@ public sealed partial class TicketWorkflow
                     cancellationToken);
 
             // Do not advance the coverage boundary past unresolved action identities.
-            if (identitiesResolved)
-                await CompleteAuditScanAsync(guildId, scanStartedUtc, cancellationToken);
-
-            return identitiesResolved;
+            return identitiesResolved && await CompleteAuditScanAsync(guildId, scanStartedUtc, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -93,7 +90,7 @@ public sealed partial class TicketWorkflow
         }
     }
 
-    private async Task CompleteAuditScanAsync(
+    private async Task<bool> CompleteAuditScanAsync(
         ulong guildId,
         DateTimeOffset scannedFromUtc,
         CancellationToken cancellationToken)
@@ -107,11 +104,16 @@ public sealed partial class TicketWorkflow
             var configuration = await dbContext.TicketConfigurations
                 .SingleAsync(configuration => configuration.GuildId == guildId, cancellationToken);
 
+            if (!configuration.Enabled || configuration.CaptureFromUtc > scannedFromUtc)
+                return false;
+
             if (configuration.LastAuditScanAtUtc is null || configuration.LastAuditScanAtUtc < scannedFromUtc)
             {
                 configuration.LastAuditScanAtUtc = scannedFromUtc;
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
+
+            return true;
         }
         finally
         {
@@ -137,6 +139,9 @@ public sealed partial class TicketWorkflow
 
             var configuration = await dbContext.TicketConfigurations
                 .SingleAsync(configuration => configuration.GuildId == guildId, cancellationToken);
+
+            if (!configuration.Enabled || configuration.DestinationChannelId is null)
+                return;
 
             if (observation is not null)
                 await ApplyObservationAsync(dbContext, configuration, observation, operationAudits, cancellationToken);
@@ -225,7 +230,7 @@ public sealed partial class TicketWorkflow
 
         var captureNew = createsTicket
                          && observation.OperationId is null
-                         && configuration.AutomaticCaptureEnabled
+                         && configuration.Enabled
                          && configuration.CaptureFromUtc <= observation.CreatedAtUtc;
 
         Ticket? created = null;

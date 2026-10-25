@@ -228,9 +228,6 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<long>("GuildId")
                         .HasColumnType("bigint");
 
-                    b.Property<bool>("AutomaticCaptureEnabled")
-                        .HasColumnType("boolean");
-
                     b.Property<DateTimeOffset?>("CaptureFromUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -255,6 +252,8 @@ namespace SylvanBot.Infrastructure.Migrations
 
                     b.ToTable("ticket_configurations", null, t =>
                         {
+                            t.HasCheckConstraint("CK_ticket_configurations_enabled_channel", "NOT \"Enabled\" OR \"DestinationChannelId\" IS NOT NULL");
+
                             t.HasCheckConstraint("CK_ticket_configurations_reminder", "\"ReminderIntervalSeconds\" >= 60");
                         });
                 });

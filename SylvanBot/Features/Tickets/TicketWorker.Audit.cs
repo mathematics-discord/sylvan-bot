@@ -15,7 +15,8 @@ public sealed partial class TicketWorker
 
             List<TicketConfiguration> configurations = await dbContext.TicketConfigurations
                 .AsNoTracking()
-                .Where(configuration => configuration.GuildId > afterGuildId && configuration.CaptureFromUtc != null)
+                .Where(configuration => configuration.GuildId > afterGuildId && configuration.Enabled
+                                        && configuration.DestinationChannelId != null && configuration.CaptureFromUtc != null)
                 .OrderBy(configuration => configuration.GuildId)
                 .Take(100)
                 .ToListAsync(cancellationToken);

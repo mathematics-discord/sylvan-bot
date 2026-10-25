@@ -12,10 +12,8 @@ public sealed class TicketAdminModule(TicketWorkflow workflow, TicketWorker work
 {
     [SlashCommand("config", "View or update ticket configuration.")]
     public async Task ConfigAsync(
-        [Summary("enabled", "Whether creation of notes is enabled.")] bool? enabled = null,
+        [Summary("enabled", "Whether the entire ticket system is enabled.")] bool? enabled = null,
         [Summary("channel", "Staff tickets channel.")] [ChannelTypes(ChannelType.Text)] ITextChannel? channel = null,
-        [Summary("automatic-capture", "Capture new timeout/ban actions; existing completion and expiry continue when disabled.")]
-        bool? automaticCapture = null,
         [Summary("reminder-minutes", "DM reminder interval in minutes (default 1440).")]
         [MinValue(1)] [MaxValue(35791394)] int? reminderMinutes = null)
     {
@@ -30,17 +28,16 @@ public sealed class TicketAdminModule(TicketWorkflow workflow, TicketWorker work
             moderator.GuildPermissions.Administrator,
             moderator.GuildPermissions.ModerateMembers);
 
-        var configuration = await workflow.ConfigureAsync(actor, enabled, channel?.Id, automaticCapture,
+        var configuration = await workflow.ConfigureAsync(actor, enabled, channel?.Id,
             reminderMinutes * 60, lifetime.ApplicationStopping);
         worker.Wake();
         var destination = configuration.DestinationChannelId is null
             ? "unset"
             : $"<#{configuration.DestinationChannelId}>";
 
-        var response = $"Note creation: {(configuration.Enabled ? "enabled" : "disabled")}\nDestination: {destination}\n"
-                       + $"Automatic timeout/ban capture: {(configuration.AutomaticCaptureEnabled ? "enabled" : "disabled")}\n"
+        var response = $"Tickets: {(configuration.Enabled ? "enabled" : "disabled")}\nDestination: {destination}\n"
                        + $"DM reminder interval: {configuration.ReminderIntervalSeconds / 60} minutes\n"
-                       + "Disabling capture does not cancel existing ticket reminders or scheduled expiries.";
+                       + "Disabling tickets pauses capture, reminders and scheduled expiry. Stored tickets are retained.";
 
         try
         {

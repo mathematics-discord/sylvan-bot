@@ -70,7 +70,10 @@ public sealed class TicketPersistence :
     public void Configure(EntityTypeBuilder<TicketConfiguration> builder)
     {
         builder.ToTable("ticket_configurations", table =>
-            table.HasCheckConstraint("CK_ticket_configurations_reminder", "\"ReminderIntervalSeconds\" >= 60"));
+        {
+            table.HasCheckConstraint("CK_ticket_configurations_reminder", "\"ReminderIntervalSeconds\" >= 60");
+            table.HasCheckConstraint("CK_ticket_configurations_enabled_channel", "NOT \"Enabled\" OR \"DestinationChannelId\" IS NOT NULL");
+        });
 
         builder.HasKey(configuration => configuration.GuildId);
 

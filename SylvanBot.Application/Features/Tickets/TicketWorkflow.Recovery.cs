@@ -14,6 +14,14 @@ public sealed partial class TicketWorkflow
         while (true)
         {
             await using var readContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+            var enabled = await readContext.TicketConfigurations
+                .AnyAsync(configuration => configuration.GuildId == guildId && configuration.Enabled
+                                           && configuration.DestinationChannelId != null, cancellationToken);
+
+            if (!enabled)
+                return;
+
             var now = DateTimeOffset.UtcNow;
 
             List<long> ids = await readContext.Tickets
@@ -85,9 +93,14 @@ public sealed partial class TicketWorkflow
         actor = await discord.GetActorAsync(actor.GuildId, actor.UserId, cancellationToken);
         await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
 
+        await RequireEnabledAsync(dbContext, actor.GuildId, cancellationToken);
+
         var head = await dbContext.Tickets
             .AsNoTracking()
-            .Where(ticket => ticket.ModeratorUserId == actor.UserId && ticket.Completion == TicketCompletion.Pending)
+            .Where(ticket => ticket.ModeratorUserId == actor.UserId && ticket.Completion == TicketCompletion.Pending
+                             && dbContext.TicketConfigurations
+                                 .Any(configuration => configuration.GuildId == ticket.GuildId && configuration.Enabled
+                                                       && configuration.DestinationChannelId != null))
             .OrderBy(ticket => ticket.CreatedAtUtc)
             .ThenBy(ticket => ticket.Id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -122,6 +135,14 @@ public sealed partial class TicketWorkflow
         try
         {
             await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+            var enabled = await dbContext.TicketConfigurations
+                .AnyAsync(configuration => configuration.GuildId == guildId && configuration.Enabled
+                                           && configuration.DestinationChannelId != null, cancellationToken);
+
+            if (!enabled)
+                return;
+
             var ticket = await dbContext.Tickets
                 .SingleAsync(ticket => ticket.GuildId == guildId && ticket.Id == id, cancellationToken);
 
@@ -147,6 +168,12 @@ public sealed partial class TicketWorkflow
         CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
+        // A disable/re-enable between the scan and this operation invalidates its coverage.
+        auditCurrent = auditCurrent && await dbContext.TicketConfigurations
+            .AnyAsync(configuration => configuration.GuildId == ticket.GuildId && configuration.Enabled
+                                       && configuration.CaptureFromUtc != null
+                                       && configuration.LastAuditScanAtUtc >= configuration.CaptureFromUtc, cancellationToken);
+
         var superseded = ticket.Status == TicketStatus.Reverted || ticket.SupersededByNumber is not null;
 
         if (ticket.PendingOperationId is not null && superseded)

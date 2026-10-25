@@ -19,69 +19,91 @@ public sealed partial class TicketWorkflow(
         TicketActor actor,
         bool? enabled,
         ulong? channelId,
-        bool? automaticCaptureEnabled = null,
         int? reminderIntervalSeconds = null,
         CancellationToken cancellationToken = default)
     {
         if (actor.GuildId == 0 || actor.UserId == 0 || !actor.IsAdministrator)
             throw new BotCommandException("Administrator permission is required to configure tickets.");
 
-        await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
-
-        var configuration = await dbContext.TicketConfigurations
-            .SingleOrDefaultAsync(configuration => configuration.GuildId == actor.GuildId, cancellationToken);
-
-        var isNew = configuration is null;
-        configuration ??= new TicketConfiguration { GuildId = actor.GuildId };
-
-        if (enabled is null && channelId is null && automaticCaptureEnabled is null && reminderIntervalSeconds is null)
-            return configuration;
-
-        var destination = channelId ?? configuration.DestinationChannelId;
-        var updatedEnabled = enabled ?? configuration.Enabled;
-        var updatedCapture = automaticCaptureEnabled ?? configuration.AutomaticCaptureEnabled;
-
-        if (reminderIntervalSeconds is < 60)
-            throw new BotCommandException("The reminder interval must be at least one minute. Configuration was not changed.");
-
-        if ((updatedEnabled || updatedCapture) && destination is null)
-            throw new BotCommandException(
-                "Choose a tickets channel before enabling notes or automatic capture. Configuration was not changed.");
-
-        if (destination is not null && (updatedEnabled || updatedCapture || channelId is not null))
-            await discord.CheckChannelAsync(actor, destination.Value, publishing: true, cancellationToken);
-
-        if (updatedCapture)
-            await discord.CheckCaptureAsync(actor.GuildId, cancellationToken);
-
-        if (updatedCapture && !configuration.AutomaticCaptureEnabled)
-            configuration.CaptureFromUtc = DateTimeOffset.UtcNow;
-
-        configuration.Enabled = updatedEnabled;
-        configuration.DestinationChannelId = destination;
-        configuration.AutomaticCaptureEnabled = updatedCapture;
-        configuration.ReminderIntervalSeconds = reminderIntervalSeconds ?? configuration.ReminderIntervalSeconds;
-
-        if (isNew)
-            dbContext.TicketConfigurations.Add(configuration);
+        await _publicationLock.WaitAsync(cancellationToken);
 
         try
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+            var configuration = await dbContext.TicketConfigurations
+                .SingleOrDefaultAsync(configuration => configuration.GuildId == actor.GuildId, cancellationToken);
+
+            var isNew = configuration is null;
+            configuration ??= new TicketConfiguration { GuildId = actor.GuildId };
+
+            if (enabled is null && channelId is null && reminderIntervalSeconds is null)
+                return configuration;
+
+            var destination = channelId ?? configuration.DestinationChannelId;
+            var updatedEnabled = enabled ?? configuration.Enabled;
+
+            if (reminderIntervalSeconds is < 60)
+                throw new BotCommandException("The reminder interval must be at least one minute. Configuration was not changed.");
+
+            if (updatedEnabled && destination is null)
+                throw new BotCommandException(
+                    "Choose a tickets channel before enabling tickets. Configuration was not changed.");
+
+            if (destination is not null && (updatedEnabled || channelId is not null))
+                await discord.CheckChannelAsync(actor, destination.Value, publishing: true, cancellationToken);
+
+            if (updatedEnabled)
+                await discord.CheckCaptureAsync(actor.GuildId, cancellationToken);
+
+            if (updatedEnabled && (!configuration.Enabled || configuration.CaptureFromUtc is null))
+                configuration.CaptureFromUtc = DateTimeOffset.UtcNow;
+
+            if (configuration.Enabled != updatedEnabled)
+            {
+                List<TicketModerator> moderators = await dbContext.TicketModerators
+                    .Where(moderator => dbContext.Tickets
+                        .Any(ticket => ticket.Id == moderator.ActiveTicketId && ticket.GuildId == actor.GuildId))
+                    .ToListAsync(cancellationToken);
+
+                foreach (var moderator in moderators)
+                {
+                    moderator.PromptVersion = null;
+                    moderator.LastAttemptedVersion = null;
+                    moderator.NextDeliveryUtc = null;
+                    moderator.Version++;
+                }
+            }
+
+            configuration.Enabled = updatedEnabled;
+            configuration.DestinationChannelId = destination;
+            configuration.ReminderIntervalSeconds = reminderIntervalSeconds ?? configuration.ReminderIntervalSeconds;
+
+            if (isNew)
+                dbContext.TicketConfigurations.Add(configuration);
+
+            try
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(
+                    "Ticket configuration save in guild {GuildId} could not be confirmed ({FailureType})",
+                    actor.GuildId,
+                    exception.GetType().Name);
+
+                throw new BotCommandException(
+                    "Saving ticket configuration could not be confirmed. Read /ticket-admin config before changing it again.",
+                    exception);
+            }
+
+            return configuration;
         }
-        catch (Exception exception)
+        finally
         {
-            logger.LogError(
-                "Ticket configuration save in guild {GuildId} could not be confirmed ({FailureType})",
-                actor.GuildId,
-                exception.GetType().Name);
-
-            throw new BotCommandException(
-                "Saving ticket configuration could not be confirmed. Read /ticket-admin config before changing it again.",
-                exception);
+            _publicationLock.Release();
         }
-
-        return configuration;
     }
 
     public async Task<Option<Ticket>> ShowAsync(
@@ -112,6 +134,8 @@ public sealed partial class TicketWorkflow(
         RequireStaff(actor);
         RequireHiddenAccess(actor, hidden);
         await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        await RequireEnabledAsync(dbContext, actor.GuildId, cancellationToken);
 
         var ticket = await dbContext.Tickets
             .AsNoTracking()
@@ -151,6 +175,8 @@ public sealed partial class TicketWorkflow(
         var canViewHidden = actor.IsAdministrator || actor.CanViewAuditLog;
         await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
 
+        await RequireEnabledAsync(dbContext, actor.GuildId, cancellationToken);
+
         List<Ticket> tickets = await dbContext.Tickets
             .AsNoTracking()
             .Where(ticket =>
@@ -188,23 +214,15 @@ public sealed partial class TicketWorkflow(
 
         await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
 
-        var configuration = await dbContext.TicketConfigurations
-            .AsNoTracking()
-            .SingleOrDefaultAsync(configuration => configuration.GuildId == actor.GuildId, cancellationToken);
-
-        if (configuration is not { Enabled: true })
-            throw new BotCommandException("Note creation is disabled in this server. No note was created.");
-
-        if (configuration.DestinationChannelId is null)
-            throw new BotCommandException("Configure a tickets channel before creating notes. No note was created.");
+        var configuration = await RequireEnabledAsync(dbContext, actor.GuildId, cancellationToken);
 
         await discord.CheckChannelAsync(
             actor,
-            configuration.DestinationChannelId.Value,
+            configuration.DestinationChannelId!.Value,
             publishing: true,
             cancellationToken);
 
-        return configuration.DestinationChannelId.Value;
+        return configuration.DestinationChannelId!.Value;
     }
 
     public async Task<TicketChange> CreateNoteAsync(
@@ -285,6 +303,8 @@ public sealed partial class TicketWorkflow(
     {
         RequireStaff(actor);
         await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        await RequireEnabledAsync(dbContext, actor.GuildId, cancellationToken);
 
         var ticket = await dbContext.Tickets
                          .AsNoTracking()
@@ -652,6 +672,24 @@ public sealed partial class TicketWorkflow(
             await discord.CheckChannelAsync(actor, channelId.Value, publishing: false, cancellationToken);
     }
 
+    private static async Task<TicketConfiguration> RequireEnabledAsync(
+        BotDbContext dbContext,
+        ulong guildId,
+        CancellationToken cancellationToken)
+    {
+        var configuration = await dbContext.TicketConfigurations
+            .AsNoTracking()
+            .SingleOrDefaultAsync(configuration => configuration.GuildId == guildId, cancellationToken);
+
+        if (configuration is not { Enabled: true })
+            throw new BotCommandException("Tickets are disabled in this server.");
+
+        if (configuration.DestinationChannelId is null)
+            throw new BotCommandException("Configure a tickets channel before using tickets in this server.");
+
+        return configuration;
+    }
+
     private static async Task<Ticket?> FindAsync(
         BotDbContext dbContext,
         ulong guildId,
@@ -662,8 +700,10 @@ public sealed partial class TicketWorkflow(
         if (number <= 0)
             throw new BotCommandException("Provide a positive ticket number.");
 
-        IQueryable<Ticket> query =
-            dbContext.Tickets.Where(ticket => ticket.GuildId == guildId && ticket.Number == number);
+        await RequireEnabledAsync(dbContext, guildId, cancellationToken);
+
+        IQueryable<Ticket> query = dbContext.Tickets
+            .Where(ticket => ticket.GuildId == guildId && ticket.Number == number);
 
         if (!tracking)
             query = query.AsNoTracking();

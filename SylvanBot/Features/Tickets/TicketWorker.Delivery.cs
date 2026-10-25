@@ -17,6 +17,10 @@ public sealed partial class TicketWorker
         {
             await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
 
+            IQueryable<ulong> enabledGuilds = dbContext.TicketConfigurations
+                .Where(configuration => configuration.Enabled && configuration.DestinationChannelId != null)
+                .Select(configuration => configuration.GuildId);
+
             IQueryable<ulong> moderatorsWithDelivery = dbContext.TicketModerators
                 .Where(moderator => moderator.ActiveTicketId != null || moderator.PromptMessageId != null
                                     || moderator.PromptVersion != null || moderator.LastAttemptedVersion != null
@@ -24,7 +28,8 @@ public sealed partial class TicketWorker
                 .Select(moderator => moderator.UserId);
 
             List<ulong> users = await dbContext.Tickets
-                .Where(ticket => ticket.Completion == TicketCompletion.Pending && ticket.ModeratorUserId != null)
+                .Where(ticket => ticket.Completion == TicketCompletion.Pending && ticket.ModeratorUserId != null
+                                 && enabledGuilds.Contains(ticket.GuildId))
                 .Select(ticket => ticket.ModeratorUserId!.Value)
                 .Union(moderatorsWithDelivery)
                 .Where(userId => userId > afterUserId)
@@ -69,6 +74,23 @@ public sealed partial class TicketWorker
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        IQueryable<ulong> enabledGuilds = dbContext.TicketConfigurations
+            .Where(configuration => configuration.Enabled && configuration.DestinationChannelId != null)
+            .Select(configuration => configuration.GuildId);
+
+        if (moderator.ActiveTicketId is not null)
+        {
+            var activeGuildEnabled = await dbContext.Tickets
+                .AnyAsync(ticket => ticket.Id == moderator.ActiveTicketId && enabledGuilds.Contains(ticket.GuildId), cancellationToken);
+
+            if (!activeGuildEnabled)
+            {
+                await DeletePromptAsync(moderator.ChannelId, moderator.PromptMessageId, cancellationToken);
+                moderator.ClearDelivery();
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+
         // Read the previous prompt's replies before selecting or delivering the next ticket.
         if (moderator.ActiveTicketId is not null && moderator.ChannelId is not null && moderator.LastReadMessageId is not null)
         {
@@ -78,7 +100,8 @@ public sealed partial class TicketWorker
 
         var ticket = await dbContext.Tickets
             .AsNoTracking()
-            .Where(ticket => ticket.ModeratorUserId == userId && ticket.Completion == TicketCompletion.Pending)
+            .Where(ticket => ticket.ModeratorUserId == userId && ticket.Completion == TicketCompletion.Pending
+                             && enabledGuilds.Contains(ticket.GuildId))
             .OrderBy(ticket => ticket.CreatedAtUtc)
             .ThenBy(ticket => ticket.Id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -139,7 +162,8 @@ public sealed partial class TicketWorker
 
         var stillCurrent = await dbContext.Tickets
             .AnyAsync(current => current.Id == ticket.Id && current.GuildId == ticket.GuildId
-                                 && current.Version == ticket.Version && current.Completion == TicketCompletion.Pending, cancellationToken);
+                                 && current.Version == ticket.Version && current.Completion == TicketCompletion.Pending
+                                 && enabledGuilds.Contains(current.GuildId), cancellationToken);
 
         if (!stillCurrent)
         {
