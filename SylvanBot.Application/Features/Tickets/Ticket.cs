@@ -1,14 +1,33 @@
-﻿namespace SylvanBot.Application.Features.Tickets;
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace SylvanBot.Application.Features.Tickets;
 
 public sealed class Ticket
 {
+    public const int CommentLimit = 3000;
+
     public long Id { get; init; }
     public ulong GuildId { get; init; }
     public long Number { get; init; }
     public TicketAction Action { get; init; }
     public ulong? SubjectUserId { get; init; }
     public ulong? ModeratorUserId { get; init; }
-    public string? Comment { get; set; }
+
+    [StringLength(CommentLimit)]
+    public string? Comment
+    {
+        get;
+        set
+        {
+            if (value?.Length > CommentLimit)
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    $"Ticket comments cannot exceed {CommentLimit:N0} characters.");
+
+            field = value;
+        }
+    }
+
     public DateTimeOffset? CreatedAtUtc { get; init; }
     public TicketStatus? Status { get; init; }
     public long? DurationSeconds { get; init; }

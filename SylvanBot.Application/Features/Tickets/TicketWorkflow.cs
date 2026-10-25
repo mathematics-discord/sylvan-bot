@@ -12,8 +12,6 @@ public sealed class TicketWorkflow(
     ILogger<TicketWorkflow> logger)
     : IDisposable
 {
-    public const int NoteCommentLimit = 2000;
-
     private readonly SemaphoreSlim _publicationLock = new(1, 1);
 
     // Shared configuration, lookup and history.
@@ -457,9 +455,10 @@ public sealed class TicketWorkflow(
         if (string.IsNullOrWhiteSpace(comment))
             throw new BotCommandException("A note comment must contain non-whitespace text. Nothing was changed.");
 
-        if (comment.Length > NoteCommentLimit - (existingComment?.Length ?? 0))
+        if (comment.Length > Ticket.CommentLimit - (existingComment?.Length ?? 0))
             throw new BotCommandException(
-                "Note comments cannot exceed 2,000 characters, including existing text and the newline when appending. "
+                $"Ticket comments cannot exceed {Ticket.CommentLimit:N0} characters, "
+                + "including existing text and the newline when appending. "
                 + "Nothing was changed.");
     }
 

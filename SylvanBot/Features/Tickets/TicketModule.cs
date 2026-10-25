@@ -43,7 +43,7 @@ public sealed class TicketModule(
     [SlashCommand("note", "Save a moderator note and publish it to the staff tickets channel.")]
     public Task NoteAsync(
         [Summary("user", "Subject's mention or user ID, including departed users.")] string user,
-        [Summary("comment", "Moderator note; omit to open an editor.")] [MaxLength(TicketWorkflow.NoteCommentLimit)]
+        [Summary("comment", "Moderator note; omit to open an editor.")] [MaxLength(Ticket.CommentLimit)]
         string? comment = null)
         => ExecuteAsync(
             async (actor, cancellationToken) =>
@@ -120,7 +120,7 @@ public sealed class TicketModule(
         [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id,
         [Summary("duration", "Notes do not accept a duration.")]
         string? duration = null,
-        [Summary("comment", "Replacement comment; omitted means unchanged.")] [MaxLength(TicketWorkflow.NoteCommentLimit)]
+        [Summary("comment", "Replacement comment; omitted means unchanged.")] [MaxLength(Ticket.CommentLimit)]
         string? comment = null,
         [Summary("hidden", "Whether to hide this note; omitted means unchanged.")] bool? hidden = null)
         => ExecuteAsync(async (actor, cancellationToken) =>
@@ -139,8 +139,8 @@ public sealed class TicketModule(
     [SlashCommand("append", "Append text to a note, preserving the existing comment.")]
     public Task AppendNoteAsync(
         [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id,
-        [Summary("comment", "Text to append; the complete comment must fit within 2,000 characters.")]
-        [MaxLength(TicketWorkflow.NoteCommentLimit)]
+        [Summary("comment", "Text to append; the complete comment must fit within the ticket comment limit.")]
+        [MaxLength(Ticket.CommentLimit)]
         string comment)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
@@ -164,11 +164,11 @@ public sealed class TicketModule(
                 deadline.CancelAfter(TimeSpan.FromSeconds(2));
                 var ticket = await prepareEdit(actor, deadline.Token);
 
-                if (ticket.Comment?.Length > TicketWorkflow.NoteCommentLimit)
+                if (ticket.Comment?.Length > Ticket.CommentLimit)
                 {
                     await ReplyAsync(
-                        "This stored comment exceeds the 2,000-character limit and has been left intact. "
-                        + $"Use /ticket set id:{ticket.Number} comment: to replace it with a comment of at most 2,000 characters, "
+                        $"This stored comment exceeds the {Ticket.CommentLimit:N0}-character limit and has been left intact. "
+                        + $"Use /ticket set id:{ticket.Number} comment: to replace it with a comment of at most {Ticket.CommentLimit:N0} characters, "
                         + "or set hidden: without supplying comment: to change visibility and retain the full text.");
 
                     return;

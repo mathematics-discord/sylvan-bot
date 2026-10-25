@@ -95,7 +95,8 @@ namespace SylvanBot.Infrastructure.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<string>("Comment")
-                        .HasColumnType("text");
+                        .HasMaxLength(3000)
+                        .HasColumnType("character varying(3000)");
 
                     b.Property<DateTimeOffset?>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");

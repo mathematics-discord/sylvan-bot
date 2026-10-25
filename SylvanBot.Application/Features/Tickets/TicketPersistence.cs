@@ -29,7 +29,7 @@ public sealed class TicketPersistence :
             .HasConversion<string>();
 
         builder.Property(ticket => ticket.Comment)
-            .HasColumnType("text");
+            .HasMaxLength(Ticket.CommentLimit);
 
         builder.Property(ticket => ticket.Version)
             .IsConcurrencyToken();
