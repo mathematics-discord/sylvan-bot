@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 using Common;
 using Infrastructure.Data;
 
-public sealed class TicketWorkflow(
+public sealed partial class TicketWorkflow(
     IDbContextFactory<BotDbContext> contextFactory,
     IDiscordTicket discord,
     ILogger<TicketWorkflow> logger)
@@ -19,6 +19,8 @@ public sealed class TicketWorkflow(
         TicketActor actor,
         bool? enabled,
         ulong? channelId,
+        bool? automaticCaptureEnabled = null,
+        int? reminderIntervalSeconds = null,
         CancellationToken cancellationToken = default)
     {
         if (actor.GuildId == 0 || actor.UserId == 0 || !actor.IsAdministrator)
@@ -32,21 +34,33 @@ public sealed class TicketWorkflow(
         var isNew = configuration is null;
         configuration ??= new TicketConfiguration { GuildId = actor.GuildId };
 
-        if (enabled is null && channelId is null)
+        if (enabled is null && channelId is null && automaticCaptureEnabled is null && reminderIntervalSeconds is null)
             return configuration;
 
         var destination = channelId ?? configuration.DestinationChannelId;
         var updatedEnabled = enabled ?? configuration.Enabled;
+        var updatedCapture = automaticCaptureEnabled ?? configuration.AutomaticCaptureEnabled;
 
-        if (updatedEnabled && destination is null)
+        if (reminderIntervalSeconds is < 60)
+            throw new BotCommandException("The reminder interval must be at least one minute. Configuration was not changed.");
+
+        if ((updatedEnabled || updatedCapture) && destination is null)
             throw new BotCommandException(
-                "Choose a tickets channel before enabling notes. Configuration was not changed.");
+                "Choose a tickets channel before enabling notes or automatic capture. Configuration was not changed.");
 
-        if (destination is not null && (updatedEnabled || channelId is not null))
+        if (destination is not null && (updatedEnabled || updatedCapture || channelId is not null))
             await discord.CheckChannelAsync(actor, destination.Value, publishing: true, cancellationToken);
+
+        if (updatedCapture)
+            await discord.CheckCaptureAsync(actor.GuildId, cancellationToken);
+
+        if (updatedCapture && !configuration.AutomaticCaptureEnabled)
+            configuration.CaptureFromUtc = DateTimeOffset.UtcNow;
 
         configuration.Enabled = updatedEnabled;
         configuration.DestinationChannelId = destination;
+        configuration.AutomaticCaptureEnabled = updatedCapture;
+        configuration.ReminderIntervalSeconds = reminderIntervalSeconds ?? configuration.ReminderIntervalSeconds;
 
         if (isNew)
             dbContext.TicketConfigurations.Add(configuration);
@@ -161,7 +175,7 @@ public sealed class TicketWorkflow(
         return new TicketPage(visiblePage, page, tickets.Count > 10);
     }
 
-    // Note creation and correction. Other ticket types remain read-only.
+    // Note creation and correction.
     public async Task<ulong> PrepareCreateNoteAsync(
         TicketActor actor,
         ulong subjectUserId,

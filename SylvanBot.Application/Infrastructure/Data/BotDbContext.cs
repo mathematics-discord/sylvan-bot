@@ -20,6 +20,7 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<RoleColourOption> RoleColourOptions => Set<RoleColourOption>();
     public DbSet<TicketConfiguration> TicketConfigurations => Set<TicketConfiguration>();
     public DbSet<Ticket> Tickets => Set<Ticket>();
+    public DbSet<TicketModerator> TicketModerators => Set<TicketModerator>();
 
     public DbSet<QuorumConfiguration> QuorumConfigurations => Set<QuorumConfiguration>();
     public DbSet<QuorumVoterRole> QuorumVoterRoles => Set<QuorumVoterRole>();

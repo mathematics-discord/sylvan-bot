@@ -128,11 +128,39 @@ internal static class TicketPresentation
                 ? "Expiration failed"
                 : ticket.Status.Value.ToString();
 
+            if (ticket.SupersededByNumber is not null)
+                status += $" · superseded by #{ticket.SupersededByNumber}";
+
             embed.AddField("Status", status, inline: true);
         }
 
         if (ticket.DurationSeconds is not null)
             embed.AddField("Duration", $"{ticket.DurationSeconds} seconds", inline: true);
+
+        if (ticket.SourceAuditId is not null)
+        {
+            if (ticket.ModeratorUserId is null)
+                embed.AddField("Moderator", "Unknown; Discord did not supply resolved user data.");
+
+            if (ticket.DurationSeconds is null)
+                embed.AddField("Duration", ticket.DurationKnown ? "Permanent" : "Unknown", inline: true);
+
+            if (ticket.ExpiresAtUtc is not null)
+                embed.AddField("Expires", $"<t:{ticket.ExpiresAtUtc.Value.ToUnixTimeSeconds()}:f>", inline: true);
+
+            embed.AddField("Details", CompletionText(ticket));
+
+            if (ticket.PendingOperationId is not null)
+                embed.AddField("Discord change", ticket.PendingOperationAttempted
+                    ? "The outcome is awaiting audit reconciliation."
+                    : "The request is prepared; reconciliation is required before an attempt.");
+
+            if (ticket.ExpirySuspended)
+                embed.AddField("Automatic expiry paused", "Audit history was unavailable. Set the duration again to authorize a new schedule.");
+
+            if (!string.IsNullOrWhiteSpace(ticket.AuditReason) && !string.Equals(ticket.AuditReason, ticket.Comment, StringComparison.Ordinal))
+                embed.AddField("Original audit reason", ticket.AuditReason);
+        }
 
         if (ticket.RoleId is not null)
             embed.AddField("Role", ticket.RoleId.Value.ToString(CultureInfo.InvariantCulture), inline: true);
@@ -141,6 +169,43 @@ internal static class TicketPresentation
     }
 
     internal static string Change(TicketChange change, bool hiding = false)
+    {
+        var text = PublicationChange(change, hiding);
+
+        if (change.ModerationOutcome is not null)
+            text += "\n" + change.ModerationOutcome;
+
+        if (change.Ticket.SourceAuditId is not null)
+            text += "\n" + CompletionText(change.Ticket);
+
+        return text;
+    }
+
+    internal static string CompletionText(Ticket ticket)
+    {
+        if (ticket.Completion == TicketCompletion.Automated)
+            return "Automated action; no moderator reply required.";
+
+        if (ticket.Completion == TicketCompletion.Complete)
+            return "Details complete. No further reminders are scheduled.";
+
+        if (ticket.PendingOperationId is not null)
+            return ticket.PendingOperationAttempted
+                ? "A Discord change is awaiting confirmation. Read the ticket before supplying a duration again."
+                : "A Discord change is prepared and awaiting reconciliation.";
+
+        List<string> missing = [];
+
+        if (!ticket.DurationKnown)
+            missing.Add(ticket.Action == TicketAction.Ban ? "a duration or explicit permanent duration" : "a finite duration");
+
+        if (string.IsNullOrWhiteSpace(ticket.Comment))
+            missing.Add("a comment");
+
+        return missing.Count == 0 ? "Details awaiting confirmation." : "Still needed: " + string.Join(" and ", missing) + ".";
+    }
+
+    private static string PublicationChange(TicketChange change, bool hiding)
     {
         var ticket = $"Ticket #{change.Ticket.Number}";
 

@@ -23,14 +23,19 @@ resharper_blank_lines_after_control_transfer_statements = 1
 resharper_blank_lines_after_multiline_statements = 1
 resharper_blank_lines_before_control_transfer_statements = 1
 resharper_blank_lines_before_multiline_statements = 1
+resharper_braces_for_ifelse = not_required
 resharper_csharp_wrap_after_declaration_lpar = true
 resharper_csharp_wrap_before_binary_opsign = true
+resharper_csharp_wrap_lines = false
 resharper_csharp_wrap_parameters_style = chop_if_long
+resharper_empty_string = string_empty
 resharper_instance_members_qualify_declared_in = base_class
+resharper_max_attribute_length_for_same_line = 10000
 resharper_method_or_operator_body = expression_body
 resharper_place_simple_embedded_statement_on_same_line = false
 resharper_wrap_after_lambda_and_anonymous_function_declaration_lpar = false
 resharper_wrap_before_arrow_with_expressions = true
+resharper_wrap_chained_method_calls = chop_if_long
 
 # Microsoft .NET properties
 csharp_preferred_modifier_order = private, static, protected, internal, file, new, public, abstract, virtual, closed, readonly, async, override, safe, unsafe, extern, volatile, sealed, required:suggestion
@@ -761,3 +766,6 @@ dotnet_diagnostic.rcs1123.severity = none
 dotnet_diagnostic.rcs1261.severity = error
 
 dotnet_diagnostic.ma0004.severity = none
+
+
+dotnet_diagnostic.rcs1001.severity = none

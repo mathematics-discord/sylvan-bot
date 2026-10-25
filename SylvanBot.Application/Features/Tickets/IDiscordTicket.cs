@@ -1,5 +1,6 @@
-namespace SylvanBot.Application.Features.Tickets;
+﻿namespace SylvanBot.Application.Features.Tickets;
 
+using System.Collections.Immutable;
 using Common;
 
 public interface IDiscordTicket
@@ -11,4 +12,13 @@ public interface IDiscordTicket
     // False means this link has no editable message owned by the current bot.
     Task<bool> UpdateAsync(Ticket ticket, TicketMessage publication, CancellationToken cancellationToken);
     Task<bool> RemoveAsync(ulong guildId, TicketMessage publication, CancellationToken cancellationToken);
+    Task<(ulong? LastAuditId, ImmutableArray<TicketObservation> Observations)> ReadAuditAsync(
+        ulong guildId, DateTimeOffset boundary, CancellationToken cancellationToken);
+    Task CheckCaptureAsync(ulong guildId, CancellationToken cancellationToken);
+    Task CheckPublicationAsync(ulong guildId, ulong channelId, CancellationToken cancellationToken);
+    Task<TicketActor> GetActorAsync(ulong guildId, ulong userId, CancellationToken cancellationToken);
+    Task<DateTimeOffset?> GetTimeoutAsync(ulong guildId, ulong userId, CancellationToken cancellationToken);
+    Task SetTimeoutAsync(Ticket ticket, DateTimeOffset? expiry, Guid operationId, CancellationToken cancellationToken);
+    Task<bool> IsBannedAsync(ulong guildId, ulong userId, CancellationToken cancellationToken);
+    Task UnbanAsync(Ticket ticket, Guid operationId, CancellationToken cancellationToken);
 }

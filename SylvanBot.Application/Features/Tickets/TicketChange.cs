@@ -6,4 +6,5 @@ public sealed record TicketChange(
     bool ReferenceSaved = true,
     bool PublicationUncertain = false,
     bool LinkedCopyRemains = false,
-    bool NoChange = false);
+    bool NoChange = false,
+    string? ModerationOutcome = null);

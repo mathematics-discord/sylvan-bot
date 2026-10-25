@@ -34,6 +34,9 @@ public static class DependencyInjection
         {
             services.AddSingleton<IDiscordTicket, DiscordTicket>();
             services.AddSingleton<TicketWorkflow>();
+            services.AddSingleton<TicketWorker>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<TicketWorker>());
+            services.AddHostedService(sp => sp.GetRequiredService<TicketWorker>());
 
             services.AddSingleton<IQuorumMembers, DiscordQuorumMembers>();
             services.AddScoped<QuorumOperations>();
@@ -118,6 +121,8 @@ public static class DependencyInjection
                         MessageCacheSize = options.MessageCacheSize,
                         GatewayIntents = GatewayIntents.Guilds
                                          | GatewayIntents.GuildMembers
+                                         | GatewayIntents.GuildBans
+                                         | GatewayIntents.DirectMessages
                                          | GatewayIntents.GuildMessages
                                          | GatewayIntents.GuildMessageReactions
                                          | GatewayIntents.MessageContent,

@@ -7,13 +7,17 @@ using SylvanBot.Application.Features.Tickets;
 [DefaultMemberPermissions(GuildPermission.Administrator)]
 [RequireUserPermission(GuildPermission.Administrator)]
 [RequireContext(ContextType.Guild)]
-public sealed class TicketAdminModule(TicketWorkflow workflow, ILogger logger, IHostApplicationLifetime lifetime)
+public sealed class TicketAdminModule(TicketWorkflow workflow, TicketWorker worker, ILogger logger, IHostApplicationLifetime lifetime)
     : InteractionModuleBase<IInteractionContext>
 {
     [SlashCommand("config", "View or update ticket configuration.")]
     public async Task ConfigAsync(
         [Summary("enabled", "Whether creation of notes is enabled.")] bool? enabled = null,
-        [Summary("channel", "Staff tickets channel.")] [ChannelTypes(ChannelType.Text)] ITextChannel? channel = null)
+        [Summary("channel", "Staff tickets channel.")] [ChannelTypes(ChannelType.Text)] ITextChannel? channel = null,
+        [Summary("automatic-capture", "Capture new timeout/ban actions; existing completion and expiry continue when disabled.")]
+        bool? automaticCapture = null,
+        [Summary("reminder-minutes", "DM reminder interval in minutes (default 1440).")]
+        [MinValue(1)] [MaxValue(35791394)] int? reminderMinutes = null)
     {
         await DeferAsync(ephemeral: true);
 
@@ -26,12 +30,17 @@ public sealed class TicketAdminModule(TicketWorkflow workflow, ILogger logger, I
             moderator.GuildPermissions.Administrator,
             moderator.GuildPermissions.ModerateMembers);
 
-        var configuration = await workflow.ConfigureAsync(actor, enabled, channel?.Id, lifetime.ApplicationStopping);
+        var configuration = await workflow.ConfigureAsync(actor, enabled, channel?.Id, automaticCapture,
+            reminderMinutes * 60, lifetime.ApplicationStopping);
+        worker.Wake();
         var destination = configuration.DestinationChannelId is null
             ? "unset"
             : $"<#{configuration.DestinationChannelId}>";
 
-        var response = $"Note creation: {(configuration.Enabled ? "enabled" : "disabled")}\nDestination: {destination}";
+        var response = $"Note creation: {(configuration.Enabled ? "enabled" : "disabled")}\nDestination: {destination}\n"
+                       + $"Automatic timeout/ban capture: {(configuration.AutomaticCaptureEnabled ? "enabled" : "disabled")}\n"
+                       + $"DM reminder interval: {configuration.ReminderIntervalSeconds / 60} minutes\n"
+                       + "Disabling capture does not cancel existing ticket reminders or scheduled expiries.";
 
         try
         {

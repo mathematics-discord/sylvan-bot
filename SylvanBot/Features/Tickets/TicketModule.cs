@@ -10,6 +10,7 @@ using SylvanBot.Application.Features.Tickets;
 [RequireContext(ContextType.Guild)]
 public sealed class TicketModule(
     TicketWorkflow workflow,
+    TicketWorker worker,
     IDiscordTicket discord,
     ILogger logger,
     IHostApplicationLifetime lifetime)
@@ -43,8 +44,7 @@ public sealed class TicketModule(
     [SlashCommand("note", "Save a moderator note and publish it to the staff tickets channel.")]
     public Task NoteAsync(
         [Summary("user", "Subject's mention or user ID, including departed users.")] string user,
-        [Summary("comment", "Moderator note; omit to open an editor.")] [MaxLength(Ticket.CommentLimit)]
-        string? comment = null)
+        [Summary("comment", "Moderator note; omit to open an editor.")] [MaxLength(Ticket.CommentLimit)] string? comment = null)
         => ExecuteAsync(
             async (actor, cancellationToken) =>
             {
@@ -73,7 +73,8 @@ public sealed class TicketModule(
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
             if (actor.GuildId != guildId || actor.UserId != ownerId)
-                throw new BotCommandException("This note form belongs to another moderator or server. Nothing was changed.");
+                throw new BotCommandException(
+                    "This note form belongs to another moderator or server. Nothing was changed.");
 
             var change = await workflow.CreateNoteAsync(actor, subjectId, modal.Comment, cancellationToken);
             await ReplyToChangeAsync(change);
@@ -82,12 +83,9 @@ public sealed class TicketModule(
     [SlashCommand("show", "Look up a user's tickets or one visible ticket number.")]
     public Task ShowAsync(
         [Summary("user", "User mention or ID, including departed users.")] string? user = null,
-        [Summary("id", "Positive ticket number in this server.")] [MinValue(1)]
-        long? id = null,
-        [Summary("message", "Ticket message link in this server.")]
-        string? message = null,
-        [Summary("page", "User results page, starting at 1.")]
-        int page = 1)
+        [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long? id = null,
+        [Summary("message", "Ticket message link in this server.")] string? message = null,
+        [Summary("page", "User results page, starting at 1.")] int page = 1)
         => ExecuteAsync((actor, cancellationToken) => ShowAsync(
             actor,
             user,
@@ -100,12 +98,9 @@ public sealed class TicketModule(
     [SlashCommand("showhidden", "Look up hidden tickets for a user or one ticket number.")]
     public Task ShowHiddenAsync(
         [Summary("user", "User mention or ID, including departed users.")] string? user = null,
-        [Summary("id", "Positive ticket number in this server.")] [MinValue(1)]
-        long? id = null,
-        [Summary("message", "Ticket message link in this server.")]
-        string? message = null,
-        [Summary("page", "User results page, starting at 1.")]
-        int page = 1)
+        [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long? id = null,
+        [Summary("message", "Ticket message link in this server.")] string? message = null,
+        [Summary("page", "User results page, starting at 1.")] int page = 1)
         => ExecuteAsync((actor, cancellationToken) => ShowAsync(
             actor,
             user,
@@ -115,17 +110,15 @@ public sealed class TicketModule(
             hidden: true,
             cancellationToken));
 
-    [SlashCommand("set", "Replace supplied ticket fields. Currently supports notes only.")]
+    [SlashCommand("set", "Replace supplied note or automatically recorded moderation-ticket fields.")]
     public Task SetNoteAsync(
         [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id,
-        [Summary("duration", "Notes do not accept a duration.")]
-        string? duration = null,
-        [Summary("comment", "Replacement comment; omitted means unchanged.")] [MaxLength(Ticket.CommentLimit)]
-        string? comment = null,
+        [Summary("duration", "Duration from the action time, or permanent for bans. Changes active moderation actions.")] string? duration = null,
+        [Summary("comment", "Replacement comment; omitted means unchanged.")] [MaxLength(Ticket.CommentLimit)] string? comment = null,
         [Summary("hidden", "Whether to hide this note; omitted means unchanged.")] bool? hidden = null)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
-            var change = await workflow.SetNoteAsync(
+            var change = await workflow.SetAsync(
                 actor,
                 id,
                 duration,
@@ -134,14 +127,22 @@ public sealed class TicketModule(
                 cancellationToken: cancellationToken);
 
             await ReplyToChangeAsync(change, hiding: hidden == true);
+            worker.Wake();
+        });
+
+    [SlashCommand("top", "Request DM redelivery of the oldest ticket in your moderator queue.")]
+    public Task TopAsync()
+        => ExecuteAsync(async (actor, cancellationToken) =>
+        {
+            await workflow.RedeliverAsync(actor, cancellationToken);
+            worker.Wake();
+            await ReplyAsync("Redelivery requested. The ticket stays queued if your DMs are unavailable.");
         });
 
     [SlashCommand("append", "Append text to a note, preserving the existing comment.")]
     public Task AppendNoteAsync(
         [Summary("id", "Positive ticket number in this server.")] [MinValue(1)] long id,
-        [Summary("comment", "Text to append; the complete comment must fit within the ticket comment limit.")]
-        [MaxLength(Ticket.CommentLimit)]
-        string comment)
+        [Summary("comment", "Text to append; the complete comment must fit within the ticket comment limit.")] [MaxLength(Ticket.CommentLimit)] string comment)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
             var change = await workflow.AppendNoteAsync(actor, id, comment, cancellationToken);
@@ -234,6 +235,7 @@ public sealed class TicketModule(
                             properties.Components = canViewHidden
                                 ? TicketPresentation.Buttons(change.Ticket)
                                 : new ComponentBuilder().Build();
+
                             properties.AllowedMentions = AllowedMentions.None;
                         });
                     }
@@ -250,7 +252,7 @@ public sealed class TicketModule(
                         change.Ticket.GuildId,
                         exception.GetType().Name);
 
-                    throw new BotCommandException(response);
+                    throw new BotCommandException(response, exception);
                 }
             },
             updateMessage: true);
@@ -275,7 +277,10 @@ public sealed class TicketModule(
             Option<Ticket> result = number is not null
                 ? await workflow.ShowAsync(actor, number.Value, hidden, cancellationToken)
                 : await workflow.ShowMessageAsync(
-                    actor, TicketReference.ParseMessageLink(message!, actor.GuildId), hidden, cancellationToken);
+                    actor,
+                    TicketReference.ParseMessageLink(message!, actor.GuildId),
+                    hidden,
+                    cancellationToken);
 
             await ShowTicketAsync(actor, result, cancellationToken);
 
@@ -386,14 +391,12 @@ public sealed class TicketModule(
     {
         Option<TicketMessage> result = await discord.FindMessageAsync(actor, ticket, cancellationToken);
 
-        if (result.Value is Some<TicketMessage>(var publication))
-        {
-            var link = TicketPresentation.Link(ticket.GuildId, publication.ChannelId, publication.MessageId);
+        if (result.Value is not Some<TicketMessage>(var publication))
+            return string.Empty;
 
-            return $"[Jump to ticket message]({link})";
-        }
+        var link = TicketPresentation.Link(ticket.GuildId, publication.ChannelId, publication.MessageId);
 
-        return string.Empty;
+        return $"[Jump to ticket message]({link})";
     }
 
     private async Task ExecuteAsync(
@@ -449,7 +452,7 @@ public sealed class TicketModule(
                 exception.GetType().Name);
 
             // The shared handler can try a private response without losing the completed operation's outcome.
-            throw new BotCommandException(response);
+            throw new BotCommandException(response, exception);
         }
     }
 

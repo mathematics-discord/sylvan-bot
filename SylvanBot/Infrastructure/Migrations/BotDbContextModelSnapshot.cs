@@ -91,6 +91,10 @@ namespace SylvanBot.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("AuditReason")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
                     b.Property<long?>("ChannelId")
                         .HasColumnType("bigint");
 
@@ -98,17 +102,32 @@ namespace SylvanBot.Infrastructure.Migrations
                         .HasMaxLength(3000)
                         .HasColumnType("character varying(3000)");
 
+                    b.Property<string>("Completion")
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset?>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("DurationKnown")
+                        .HasColumnType("boolean");
+
                     b.Property<long?>("DurationSeconds")
                         .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("ExpirySuspended")
+                        .HasColumnType("boolean");
 
                     b.Property<long>("GuildId")
                         .HasColumnType("bigint");
 
                     b.Property<bool>("Hidden")
                         .HasColumnType("boolean");
+
+                    b.Property<long?>("LastAuditId")
+                        .HasColumnType("bigint");
 
                     b.Property<DateTimeOffset?>("LastModifiedAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -125,6 +144,21 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<long>("Number")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("PendingEditorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("PendingExpiryUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("PendingOperationAttempted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("PendingOperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PendingRequestedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<long?>("PreviousChannelId")
                         .HasColumnType("bigint");
 
@@ -134,13 +168,22 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<bool>("PublicationPending")
                         .HasColumnType("boolean");
 
+                    b.Property<int?>("PublishedVersion")
+                        .HasColumnType("integer");
+
                     b.Property<long?>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("SourceAuditId")
                         .HasColumnType("bigint");
 
                     b.Property<string>("Status")
                         .HasColumnType("text");
 
                     b.Property<long?>("SubjectUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("SupersededByNumber")
                         .HasColumnType("bigint");
 
                     b.Property<int>("Version")
@@ -152,9 +195,19 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.HasIndex("GuildId", "Number")
                         .IsUnique();
 
+                    b.HasIndex("GuildId", "SourceAuditId")
+                        .IsUnique()
+                        .HasFilter("\"SourceAuditId\" IS NOT NULL");
+
                     b.HasIndex("GuildId", "ChannelId", "MessageId");
 
                     b.HasIndex("GuildId", "PreviousChannelId", "PreviousMessageId");
+
+                    b.HasIndex("GuildId", "Status", "ExpiresAtUtc")
+                        .HasFilter("\"SourceAuditId\" IS NOT NULL");
+
+                    b.HasIndex("ModeratorUserId", "CreatedAtUtc", "Id")
+                        .HasFilter("\"Completion\" = 'Pending'");
 
                     b.HasIndex("GuildId", "SubjectUserId", "Hidden", "Id");
 
@@ -163,6 +216,10 @@ namespace SylvanBot.Infrastructure.Migrations
                             t.HasCheckConstraint("CK_tickets_note_duration", "\"Action\" <> 'Note' OR \"DurationSeconds\" IS NULL");
 
                             t.HasCheckConstraint("CK_tickets_number", "\"Number\" > 0");
+
+                            t.HasCheckConstraint("CK_tickets_observed_duration", "\"SourceAuditId\" IS NULL OR ((\"DurationKnown\" OR \"DurationSeconds\" IS NULL) AND (\"DurationSeconds\" IS NULL OR \"DurationSeconds\" > 0))");
+
+                            t.HasCheckConstraint("CK_tickets_pending_operation", "(\"PendingOperationId\" IS NULL AND \"PendingRequestedAtUtc\" IS NULL) OR (\"SourceAuditId\" IS NOT NULL AND \"PendingOperationId\" IS NOT NULL AND \"PendingRequestedAtUtc\" IS NOT NULL)");
                         });
                 });
 
@@ -171,15 +228,70 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<long>("GuildId")
                         .HasColumnType("bigint");
 
+                    b.Property<bool>("AutomaticCaptureEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("CaptureFromUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<long?>("DestinationChannelId")
                         .HasColumnType("bigint");
 
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
 
+                    b.Property<long?>("LastAuditId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("LastAuditScanAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ReminderIntervalSeconds")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(86400);
+
                     b.HasKey("GuildId");
 
-                    b.ToTable("ticket_configurations", (string)null);
+                    b.ToTable("ticket_configurations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ticket_configurations_reminder", "\"ReminderIntervalSeconds\" >= 60");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.Tickets.TicketModerator", b =>
+                {
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ActiveTicketId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("LastAttemptedVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("LastReadMessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("NextDeliveryUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("PromptMessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("PromptVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("ticket_moderators", (string)null);
                 });
 
             modelBuilder.Entity("SylvanBot.Features.EmojiAnalytics.EmojiUsageCount", b =>
