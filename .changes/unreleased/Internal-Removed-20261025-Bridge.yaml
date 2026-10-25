@@ -1,4 +1,0 @@
-component: Internal
-kind: Removed
-body: Remove Bridge, including its WebSocket API and /bridge commands. Remove the stored Bridge channel configuration and the requirement for a dedicated Bridge credential.
-time: 2026-10-25T01:35:33+00:00

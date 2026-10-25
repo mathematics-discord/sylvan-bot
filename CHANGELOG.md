@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.7 - 2026-10-25
+## Internal
+### Removed
+- Remove Bridge, including its WebSocket API and /bridge commands. Remove the stored Bridge channel configuration and the requirement for a dedicated Bridge credential.
 # v0.1.6 - 2026-10-23
 ## Internal
 ### Added
