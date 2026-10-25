@@ -77,21 +77,6 @@ namespace RatBot.Infrastructure.Migrations
                     b.ToTable("quorum_voter_roles", "public");
                 });
 
-            modelBuilder.Entity("RatBot.Features.Bridge.BridgeChannel", b =>
-                {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("guild_id");
-
-                    b.Property<long>("ChannelId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("channel_id");
-
-                    b.HasKey("GuildId", "ChannelId");
-
-                    b.ToTable("bridge_channels", (string)null);
-                });
-
             modelBuilder.Entity("RatBot.Features.EmojiAnalytics.EmojiUsageCount", b =>
                 {
                     b.Property<long>("GuildId")

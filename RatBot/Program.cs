@@ -1,10 +1,6 @@
 ﻿namespace RatBot;
 
-using System.Net;
 using DotNetEnv;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using RatBot.Features.Bridge;
 using RatBot.Interactions;
 using Serilog.Debugging;
 using Serilog.Events;
@@ -23,22 +19,6 @@ public static class Program
             .ConfigureAppConfiguration((_, configurationBuilder) => configurationBuilder.AddEnvironmentVariables())
             .UseSerilog((ctx, _, loggerConfiguration) => ConfigureSerilog(ctx.Configuration, loggerConfiguration))
             .ConfigureServices((ctx, services) => services.AddRatBot(ctx.Configuration))
-            .ConfigureWebHostDefaults(web => web
-                .ConfigureKestrel(server =>
-                {
-                    var options = server.ApplicationServices.GetRequiredService<IOptions<BridgeOptions>>().Value;
-                    server.Listen(IPAddress.Parse(options.Address), options.Port);
-                })
-                .Configure(app =>
-                {
-                    app.UseWebSockets(new WebSocketOptions
-                    {
-                        KeepAliveInterval = TimeSpan.FromSeconds(20),
-                        KeepAliveTimeout = TimeSpan.FromSeconds(20)
-                    });
-
-                    app.Run(app.ApplicationServices.GetRequiredService<BridgeEndpoint>().HandleAsync);
-                }))
             .Build();
 
         await host.RunAsync();

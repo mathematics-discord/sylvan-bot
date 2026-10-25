@@ -12,9 +12,7 @@ From the repository root, copy the example configuration:
 cp env/local.env.example .env
 ```
 
-Set `DISCORD__TOKEN` in `.env` to your bot's token and `BRIDGE__CREDENTIAL` to a separate random credential of at least 32 characters. The example includes the local database settings, and Git ignores `.env`.
-
-Bridge exposes an authenticated WebSocket at `ws://127.0.0.1:8765/bridge`. See [Bridge configuration and protocol](docs/bridge.md), including operation without privileged Discord intents.
+Set `DISCORD__TOKEN` in `.env` to your bot's token. **That's the only value you need to change.** The example includes the local database settings, and Git ignores `.env`.
 
 Start Docker, then choose how to run the bot:
 

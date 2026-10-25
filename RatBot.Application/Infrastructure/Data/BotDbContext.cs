@@ -2,7 +2,6 @@
 
 using Microsoft.EntityFrameworkCore;
 using RatBot.Application.Features.Quorum;
-using RatBot.Features.Bridge;
 using RatBot.Features.EmojiAnalytics;
 using RatBot.Features.Logging;
 using RatBot.Features.Moderation;
@@ -13,8 +12,6 @@ using RatBot.Features.RoleColours;
 /// </summary>
 public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbContext(options)
 {
-    public DbSet<BridgeChannel> BridgeChannels => Set<BridgeChannel>();
-
     public DbSet<EmojiUsageCount> EmojiUsageCounts => Set<EmojiUsageCount>();
     public DbSet<ImageSpamSettings> ImageSpamSettings => Set<ImageSpamSettings>();
     public DbSet<LoggingConfiguration> LoggingConfigurations => Set<LoggingConfiguration>();
