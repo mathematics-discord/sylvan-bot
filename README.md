@@ -1,4 +1,4 @@
-# RatBot
+# Sylvan Bot
 
 A Discord bot for server moderation, role colours, emoji tools, and quorum checks. Built with C#, Discord.NET, and PostgreSQL.
 
@@ -14,13 +14,15 @@ cp env/local.env.example .env
 
 Set `DISCORD__TOKEN` in `.env` to your bot's token. **That's the only value you need to change.** The example includes the local database settings, and Git ignores `.env`.
 
+For an existing local database, keep its `DB__DATABASE` value in `.env` and set `SYLVAN_BOT_POSTGRES_VOLUME` to its current volume name (for example, `ratbot_postgres_data`). This reuses the stored data instead of selecting a new volume.
+
 Start Docker, then choose how to run the bot:
 
 | Editor | Setup and launch |
 | --- | --- |
-| Rider | Open `RatBot.slnx`, select **RatBot Local with database**, then Run or Debug. |
-| VS Code | Open the repository folder, install the recommended **C# Dev Kit** extension, then launch **RatBot Local with database** from Run and Debug. |
-| Visual Studio | Open `RatBot.slnx`, set `RatBot` as the startup project, select **Debug** and **RatBot.Local**, then press F5. Use a version that supports the SDK in `global.json`. |
+| Rider | Open `SylvanBot.slnx`, select **Sylvan Bot Local with database**, then Run or Debug. |
+| VS Code | Open the repository folder, install the recommended **C# Dev Kit** extension, then launch **Sylvan Bot Local with database** from Run and Debug. |
+| Visual Studio | Open `SylvanBot.slnx`, set `SylvanBot` as the startup project, select **Debug** and **SylvanBot.Local**, then press F5. Use a version that supports the SDK in `global.json`. |
 
 These setups start PostgreSQL and wait until it is ready. Visual Studio does this during Debug builds, so keep build-before-run enabled; an ordinary Debug build in Visual Studio also starts the database.
 
@@ -28,10 +30,10 @@ To run from a terminal instead:
 
 ```sh
 docker compose --env-file .env -f docker-compose.yml up -d --wait db
-dotnet run --project RatBot --launch-profile RatBot.Local
+dotnet run --project SylvanBot --launch-profile SylvanBot.Local
 ```
 
-RatBot applies database migrations and registers commands automatically on startup.
+Sylvan Bot applies database migrations and registers commands automatically on startup.
 
 Stopping the bot leaves PostgreSQL running. `docker compose down` stops the local stack and keeps its data for next time.
 
@@ -39,13 +41,13 @@ Stopping the bot leaves PostgreSQL running. `docker compose down` stops the loca
 
 Keep pull requests focused, follow the existing formatting rules in `.editorconfig`, and include tests for changed behaviour.
 
-Code is organised by feature under `RatBot/Features/`. Each feature keeps its commands, gateway handlers, operations, and models together; database stores and EF mappings live in its `Persistence/` subfolder. Shared Discord interaction code lives in `RatBot/Interactions/`, gateway lifecycle code in `RatBot/Gateway/`, and general helpers in `RatBot/Common/`. The database context and connection setup live in `RatBot/Infrastructure/Data/`, with migration history in `RatBot/Infrastructure/Migrations/`. Registrations are explicit in `RatBot/DependencyInjection.cs`.
+Code is organised by feature under `SylvanBot/Features/`. Each feature keeps its commands, gateway handlers, operations, and models together; database stores and EF mappings live in its `Persistence/` subfolder. Shared Discord interaction code lives in `SylvanBot/Interactions/`, gateway lifecycle code in `SylvanBot/Gateway/`, and general helpers in `SylvanBot/Common/`. The database context and connection setup live in `SylvanBot/Infrastructure/Data/`, with migration history in `SylvanBot/Infrastructure/Migrations/`. Registrations are explicit in `SylvanBot/DependencyInjection.cs`.
 
 Build and test from the repository root:
 
 ```sh
-dotnet build RatBot.slnx --configuration Release
-dotnet test RatBot.slnx --configuration Release --results-directory ./TestResults
+dotnet build SylvanBot.slnx --configuration Release
+dotnet test SylvanBot.slnx --configuration Release --results-directory ./TestResults
 ```
 
 The PostgreSQL integration tests use Testcontainers and need Docker running. They create their own test databases; the development bot does not need to be running. For a focused change, run the affected test project or use `--filter`.

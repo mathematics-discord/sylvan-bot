@@ -5,11 +5,11 @@ services:
     ports:
       - "${DB__PORT:-5432}:5432"
     environment:
-      POSTGRES_DB: ${DB__DATABASE:-ratbot}
+      POSTGRES_DB: ${DB__DATABASE:-sylvan-bot}
       POSTGRES_USER: ${DB__USER:-postgres}
       POSTGRES_PASSWORD: ${DB__PASSWORD:-postgres}
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DB__USER:-postgres} -d ${DB__DATABASE:-ratbot}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB__USER:-postgres} -d ${DB__DATABASE:-sylvan-bot}" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -20,8 +20,8 @@ services:
 
 volumes:
   postgres_data:
-    name: ratbot_postgres_data
+    name: ${SYLVAN_BOT_POSTGRES_VOLUME:-sylvan-bot-postgres-data}
 
 networks:
   bot-network:
-    name: ratbot_network
+    name: sylvan-bot-internal
