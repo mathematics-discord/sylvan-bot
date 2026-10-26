@@ -79,10 +79,13 @@ public sealed class EmojiAnalyticsGatewayHandler(
                 await buffer.Writer.WriteAsync(increment);
         }
 
-        _logger.Debug(
-            "Queued {Count} message emoji increments for guild {GuildId}",
-            increments.Length,
-            guildChannel.GuildId);
+        if (increments.Length > 0)
+        {
+            _logger.Debug(
+                "Queued {Count} message emoji increments for guild {GuildId}",
+                increments.Length,
+                guildChannel.GuildId);
+        }
     }
 
     private async Task HandleReactionAddedAsync(
