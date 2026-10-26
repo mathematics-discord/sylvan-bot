@@ -1,4 +1,0 @@
-component: Internal
-kind: Changed
-body: Add five-minute message-cache occupancy samples and write general file logs as JSONL with rendered messages and structured context. Retain 'human-readable' console output.
-time: 2026-10-26T17:52:44.1592111Z

@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.10 - 2026-10-26
+## Internal
+### Changed
+- Add five-minute message-cache occupancy samples and write general file logs as JSONL with rendered messages and structured context. Retain 'human-readable' console output.
 # v0.1.9 - 2026-10-26
 ## Moderation
 ### Added
