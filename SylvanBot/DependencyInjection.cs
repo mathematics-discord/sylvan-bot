@@ -9,10 +9,12 @@ using SylvanBot.Features.EmojiAnalytics;
 using SylvanBot.Features.EmojiAnalytics.Persistence;
 using SylvanBot.Features.EmojiYoink;
 using SylvanBot.Features.Logging;
+using SylvanBot.Features.MessageCache;
 using SylvanBot.Features.Moderation;
 using SylvanBot.Features.Quorum;
 using SylvanBot.Features.RoleColours;
 using SylvanBot.Features.Tickets;
+using SylvanBot.Features.WorkingHours;
 using SylvanBot.Gateway;
 using SylvanBot.Infrastructure.Data;
 using SylvanBot.Interactions;
@@ -37,6 +39,7 @@ public static class DependencyInjection
             services.AddSingleton<TicketWorker>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<TicketWorker>());
             services.AddHostedService(sp => sp.GetRequiredService<TicketWorker>());
+            services.AddWorkingHours();
 
             services.AddSingleton<IQuorumMembers, DiscordQuorumMembers>();
             services.AddScoped<QuorumOperations>();
@@ -92,6 +95,14 @@ public static class DependencyInjection
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<RoleColourGatewayHandler>());
         }
 
+        private void AddWorkingHours()
+        {
+            services.AddSingleton(TimeProvider.System);
+            services.AddSingleton<WorkingHoursCoordinator>();
+            services.AddHostedService<WorkingHoursWorker>();
+            services.AddSingleton<IDiscordGatewayHandler, WorkingHoursGatewayHandler>();
+        }
+
         private void AddPersistence(IConfiguration configuration)
         {
             var connectionString = PostgresConnectionStringBuilder.Build(configuration);
@@ -132,12 +143,14 @@ public static class DependencyInjection
 
             services.AddSingleton(sp => new InteractionService(
                 discordProvider: sp.GetRequiredService<DiscordSocketClient>(),
-                config: new InteractionServiceConfig { AutoServiceScopes = true, ThrowOnError = false }));
+                config: new InteractionServiceConfig { AutoServiceScopes = true, ThrowOnError = false, EnableAutocompleteHandlers = true }));
 
             services.AddSingleton<DiscordInteractionHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordInteractionHandler>());
             services.AddSingleton<HttpClient>();
             services.AddSingleton<IDiscordClient>(sp => sp.GetRequiredService<DiscordSocketClient>());
+            // Subscribe to readiness before the gateway starts.
+            services.AddHostedService<MessageCacheSamplingWorker>();
             services.AddHostedService<DiscordBotHostedService>();
         }
     }

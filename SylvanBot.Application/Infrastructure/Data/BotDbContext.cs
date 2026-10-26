@@ -3,6 +3,7 @@
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Quorum;
 using SylvanBot.Application.Features.Tickets;
+using SylvanBot.Application.Features.WorkingHours;
 using SylvanBot.Features.EmojiAnalytics;
 using SylvanBot.Features.Logging;
 using SylvanBot.Features.Moderation;
@@ -13,6 +14,8 @@ using SylvanBot.Features.RoleColours;
 /// </summary>
 public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbContext(options)
 {
+    public DbSet<WorkingHoursPreference> WorkingHours => Set<WorkingHoursPreference>();
+    public DbSet<WorkingHoursSettings> WorkingHoursSettings => Set<WorkingHoursSettings>();
     public DbSet<EmojiUsageCount> EmojiUsageCounts => Set<EmojiUsageCount>();
     public DbSet<ImageSpamSettings> ImageSpamSettings => Set<ImageSpamSettings>();
     public DbSet<LoggingConfiguration> LoggingConfigurations => Set<LoggingConfiguration>();

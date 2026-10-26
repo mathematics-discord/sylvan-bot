@@ -1,7 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <ItemGroup>
         <PackageReference Include="ErrorOr"/>
+        <PackageReference Include="NodaTime"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational"/>
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL"/>
+        <PackageReference Include="StyleCop.Analyzers">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+    <ItemGroup>
+        <AdditionalFiles Include="stylecop.json"/>
     </ItemGroup>
 </Project>

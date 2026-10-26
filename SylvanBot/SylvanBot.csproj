@@ -24,6 +24,7 @@
         <PackageReference Include="Discord.Net.Interactions"/>
         <PackageReference Include="Discord.Net.WebSocket"/>
         <PackageReference Include="DotNetEnv"/>
+        <PackageReference Include="ErrorOr"/>
         <PackageReference Include="JetBrains.Annotations"/>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
             <PrivateAssets>all</PrivateAssets>

@@ -4,6 +4,8 @@ using DotNetEnv;
 using SylvanBot.Interactions;
 using Serilog.Debugging;
 using Serilog.Events;
+using Serilog.Filters;
+using Serilog.Formatting.Json;
 
 public static class Program
 {
@@ -25,9 +27,13 @@ public static class Program
         return 0;
     }
 
-    private static void ConfigureSerilog(IConfiguration config, LoggerConfiguration loggerConfiguration)
+    public static void ConfigureSerilog(
+        IConfiguration config,
+        LoggerConfiguration loggerConfiguration,
+        string logDirectory = "logs")
     {
         var serviceInstanceId = Environment.MachineName;
+        var jsonFormatter = new JsonFormatter(renderMessage: true);
 
         loggerConfiguration
             .MinimumLevel.Verbose()
@@ -37,15 +43,34 @@ public static class Program
             .Enrich.WithProperty("service_instance_id", serviceInstanceId)
             .Enrich.WithProperty("environment",
                 config["ASPNETCORE_ENVIRONMENT"] ?? "production")
-            .WriteTo.Console(
-                LogEventLevel.Debug,
-                "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff'Z'} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}"
-            )
-            .WriteTo.File("logs/verbose-.log", rollingInterval: RollingInterval.Day)
-            .WriteTo.File("logs/debug-.log", LogEventLevel.Debug, rollingInterval: RollingInterval.Day)
-            .WriteTo.File("logs/info-.log", LogEventLevel.Information, rollingInterval: RollingInterval.Day)
-            .WriteTo.File("logs/warning-.log", LogEventLevel.Warning, rollingInterval: RollingInterval.Day)
-            .WriteTo.File("logs/error-.log", LogEventLevel.Error, rollingInterval: RollingInterval.Day);
+            .WriteTo.Logger(ordinary => ordinary
+                .MinimumLevel.Verbose()
+                .Filter.ByExcluding(Matching.WithProperty("MessageCacheSample"))
+                .WriteTo.Console(
+                    LogEventLevel.Debug,
+                    "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff'Z'} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}"
+                )
+                .WriteTo.File(jsonFormatter, Path.Combine(logDirectory, "verbose-.jsonl"),
+                    rollingInterval: RollingInterval.Day)
+                .WriteTo.File(jsonFormatter, Path.Combine(logDirectory, "debug-.jsonl"),
+                    LogEventLevel.Debug, rollingInterval: RollingInterval.Day)
+                .WriteTo.File(jsonFormatter, Path.Combine(logDirectory, "info-.jsonl"),
+                    LogEventLevel.Information, rollingInterval: RollingInterval.Day)
+                .WriteTo.File(jsonFormatter, Path.Combine(logDirectory, "warning-.jsonl"),
+                    LogEventLevel.Warning, rollingInterval: RollingInterval.Day)
+                .WriteTo.File(jsonFormatter, Path.Combine(logDirectory, "error-.jsonl"),
+                    LogEventLevel.Error, rollingInterval: RollingInterval.Day))
+            .WriteTo.Logger(cache => cache
+                .MinimumLevel.Debug()
+                .Filter.ByIncludingOnly(Matching.WithProperty("MessageCacheSample"))
+                .WriteTo.File(
+                    new JsonFormatter(),
+                    Path.Combine(logDirectory, "cache-.jsonl"),
+                    restrictedToMinimumLevel: LogEventLevel.Debug,
+                    rollingInterval: RollingInterval.Day,
+                    fileSizeLimitBytes: 10 * 1024 * 1024,
+                    rollOnFileSizeLimit: true,
+                    retainedFileCountLimit: 14));
     }
 
     private static void EnableSerilogSelfDiagnostics()

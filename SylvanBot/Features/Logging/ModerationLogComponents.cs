@@ -24,6 +24,7 @@ internal static class ModerationLogComponents
 
         var blockLength = (MaxComponentTextLength - header.Length - 1) / 2;
         var content = $"{CodeBlock(before, blockLength, ansi: true)}\n{CodeBlock(after, blockLength, ansi: true)}";
+
         var components = new ComponentBuilderV2(
             new ContainerBuilder()
                 .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
@@ -36,29 +37,26 @@ internal static class ModerationLogComponents
 
     public static ModerationLogMessage BuildDeleteLog(
         ulong channelId,
-        ulong messageId,
-        ulong? authorId,
+        ulong authorId,
         string? precedingMessageJumpUrl,
-        string? content,
+        string content,
         IReadOnlyCollection<DownloadedAttachment> attachments,
         int omittedAttachmentCount = 0
     )
     {
-        var author = authorId is null ? "author unknown" : $"<@{authorId}> (`{authorId}`)";
+        var author = $"<@{authorId}> (`{authorId}`)";
         var header = $"**Message Delete:** {author} in <#{channelId}>";
-
-        if (authorId is null)
-            header += $" • Message `{messageId}`";
 
         if (!string.IsNullOrWhiteSpace(precedingMessageJumpUrl))
             header += $" • [Preceding message]({precedingMessageJumpUrl})";
 
         var attachmentNotice = omittedAttachmentCount > 0
-            ? $"\n*{omittedAttachmentCount} attachment(s) unavailable or omitted (download/upload limits).*"
+            ? $"\n*{omittedAttachmentCount} attachment(s) omitted (download failures or limits).*"
             : string.Empty;
 
         var contentLength = MaxComponentTextLength - header.Length - attachmentNotice.Length;
-        var contentBlock = content is null ? "*Unavailable*" : CodeBlock(content, contentLength, ansi: false);
+        var contentBlock = CodeBlock(content, contentLength, ansi: false);
+
         var container = new ContainerBuilder()
             .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
             .WithSeparator(new SeparatorBuilder())

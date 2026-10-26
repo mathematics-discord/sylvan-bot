@@ -23,6 +23,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\..\SylvanBot\SylvanBot.csproj"/>
         <ProjectReference Include="..\..\SylvanBot.Application\SylvanBot.Application.csproj"/>
     </ItemGroup>
 </Project>

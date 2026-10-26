@@ -49,7 +49,7 @@ namespace SylvanBot.Infrastructure.Migrations
                     TrackedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     VetoReason = table.Column<string>(type: "character varying(1950)", maxLength: 1950, nullable: true),
                     VetoedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    VetoedByUserId = table.Column<long>(type: "bigint", nullable: true),
+                    VetoedByUserId = table.Column<long>(type: "bigint", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -65,7 +65,7 @@ namespace SylvanBot.Infrastructure.Migrations
                     CabinetRoleId = table.Column<long>(type: "bigint", nullable: false),
                     CommitteeRoleId = table.Column<long>(type: "bigint", nullable: false),
                     ProposalsForumChannelId = table.Column<long>(type: "bigint", nullable: false),
-                    SuggestionsForumChannelId = table.Column<long>(type: "bigint", nullable: false),
+                    SuggestionsForumChannelId = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
                 {

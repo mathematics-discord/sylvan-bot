@@ -2,6 +2,32 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.10 - 2026-10-26
+## Internal
+### Changed
+- Add five-minute message-cache occupancy samples and write general file logs as JSONL with rendered messages and structured context. Retain 'human-readable' console output.
+# v0.1.9 - 2026-10-26
+## Moderation
+### Added
+- Attribute bulk deletions using matching audit-log entries, including ban-related deletions when identifiable.
+### Changed
+- Replace bulk deletion summaries and media attachments with JSONL exports containing cached message authors, channels, and full content.
+### Fixed
+- Skip deletion logs for messages missing from the cache (this preserves legacy bot behaviour).
+# v0.1.8 - 2026-10-25
+## Moderation
+### Added
+- Add /working-hours for recurring daily availability and administrator-only /working-conditions for persisted per-guild settings. Global disable restores ordinary staff ping-role defaults while exempt staff retain manual control; saved schedules resume when re-enabled. Changing the ping role requires disabling first and leaves old role assignments unchanged. Time input uses the documented [RFC 3339 time-only profile](https://www.rfc-editor.org/rfc/rfc3339.html#section-5.6), with fixed offsets or named zones from the [IANA Time Zone Database](https://www.iana.org/time-zones).
+# v0.1.7 - 2026-10-25
+## Internal
+### Removed
+- Remove Bridge, including its WebSocket API and /bridge commands. Remove the stored Bridge channel configuration and the requirement for a dedicated Bridge credential.
+# v0.1.6 - 2026-10-23
+## Internal
+### Added
+- Add Bridge, an authenticated WebSocket API for explicitly bot-mentioned messages in configured channels, with scoped typing and replies. Manage channels using /bridge add, /bridge remove, and /bridge list. Set a dedicated BRIDGE__CREDENTIAL before starting the bot. Discord intents and automatic member downloading can now be configured for deployments without privileged intents.
+### Changed
+- Downversion SDK from net11.0-(preview) to net10.0
 # v0.1.5 - 2026-10-21
 ## General
 ### Fixed

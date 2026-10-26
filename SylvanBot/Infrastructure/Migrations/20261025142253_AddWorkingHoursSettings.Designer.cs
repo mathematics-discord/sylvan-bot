@@ -12,8 +12,8 @@ using SylvanBot.Infrastructure.Data;
 namespace SylvanBot.Infrastructure.Migrations
 {
     [DbContext(typeof(BotDbContext))]
-    [Migration("20261024225624_ReconcileTicketApplicationNamespace")]
-    partial class ReconcileTicketApplicationNamespace
+    [Migration("20261025142253_AddWorkingHoursSettings")]
+    partial class AddWorkingHoursSettings
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,8 +24,6 @@ namespace SylvanBot.Infrastructure.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.HasSequence("ticket_numbers");
 
             modelBuilder.Entity("SylvanBot.Application.Features.Quorum.QuorumConfiguration", b =>
                 {
@@ -82,106 +80,81 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.ToTable("quorum_voter_roles", "public");
                 });
 
-            modelBuilder.Entity("SylvanBot.Application.Features.Tickets.Ticket", b =>
+            modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursEligibleRole", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("Action")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<long?>("ChannelId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Comment")
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset?>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("DurationSeconds")
-                        .HasColumnType("bigint");
-
                     b.Property<long>("GuildId")
                         .HasColumnType("bigint");
 
-                    b.Property<bool>("Hidden")
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsExempt")
                         .HasColumnType("boolean");
 
-                    b.Property<DateTimeOffset?>("LastModifiedAtUtc")
-                        .HasColumnType("timestamp with time zone");
+                    b.HasKey("GuildId", "RoleId");
 
-                    b.Property<long?>("LastModifiedByUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("MessageId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("ModeratorUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("Number")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("PreviousChannelId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("PreviousMessageId")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("PublicationPending")
-                        .HasColumnType("boolean");
-
-                    b.Property<long?>("RoleId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Status")
-                        .HasColumnType("text");
-
-                    b.Property<long?>("SubjectUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GuildId", "Number")
-                        .IsUnique();
-
-                    b.HasIndex("GuildId", "ChannelId", "MessageId");
-
-                    b.HasIndex("GuildId", "PreviousChannelId", "PreviousMessageId");
-
-                    b.HasIndex("GuildId", "SubjectUserId", "Hidden", "Id");
-
-                    b.ToTable("tickets", null, t =>
+                    b.ToTable("working_hours_eligible_roles", null, t =>
                         {
-                            t.HasCheckConstraint("CK_tickets_note_duration", "\"Action\" <> 'Note' OR \"DurationSeconds\" IS NULL");
-
-                            t.HasCheckConstraint("CK_tickets_number", "\"Number\" > 0");
+                            t.HasCheckConstraint("CK_working_hours_eligible_roles_identity", "\"RoleId\" <> 0 AND \"RoleId\" <> \"GuildId\"");
                         });
                 });
 
-            modelBuilder.Entity("SylvanBot.Application.Features.Tickets.TicketConfiguration", b =>
+            modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursPreference", b =>
                 {
                     b.Property<long>("GuildId")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("DestinationChannelId")
+                    b.Property<long>("MemberId")
                         .HasColumnType("bigint");
 
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("EndTime")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("OffsetMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StartTime")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ZoneId")
+                        .HasColumnType("text");
+
+                    b.HasKey("GuildId", "MemberId");
+
+                    b.ToTable("working_hours", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_working_hours_identity", "\"GuildId\" <> 0 AND \"MemberId\" <> 0");
+
+                            t.HasCheckConstraint("CK_working_hours_window", "(\"StartTime\" IS NULL AND \"EndTime\" IS NULL AND \"OffsetMinutes\" IS NULL AND \"ZoneId\" IS NULL AND NOT \"Enabled\") OR (\"StartTime\" IS NOT NULL AND \"EndTime\" IS NOT NULL AND ((\"OffsetMinutes\" IS NOT NULL AND \"OffsetMinutes\" BETWEEN -1439 AND 1439 AND \"ZoneId\" IS NULL) OR (\"OffsetMinutes\" IS NULL AND \"ZoneId\" IS NOT NULL AND length(\"ZoneId\") > 0)))");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursSettings", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("Enabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<long?>("PingRoleId")
+                        .HasColumnType("bigint");
+
                     b.HasKey("GuildId");
 
-                    b.ToTable("ticket_configurations", (string)null);
+                    b.ToTable("working_hours_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_working_hours_settings_enabled", "NOT \"Enabled\" OR \"PingRoleId\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_working_hours_settings_identity", "\"GuildId\" <> 0");
+
+                            t.HasCheckConstraint("CK_working_hours_settings_target", "\"PingRoleId\" IS NULL OR (\"PingRoleId\" <> 0 AND \"PingRoleId\" <> \"GuildId\")");
+                        });
                 });
 
             modelBuilder.Entity("SylvanBot.Features.EmojiAnalytics.EmojiUsageCount", b =>
@@ -322,9 +295,23 @@ namespace SylvanBot.Infrastructure.Migrations
                         .HasConstraintName("fk_quorum_voter_roles_quorum_configurations");
                 });
 
+            modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursEligibleRole", b =>
+                {
+                    b.HasOne("SylvanBot.Application.Features.WorkingHours.WorkingHoursSettings", null)
+                        .WithMany("EligibleRoles")
+                        .HasForeignKey("GuildId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SylvanBot.Application.Features.Quorum.QuorumConfiguration", b =>
                 {
                     b.Navigation("VoterRoles");
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursSettings", b =>
+                {
+                    b.Navigation("EligibleRoles");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,57 +1,58 @@
 # Sylvan Bot
 
-A Discord bot for server moderation, role colours, emoji tools, and quorum checks. Built with C#, Discord.NET, and PostgreSQL.
+A Discord bot built with C#, Discord.NET and PostgreSQL.
 
 ## Run locally
 
-You need the .NET SDK specified in [global.json](global.json), Docker with Compose, and a development bot invited to a test server. In the [Discord Developer Portal](https://discord.com/developers/applications), enable **Server Members Intent** and **Message Content Intent** for that bot.
+Install the .NET SDK specified in [global.json](global.json) and Docker with Compose. Invite a development bot to a test
+server and enable **Server Members Intent** and **Message Content Intent** in
+the [Discord Developer Portal](https://discord.com/developers/applications).
 
-From the repository root, copy the example configuration:
+From the repository root:
 
 ```sh
 cp env/local.env.example .env
 ```
 
-Set `DISCORD__TOKEN` in `.env` to your bot's token. **That's the only value you need to change.** The example includes the local database settings, and Git ignores `.env`.
+Set `DISCORD__TOKEN` in `.env`. The example supplies the local database settings; Git ignores `.env`. To reuse a
+database, keep its `DB__DATABASE` value and set `SYLVAN_BOT_POSTGRES_VOLUME` to its volume name.
 
-Start Docker, then choose how to run the bot:
+| Editor        | Launch                                                                                                                            |
+|---------------|-----------------------------------------------------------------------------------------------------------------------------------|
+| Rider         | Open `SylvanBot.slnx` and run **Sylvan Bot Local with database**.                                                                 |
+| VS Code       | Install the recommended **C# Dev Kit** extension and launch **Sylvan Bot Local with database**.                                   |
+| Visual Studio | Open `SylvanBot.slnx`, set `SylvanBot` as the startup project, and run **Debug / SylvanBot.Local** with build-before-run enabled. |
 
-| Editor | Setup and launch |
-| --- | --- |
-| Rider | Open `SylvanBot.slnx`, select **Sylvan Bot Local with database**, then Run or Debug. |
-| VS Code | Open the repository folder, install the recommended **C# Dev Kit** extension, then launch **Sylvan Bot Local with database** from Run and Debug. |
-| Visual Studio | Open `SylvanBot.slnx`, set `SylvanBot` as the startup project, select **Debug** and **SylvanBot.Local**, then press F5. Use a version that supports the SDK in `global.json`. |
+These configurations start PostgreSQL and wait for it to be ready. Visual Studio also starts the database during
+ordinary Debug builds.
 
-These setups start PostgreSQL and wait until it is ready. Visual Studio does this during Debug builds, so keep build-before-run enabled; an ordinary Debug build in Visual Studio also starts the database.
-
-To run from a terminal instead:
+To run from a terminal:
 
 ```sh
 docker compose --env-file .env -f docker-compose.yml up -d --wait db
 dotnet run --project SylvanBot --launch-profile SylvanBot.Local
 ```
 
-Sylvan Bot applies database migrations and registers commands automatically on startup.
+The bot applies database migrations and registers commands on startup. Stopping it leaves PostgreSQL running.
+`docker compose down` stops the local stack and preserves its data.
 
-Stopping the bot leaves PostgreSQL running. `docker compose down` stops the local stack and keeps its data for next time.
+## Development
 
-For an existing development database, set `SYLVAN_BOT_POSTGRES_VOLUME` in `.env` to its current volume name to keep using its data.
+Code is grouped under `SylvanBot/Features/`, with feature persistence in `Persistence/` subfolders. Shared interactions,
+gateway lifecycle and helpers live in `Interactions/`, `Gateway/` and `Common/`. Database setup is in
+`Infrastructure/Data/`; migrations are in `Infrastructure/Migrations/`. Registrations are explicit in
+`DependencyInjection.cs`.
 
-## Contributing
-
-Keep pull requests focused, follow the existing formatting rules in `.editorconfig`, and include tests for changed behaviour.
-
-Code is organised by feature under `SylvanBot/Features/`. Each feature keeps its commands, gateway handlers, operations, and models together; database stores and EF mappings live in its `Persistence/` subfolder. Shared Discord interaction code lives in `SylvanBot/Interactions/`, gateway lifecycle code in `SylvanBot/Gateway/`, and general helpers in `SylvanBot/Common/`. The database context and connection setup live in `SylvanBot/Infrastructure/Data/`, with migration history in `SylvanBot/Infrastructure/Migrations/`. Registrations are explicit in `SylvanBot/DependencyInjection.cs`.
-
-Build and test from the repository root:
+Follow `.editorconfig`, keep changes focused and run relevant checks from the repository root:
 
 ```sh
 dotnet build SylvanBot.slnx --configuration Release
 dotnet test SylvanBot.slnx --configuration Release --results-directory ./TestResults
 ```
 
-The PostgreSQL integration tests use Testcontainers and need Docker running. They create their own test databases; the development bot does not need to be running. For a focused change, run the affected test project or use `--filter`.
+Use `--filter` for focused tests. Existing PostgreSQL integration tests require Docker and create their own databases;
+the bot need not be running.
 
-See the [changelog](CHANGELOG.md) for release history.
-
-Write changelog entries around what users will notice, need to do differently, or can no longer rely on. Use the `Internal` component for refactors, build tooling, and other changes without user-facing effects, with the usual Added/Changed/Fixed kinds. Internal entries remain in the full changelog; Discord announcements link to them in a small-text footer instead of listing them. Releases containing only internal changes are announced as maintenance releases with no user-facing changes.
+See [CHANGELOG.md](CHANGELOG.md) for release history. Changie fragments describe user-visible changes; use the
+`Internal` component for maintenance. Internal entries appear in the full changelog and are linked from Discord
+announcements rather than listed as user-facing changes.

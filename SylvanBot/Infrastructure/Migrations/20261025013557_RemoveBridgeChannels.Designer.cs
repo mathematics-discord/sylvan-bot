@@ -12,20 +12,73 @@ using SylvanBot.Infrastructure.Data;
 namespace SylvanBot.Infrastructure.Migrations
 {
     [DbContext(typeof(BotDbContext))]
-    [Migration("20261018224225_AddTickets")]
-    partial class AddTickets
+    [Migration("20261025013557_RemoveBridgeChannels")]
+    partial class RemoveBridgeChannels
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.10")
+                .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.HasSequence("ticket_reference_numbers");
+            modelBuilder.Entity("SylvanBot.Application.Features.Quorum.QuorumConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("ChannelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("channel_id");
+
+                    b.Property<string>("ChannelKind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("channel_kind");
+
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("guild_id");
+
+                    b.Property<decimal>("Proportion")
+                        .HasPrecision(9, 8)
+                        .HasColumnType("numeric(9,8)")
+                        .HasColumnName("proportion");
+
+                    b.HasKey("Id")
+                        .HasName("pk_quorum_configurations");
+
+                    b.HasAlternateKey("GuildId", "ChannelId")
+                        .HasName("ak_quorum_configurations_guild_id_channel_id");
+
+                    b.ToTable("quorum_configurations", "public", t =>
+                        {
+                            t.HasCheckConstraint("ck_quorum_configurations_channel_kind", "channel_kind IN ('text', 'forum')");
+
+                            t.HasCheckConstraint("ck_quorum_configurations_proportion", "proportion > 0 AND proportion <= 1");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.Quorum.QuorumVoterRole", b =>
+                {
+                    b.Property<Guid>("QuorumConfigurationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("quorum_configuration_id");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("role_id");
+
+                    b.HasKey("QuorumConfigurationId", "RoleId")
+                        .HasName("pk_quorum_voter_roles");
+
+                    b.ToTable("quorum_voter_roles", "public");
+                });
 
             modelBuilder.Entity("SylvanBot.Features.EmojiAnalytics.EmojiUsageCount", b =>
                 {
@@ -155,108 +208,19 @@ namespace SylvanBot.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SylvanBot.Features.Tickets.Ticket", b =>
+            modelBuilder.Entity("SylvanBot.Application.Features.Quorum.QuorumVoterRole", b =>
                 {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("Action")
+                    b.HasOne("SylvanBot.Application.Features.Quorum.QuorumConfiguration", null)
+                        .WithMany("VoterRoles")
+                        .HasForeignKey("QuorumConfigurationId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<long?>("ChannelId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Comment")
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset?>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("DurationSeconds")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("Hidden")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset?>("LastModifiedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("LastModifiedByUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("MessageId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("ModeratorUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("PreviousChannelId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("PreviousMessageId")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("PublicationPending")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Reference")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<long?>("RoleId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Status")
-                        .HasColumnType("text");
-
-                    b.Property<long?>("SubjectUserId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("GuildId", "Reference")
-                        .IsUnique();
-
-                    b.HasIndex("GuildId", "ChannelId", "MessageId");
-
-                    b.HasIndex("GuildId", "PreviousChannelId", "PreviousMessageId");
-
-                    b.HasIndex("GuildId", "SubjectUserId", "Hidden", "Id");
-
-                    b.ToTable("tickets", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_tickets_note_duration", "\"Action\" <> 'Note' OR \"DurationSeconds\" IS NULL");
-
-                            t.HasCheckConstraint("CK_tickets_reference", "\"Reference\" ~ '^(T-[0-9]{4,}|[0-9]+)$'");
-                        });
+                        .HasConstraintName("fk_quorum_voter_roles_quorum_configurations");
                 });
 
-            modelBuilder.Entity("SylvanBot.Features.Tickets.TicketConfiguration", b =>
+            modelBuilder.Entity("SylvanBot.Application.Features.Quorum.QuorumConfiguration", b =>
                 {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("DestinationChannelId")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("GuildId");
-
-                    b.ToTable("ticket_configurations", (string)null);
+                    b.Navigation("VoterRoles");
                 });
 #pragma warning restore 612, 618
         }
