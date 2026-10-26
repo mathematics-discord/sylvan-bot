@@ -33,6 +33,7 @@ public static class Program
         string logDirectory = "logs")
     {
         var serviceInstanceId = Environment.MachineName;
+        var jsonFormatter = new JsonFormatter(renderMessage: true);
 
         loggerConfiguration
             .MinimumLevel.Verbose()
@@ -49,11 +50,16 @@ public static class Program
                     LogEventLevel.Debug,
                     "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff'Z'} {Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}"
                 )
-                .WriteTo.File(Path.Combine(logDirectory, "verbose-.log"), rollingInterval: RollingInterval.Day)
-                .WriteTo.File(Path.Combine(logDirectory, "debug-.log"), LogEventLevel.Debug, rollingInterval: RollingInterval.Day)
-                .WriteTo.File(Path.Combine(logDirectory, "info-.log"), LogEventLevel.Information, rollingInterval: RollingInterval.Day)
-                .WriteTo.File(Path.Combine(logDirectory, "warning-.log"), LogEventLevel.Warning, rollingInterval: RollingInterval.Day)
-                .WriteTo.File(Path.Combine(logDirectory, "error-.log"), LogEventLevel.Error, rollingInterval: RollingInterval.Day))
+                .WriteTo.File(jsonFormatter, Path.Combine(logDirectory, "verbose-.jsonl"),
+                    rollingInterval: RollingInterval.Day)
+                .WriteTo.File(jsonFormatter, Path.Combine(logDirectory, "debug-.jsonl"),
+                    LogEventLevel.Debug, rollingInterval: RollingInterval.Day)
+                .WriteTo.File(jsonFormatter, Path.Combine(logDirectory, "info-.jsonl"),
+                    LogEventLevel.Information, rollingInterval: RollingInterval.Day)
+                .WriteTo.File(jsonFormatter, Path.Combine(logDirectory, "warning-.jsonl"),
+                    LogEventLevel.Warning, rollingInterval: RollingInterval.Day)
+                .WriteTo.File(jsonFormatter, Path.Combine(logDirectory, "error-.jsonl"),
+                    LogEventLevel.Error, rollingInterval: RollingInterval.Day))
             .WriteTo.Logger(cache => cache
                 .MinimumLevel.Debug()
                 .Filter.ByIncludingOnly(Matching.WithProperty("MessageCacheSample"))

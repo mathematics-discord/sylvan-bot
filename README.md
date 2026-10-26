@@ -54,6 +54,8 @@ The PostgreSQL integration tests use Testcontainers and need Docker running. The
 
 See the [changelog](CHANGELOG.md) for release history.
 
+General file logs now use `logs/verbose-*.jsonl`, `debug-*.jsonl`, `info-*.jsonl`, `warning-*.jsonl` and `error-*.jsonl` instead of `.log`. Each line is a Serilog JSON event with `Timestamp`, `Level`, `MessageTemplate`, `RenderedMessage`, `Properties` and, when present, `Exception`. Existing structured context is now visible in `Properties`, including values absent from the rendered message; no additional event data is collected. The outputs retain their overlapping minimum levels, daily rolling and existing retention settings. Console output remains human-readable, existing `.log` files are preserved, and production keeps the same persistent `./logs:/app/logs` directory. File readers should select `.jsonl` files and parse each line as JSON.
+
 Administrators configure Working Hours with `/working-conditions`; staff save their recurring daily availability with `/working-hours`. See [Working Hours](docs/working-hours.md) for input modes, per-guild configuration, role defaults and recovery behaviour.
 
 Write changelog entries around what users will notice, need to do differently, or can no longer rely on. Use the `Internal` component for refactors, build tooling, and other changes without user-facing effects, with the usual Added/Changed/Fixed kinds. Internal entries remain in the full changelog; Discord announcements link to them in a small-text footer instead of listing them. Releases containing only internal changes are announced as maintenance releases with no user-facing changes.
