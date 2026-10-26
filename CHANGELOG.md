@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.11 - 2026-10-26
+## General
+### Changed
+- Move colour selection to /colour set and make configured colour mappings available to everyone through /colour list, replacing /colour-admin list.
 # v0.1.10 - 2026-10-26
 ## Internal
 ### Changed
