@@ -1,0 +1,4 @@
+component: General
+kind: Changed
+body: Move colour selection to /colour set and make configured colour mappings available to everyone through /colour list, replacing /colour-admin list.
+time: 2026-10-26T21:41:52.3247513Z

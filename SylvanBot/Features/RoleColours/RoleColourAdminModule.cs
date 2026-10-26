@@ -1,7 +1,5 @@
 namespace SylvanBot.Features.RoleColours;
 
-using System.Text;
-
 [Group("colour-admin", "Administrative role colour commands.")]
 [DefaultMemberPermissions(GuildPermission.Administrator)]
 public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleColourReconciler reconciler)
@@ -91,28 +89,6 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
             ephemeral: true);
     }
 
-    [SlashCommand("list", "List configured role colour options.")]
-    [RequireUserPermission(GuildPermission.Administrator)]
-    public async Task ListAsync()
-    {
-        if (Context.Guild is null)
-        {
-            await RespondAsync(ResponseNoGuild, ephemeral: true);
-            return;
-        }
-
-        ImmutableArray<RoleColourOption> options =
-            await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
-
-        if (options.IsEmpty)
-        {
-            await RespondAsync("No colour options are configured.", ephemeral: true);
-            return;
-        }
-
-        await RespondAsync(BuildListResponse(options), ephemeral: true);
-    }
-
     [SlashCommand("sync", "Reconcile display colour roles for all members who currently have a source colour role.")]
     [RequireUserPermission(GuildPermission.Administrator)]
     public async Task SyncAsync()
@@ -141,16 +117,5 @@ public sealed class RoleColourAdminModule(RoleColourOperations operations, RoleC
     private static string CheckSummary(int incomplete)
     {
         return incomplete == 0 ? string.Empty : $" {incomplete} update(s) incomplete; see logs.";
-    }
-
-    private static string BuildListResponse(IReadOnlyList<RoleColourOption> options)
-    {
-        var builder = new StringBuilder("Configured colour options:");
-
-        foreach (var option in options)
-            builder.AppendLine()
-                .Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
-
-        return builder.ToString();
     }
 }

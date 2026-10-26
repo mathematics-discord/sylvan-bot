@@ -1,8 +1,10 @@
 ﻿namespace SylvanBot.Features.RoleColours;
 
+using System.Text;
 using SylvanBot.Application.Common;
 
-public sealed class ColourModule(RoleColourReconciler colours) : InteractionModuleBase<IInteractionContext>
+[Group("colour", "Choose or list display colours.")]
+public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperations operations) : InteractionModuleBase<IInteractionContext>
 {
     private const string SwapPrefix = "colour-swap";
 
@@ -30,7 +32,7 @@ public sealed class ColourModule(RoleColourReconciler colours) : InteractionModu
         await ApplySelectionAsync(null);
     }
 
-    [SlashCommand("colour", "Choose or reset your display colour.")]
+    [SlashCommand("set", "Choose or reset your display colour.")]
     public async Task ColourAsync()
     {
         if (Context.Guild is null)
@@ -63,6 +65,27 @@ public sealed class ColourModule(RoleColourReconciler colours) : InteractionModu
             : "Select a colour to apply it, or use Reset to remove your display colour.";
 
         await FollowupAsync(prompt, components: BuildMenu(Context.User.Id, eligible), ephemeral: true);
+    }
+
+    [SlashCommand("list", "List configured role colour options.")]
+    public async Task ListAsync()
+    {
+        if (Context.Guild is null)
+        {
+            await RespondAsync("This command can only be used in a guild.", ephemeral: true);
+            return;
+        }
+
+        ImmutableArray<RoleColourOption> options =
+            await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
+
+        if (options.IsEmpty)
+        {
+            await RespondAsync("No colour options are configured.", ephemeral: true);
+            return;
+        }
+
+        await RespondAsync(BuildListResponse(options), ephemeral: true);
     }
 
     internal static MessageComponent BuildMenu(ulong ownerUserId, ImmutableArray<IRole> eligible)
@@ -125,5 +148,16 @@ public sealed class ColourModule(RoleColourReconciler colours) : InteractionModu
         }
 
         return true;
+    }
+
+    private static string BuildListResponse(IReadOnlyList<RoleColourOption> options)
+    {
+        var builder = new StringBuilder("Configured colour options:");
+
+        foreach (var option in options)
+            builder.AppendLine()
+                .Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
+
+        return builder.ToString();
     }
 }
