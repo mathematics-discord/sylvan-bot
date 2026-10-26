@@ -2,6 +2,14 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.9 - 2026-10-26
+## Moderation
+### Added
+- Attribute bulk deletions using matching audit-log entries, including ban-related deletions when identifiable.
+### Changed
+- Replace bulk deletion summaries and media attachments with JSONL exports containing cached message authors, channels, and full content.
+### Fixed
+- Skip deletion logs for messages missing from the cache (this preserves legacy bot behaviour).
 # v0.1.8 - 2026-10-25
 ## Moderation
 ### Added

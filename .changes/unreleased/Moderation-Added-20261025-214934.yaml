@@ -1,4 +1,0 @@
-component: Moderation
-kind: Added
-body: Attribute bulk deletions using matching audit-log entries, including ban-related deletions when identifiable.
-time: 2026-10-25T21:49:34.8946822Z
