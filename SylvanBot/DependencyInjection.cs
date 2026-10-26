@@ -8,6 +8,7 @@ using SylvanBot.Features.EmojiAnalytics;
 using SylvanBot.Features.EmojiAnalytics.Persistence;
 using SylvanBot.Features.EmojiYoink;
 using SylvanBot.Features.Logging;
+using SylvanBot.Features.MessageCache;
 using SylvanBot.Features.Moderation;
 using SylvanBot.Features.Quorum;
 using SylvanBot.Features.RoleColours;
@@ -139,6 +140,8 @@ public static class DependencyInjection
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordInteractionHandler>());
             services.AddSingleton<HttpClient>();
             services.AddSingleton<IDiscordClient>(sp => sp.GetRequiredService<DiscordSocketClient>());
+            // Subscribe to readiness before the gateway starts.
+            services.AddHostedService<MessageCacheSamplingWorker>();
             services.AddHostedService<DiscordBotHostedService>();
         }
     }

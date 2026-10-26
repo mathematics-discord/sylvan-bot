@@ -1,6 +1,7 @@
 ﻿# Build outputs
 **/bin/
 **/obj/
+**/logs/*.jsonl
 
 # NuGet packages
 *.nupkg
