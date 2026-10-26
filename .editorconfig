@@ -948,6 +948,9 @@ indent_style = space
 indent_size = 4
 tab_width = 4
 
+
+dotnet_diagnostic.MA0029.severity = none
+
 [*.cs]
 dotnet_diagnostic.rcs1123.severity = none
 dotnet_diagnostic.rcs1261.severity = error

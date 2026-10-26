@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: Skip deletion logs for messages missing from the cache (this preserves legacy bot behaviour).
+time: 2026-10-25T21:49:32.4111078Z

@@ -1,0 +1,4 @@
+component: Moderation
+kind: Changed
+body: Replace bulk deletion summaries and media attachments with JSONL exports containing cached message authors, channels, and full content.
+time: 2026-10-25T21:49:33.6724072Z
