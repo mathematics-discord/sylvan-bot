@@ -17,6 +17,7 @@ public sealed class MessageCacheSamplingWorker(
     public override Task StartAsync(CancellationToken cancellationToken)
     {
         client.Ready += OnReadyAsync;
+
         return base.StartAsync(cancellationToken);
     }
 
@@ -37,16 +38,9 @@ public sealed class MessageCacheSamplingWorker(
                 if (!_initiallyReady || client.ConnectionState != ConnectionState.Connected)
                     continue;
 
-                var sampleTimeUtc = DateTimeOffset.UtcNow;
-                var sampleId = Guid.NewGuid().ToString("N");
-                var sampleLogger = _logger
-                    .ForContext("ProcessRunId", _processRunId)
-                    .ForContext("SampleId", sampleId)
-                    .ForContext("SampleTimeUtc", sampleTimeUtc);
-
                 try
                 {
-                    Sample(sampleLogger, sampleId, sampleTimeUtc, stoppingToken);
+                    Sample(stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -54,7 +48,7 @@ public sealed class MessageCacheSamplingWorker(
                 }
                 catch (Exception ex)
                 {
-                    sampleLogger.Error(ex, "Message-cache sampling pass failed");
+                    _logger.Error(ex, "Message-cache sampling pass failed for run {ProcessRunId}", _processRunId);
                 }
             }
         }
@@ -66,17 +60,16 @@ public sealed class MessageCacheSamplingWorker(
     private Task OnReadyAsync()
     {
         _initiallyReady = true;
+
         return Task.CompletedTask;
     }
 
-    private int SampleChannel(
-        ILogger channelLogger,
+    private static ChannelMeasurement CollectChannel(
         ulong guildId,
         ISocketMessageChannel channel,
         CancellationToken cancellationToken)
     {
-        var messages = channel.CachedMessages;
-        var count = messages.Count;
+        IReadOnlyCollection<SocketMessage> messages = channel.CachedMessages;
         DateTimeOffset? oldestMessageCreatedAtUtc = null;
 
         foreach (var message in messages)
@@ -87,24 +80,16 @@ public sealed class MessageCacheSamplingWorker(
                 oldestMessageCreatedAtUtc = message.Timestamp.ToUniversalTime();
         }
 
-        channelLogger.Debug(
-            "Message-cache occupancy: guild {GuildId}, channel {ChannelId}, count {CachedMessageCount}, capacity {Capacity}, oldest {OldestMessageCreatedAtUtc}",
+        return new ChannelMeasurement(
             guildId.ToString(CultureInfo.InvariantCulture),
             channel.Id.ToString(CultureInfo.InvariantCulture),
-            count,
-            _capacity,
+            messages.Count,
             oldestMessageCreatedAtUtc);
-
-        return count;
     }
 
-    private void Sample(ILogger sampleLogger, string sampleId, DateTimeOffset sampleTimeUtc, CancellationToken cancellationToken)
+    private void Sample(CancellationToken cancellationToken)
     {
-        var channelLogger = sampleLogger.ForContext("MessageCacheSample", true);
-        var sampledChannels = 0;
-        var populatedChannels = 0;
-        var fullChannels = 0;
-        long totalCachedMessages = 0;
+        Queue<ChannelMeasurement> measurements = [];
         long cachedGuildMembers = 0;
 
         foreach (var guild in client.Guilds)
@@ -118,7 +103,8 @@ public sealed class MessageCacheSamplingWorker(
                 continue;
 
             cachedGuildMembers += guild.Users.Count;
-            var channels = guild.Channels
+
+            IEnumerable<ISocketMessageChannel> channels = guild.Channels
                 .Concat(guild.ThreadChannels)
                 .DistinctBy(channel => channel.Id)
                 .OfType<ISocketMessageChannel>();
@@ -127,57 +113,68 @@ public sealed class MessageCacheSamplingWorker(
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (client.ConnectionState != ConnectionState.Connected)
+                if (client.ConnectionState != ConnectionState.Connected || !((IGuild)guild).Available)
                     return;
 
-                if (!((IGuild)guild).Available)
-                    break;
-
-                var count = SampleChannel(channelLogger, guild.Id, channel, cancellationToken);
-
-                sampledChannels++;
-                totalCachedMessages += count;
-
-                if (count > 0)
-                    populatedChannels++;
-
-                if (_capacity > 0 && count >= _capacity)
-                    fullChannels++;
+                measurements.Enqueue(CollectChannel(guild.Id, channel, cancellationToken));
             }
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (sampledChannels == 0 || client.ConnectionState != ConnectionState.Connected)
+        if (measurements.Count == 0)
             return;
 
-        LogSummary(sampleLogger, sampleId, sampleTimeUtc, sampledChannels, populatedChannels, fullChannels,
-            totalCachedMessages, cachedGuildMembers);
+        LogSnapshot(measurements, cachedGuildMembers, cancellationToken);
     }
 
-    private void LogSummary(
-        ILogger sampleLogger,
-        string sampleId,
-        DateTimeOffset sampleTimeUtc,
-        int sampledChannels,
-        int populatedChannels,
-        int fullChannels,
-        long totalCachedMessages,
-        long cachedGuildMembers)
+    private void LogSnapshot(Queue<ChannelMeasurement> channels, long cachedGuildMembers, CancellationToken cancellationToken)
     {
+        var populatedChannels = channels.Count(channel => channel.CachedMessageCount > 0);
+        var fullChannels = channels.Count(channel => _capacity > 0 && channel.CachedMessageCount >= _capacity);
+        var totalCachedMessages = channels.Sum(channel => (long)channel.CachedMessageCount);
+
         using var process = Process.GetCurrentProcess();
+        var workingSetBytes = process.WorkingSet64;
         var uptime = DateTime.UtcNow - process.StartTime.ToUniversalTime();
-        sampleLogger.Debug(
-            "Message-cache summary at {SampleTimeUtc}, run {ProcessRunId}, sample {SampleId}: {SampledChannelCount} channels, {PopulatedChannelCount} populated, {FullChannelCount} full, {TotalCachedMessages} cached messages, {CachedGuildMemberCount} cached guild members, whole-process working set {ProcessWorkingSetBytes} bytes, uptime {ProcessUptime}",
-            sampleTimeUtc,
+        var collectedAtUtc = DateTimeOffset.UtcNow.ToString("u", CultureInfo.InvariantCulture);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (client.ConnectionState != ConnectionState.Connected)
+            return;
+
+        var snapshotLogger = _logger
+            .ForContext("ProcessRunId", _processRunId)
+            .ForContext("CollectedAtUtc", collectedAtUtc)
+            .ForContext("Capacity", _capacity)
+            .ForContext("SampledChannelCount", channels.Count)
+            .ForContext("PopulatedChannelCount", populatedChannels)
+            .ForContext("FullChannelCount", fullChannels)
+            .ForContext("TotalCachedMessages", totalCachedMessages)
+            .ForContext("CachedGuildMemberCount", cachedGuildMembers)
+            .ForContext("ProcessWorkingSetBytes", workingSetBytes)
+            .ForContext("ProcessUptime", uptime);
+
+        snapshotLogger
+            .ForContext("MessageCacheSample", value: true)
+            .Debug("Message-cache snapshot: {@Channels}", channels);
+
+        snapshotLogger.Debug(
+            "Message-cache summary at {CollectedAtUtc}, run {ProcessRunId}: {SampledChannelCount} channels, {PopulatedChannelCount} populated, {FullChannelCount} full, {TotalCachedMessages} cached messages, {CachedGuildMemberCount} cached guild members, whole-process working set {ProcessWorkingSetBytes} bytes, uptime {ProcessUptime}",
+            collectedAtUtc,
             _processRunId,
-            sampleId,
-            sampledChannels,
+            channels.Count,
             populatedChannels,
             fullChannels,
             totalCachedMessages,
             cachedGuildMembers,
-            process.WorkingSet64,
+            workingSetBytes,
             uptime);
     }
+
+    [UsedImplicitly]
+    private sealed record ChannelMeasurement(
+        string GuildId,
+        string ChannelId,
+        int CachedMessageCount,
+        DateTimeOffset? OldestMessageCreatedAtUtc);
 }
