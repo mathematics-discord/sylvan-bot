@@ -1,0 +1,16 @@
+---
+import roles from '../data/roles.json';
+
+interface Props {
+  id: keyof typeof roles;
+}
+
+const { id } = Astro.props;
+const role = roles[id];
+
+if (!role) {
+  throw new Error(`Unknown Discord role ID: ${id}. Add it to src/data/roles.json.`);
+}
+---
+
+<span class="role-mention" style={`--role-color: ${role.color ?? 'var(--ink)'};`}>@{role.name}</span>

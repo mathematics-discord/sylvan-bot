@@ -1,0 +1,5 @@
+Source Sans 3 by Adobe, distributed through Google Fonts.
+Source: https://github.com/google/fonts/tree/main/ofl/sourcesans3
+Downloaded: 2026-10-26
+Original files: SourceSans3[wght].ttf and SourceSans3-Italic[wght].ttf
+Licence: SIL Open Font License 1.1 (see OFL.txt).
