@@ -31,6 +31,9 @@ have been published in this category yet.
 
 ## Administrator commands
 
+- [/config rolereact](./role-react/) — Add or remove message reactions
+  that let members choose ordinary roles. Requires Administrator.
+
 - [/config sylvanmail](./sylvanmail/#administrator-configuration) — Select the private mail forum and staff role. The
   entire
   `/config` group requires Administrator.

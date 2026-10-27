@@ -34,6 +34,7 @@ export default defineConfig({
                 items: [
                     {slug: 'commands/color-admin'},
                     {label: '/config sylvanmail', link: 'https://math.ratgirl.dev/sylvan/commands/sylvanmail/#administrator-configuration'},
+                    {slug: 'commands/role-react'},
                 ],
             },
         ],
