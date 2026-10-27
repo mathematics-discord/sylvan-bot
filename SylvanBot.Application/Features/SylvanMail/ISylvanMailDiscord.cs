@@ -10,7 +10,7 @@ public interface ISylvanMailDiscord
 
     Task<ulong> CreatePostAsync(SylvanMailConversation conversation, ulong roleId, string username, CancellationToken ct);
 
-    // False means a confirmed Unknown Channel response, never a cache miss or access failure.
+    // False means the mapped post is gone, inaccessible, or outside the configured forum.
     Task<bool> OpenPostAsync(SylvanMailConversation conversation, CancellationToken ct);
 
     Task<ulong> OpenDmAsync(ulong userId, CancellationToken ct);

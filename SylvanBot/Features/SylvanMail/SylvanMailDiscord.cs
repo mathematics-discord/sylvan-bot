@@ -145,19 +145,28 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         {
             channel = await client.Rest.GetChannelAsync(conversation.ThreadId!.Value, Options(ct));
         }
-        catch (HttpException exception) when (exception.DiscordCode == DiscordErrorCode.UnknownChannel)
+        catch (HttpException exception) when (exception.DiscordCode == DiscordErrorCode.UnknownChannel || exception.HttpCode == HttpStatusCode.Forbidden)
         {
             return false;
         }
 
         if (channel is not RestThreadChannel thread || thread.GuildId != conversation.GuildId || thread.ParentChannelId != conversation.ForumId)
-            throw new BotCommandException("The mapped post is inaccessible or no longer belongs to the configured forum.");
+            return false;
 
         if (thread.IsLocked)
             throw new BotCommandException("The mapped post is locked. No replacement was created and no message was relayed.");
 
         if (thread.IsArchived)
-            await thread.ModifyAsync(properties => properties.Archived = false, Options(ct));
+        {
+            try
+            {
+                await thread.ModifyAsync(properties => properties.Archived = false, Options(ct));
+            }
+            catch (HttpException exception) when (exception.DiscordCode == DiscordErrorCode.UnknownChannel || exception.HttpCode == HttpStatusCode.Forbidden)
+            {
+                return false;
+            }
+        }
 
         return true;
     }
