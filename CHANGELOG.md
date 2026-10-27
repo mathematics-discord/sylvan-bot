@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.12 - 2026-10-27
+## Internal
+### Changed
+- SylvanMail is now available as an untested beta for private Senior Moderator correspondence. Bugs, incomplete delivery and lost messages are possible; live Discord behaviour has not been verified.
 # v0.1.11 - 2026-10-26
 ## General
 ### Changed
