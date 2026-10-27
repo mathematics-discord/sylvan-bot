@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.13 - 2026-10-27
+## Internal
+### Fixed
+- Allow SylvanMail forums to grant View Channel access to additional non-administrator roles.
 # v0.1.12 - 2026-10-27
 ## Internal
 ### Changed
