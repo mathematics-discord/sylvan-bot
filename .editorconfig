@@ -100,7 +100,7 @@ resharper_arguments_skip_single = true
 resharper_blank_lines_after_control_transfer_statements = 1
 resharper_blank_lines_before_control_transfer_statements = 1
 resharper_blank_lines_before_multiline_statements = 1
-resharper_csharp_max_line_length = 150
+resharper_csharp_max_line_length = 0
 resharper_csharp_wrap_after_declaration_lpar = true
 resharper_csharp_wrap_lines = false
 resharper_csharp_wrap_parameters_style = chop_if_long
@@ -949,7 +949,7 @@ indent_size = 4
 tab_width = 4
 
 
-dotnet_diagnostic.MA0029.severity = none
+dotnet_diagnostic.ma0029.severity = none
 
 [*.cs]
 dotnet_diagnostic.rcs1123.severity = none
@@ -965,4 +965,4 @@ dotnet_diagnostic.sa1600.severity = none
 dotnet_diagnostic.sa1633.severity = none
 dotnet_diagnostic.sa1010.severity = none
 dotnet_diagnostic.sa1000.severity = none
-dotnet_diagnostic.SA1009.severity = none
+dotnet_diagnostic.sa1009.severity = none

@@ -77,6 +77,153 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.ToTable("quorum_voter_roles", "public");
                 });
 
+            modelBuilder.Entity("SylvanBot.Application.Features.SylvanMail.SylvanMailConversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("CreationStarted")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("ForumId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("NoticeMessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("NoticeStarted")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("Number")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Number"));
+
+                    b.Property<bool>("Retired")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("ThreadId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex("ThreadId")
+                        .IsUnique();
+
+                    b.HasIndex("GuildId", "ForumId", "UserId")
+                        .IsUnique()
+                        .HasFilter("NOT \"Retired\"");
+
+                    b.ToTable("sylvan_mail_conversations", (string)null);
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.SylvanMail.SylvanMailDelivery", b =>
+                {
+                    b.Property<long>("SourceMessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("integer");
+
+                    b.Property<long?>("MessageId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("SourceMessageId", "Ordinal");
+
+                    b.ToTable("sylvan_mail_deliveries", (string)null);
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.SylvanMail.SylvanMailOperation", b =>
+                {
+                    b.Property<long>("SourceMessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("AcknowledgementMessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("AcknowledgementStarted")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("AuthorId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("DestinationChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ReceiptMessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("SourceChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.Property<bool>("ToStaff")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("SourceMessageId");
+
+                    b.HasIndex("ConversationId");
+
+                    b.ToTable("sylvan_mail_operations", (string)null);
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.SylvanMail.SylvanMailSettings", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ForumId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Slot")
+                        .HasColumnType("integer");
+
+                    b.HasKey("GuildId");
+
+                    b.HasIndex("ForumId")
+                        .IsUnique();
+
+                    b.HasIndex("Slot")
+                        .IsUnique();
+
+                    b.ToTable("sylvan_mail_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_sylvan_mail_single_destination", "\"Slot\" = 1");
+                        });
+                });
+
             modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursEligibleRole", b =>
                 {
                     b.Property<long>("GuildId")
@@ -292,6 +439,23 @@ namespace SylvanBot.Infrastructure.Migrations
                         .HasConstraintName("fk_quorum_voter_roles_quorum_configurations");
                 });
 
+            modelBuilder.Entity("SylvanBot.Application.Features.SylvanMail.SylvanMailDelivery", b =>
+                {
+                    b.HasOne("SylvanBot.Application.Features.SylvanMail.SylvanMailOperation", null)
+                        .WithMany("Deliveries")
+                        .HasForeignKey("SourceMessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.SylvanMail.SylvanMailOperation", b =>
+                {
+                    b.HasOne("SylvanBot.Application.Features.SylvanMail.SylvanMailConversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursEligibleRole", b =>
                 {
                     b.HasOne("SylvanBot.Application.Features.WorkingHours.WorkingHoursSettings", null)
@@ -304,6 +468,11 @@ namespace SylvanBot.Infrastructure.Migrations
             modelBuilder.Entity("SylvanBot.Application.Features.Quorum.QuorumConfiguration", b =>
                 {
                     b.Navigation("VoterRoles");
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.SylvanMail.SylvanMailOperation", b =>
+                {
+                    b.Navigation("Deliveries");
                 });
 
             modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursSettings", b =>

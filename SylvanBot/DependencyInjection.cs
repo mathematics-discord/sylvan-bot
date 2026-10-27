@@ -4,6 +4,8 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Quorum;
+using SylvanBot.Application.Features.SylvanMail;
+using SylvanBot.Features.SylvanMail;
 using SylvanBot.Features.EmojiAnalytics;
 using SylvanBot.Features.EmojiAnalytics.Persistence;
 using SylvanBot.Features.EmojiYoink;
@@ -32,6 +34,12 @@ public static class DependencyInjection
 
         private void AddFeatures(IConfiguration configuration)
         {
+            services.AddSingleton<ISylvanMailDiscord, SylvanMailDiscord>();
+            services.AddSingleton<SylvanMailWorkflow>();
+            services.AddSingleton<SylvanMailGatewayHandler>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<SylvanMailGatewayHandler>());
+            services.AddHostedService(sp => sp.GetRequiredService<SylvanMailGatewayHandler>());
+
             services.AddWorkingHours();
 
             services.AddSingleton<IQuorumMembers, DiscordQuorumMembers>();
@@ -124,6 +132,7 @@ public static class DependencyInjection
                         AlwaysDownloadUsers = true,
                         MessageCacheSize = options.MessageCacheSize,
                         GatewayIntents = GatewayIntents.Guilds
+                                         | GatewayIntents.DirectMessages
                                          | GatewayIntents.GuildMembers
                                          | GatewayIntents.GuildMessages
                                          | GatewayIntents.GuildMessageReactions

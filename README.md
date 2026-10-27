@@ -36,6 +36,10 @@ dotnet run --project SylvanBot --launch-profile SylvanBot.Local
 The bot applies database migrations and registers commands on startup. Stopping it leaves PostgreSQL running.
 `docker compose down` stops the local stack and preserves its data.
 
+[SylvanMail](docs/src/content/docs/commands/sylvanmail.md) relays DMs to a private Senior Moderator forum. Configure it with
+`/config sylvanmail enable:<forum-channel> role:<role>` (Administrator only); staff must explicitly mention Sylvan to send
+a reply. SylvanMail itself works without the privileged Message Content intent.
+
 ## Development
 
 Code is grouped under `SylvanBot/Features/`, with feature persistence in `Persistence/` subfolders. Shared interactions,
