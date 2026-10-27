@@ -109,7 +109,7 @@ An administrator can select the private forum and notification role:
 /config sylvanmail enable:<forum-channel> role:<ping-role>
 ```
 
-Both options are required. The entire `/config` group requires Administrator.
+Both options are required.
 
 ### Set forum access
 
@@ -117,14 +117,10 @@ Explicitly deny **View Channel** to `@everyone` on the mail forum, then grant
 the staff roles or members who should read and answer mail the access they
 need. Selecting a notification role does not grant forum permissions.
 
-Sylvan needs **View Channel**, **Send Messages (Create Posts)**,
-**Send Messages in Threads**, **Read Message History**, **Attach Files**,
-**Embed Links**, **Manage Threads** and **Add Reactions**. If the forum
-requires tags, Sylvan uses the first available tag.
+If the forum requires tags, Sylvan uses the first available tag.
 
 The notification role can be any server role, including a managed role or
-`@everyone`. Sylvan must be able to mention it; notifying `@everyone`
-requires **Mention Everyone**.
+`@everyone`.
 
 ### Change the destination
 

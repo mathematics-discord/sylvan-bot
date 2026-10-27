@@ -2,8 +2,8 @@ using SylvanBot.Interactions;
 
 namespace SylvanBot.Features.EmojiYoink;
 
-[DefaultMemberPermissions(GuildPermission.ManageEmojisAndStickers)]
-[RequireUserPermission(GuildPermission.ManageEmojisAndStickers)]
+[DefaultMemberPermissions(GuildPermission.ViewAuditLog)]
+[RequireUserPermission(GuildPermission.ViewAuditLog)]
 [RequireBotPermission(GuildPermission.CreateGuildExpressions)]
 [CommandContextType(InteractionContextType.Guild)]
 public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : SlashCommandBase

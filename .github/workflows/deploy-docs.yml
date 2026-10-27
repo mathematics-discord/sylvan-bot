@@ -1,12 +1,21 @@
 name: Deploy Sylvan documentation
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'docs/**'
-      - '.github/workflows/deploy-docs.yml'
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_sha:
+        description: Published release commit
+        required: true
+        type: string
+      version:
+        description: Release version
+        required: true
+        type: string
+    secrets:
+      DOCS_DEPLOY_SSH_KEY:
+        required: true
+      DOCS_DEPLOY_KNOWN_HOSTS:
+        required: true
 
 permissions:
   contents: read
@@ -17,7 +26,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -26,6 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ inputs.source_sha }}
           persist-credentials: false
 
       - uses: actions/setup-node@v4
@@ -37,6 +46,8 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run build
+        env:
+          DOCS_RELEASE: ${{ inputs.version }}
 
       - name: Publish static documentation
         env:

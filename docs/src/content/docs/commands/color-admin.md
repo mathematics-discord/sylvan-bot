@@ -9,8 +9,7 @@ Each mapping connects a source role, which grants access to a colour,
 to a display role, which supplies that colour. For example, mapping
 Members to Purple lets members with the Members role choose Purple.
 
-**Permissions:** Administrator. These commands can only be used
-inside a server. Replies are visible only to you.
+Use these commands inside a server. Replies are visible only to you.
 
 ## upsert
 

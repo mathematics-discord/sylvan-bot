@@ -4,6 +4,8 @@ namespace SylvanBot.Features.WorkingHours;
 
 [CommandContextType(InteractionContextType.Guild)]
 [RequireContext(ContextType.Guild)]
+[DefaultMemberPermissions(GuildPermission.MuteMembers)]
+[RequireUserPermission(GuildPermission.MuteMembers)]
 public sealed class WorkingHoursModule(WorkingHoursCoordinator coordinator, IHostApplicationLifetime lifetime)
     : SlashCommandBase
 {

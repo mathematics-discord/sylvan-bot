@@ -25,9 +25,13 @@ and code keeps its monospace font.
 
 ## Deployment
 
-`.github/workflows/deploy-docs.yml` checks, builds and publishes this site
-when `docs/` changes are pushed to `master`. It also supports a manual run
-from `master`. It does not build or deploy the bot.
+The production release workflow calls `.github/workflows/deploy-docs.yml`
+after publishing the scanned release commit to `master`. The docs workflow
+checks, builds and publishes that exact commit, independently of the bot's
+image build and deployment. Ordinary pushes do not deploy the docs.
+
+The release version is passed as `DOCS_RELEASE` at build time and displayed
+beside the site title. Local builds omit it unless that variable is set.
 
 The repository secrets `DOCS_DEPLOY_SSH_KEY` and `DOCS_DEPLOY_KNOWN_HOSTS`
 provide the dedicated docs SSH key and pinned VPS host key. The VPS account

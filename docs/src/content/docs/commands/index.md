@@ -12,31 +12,38 @@ and instructions.
 
 ## User commands
 
+- [/hello](./hello/) — Ask Sylvan for a greeting.
+
 - [/colour](./color/) — Choose or reset your display colour, or list the
   server's colour options.
 
-- [/working-hours](./working-hours/) — Set your daily availability and
-  let Sylvan manage your Moderators role. Available to Senior Moderators,
-  Community Moderators, and Trial Moderators.
+- [/emoji usage](./emoji/) — Browse custom emoji usage counts.
 
 ## Moderator commands
 
-This category is for commands requiring **Mute Members**. No command guides
-have been published in this category yet.
+- [/working-hours](./working-hours/) — Set your daily availability and
+  let Sylvan manage your Moderators role. You must also hold one of the
+  configured eligible staff roles.
 
 ## Senior moderator commands
 
-This category is for commands requiring **View Audit Log**. No command guides
-have been published in this category yet.
+- [/yoink and Yoink emoji](./yoink/) — Copy a custom emoji into the server
+  using a slash command or a message's Apps menu.
 
 ## Administrator commands
 
 - [/config rolereact](./role-react/) — Add or remove message reactions
-  that let members choose ordinary roles. Requires Administrator.
+  that let members choose ordinary roles.
 
-- [/config sylvanmail](./sylvanmail/#administrator-configuration) — Select the private mail forum and staff role. The
-  entire
-  `/config` group requires Administrator.
+- [/config sylvanmail](./sylvanmail/#administrator-configuration) — Select
+  the private mail forum and staff role.
 
 - [/colour-admin](./color-admin/) — Configure which roles grant access
-  to display colours and check members' colour roles. Requires Administrator.
+  to display colours and check members' colour roles.
+
+- [/logging](./logging/) — Choose log destinations and channel exclusions.
+
+- [/spam image-spam-config](./spam/) — View or adjust image burst detection.
+
+- [/working-conditions](./working-conditions/) — Configure eligible roles,
+  exemptions and the ping role used by Working Hours.

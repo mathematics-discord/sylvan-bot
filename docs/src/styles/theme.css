@@ -119,6 +119,23 @@ h6 {
     letter-spacing: normal;
 }
 
+.site-brand {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.site-release {
+    flex-shrink: 0;
+    font-family: var(--sl-font);
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--ink);
+    opacity: 0.75;
+    white-space: nowrap;
+}
+
 /* Keep the personal site's Georgia wordmark separate from the docs font. */
 .site-title {
     font-family: Georgia, serif;

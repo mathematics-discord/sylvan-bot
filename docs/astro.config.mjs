@@ -12,6 +12,7 @@ export default defineConfig({
         defaultLocale: 'root',
         locales: {root: {label: 'English', lang: 'en-GB'}},
         customCss: ['./src/styles/theme.css'],
+        components: {SiteTitle: './src/components/SiteTitle.astro'},
         pagination: false,
         sidebar: [
             {slug: 'index', label: 'Introduction'},
@@ -19,15 +20,19 @@ export default defineConfig({
             {slug: 'commands', label: 'Command overview'},
             {
                 label: 'User commands',
-                items: [{slug: 'commands/color'}, {slug: 'commands/working-hours'}],
+                items: [
+                    {slug: 'commands/hello'},
+                    {slug: 'commands/color'},
+                    {slug: 'commands/emoji'},
+                ],
             },
             {
                 label: 'Moderator commands',
-                items: [],
+                items: [{slug: 'commands/working-hours'}],
             },
             {
                 label: 'Senior moderator commands',
-                items: [],
+                items: [{slug: 'commands/yoink'}],
             },
             {
                 label: 'Administrator commands',
@@ -35,6 +40,9 @@ export default defineConfig({
                     {slug: 'commands/color-admin'},
                     {label: '/config sylvanmail', link: 'https://math.ratgirl.dev/sylvan/commands/sylvanmail/#administrator-configuration'},
                     {slug: 'commands/role-react'},
+                    {slug: 'commands/logging'},
+                    {slug: 'commands/spam'},
+                    {slug: 'commands/working-conditions'},
                 ],
             },
         ],

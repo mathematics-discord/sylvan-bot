@@ -125,6 +125,18 @@ jobs:
       - name: Publish scanned release
         run: git push origin HEAD:master
 
+  deploy-docs:
+    needs:
+      - release
+      - publish-release
+    uses: ./.github/workflows/deploy-docs.yml
+    with:
+      source_sha: ${{ needs.release.outputs.source_sha }}
+      version: ${{ needs.release.outputs.version }}
+    secrets:
+      DOCS_DEPLOY_SSH_KEY: ${{ secrets.DOCS_DEPLOY_SSH_KEY }}
+      DOCS_DEPLOY_KNOWN_HOSTS: ${{ secrets.DOCS_DEPLOY_KNOWN_HOSTS }}
+
   build-and-push:
     needs:
       - release

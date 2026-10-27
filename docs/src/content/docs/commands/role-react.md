@@ -25,8 +25,7 @@ again.
 | `emoji`        | One Unicode emoji, or a custom emoji Sylvan can use.                              |
 | `role_mention` | Choose the role to grant. Required for `add`; leave it out for `remove`.          |
 
-The linked message can be in another channel or a thread in this server. You and Sylvan must be able to view its channel
-and read its message history.
+The linked message can be in another channel or a thread in this server.
 
 Sylvan adds the emoji to the message. Members can then select that reaction to receive the role and select it again to
 remove their reaction and role. Existing reactions are not processed when you create the mapping.
@@ -44,8 +43,7 @@ Roles with staff powers are rejected. This includes Administrator, View Audit Lo
 voice moderation, pinning, slowmode bypass, server-wide mentions and server analytics access. Permissions allowed
 through channel or category overrides are checked too.
 
-Sylvan's highest role must be above the role it will assign. Unless you
-own the server, the target role must also be below your highest role.
+Unless you own the server, the target role must be below your highest role.
 
 Sylvan checks the role's permissions again before each new grant. If the
 role later gains staff powers, new grants stop. Existing members are not
@@ -72,12 +70,13 @@ You can remove the mapping even if its message has been deleted. If Sylvan
 cannot clear the visible reactions, its reply explains that the mapping is
 disabled and asks you to clear those reactions manually.
 
-## Bot permissions and incomplete updates
+## Incomplete updates
 
 If the mapping is saved but Sylvan cannot add the emoji, the reply says so.
-Check the emoji and bot permissions, then repeat `add` with the same options.
+Read the error in Sylvan's reply, correct the problem, then repeat `add`
+with the same options.
 
 Role changes are processed while Sylvan is online. If someone reacted
 before setup or while Sylvan was offline, ask them to remove and add their
 reaction again. If a role still does not update, ask the person running
-Sylvan to check its logs and the role's permissions and position.
+Sylvan to check its logs.
