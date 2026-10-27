@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.15 - 2026-10-27
+## Internal
+### Fixed
+- Remove redundant permission preflights from outgoing SylvanMail replies. Trust Discord to enforce forum access while preserving mapped-case validation, author-only confirmation and duplicate-send protection. Stop reopening threads for outgoing DMs and surface unexpected draft failures in logs.
 # v0.1.14 - 2026-10-27
 ## Internal
 ### Changed
