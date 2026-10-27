@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.16 - 2026-10-27
+## Administration
+### Added
+- Add administrator-only `/config rolereact` with `add` and `remove` actions for configuring message reaction roles. Members gain the selected role when reacting and lose it when unreacting. Removing a mapping keeps existing roles. Roles with staff or moderation permissions, including channel overrides, are rejected.
 # v0.1.15 - 2026-10-27
 ## Internal
 ### Fixed
