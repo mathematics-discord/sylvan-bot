@@ -11,6 +11,7 @@ using SylvanBot.Features.MessageCache;
 using SylvanBot.Features.Moderation;
 using SylvanBot.Features.Quorum;
 using SylvanBot.Features.RoleColours;
+using SylvanBot.Features.RoleReactions;
 using SylvanBot.Features.SylvanMail;
 using SylvanBot.Features.WorkingHours;
 using SylvanBot.Gateway;
@@ -41,6 +42,11 @@ public static class DependencyInjection
             services.AddHostedService(sp => sp.GetRequiredService<SylvanMailGatewayHandler>());
 
             services.AddWorkingHours();
+
+            services.AddSingleton<RoleReactionCoordinator>();
+            services.AddSingleton<RoleReactionGatewayHandler>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<RoleReactionGatewayHandler>());
+            services.AddHostedService(sp => sp.GetRequiredService<RoleReactionGatewayHandler>());
 
             services.AddSingleton<IQuorumMembers, DiscordQuorumMembers>();
             services.AddScoped<QuorumOperations>();
