@@ -1,6 +1,6 @@
-﻿namespace SylvanBot.Features.WorkingHours;
+﻿using SylvanBot.Interactions;
 
-using SylvanBot.Interactions;
+namespace SylvanBot.Features.WorkingHours;
 
 [Group("working-conditions", "Administer Working Hours for this guild")]
 [CommandContextType(InteractionContextType.Guild)]
@@ -13,17 +13,17 @@ public sealed class WorkingConditionsModule(WorkingHoursCoordinator coordinator,
     public async Task ShowAsync()
     {
         await DeferAsync(ephemeral: true);
-        ErrorOr<string> message = await coordinator.ShowAsync(Context.Guild.Id, lifetime.ApplicationStopping);
+        ErrorOr<string> message = await coordinator.ShowAsync(guildId: Context.Guild.Id, ct: lifetime.ApplicationStopping);
 
         await WorkingHoursReply.SendAsync(
-            Context.Interaction,
+            interaction: Context.Interaction,
             message.IsError
                 ? message.FirstError.Description
                 : message.Value);
     }
 
     [SlashCommand("ping-role", "Set the ping role while scheduling is disabled; the old role is left unchanged")]
-    public Task PingRoleAsync(IRole role) => UpdateAsync(WorkingConditionsChange.PingRole, role);
+    public Task PingRoleAsync(IRole role) => UpdateAsync(change: WorkingConditionsChange.PingRole, role: role);
 
     [SlashCommand("eligible-role", "Add or remove a role that authorises participation")]
     public Task EligibleRoleAsync(WorkingRoleAction action, IRole role) =>
@@ -31,7 +31,7 @@ public sealed class WorkingConditionsModule(WorkingHoursCoordinator coordinator,
             action == WorkingRoleAction.Add
                 ? WorkingConditionsChange.AddEligible
                 : WorkingConditionsChange.RemoveEligible,
-            role);
+            role: role);
 
     [SlashCommand("exempt-role", "Add or remove an eligible role's unscheduled exemption")]
     public Task ExemptRoleAsync(WorkingRoleAction action, IRole role) =>
@@ -39,7 +39,7 @@ public sealed class WorkingConditionsModule(WorkingHoursCoordinator coordinator,
             action == WorkingRoleAction.Add
                 ? WorkingConditionsChange.AddExempt
                 : WorkingConditionsChange.RemoveExempt,
-            role);
+            role: role);
 
     [SlashCommand("enable", "Enable scheduling once configuration is complete and valid")]
     public Task EnableAsync() => UpdateAsync(WorkingConditionsChange.Enable);
@@ -53,12 +53,12 @@ public sealed class WorkingConditionsModule(WorkingHoursCoordinator coordinator,
 
         if (role is not null && role.Guild.Id != Context.Guild.Id)
         {
-            await WorkingHoursReply.SendAsync(Context.Interaction, "Choose a role from this guild. No settings changed.");
+            await WorkingHoursReply.SendAsync(interaction: Context.Interaction, "Choose a role from this guild. No settings changed.");
 
             return;
         }
 
-        ErrorOr<string> result = await coordinator.UpdateAsync(Context.Guild.Id, change, role?.Id, lifetime.ApplicationStopping);
-        await WorkingHoursReply.SendAsync(Context.Interaction, result.IsError ? result.FirstError.Description : result.Value);
+        ErrorOr<string> result = await coordinator.UpdateAsync(guildId: Context.Guild.Id, change: change, roleId: role?.Id, ct: lifetime.ApplicationStopping);
+        await WorkingHoursReply.SendAsync(interaction: Context.Interaction, result.IsError ? result.FirstError.Description : result.Value);
     }
 }

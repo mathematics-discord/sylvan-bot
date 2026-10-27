@@ -1,15 +1,13 @@
 namespace SylvanBot.Features.Logging;
 
-using SylvanBot.Application.Common;
-
 /// <summary>
-/// Downloads attachment evidence while enforcing a maximum response size.
+///     Downloads attachment evidence while enforcing a maximum response size.
 /// </summary>
 internal static class AttachmentEvidenceDownloader
 {
     /// <summary>
-    /// Downloads a successful response body if it does not exceed <paramref name="maxBytes"/>.
-    /// Returns none for unsuccessful responses, oversized bodies, or download failures.
+    ///     Downloads a successful response body if it does not exceed <paramref name="maxBytes"/>.
+    ///     Returns none for unsuccessful responses, oversized bodies, or download failures.
     /// </summary>
     /// <param name="httpClient">The client used to request the attachment.</param>
     /// <param name="url">The attachment URL.</param>
@@ -27,7 +25,7 @@ internal static class AttachmentEvidenceDownloader
         try
         {
             using var response = await httpClient
-                .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+               .GetAsync(requestUri: url, completionOption: HttpCompletionOption.ResponseHeadersRead, cancellationToken: ct);
 
             if (!response.IsSuccessStatusCode)
                 return new None();
@@ -39,7 +37,7 @@ internal static class AttachmentEvidenceDownloader
 
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
 
-            return await ReadLimitedAsync(stream, maxBytes, ct);
+            return await ReadLimitedAsync(stream: stream, maxBytes: maxBytes, ct: ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -47,14 +45,14 @@ internal static class AttachmentEvidenceDownloader
         }
         catch (Exception ex)
         {
-            logger.Debug(ex, "Failed to download moderation logging attachment evidence");
+            logger.Debug(exception: ex, "Failed to download moderation logging attachment evidence");
 
             return new None();
         }
     }
 
     /// <summary>
-    /// Reads a stream up to the limit, returning none if it contains more than <paramref name="maxBytes"/>.
+    ///     Reads a stream up to the limit, returning none if it contains more than <paramref name="maxBytes"/>.
     /// </summary>
     /// <param name="stream">The response stream to read.</param>
     /// <param name="maxBytes">The maximum number of bytes to return.</param>
@@ -69,21 +67,21 @@ internal static class AttachmentEvidenceDownloader
         const int maxReadBufferBytes = 81920;
 
         var bufferedByteLimit = maxBytes == long.MaxValue ? long.MaxValue : maxBytes + 1;
-        var bytesRemaining = bufferedByteLimit;
-        var readBufferBytes = (int)Math.Min(maxReadBufferBytes, Math.Max(1, bytesRemaining));
-        var readBuffer = new byte[readBufferBytes];
+        var bytesRemaining    = bufferedByteLimit;
+        var readBufferBytes   = (int)Math.Min(val1: maxReadBufferBytes, Math.Max(val1: 1, val2: bytesRemaining));
+        var readBuffer        = new byte[readBufferBytes];
 
         await using var buffer = new MemoryStream(readBufferBytes);
 
         while (bytesRemaining > 0)
         {
-            var bytesToRead = (int)Math.Min(readBuffer.Length, bytesRemaining);
-            var bytesRead = await stream.ReadAsync(readBuffer.AsMemory(0, bytesToRead), ct);
+            var bytesToRead = (int)Math.Min(val1: readBuffer.Length, val2: bytesRemaining);
+            var bytesRead   = await stream.ReadAsync(readBuffer.AsMemory(start: 0, length: bytesToRead), cancellationToken: ct);
 
             if (bytesRead == 0)
                 return new Some<byte[]>(buffer.ToArray());
 
-            await buffer.WriteAsync(readBuffer.AsMemory(0, bytesRead), ct);
+            await buffer.WriteAsync(readBuffer.AsMemory(start: 0, length: bytesRead), cancellationToken: ct);
 
             bytesRemaining -= bytesRead;
         }

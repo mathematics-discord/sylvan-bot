@@ -1,8 +1,8 @@
-namespace SylvanBot.Features.SylvanMail;
-
 using System.Threading.Channels;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Gateway;
+
+namespace SylvanBot.Features.SylvanMail;
 
 public sealed class SylvanMailGatewayHandler(
     DiscordSocketClient client,
@@ -17,14 +17,14 @@ public sealed class SylvanMailGatewayHandler(
         {
             SingleReader = true,
             SingleWriter = false,
-            FullMode = BoundedChannelFullMode.Wait,
+            FullMode     = BoundedChannelFullMode.Wait,
         });
 
     public Task InitializeAsync(CancellationToken ct)
     {
         client.MessageReceived += ReceivedAsync;
-        client.MessageUpdated += UpdatedAsync;
-        client.ReactionAdded += ReactionAddedAsync;
+        client.MessageUpdated  += UpdatedAsync;
+        client.ReactionAdded   += ReactionAddedAsync;
 
         return Task.CompletedTask;
     }
@@ -32,8 +32,8 @@ public sealed class SylvanMailGatewayHandler(
     public void Unsubscribe()
     {
         client.MessageReceived -= ReceivedAsync;
-        client.MessageUpdated -= UpdatedAsync;
-        client.ReactionAdded -= ReactionAddedAsync;
+        client.MessageUpdated  -= UpdatedAsync;
+        client.ReactionAdded   -= ReactionAddedAsync;
         _messages.Writer.TryComplete();
     }
 
@@ -42,41 +42,47 @@ public sealed class SylvanMailGatewayHandler(
         try
         {
             await foreach (var message in _messages.Reader.ReadAllAsync(stoppingToken))
-            {
                 try
                 {
                     using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
                     timeout.CancelAfter(TimeSpan.FromMinutes(3));
+
                     if (message.Inbound is not null)
-                        await workflow.RelayAsync(message.Inbound, timeout.Token);
+                        await workflow.RelayAsync(message: message.Inbound, ct: timeout.Token);
                     else
-                        await workflow.HandleDraftAsync(message.ChannelId, message.MessageId, message.AuthorId, message.Confirm, timeout.Token);
+                        await workflow.HandleDraftAsync(threadId: message.ChannelId, messageId: message.MessageId, authorId: message.AuthorId, confirm: message.Confirm, ct: timeout.Token);
                 }
                 catch (Exception exception)
                 {
                     logger.Warning(
                         "SylvanMail handling failed for source {SourceId}: {ExceptionType}",
-                        message.MessageId,
-                        exception.GetType().Name);
+                        propertyValue0: message.MessageId,
+                        propertyValue1: exception.GetType().Name);
 
                     if (!stoppingToken.IsCancellationRequested && message.Inbound is not null)
                     {
                         using var noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
                         await discord.ReportAsync(
-                            message.Inbound,
-                            null,
-                            null,
+                            source: message.Inbound,
+                            threadId: null,
+                            operation: null,
                             "SylvanMail processing failed or was interrupted. Delivery is unconfirmed; do not assume it arrived. No automatic resend.",
-                            noticeTimeout.Token);
+                            ct: noticeTimeout.Token);
                     }
                 }
-            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             // Undelivered in-memory events are not replayed on startup. Saved attempts remain available for reconciliation.
         }
     }
+
+    private static bool IsUserMessage(IUserMessage message) =>
+        !message.Author.IsBot
+        && !message.Author.IsWebhook
+        && message.Source == MessageSource.User
+        && message.Type is MessageType.Default or MessageType.Reply;
 
     private Task ReceivedAsync(SocketMessage source)
     {
@@ -85,53 +91,47 @@ public sealed class SylvanMailGatewayHandler(
 
         if (source.Channel is IDMChannel)
         {
-            var input = SylvanMailDiscord.ReadMessage(message, guildId: null);
-            var work = new MailWork(source.Channel.Id, source.Id, source.Author.Id, false, input);
+            var input = SylvanMailDiscord.ReadMessage(source: message, guildId: null);
+            var work  = new MailWork(ChannelId: source.Channel.Id, MessageId: source.Id, AuthorId: source.Author.Id, Confirm: false, Inbound: input);
 
             return !_messages.Writer.TryWrite(work) ? RefuseBusyAsync(input) : Task.CompletedTask;
         }
 
-        return QueueDraftAsync(message, edited: false);
+        return QueueDraftAsync(message: message, edited: false);
     }
 
-    private Task UpdatedAsync(Cacheable<IMessage, ulong> before, SocketMessage after, ISocketMessageChannel channel)
-    {
+    private Task UpdatedAsync(Cacheable<IMessage, ulong> before, SocketMessage after, ISocketMessageChannel channel) =>
         // Edits only refresh the draft marker. They can never send a reply.
-        return after is IUserMessage message && IsUserMessage(message) ? QueueDraftAsync(message, edited: true) : Task.CompletedTask;
-    }
+        after is IUserMessage message && IsUserMessage(message) ? QueueDraftAsync(message: message, edited: true) : Task.CompletedTask;
 
     private Task QueueDraftAsync(IUserMessage message, bool edited)
     {
         if (message.Channel is not IThreadChannel)
             return Task.CompletedTask;
 
-        var hasBodyMention = SylvanMailReply.Parse(message.Content ?? string.Empty, client.CurrentUser.Id, false, false) is not null;
-        var hasReplyPing = message.Type == MessageType.Reply && message.MentionedUserIds.Contains(client.CurrentUser.Id);
+        var hasBodyMention = SylvanMailReply.Parse(message.Content ?? string.Empty, botId: client.CurrentUser.Id, replyToBot: false, replyPingEnabled: false) is not null;
+        var hasReplyPing   = message.Type == MessageType.Reply && message.MentionedUserIds.Contains(client.CurrentUser.Id);
 
         if (!edited && !hasBodyMention && !hasReplyPing)
             return Task.CompletedTask;
 
         // The workflow checks the mapped forum before fetching any content.
-        _messages.Writer.TryWrite(new MailWork(message.Channel.Id, message.Id, message.Author.Id, false, null));
+        _messages.Writer.TryWrite(new MailWork(ChannelId: message.Channel.Id, MessageId: message.Id, AuthorId: message.Author.Id, Confirm: false, Inbound: null));
 
         return Task.CompletedTask;
     }
 
     private Task ReactionAddedAsync(Cacheable<IUserMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel, SocketReaction reaction)
     {
-        if (reaction.UserId == client.CurrentUser.Id || !string.Equals(reaction.Emote.Name, SylvanMailDiscord.SendEmoji, StringComparison.Ordinal))
+        if (reaction.UserId == client.CurrentUser.Id || !string.Equals(a: reaction.Emote.Name, b: SylvanMailDiscord.SendEmoji, comparisonType: StringComparison.Ordinal))
             return Task.CompletedTask;
 
-        var work = new MailWork(channel.Id, message.Id, reaction.UserId, true, null);
+        var work = new MailWork(ChannelId: channel.Id, MessageId: message.Id, AuthorId: reaction.UserId, Confirm: true, Inbound: null);
 
         return !_messages.Writer.TryWrite(work)
             ? RefuseConfirmationAsync(work)
             : Task.CompletedTask;
     }
-
-    private static bool IsUserMessage(IUserMessage message) =>
-        !message.Author.IsBot && !message.Author.IsWebhook && message.Source == MessageSource.User
-        && message.Type is MessageType.Default or MessageType.Reply;
 
     private async Task RefuseConfirmationAsync(MailWork work)
     {
@@ -139,12 +139,14 @@ public sealed class SylvanMailGatewayHandler(
 
         try
         {
-            await workflow.RefuseConfirmationAsync(work.ChannelId, work.MessageId, work.AuthorId, timeout.Token);
+            await workflow.RefuseConfirmationAsync(threadId: work.ChannelId, messageId: work.MessageId, authorId: work.AuthorId, ct: timeout.Token);
         }
         catch (Exception exception)
         {
-            logger.Warning("SylvanMail confirmation refusal failed for source {SourceId}: {ExceptionType}",
-                work.MessageId, exception.GetType().Name);
+            logger.Warning(
+                "SylvanMail confirmation refusal failed for source {SourceId}: {ExceptionType}",
+                propertyValue0: work.MessageId,
+                propertyValue1: exception.GetType().Name);
         }
     }
 
@@ -154,13 +156,15 @@ public sealed class SylvanMailGatewayHandler(
 
         try
         {
-            await workflow.RefuseBusyAsync(message, timeout.Token);
+            await workflow.RefuseBusyAsync(message: message, ct: timeout.Token);
         }
         catch (Exception exception)
         {
-            logger.Warning("SylvanMail overload refusal failed for source {SourceId}: {ExceptionType}",
-                message.SourceMessageId, exception.GetType().Name);
-            await discord.ReportAsync(message, null, null, "Not relayed: SylvanMail is temporarily busy. Please try again later.", timeout.Token);
+            logger.Warning(
+                "SylvanMail overload refusal failed for source {SourceId}: {ExceptionType}",
+                propertyValue0: message.SourceMessageId,
+                propertyValue1: exception.GetType().Name);
+            await discord.ReportAsync(source: message, threadId: null, operation: null, "Not relayed: SylvanMail is temporarily busy. Please try again later.", ct: timeout.Token);
         }
     }
 

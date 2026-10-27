@@ -1,7 +1,7 @@
-﻿namespace SylvanBot.Features.EmojiAnalytics.Persistence;
-
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace SylvanBot.Features.EmojiAnalytics.Persistence;
 
 public sealed class EmojiUsageCountConfiguration : IEntityTypeConfiguration<EmojiUsageCount>
 {
@@ -9,8 +9,9 @@ public sealed class EmojiUsageCountConfiguration : IEntityTypeConfiguration<Emoj
     {
         builder.ToTable("EmojiUsageCounts");
         builder.HasKey(x => new { x.GuildId, x.EmojiId });
+
         builder.Property(x => x.GuildId).IsRequired().HasConversion<long>().HasColumnType("bigint")
-            .ValueGeneratedNever();
+           .ValueGeneratedNever();
         builder.Property(x => x.EmojiId).ValueGeneratedNever();
         builder.Property(x => x.ReactionUsageCount).HasColumnType("int");
     }

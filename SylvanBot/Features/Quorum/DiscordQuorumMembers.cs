@@ -1,11 +1,10 @@
-﻿namespace SylvanBot.Features.Quorum;
-
-using System.Net.Sockets;
+﻿using System.Net.Sockets;
 using Discord.Net;
-using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Quorum;
 
-/// <inheritdoc />
+namespace SylvanBot.Features.Quorum;
+
+/// <inheritdoc/>
 public sealed class DiscordQuorumMembers(IDiscordClient client) : IQuorumMembers
 {
     /// <inheritdoc/>
@@ -17,16 +16,14 @@ public sealed class DiscordQuorumMembers(IDiscordClient client) : IQuorumMembers
         try
         {
             var options = new RequestOptions { CancelToken = ct };
-            var guild = await client.GetGuildAsync(guildId, CacheMode.CacheOnly, options);
+            var guild   = await client.GetGuildAsync(id: guildId, mode: CacheMode.CacheOnly, options: options);
             ct.ThrowIfCancellationRequested();
 
             if (guild is null)
-            {
                 throw new BotCommandException(QuorumMessages.MemberDataUnavailable);
-            }
 
             // AllowDownload retrieves the complete population; CacheOnly may return a partial electorate.
-            members = await guild.GetUsersAsync(CacheMode.AllowDownload, options);
+            members = await guild.GetUsersAsync(mode: CacheMode.AllowDownload, options: options);
             ct.ThrowIfCancellationRequested();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -34,14 +31,14 @@ public sealed class DiscordQuorumMembers(IDiscordClient client) : IQuorumMembers
             throw;
         }
         catch (Exception ex) when (ex is HttpException or HttpRequestException or SocketException
-                                       or IOException or TimeoutException or OperationCanceledException)
+                                         or IOException or TimeoutException or OperationCanceledException)
         {
-            throw new BotCommandException(QuorumMessages.MemberDataUnavailable, ex);
+            throw new BotCommandException(message: QuorumMessages.MemberDataUnavailable, innerException: ex);
         }
 
         QuorumMember[] population = members
-            .Select(member => new QuorumMember(member.Id, member.IsBot, [.. member.RoleIds]))
-            .ToArray();
+           .Select(member => new QuorumMember(UserId: member.Id, IsBot: member.IsBot, [.. member.RoleIds]))
+           .ToArray();
 
         ct.ThrowIfCancellationRequested();
 

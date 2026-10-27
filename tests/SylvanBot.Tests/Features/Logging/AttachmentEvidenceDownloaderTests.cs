@@ -1,10 +1,9 @@
-﻿namespace SylvanBot.Tests.Features.Logging;
-
-using System.Net;
-using SylvanBot.Application.Common;
-using SylvanBot.Common;
-using SylvanBot.Features.Logging;
+﻿using System.Net;
 using Serilog.Core;
+using SylvanBot.Application.Common;
+using SylvanBot.Features.Logging;
+
+namespace SylvanBot.Tests.Features.Logging;
 
 [TestFixture]
 public sealed class AttachmentEvidenceDownloaderTests
@@ -16,7 +15,7 @@ public sealed class AttachmentEvidenceDownloaderTests
         byte[] body = [1, 2, 3, 4];
 
         // Act
-        Option<byte[]> result = await DownloadAsync(body, body.Length, body.Length);
+        Option<byte[]> result = await DownloadAsync(body: body, declaredLength: body.Length, maxBytes: body.Length);
 
         // Assert
         result.Value.ShouldBeOfType<Some<byte[]>>().Value.ShouldBe(body);
@@ -29,7 +28,7 @@ public sealed class AttachmentEvidenceDownloaderTests
         byte[] body = [1, 2, 3, 4];
 
         // Act
-        Option<byte[]> result = await DownloadAsync(body, body.Length, body.Length - 1);
+        Option<byte[]> result = await DownloadAsync(body: body, declaredLength: body.Length, body.Length - 1);
 
         // Assert
         result.Value.ShouldBeOfType<None>();
@@ -42,7 +41,7 @@ public sealed class AttachmentEvidenceDownloaderTests
         byte[] body = [1, 2, 3, 4, 5];
 
         // Act
-        Option<byte[]> result = await DownloadAsync(body, null, 4);
+        Option<byte[]> result = await DownloadAsync(body: body, declaredLength: null, maxBytes: 4);
 
         // Assert
         result.Value.ShouldBeOfType<None>();
@@ -55,7 +54,7 @@ public sealed class AttachmentEvidenceDownloaderTests
         byte[] body = [1, 2, 3, 4, 5];
 
         // Act
-        Option<byte[]> result = await DownloadAsync(body, 1, 4);
+        Option<byte[]> result = await DownloadAsync(body: body, declaredLength: 1, maxBytes: 4);
 
         // Assert
         result.Value.ShouldBeOfType<None>();
@@ -68,7 +67,7 @@ public sealed class AttachmentEvidenceDownloaderTests
         await using var stream = new CountingStream([1, 2, 3, 4, 5, 6, 7]);
 
         // Act
-        Option<byte[]> result = await AttachmentEvidenceDownloader.ReadLimitedAsync(stream, 3, CancellationToken.None);
+        Option<byte[]> result = await AttachmentEvidenceDownloader.ReadLimitedAsync(stream: stream, maxBytes: 3, ct: CancellationToken.None);
 
         // Assert
         result.Value.ShouldBeOfType<None>();
@@ -82,7 +81,7 @@ public sealed class AttachmentEvidenceDownloaderTests
         byte[] body = [];
 
         // Act
-        Option<byte[]> result = await DownloadAsync(body, declaredLength: 0, maxBytes: 0);
+        Option<byte[]> result = await DownloadAsync(body: body, declaredLength: 0, maxBytes: 0);
 
         // Assert
         result.Value.ShouldBeOfType<Some<byte[]>>().Value.ShouldBeEmpty();
@@ -97,11 +96,11 @@ public sealed class AttachmentEvidenceDownloaderTests
 
         // Act
         Option<byte[]> result = await AttachmentEvidenceDownloader.TryDownloadAsync(
-            httpClient,
+            httpClient: httpClient,
             "https://example.invalid/attachment",
             maxBytes: 4,
-            Logger.None,
-            CancellationToken.None);
+            logger: Logger.None,
+            ct: CancellationToken.None);
 
         // Assert
         result.Value.ShouldBeOfType<None>();
@@ -111,18 +110,18 @@ public sealed class AttachmentEvidenceDownloaderTests
     public async Task TryDownloadAsync_CancelledRequest_PropagatesCancellation()
     {
         // Arrange
-        using var httpClient = new HttpClient(new StaticResponseHandler([1], declaredLength: 1));
+        using var httpClient   = new HttpClient(new StaticResponseHandler([1], declaredLength: 1));
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
         // Act
         var exception = await Should.ThrowAsync<OperationCanceledException>(() =>
-            AttachmentEvidenceDownloader.TryDownloadAsync(
-                httpClient,
-                "https://example.invalid/attachment",
-                maxBytes: 4,
-                Logger.None,
-                cancellation.Token));
+                                                                                AttachmentEvidenceDownloader.TryDownloadAsync(
+                                                                                    httpClient: httpClient,
+                                                                                    "https://example.invalid/attachment",
+                                                                                    maxBytes: 4,
+                                                                                    logger: Logger.None,
+                                                                                    ct: cancellation.Token));
 
         // Assert
         exception.CancellationToken.IsCancellationRequested.ShouldBeTrue();
@@ -130,18 +129,18 @@ public sealed class AttachmentEvidenceDownloaderTests
 
     private static async Task<Option<byte[]>> DownloadAsync(byte[] body, long? declaredLength, long maxBytes)
     {
-        using var httpClient = new HttpClient(new StaticResponseHandler(body, declaredLength));
+        using var httpClient = new HttpClient(new StaticResponseHandler(body: body, declaredLength: declaredLength));
 
         httpClient.BaseAddress = new Uri("https://example.invalid");
 
         return await AttachmentEvidenceDownloader
-            .TryDownloadAsync(
+           .TryDownloadAsync(
                 httpClient: httpClient,
-                url: "/attachment",
+                "/attachment",
                 maxBytes: maxBytes,
                 logger: Logger.None,
                 ct: CancellationToken.None)
-            .ConfigureAwait(false);
+           .ConfigureAwait(false);
     }
 
     private sealed class StaticResponseHandler(
@@ -149,11 +148,12 @@ public sealed class AttachmentEvidenceDownloaderTests
         long? declaredLength,
         HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             var response = new HttpResponseMessage(status)
-                { Content = new StaticLengthContent(body, declaredLength) };
+                { Content = new StaticLengthContent(body: body, declaredLength: declaredLength) };
 
             return Task.FromResult(response);
         }
@@ -161,38 +161,34 @@ public sealed class AttachmentEvidenceDownloaderTests
 
     private sealed class StaticLengthContent(byte[] body, long? declaredLength) : HttpContent
     {
-        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
-        {
-            return stream.WriteAsync(body, 0, body.Length);
-        }
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) => stream.WriteAsync(buffer: body, offset: 0, count: body.Length);
 
         protected override bool TryComputeLength(out long length)
         {
             if (declaredLength is null)
             {
                 length = 0;
+
                 return false;
             }
 
             length = declaredLength.Value;
+
             return true;
         }
 
-        protected override Task<Stream> CreateContentReadStreamAsync()
-        {
-            return Task.FromResult<Stream>(new MemoryStream(body));
-        }
+        protected override Task<Stream> CreateContentReadStreamAsync() => Task.FromResult<Stream>(new MemoryStream(body));
     }
 
     private sealed class CountingStream(byte[] body) : Stream
     {
         private int _position;
 
-        public int BytesRead { get; private set; }
-        public override bool CanRead => true;
-        public override bool CanSeek => false;
-        public override bool CanWrite => false;
-        public override long Length => body.Length;
+        public          int  BytesRead { get; private set; }
+        public override bool CanRead   => true;
+        public override bool CanSeek   => false;
+        public override bool CanWrite  => false;
+        public override long Length    => body.Length;
 
         public override long Position
         {
@@ -206,32 +202,28 @@ public sealed class AttachmentEvidenceDownloaderTests
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            var bytesRead = Read(buffer.AsSpan(offset, count));
+            var bytesRead = Read(buffer.AsSpan(start: offset, length: count));
+
             return bytesRead;
         }
 
         public override int Read(Span<byte> buffer)
         {
-            var bytesToRead = Math.Min(buffer.Length, body.Length - _position);
+            var bytesToRead = Math.Min(val1: buffer.Length, body.Length - _position);
 
             if (bytesToRead == 0)
                 return 0;
 
-            body.AsSpan(_position, bytesToRead).CopyTo(buffer);
+            body.AsSpan(start: _position, length: bytesToRead).CopyTo(buffer);
             _position += bytesToRead;
             BytesRead += bytesToRead;
+
             return bytesToRead;
         }
 
-        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
-        {
-            return ValueTask.FromResult(Read(buffer.Span));
-        }
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => ValueTask.FromResult(Read(buffer.Span));
 
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            throw new NotSupportedException();
-        }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
         public override void SetLength(long value)
         {

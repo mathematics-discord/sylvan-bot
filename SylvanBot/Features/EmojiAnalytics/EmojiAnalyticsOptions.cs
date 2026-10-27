@@ -6,8 +6,5 @@ public sealed class EmojiAnalyticsOptions
 
     public ulong[] EnabledGuildIds { get; init; } = [];
 
-    public bool IsEnabled(ulong guildId)
-    {
-        return EnabledGuildIds.Contains(guildId);
-    }
+    public bool IsEnabled(ulong guildId) => EnabledGuildIds.Contains(guildId);
 }

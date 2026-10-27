@@ -1,33 +1,29 @@
-﻿namespace SylvanBot.Application.Features.Quorum;
-
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Common;
 using SylvanBot.Infrastructure.Data;
+
+namespace SylvanBot.Application.Features.Quorum;
 
 public sealed class QuorumOperations(IDbContextFactory<BotDbContext> contexts, IQuorumMembers members)
 {
     public async Task<QuorumCalculation> CalculateAsync(ulong guildId, ulong channelId, CancellationToken ct)
     {
-        Option<QuorumConfiguration> configuration = await InspectAsync(guildId, channelId, ct);
+        Option<QuorumConfiguration> configuration = await InspectAsync(guildId: guildId, channelId: channelId, ct: ct);
 
         if (configuration.Value is not Some<QuorumConfiguration>(var configured))
-        {
             throw new BotCommandException(QuorumMessages.ConfigurationNotFound);
-        }
 
         HashSet<ulong> voterRoleIds = configured.VoterRoles
-            .Select(role => role.RoleId)
-            .ToHashSet();
+           .Select(role => role.RoleId)
+           .ToHashSet();
 
         if (voterRoleIds.Count == 0)
-        {
             throw new BotCommandException(QuorumMessages.ConfigurationIncomplete);
-        }
 
-        QuorumMember[] population = await members.GetMembersAsync(guildId, ct);
+        QuorumMember[] population = await members.GetMembersAsync(guildId: guildId, ct: ct);
         ct.ThrowIfCancellationRequested();
 
-        return QuorumCalculator.Calculate(population, voterRoleIds, configured.Proportion);
+        return QuorumCalculator.Calculate(members: population, voterRoleIds: voterRoleIds, proportion: configured.Proportion);
     }
 
     public async Task<Option<QuorumConfiguration>> InspectAsync(ulong guildId, ulong channelId, CancellationToken ct)
@@ -35,11 +31,11 @@ public sealed class QuorumOperations(IDbContextFactory<BotDbContext> contexts, I
         await using var db = await contexts.CreateDbContextAsync(ct);
 
         var configuration = await db.QuorumConfigurations
-            .AsNoTracking()
-            .Include(configuration => configuration.VoterRoles)
-            .SingleOrDefaultAsync(
+           .AsNoTracking()
+           .Include(configuration => configuration.VoterRoles)
+           .SingleOrDefaultAsync(
                 configuration => configuration.GuildId == guildId && configuration.ChannelId == channelId,
-                ct);
+                cancellationToken: ct);
 
         return configuration is null ? new None() : new Some<QuorumConfiguration>(configuration);
     }
@@ -54,23 +50,19 @@ public sealed class QuorumOperations(IDbContextFactory<BotDbContext> contexts, I
         ct.ThrowIfCancellationRequested();
 
         if (proportion is <= 0 or > 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(proportion), proportion, QuorumMessages.InvalidProportion);
-        }
+            throw new ArgumentOutOfRangeException(nameof(proportion), actualValue: proportion, message: QuorumMessages.InvalidProportion);
 
         if (channelKind is not ("text" or "forum"))
-        {
-            throw new ArgumentOutOfRangeException(nameof(channelKind), channelKind, "Unsupported quorum channel kind.");
-        }
+            throw new ArgumentOutOfRangeException(nameof(channelKind), actualValue: channelKind, "Unsupported quorum channel kind.");
 
-        await using var db = await contexts.CreateDbContextAsync(ct);
-        var id = Guid.CreateVersion7();
-        var storedGuildId = checked((long)guildId);
-        var storedChannelId = checked((long)channelId);
+        await using var db              = await contexts.CreateDbContextAsync(ct);
+        var             id              = Guid.CreateVersion7();
+        var             storedGuildId   = checked((long)guildId);
+        var             storedChannelId = checked((long)channelId);
 
         // The upsert locks an existing parent row and retains its identity and voter roles.
         List<Guid> configurationIds = await db.Database
-            .SqlQuery<Guid>(
+           .SqlQuery<Guid>(
                 $"""
                  INSERT INTO public.quorum_configurations (id, guild_id, channel_id, channel_kind, proportion)
                  VALUES ({id}, {storedGuildId}, {storedChannelId}, {channelKind}, {proportion})
@@ -78,7 +70,7 @@ public sealed class QuorumOperations(IDbContextFactory<BotDbContext> contexts, I
                  SET channel_kind = EXCLUDED.channel_kind, proportion = EXCLUDED.proportion
                  RETURNING id AS "Value"
                  """)
-            .ToListAsync(ct);
+           .ToListAsync(ct);
 
         return configurationIds[0] == id;
     }
@@ -88,8 +80,8 @@ public sealed class QuorumOperations(IDbContextFactory<BotDbContext> contexts, I
         await using var db = await contexts.CreateDbContextAsync(ct);
 
         var deleted = await db.QuorumConfigurations
-            .Where(configuration => configuration.GuildId == guildId && configuration.ChannelId == channelId)
-            .ExecuteDeleteAsync(ct);
+           .Where(configuration => configuration.GuildId == guildId && configuration.ChannelId == channelId)
+           .ExecuteDeleteAsync(ct);
 
         return deleted > 0;
     }
@@ -101,26 +93,24 @@ public sealed class QuorumOperations(IDbContextFactory<BotDbContext> contexts, I
         bool shouldAdd,
         CancellationToken ct)
     {
-        await using var db = await contexts.CreateDbContextAsync(ct);
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var storedGuildId = checked((long)guildId);
-        var storedChannelId = checked((long)channelId);
-        var storedRoleId = checked((long)roleId);
+        await using var db              = await contexts.CreateDbContextAsync(ct);
+        await using var transaction     = await db.Database.BeginTransactionAsync(ct);
+        var             storedGuildId   = checked((long)guildId);
+        var             storedChannelId = checked((long)channelId);
+        var             storedRoleId    = checked((long)roleId);
 
         // Keep this lock and the targeted write on the same context and transaction.
         List<Guid> configurationIds = await db.Database
-            .SqlQuery<Guid>(
+           .SqlQuery<Guid>(
                 $"""
                  SELECT id AS "Value" FROM public.quorum_configurations
                  WHERE guild_id = {storedGuildId} AND channel_id = {storedChannelId}
                  FOR UPDATE
                  """)
-            .ToListAsync(ct);
+           .ToListAsync(ct);
 
         if (configurationIds.Count == 0)
-        {
             throw new BotCommandException(QuorumMessages.ConfigurationNotFound);
-        }
 
         var configurationId = configurationIds[0];
 
@@ -132,13 +122,13 @@ public sealed class QuorumOperations(IDbContextFactory<BotDbContext> contexts, I
                  VALUES ({configurationId}, {storedRoleId})
                  ON CONFLICT (quorum_configuration_id, role_id) DO NOTHING
                  """,
-                ct);
+                cancellationToken: ct);
         }
         else
         {
             await db.QuorumVoterRoles
-                .Where(role => role.QuorumConfigurationId == configurationId && role.RoleId == roleId)
-                .ExecuteDeleteAsync(ct);
+               .Where(role => role.QuorumConfigurationId == configurationId && role.RoleId == roleId)
+               .ExecuteDeleteAsync(ct);
         }
 
         await transaction.CommitAsync(ct);

@@ -12,3 +12,4 @@ global using Microsoft.Extensions.Hosting;
 global using Microsoft.Extensions.Options;
 global using SylvanBot.Common;
 global using Serilog;
+global using SylvanBot.Application.Common;

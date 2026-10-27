@@ -1,11 +1,11 @@
-﻿namespace SylvanBot.Features.WorkingHours;
-
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net;
 using Discord.Net;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.WorkingHours;
 using SylvanBot.Infrastructure.Data;
+
+namespace SylvanBot.Features.WorkingHours;
 
 public sealed class WorkingHoursCoordinator(
     DiscordSocketClient client,
@@ -20,22 +20,22 @@ public sealed class WorkingHoursCoordinator(
         await using var db = await contexts.CreateDbContextAsync(ct);
 
         var settings = await db.WorkingHoursSettings
-            .AsNoTracking()
-            .Include(item => item.EligibleRoles)
-            .SingleOrDefaultAsync(item => item.GuildId == guildId, ct);
+           .AsNoTracking()
+           .Include(item => item.EligibleRoles)
+           .SingleOrDefaultAsync(item => item.GuildId == guildId, cancellationToken: ct);
 
         settings ??= new WorkingHoursSettings { GuildId = guildId };
 
         IEnumerable<string> eligible = settings.EligibleRoles
-            .OrderBy(role => role.RoleId)
-            .Select(role => $"<@&{role.RoleId}>");
+           .OrderBy(role => role.RoleId)
+           .Select(role => $"<@&{role.RoleId}>");
 
         IEnumerable<string> exemptions = settings.EligibleRoles
-            .Where(role => role.IsExempt)
-            .OrderBy(role => role.RoleId)
-            .Select(role => $"<@&{role.RoleId}>");
-        var guild = client.GetGuild(guildId);
-        List<string> problems = ConfigurationProblems(settings, guild);
+           .Where(role => role.IsExempt)
+           .OrderBy(role => role.RoleId)
+           .Select(role => $"<@&{role.RoleId}>");
+        var          guild    = client.GetGuild(guildId);
+        List<string> problems = ConfigurationProblems(settings: settings, guild: guild);
 
         if (!IsReady(guild))
             problems.Add("Member data is not ready; role reconciliation is pending.");
@@ -43,8 +43,8 @@ public sealed class WorkingHoursCoordinator(
         var target = settings.PingRoleId is { } id ? $"<@&{id}>" : "unset";
 
         return $"Working Hours: {(settings.Enabled ? "enabled" : "disabled")}\n"
-               + $"Ping role: {target}\nEligible roles: {FormatRoles(eligible)}\nExemption roles: {FormatRoles(exemptions)}\n"
-               + (problems.Count == 0 ? "Configuration is valid." : string.Join('\n', problems));
+            + $"Ping role: {target}\nEligible roles: {FormatRoles(eligible)}\nExemption roles: {FormatRoles(exemptions)}\n"
+            + (problems.Count == 0 ? "Configuration is valid." : string.Join(separator: '\n', values: problems));
     }
 
     public async Task<ErrorOr<string>> UpdateAsync(
@@ -53,16 +53,16 @@ public sealed class WorkingHoursCoordinator(
         ulong? roleId,
         CancellationToken ct)
     {
-        var state = _guilds.GetOrAdd(guildId, _ => new GuildState());
+        var state = _guilds.GetOrAdd(key: guildId, _ => new GuildState());
         await state.Gate.WaitAsync(ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
-            var settings = await LoadSettingsAsync(db, guildId, ct);
-            var isNew = settings is null;
+            await using var db       = await contexts.CreateDbContextAsync(ct);
+            var             settings = await LoadSettingsAsync(db: db, guildId: guildId, ct: ct);
+            var             isNew    = settings is null;
             settings ??= new WorkingHoursSettings { GuildId = guildId };
-            ErrorOr<Success> validation = ApplyConfigurationChange(settings, change, roleId);
+            ErrorOr<Success> validation = ApplyConfigurationChange(settings: settings, change: change, roleId: roleId);
 
             if (validation.IsError)
                 return validation.Errors;
@@ -71,12 +71,12 @@ public sealed class WorkingHoursCoordinator(
                 db.WorkingHoursSettings.Add(settings);
 
             await db.SaveChangesAsync(ct);
-            var pending = await ReconcileSavedAsync(db, settings, state, ct);
+            var pending = await ReconcileSavedAsync(db: db, settings: settings, state: state, ct: ct);
 
             var message = change switch
             {
                 WorkingConditionsChange.Disable => "Scheduling disabled. Personal schedules have been retained.",
-                WorkingConditionsChange.Enable => "Scheduling enabled. Saved enabled schedules resume from the current time.",
+                WorkingConditionsChange.Enable  => "Scheduling enabled. Saved enabled schedules resume from the current time.",
                 WorkingConditionsChange.PingRole =>
                     "Ping role saved. Existing assignments of the old role are unchanged; no mass role migration is performed.",
                 _ => "Working conditions saved.",
@@ -84,7 +84,7 @@ public sealed class WorkingHoursCoordinator(
 
             var action = settings.Enabled ? "Role reconciliation" : "Default-role restoration";
 
-            return message + "\n" + CompletionMessage(action, pending);
+            return message + "\n" + CompletionMessage(action: action, pending: pending);
         }
         finally
         {
@@ -102,24 +102,24 @@ public sealed class WorkingHoursCoordinator(
         string? timezone,
         CancellationToken ct)
     {
-        var state = _guilds.GetOrAdd(guildId, _ => new GuildState());
+        var state = _guilds.GetOrAdd(key: guildId, _ => new GuildState());
         await state.Gate.WaitAsync(ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
-            var settings = await LoadSettingsAsync(db, guildId, ct);
+            await using var db       = await contexts.CreateDbContextAsync(ct);
+            var             settings = await LoadSettingsAsync(db: db, guildId: guildId, ct: ct);
 
             if (settings is not { Enabled: true })
                 return Error.Validation(description: "Working Hours scheduling is disabled for this guild. No preference or role was changed.");
 
-            ErrorOr<WorkingHoursWindow?> validation = ValidateSubmission(username, enable, start, end, timezone);
+            ErrorOr<WorkingHoursWindow?> validation = ValidateSubmission(username: username, enable: enable, start: start, end: end, timezone: timezone);
 
             if (validation.IsError)
                 return validation.Errors;
 
             var window = validation.Value;
-            var guild = client.GetGuild(guildId);
+            var guild  = client.GetGuild(guildId);
 
             if (!IsReady(guild))
                 return Error.Failure(description: "Current guild/member data is unavailable. No preference was changed.");
@@ -132,17 +132,17 @@ public sealed class WorkingHoursCoordinator(
             if (member is null)
                 return Error.Failure(description: "Current member data is unavailable. No preference was changed.");
 
-            if (!IsEligible(settings, member))
+            if (!IsEligible(settings: settings, member: member))
                 return Error.Unauthorized(description: "Only members with a configured eligible staff role may set working hours.");
 
-            await SaveScheduleAsync(db, state, guildId, memberId, window, ct);
-            var pending = await ReconcileSavedAsync(db, settings, state, ct, memberId);
+            await SaveScheduleAsync(db: db, state: state, guildId: guildId, memberId: memberId, window: window, ct: ct);
+            var pending = await ReconcileSavedAsync(db: db, settings: settings, state: state, ct: ct, onlyMember: memberId);
 
             var response = window is null
                 ? "Your schedule is disabled. Ordinary staff require the ping role; exempt seniors retain manual control."
                 : string.Join("\n\n", WorkingHoursResponses.Accepted(window));
 
-            return "Saved. " + CompletionMessage("Role reconciliation", pending) + "\n\n" + response;
+            return "Saved. " + CompletionMessage("Role reconciliation", pending: pending) + "\n\n" + response;
         }
         finally
         {
@@ -152,13 +152,13 @@ public sealed class WorkingHoursCoordinator(
 
     public async Task ReconcileAsync(ulong guildId, CancellationToken ct)
     {
-        var state = _guilds.GetOrAdd(guildId, _ => new GuildState());
+        var state = _guilds.GetOrAdd(key: guildId, _ => new GuildState());
         await state.Gate.WaitAsync(ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
-            var settings = await LoadSettingsAsync(db, guildId, ct);
+            await using var db       = await contexts.CreateDbContextAsync(ct);
+            var             settings = await LoadSettingsAsync(db: db, guildId: guildId, ct: ct);
 
             if (settings is null)
                 return;
@@ -170,8 +170,8 @@ public sealed class WorkingHoursCoordinator(
 
             // Ready guild role metadata confirms deletions. Never infer deletion while disconnected.
             WorkingHoursEligibleRole[] deleted = settings.EligibleRoles
-                .Where(role => guild!.GetRole(role.RoleId) is null)
-                .ToArray();
+               .Where(role => guild!.GetRole(role.RoleId) is null)
+               .ToArray();
 
             foreach (var role in deleted)
                 settings.EligibleRoles.Remove(role);
@@ -183,7 +183,7 @@ public sealed class WorkingHoursCoordinator(
                 settings.Enabled = false;
 
             await db.SaveChangesAsync(ct);
-            await ReconcileSavedAsync(db, settings, state, ct);
+            await ReconcileSavedAsync(db: db, settings: settings, state: state, ct: ct);
         }
         finally
         {
@@ -199,22 +199,26 @@ public sealed class WorkingHoursCoordinator(
                 continue;
 
             lock (pair.Value.Sync)
+            {
                 pair.Value.Seeded = false;
+            }
         }
     }
 
     public void MemberChanged(SocketGuildUser member)
     {
-        if (!_guilds.TryGetValue(member.Guild.Id, out var state))
+        if (!_guilds.TryGetValue(key: member.Guild.Id, out var state))
             return;
 
         lock (state.Sync)
-            IndexMember(state, member);
+        {
+            IndexMember(state: state, member: member);
+        }
     }
 
     public void MemberLeft(ulong guildId, ulong memberId)
     {
-        if (!_guilds.TryGetValue(guildId, out var state))
+        if (!_guilds.TryGetValue(key: guildId, out var state))
             return;
 
         lock (state.Sync)
@@ -238,21 +242,19 @@ public sealed class WorkingHoursCoordinator(
             if (start is null || end is null)
                 return Error.Validation(description: "Enabling requires both start and end on every submission.");
 
-            ErrorOr<WorkingHoursWindow> parsed = WorkingHoursTimeParser.Parse(start, end, timezone);
+            ErrorOr<WorkingHoursWindow> parsed = WorkingHoursTimeParser.Parse(start: start, end: end, timezone: timezone);
 
             if (parsed.IsError)
                 return parsed.Errors;
 
             window = parsed.Value;
-            var rejection = WorkingHoursResponses.Rejection(window, username);
+            var rejection = WorkingHoursResponses.Rejection(window: window, username: username);
 
             if (rejection is not null)
                 return Error.Validation(description: rejection);
         }
         else if (start is not null || end is not null || timezone is not null)
-        {
             return Error.Validation(description: "Disabling accepts no start, end or timezone options.");
-        }
 
         return window;
     }
@@ -266,13 +268,15 @@ public sealed class WorkingHoursCoordinator(
         CancellationToken ct)
     {
         var preference = await db.WorkingHours
-            .SingleOrDefaultAsync(item => item.GuildId == guildId && item.MemberId == memberId, ct);
+           .SingleOrDefaultAsync(item => item.GuildId == guildId && item.MemberId == memberId, cancellationToken: ct);
 
         // Consume only losses preceding this explicit command; later gateway losses remain pending.
         bool priorLoss;
 
         lock (state.Sync)
+        {
             priorLoss = state.Losses.Remove(memberId);
+        }
 
         try
         {
@@ -280,23 +284,23 @@ public sealed class WorkingHoursCoordinator(
             {
                 if (preference is null)
                 {
-                    preference = new WorkingHoursPreference(guildId, memberId);
+                    preference = new WorkingHoursPreference(guildId: guildId, memberId: memberId);
                     db.WorkingHours.Add(preference);
                 }
 
                 preference.EnableSchedule(window);
             }
             else
-            {
                 preference?.DisableSchedule();
-            }
 
             await db.SaveChangesAsync(ct);
         }
         catch when (priorLoss)
         {
             lock (state.Sync)
+            {
                 state.Losses.Add(memberId);
+            }
 
             throw;
         }
@@ -306,7 +310,7 @@ public sealed class WorkingHoursCoordinator(
     {
         var eligible = state.EligibleRoles.Overlaps(member.RoleIds);
 
-        if (state.Members.TryGetValue(member.Id, out var previouslyEligible) && previouslyEligible && !eligible)
+        if (state.Members.TryGetValue(key: member.Id, out var previouslyEligible) && previouslyEligible && !eligible)
             state.Losses.Add(member.Id);
 
         var hasTarget = state.PingRoleId is { } target && member.RoleIds.Contains(target);
@@ -319,12 +323,12 @@ public sealed class WorkingHoursCoordinator(
 
     private static Task<WorkingHoursSettings?> LoadSettingsAsync(BotDbContext db, ulong guildId, CancellationToken ct) =>
         db.WorkingHoursSettings
-            .Include(settings => settings.EligibleRoles)
-            .SingleOrDefaultAsync(settings => settings.GuildId == guildId, ct);
+           .Include(settings => settings.EligibleRoles)
+           .SingleOrDefaultAsync(settings => settings.GuildId == guildId, cancellationToken: ct);
 
     private static string FormatRoles(IEnumerable<string> roles)
     {
-        var text = string.Join(", ", roles);
+        var text = string.Join(", ", values: roles);
 
         return text.Length == 0 ? "none" : text;
     }
@@ -332,14 +336,14 @@ public sealed class WorkingHoursCoordinator(
     private static string CompletionMessage(string action, int? pending) => pending switch
     {
         null => $"{action} pending: configuration or member data is unavailable. Reconciliation will retry.",
-        0 => $"{action} completed for the currently observed members.",
-        _ => $"{action} pending for {pending} member(s). Reconciliation will retry.",
+        0    => $"{action} completed for the currently observed members.",
+        _    => $"{action} pending for {pending} member(s). Reconciliation will retry.",
     };
 
     private static bool IsEligible(WorkingHoursSettings settings, IGuildUser member)
     {
         return settings.EligibleRoles
-            .Any(role => member.RoleIds.Contains(role.RoleId));
+           .Any(role => member.RoleIds.Contains(role.RoleId));
     }
 
     private static async Task ApplyLossesAsync(
@@ -354,25 +358,25 @@ public sealed class WorkingHoursCoordinator(
         lock (state.Sync)
         {
             losses = state.Losses
-                .Where(id => !onlyMember.HasValue || id == onlyMember.Value)
-                .ToArray();
+               .Where(id => !onlyMember.HasValue || id == onlyMember.Value)
+               .ToArray();
             state.Losses.ExceptWith(losses);
         }
 
         try
         {
             foreach (var memberId in losses)
-            {
-                if (preferences.TryGetValue(memberId, out var preference))
+                if (preferences.TryGetValue(key: memberId, out var preference))
                     preference.DisableSchedule();
-            }
 
             await db.SaveChangesAsync(ct);
         }
         catch
         {
             lock (state.Sync)
+            {
                 state.Losses.UnionWith(losses);
+            }
 
             throw;
         }
@@ -398,12 +402,12 @@ public sealed class WorkingHoursCoordinator(
 
         ErrorOr<Success> validation = change switch
         {
-            WorkingConditionsChange.PingRole => settings.SetPingRole(roleId!.Value),
-            WorkingConditionsChange.AddEligible => settings.ChangeEligibleRole(roleId!.Value, add: true),
-            WorkingConditionsChange.RemoveEligible => settings.ChangeEligibleRole(roleId!.Value, add: false),
-            WorkingConditionsChange.AddExempt => settings.ChangeExemptRole(roleId!.Value, add: true),
-            WorkingConditionsChange.RemoveExempt => settings.ChangeExemptRole(roleId!.Value, add: false),
-            _ => Result.Success,
+            WorkingConditionsChange.PingRole       => settings.SetPingRole(roleId!.Value),
+            WorkingConditionsChange.AddEligible    => settings.ChangeEligibleRole(roleId: roleId!.Value, add: true),
+            WorkingConditionsChange.RemoveEligible => settings.ChangeEligibleRole(roleId: roleId!.Value, add: false),
+            WorkingConditionsChange.AddExempt      => settings.ChangeExemptRole(roleId: roleId!.Value, add: true),
+            WorkingConditionsChange.RemoveExempt   => settings.ChangeExemptRole(roleId: roleId!.Value, add: false),
+            _                                      => Result.Success,
         };
 
         if (validation.IsError)
@@ -411,17 +415,15 @@ public sealed class WorkingHoursCoordinator(
 
         if (change == WorkingConditionsChange.Enable)
         {
-            List<string> problems = ConfigurationProblems(settings, guild);
+            List<string> problems = ConfigurationProblems(settings: settings, guild: guild);
 
             if (problems.Count > 0)
-                return Error.Validation(description: string.Join('\n', problems));
+                return Error.Validation(description: string.Join(separator: '\n', values: problems));
 
             settings.Enabled = true;
         }
         else if (change == WorkingConditionsChange.Disable)
-        {
             settings.Enabled = false;
-        }
 
         return Result.Success;
     }
@@ -445,17 +447,21 @@ public sealed class WorkingHoursCoordinator(
 
         problems.AddRange(
             settings.EligibleRoles
-                .Where(entry => entry.RoleId == guild.Id || entry.RoleId == settings.PingRoleId || guild.GetRole(entry.RoleId) is null)
-                .Select(entry => $"Eligible role {entry.RoleId} is missing or invalid."));
+               .Where(entry => entry.RoleId == guild.Id || entry.RoleId == settings.PingRoleId || guild.GetRole(entry.RoleId) is null)
+               .Select(entry => $"Eligible role {entry.RoleId} is missing or invalid."));
 
         if (settings.PingRoleId is not { } targetId)
             return problems;
 
         var target = guild.GetRole(targetId);
-        var bot = guild.CurrentUser;
+        var bot    = guild.CurrentUser;
 
-        var manageable = target is not null && target.Id != guild.Id && !target.IsManaged
-                         && bot is not null && bot.GuildPermissions.ManageRoles && bot.Hierarchy > target.Position;
+        var manageable = target is not null
+            && target.Id != guild.Id
+            && !target.IsManaged
+            && bot is not null
+            && bot.GuildPermissions.ManageRoles
+            && bot.Hierarchy > target.Position;
 
         if (!manageable)
             problems.Add("The ping role is missing, @everyone, integration-managed or beyond the bot's Manage Roles permission/hierarchy.");
@@ -477,21 +483,21 @@ public sealed class WorkingHoursCoordinator(
         try
         {
             var guild = client.GetGuild(settings.GuildId);
-            PublishSettingsAndSeed(settings, guild, state);
+            PublishSettingsAndSeed(settings: settings, guild: guild, state: state);
 
             if (!IsReady(guild))
                 return null;
 
             Dictionary<ulong, WorkingHoursPreference> preferences = await db.WorkingHours
-                .Where(item => item.GuildId == settings.GuildId)
-                .ToDictionaryAsync(item => item.MemberId, ct);
+               .Where(item => item.GuildId == settings.GuildId)
+               .ToDictionaryAsync(item => item.MemberId, cancellationToken: ct);
 
-            await ApplyLossesAsync(db, state, preferences, onlyMember, ct);
-            List<string> problems = ConfigurationProblems(settings, guild);
+            await ApplyLossesAsync(db: db, state: state, preferences: preferences, onlyMember: onlyMember, ct: ct);
+            List<string> problems = ConfigurationProblems(settings: settings, guild: guild);
 
             if (problems.Count > 0)
             {
-                logger.Warning("Working Hours blocked in guild {GuildId}: {Problems}", settings.GuildId, string.Join("; ", problems));
+                logger.Warning("Working Hours blocked in guild {GuildId}: {Problems}", propertyValue0: settings.GuildId, string.Join("; ", values: problems));
 
                 return null;
             }
@@ -499,18 +505,20 @@ public sealed class WorkingHoursCoordinator(
             HashSet<ulong> members;
 
             lock (state.Sync)
+            {
                 members = new HashSet<ulong>(state.Members.Keys);
+            }
 
             IEnumerable<ulong> scheduled = preferences.Values
-                .Where(preference => preference.Enabled)
-                .Select(preference => preference.MemberId);
+               .Where(preference => preference.Enabled)
+               .Select(preference => preference.MemberId);
 
             members.UnionWith(scheduled);
 
             if (onlyMember.HasValue)
                 members = [onlyMember.Value];
 
-            return await ReconcileMembersAsync(db, settings, guild!, state, members, preferences, ct);
+            return await ReconcileMembersAsync(db: db, settings: settings, guild!, state: state, members: members, preferences: preferences, ct: ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -518,7 +526,7 @@ public sealed class WorkingHoursCoordinator(
         }
         catch (Exception ex)
         {
-            logger.Error(ex, "Working Hours saved; reconciliation pending in guild {GuildId}", settings.GuildId);
+            logger.Error(exception: ex, "Working Hours saved; reconciliation pending in guild {GuildId}", propertyValue: settings.GuildId);
 
             return null;
         }
@@ -541,9 +549,9 @@ public sealed class WorkingHoursCoordinator(
 
             try
             {
-                preferences.TryGetValue(memberId, out var preference);
+                preferences.TryGetValue(key: memberId, out var preference);
 
-                if (!await ReconcileMemberAsync(db, settings, guild, state, memberId, preference, ct))
+                if (!await ReconcileMemberAsync(db: db, settings: settings, guild: guild, state: state, memberId: memberId, preference: preference, ct: ct))
                     pending++;
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -553,7 +561,7 @@ public sealed class WorkingHoursCoordinator(
             catch (Exception ex)
             {
                 pending++;
-                logger.Warning(ex, "Working Hours update pending for guild {GuildId}, member {MemberId}", settings.GuildId, memberId);
+                logger.Warning(exception: ex, "Working Hours update pending for guild {GuildId}, member {MemberId}", propertyValue0: settings.GuildId, propertyValue1: memberId);
             }
         }
 
@@ -563,13 +571,13 @@ public sealed class WorkingHoursCoordinator(
     private void PublishSettingsAndSeed(WorkingHoursSettings settings, SocketGuild? guild, GuildState state)
     {
         HashSet<ulong> eligibleRoles = settings.EligibleRoles
-            .Select(role => role.RoleId)
-            .ToHashSet();
+           .Select(role => role.RoleId)
+           .ToHashSet();
 
         lock (state.Sync)
         {
             var changed = state.PingRoleId != settings.PingRoleId || !state.EligibleRoles.SetEquals(eligibleRoles);
-            state.PingRoleId = settings.PingRoleId;
+            state.PingRoleId    = settings.PingRoleId;
             state.EligibleRoles = eligibleRoles;
 
             if (changed)
@@ -579,27 +587,25 @@ public sealed class WorkingHoursCoordinator(
                 return;
 
             var previousEligible = state.Members
-                .Where(pair => pair.Value)
-                .Select(pair => pair.Key)
-                .ToArray();
+               .Where(pair => pair.Value)
+               .Select(pair => pair.Key)
+               .ToArray();
             state.Members.Clear();
 
             foreach (var member in guild!.Users)
             {
-                IReadOnlyCollection<ulong> roles = ((IGuildUser)member).RoleIds;
-                var eligible = eligibleRoles.Overlaps(roles);
-                var hasTarget = settings.PingRoleId is { } target && roles.Contains(target);
+                IReadOnlyCollection<ulong> roles     = ((IGuildUser)member).RoleIds;
+                var                        eligible  = eligibleRoles.Overlaps(roles);
+                var                        hasTarget = settings.PingRoleId is { } target && roles.Contains(target);
 
                 if (eligible || hasTarget)
                     state.Members[member.Id] = eligible;
             }
 
             foreach (var memberId in previousEligible)
-            {
                 // A missing member is unknown; only a present member proves loss of eligibility here.
                 if (guild.GetUser(memberId) is not null && !state.Members.GetValueOrDefault(memberId))
                     state.Losses.Add(memberId);
-            }
 
             state.Seeded = true;
         }
@@ -617,7 +623,7 @@ public sealed class WorkingHoursCoordinator(
         if (!IsReady(guild))
             return false;
 
-        var (member, departed) = await ReadMemberAsync(guild, state, memberId, ct);
+        var (member, departed) = await ReadMemberAsync(guild: guild, state: state, memberId: memberId, ct: ct);
 
         if (departed)
         {
@@ -628,7 +634,9 @@ public sealed class WorkingHoursCoordinator(
             }
 
             lock (state.Sync)
+            {
                 state.Members.Remove(memberId);
+            }
 
             return true;
         }
@@ -636,7 +644,7 @@ public sealed class WorkingHoursCoordinator(
         if (member is null)
             return false;
 
-        var eligible = IsEligible(settings, member);
+        var eligible = IsEligible(settings: settings, member: member);
 
         if (!eligible && preference is { Enabled: true })
         {
@@ -644,31 +652,31 @@ public sealed class WorkingHoursCoordinator(
             await db.SaveChangesAsync(ct);
         }
 
-        member = guild.GetUser(memberId) ?? member;
-        eligible = IsEligible(settings, member);
+        member   = guild.GetUser(memberId) ?? member;
+        eligible = IsEligible(settings: settings, member: member);
 
-        var active = settings.Enabled && preference is { Enabled: true } && preference.Window!.IsActive(time.GetUtcNow());
-        var exempt = settings.EligibleRoles.Any(role => role.IsExempt && member.RoleIds.Contains(role.RoleId));
-        var desired = settings.DesiredPingRole(eligible, exempt, preference?.Enabled == true, active);
-        var target = settings.PingRoleId!.Value;
+        var active  = settings.Enabled && preference is { Enabled: true } && preference.Window!.IsActive(time.GetUtcNow());
+        var exempt  = settings.EligibleRoles.Any(role => role.IsExempt && member.RoleIds.Contains(role.RoleId));
+        var desired = settings.DesiredPingRole(eligible: eligible, exempt: exempt, preference?.Enabled == true, active: active);
+        var target  = settings.PingRoleId!.Value;
 
         if (!desired.HasValue || member.RoleIds.Contains(target) == desired.Value)
             return true;
 
         member = guild.GetUser(memberId) ?? member;
 
-        if (!IsReady(guild) || ConfigurationProblems(settings, guild).Count > 0)
+        if (!IsReady(guild) || ConfigurationProblems(settings: settings, guild: guild).Count > 0)
             return false;
 
-        if (desired.Value && !IsEligible(settings, member))
+        if (desired.Value && !IsEligible(settings: settings, member: member))
             return false;
 
         var request = new RequestOptions { CancelToken = ct, AuditLogReason = "Working Hours: reconcile configured ping role" };
 
         if (desired.Value)
-            await member.AddRoleAsync(target, request);
+            await member.AddRoleAsync(roleId: target, options: request);
         else
-            await member.RemoveRoleAsync(target, request);
+            await member.RemoveRoleAsync(roleId: target, options: request);
 
         return true;
     }
@@ -686,13 +694,15 @@ public sealed class WorkingHoursCoordinator(
 
         try
         {
-            var member = await client.Rest.GetGuildUserAsync(guild.Id, memberId, new RequestOptions { CancelToken = ct });
+            var member = await client.Rest.GetGuildUserAsync(guildId: guild.Id, id: memberId, new RequestOptions { CancelToken = ct });
 
             if (member is not null)
             {
                 // A REST-only member must remain indexed if disabling its preference precedes a failed role removal.
                 lock (state.Sync)
-                    IndexMember(state, member);
+                {
+                    IndexMember(state: state, member: member);
+                }
             }
 
             return (member, false);
@@ -705,7 +715,7 @@ public sealed class WorkingHoursCoordinator(
 
     private sealed class GuildState
     {
-        public SemaphoreSlim Gate { get; } = new(1, 1);
+        public SemaphoreSlim Gate { get; } = new(initialCount: 1, maxCount: 1);
 
         public Lock Sync { get; } = new();
 

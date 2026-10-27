@@ -1,25 +1,25 @@
 ﻿using System.Diagnostics.CodeAnalysis;
-
-namespace SylvanBot.Tests.Integration;
-
+using System.Globalization;
 using NSubstitute;
 using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Quorum;
+
+namespace SylvanBot.Tests.Integration;
 
 [TestFixture]
 [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements should be documented")]
 public sealed class QuorumOperationsTests
 {
-    private IQuorumMembers _members = null!;
-    private QuorumOperations _operations = null!;
-
     [SetUp]
     public async Task SetUp()
     {
         await PostgresDatabaseFixture.ResetAsync();
-        _members = Substitute.For<IQuorumMembers>();
-        _operations = new QuorumOperations(PostgresDatabaseFixture.CreateContextFactory(), _members);
+        _members    = Substitute.For<IQuorumMembers>();
+        _operations = new QuorumOperations(PostgresDatabaseFixture.CreateContextFactory(), members: _members);
     }
+
+    private IQuorumMembers   _members    = null!;
+    private QuorumOperations _operations = null!;
 
     [Test]
     public async Task CalculateAsync_MissingConfiguration_DoesNotRequestMembers()
@@ -28,43 +28,43 @@ public sealed class QuorumOperationsTests
 
         // Act
         var exception = await Should.ThrowAsync<BotCommandException>(() =>
-            _operations.CalculateAsync(100, 200, CancellationToken.None));
+                                                                         _operations.CalculateAsync(guildId: 100, channelId: 200, ct: CancellationToken.None));
 
         // Assert
         exception.Message.ShouldBe(QuorumMessages.ConfigurationNotFound);
-        await _members.DidNotReceiveWithAnyArgs().GetMembersAsync(0, CancellationToken.None);
+        await _members.DidNotReceiveWithAnyArgs().GetMembersAsync(guildId: 0, ct: CancellationToken.None);
     }
 
     [Test]
     public async Task CalculateAsync_IncompleteConfiguration_DoesNotRequestMembers()
     {
         // Arrange
-        await _operations.RegisterAsync(100, 200, "text", 0.5m, CancellationToken.None);
+        await _operations.RegisterAsync(guildId: 100, channelId: 200, "text", proportion: 0.5m, ct: CancellationToken.None);
 
         // Act
         var exception =
             await Should.ThrowAsync<BotCommandException>(() =>
-                _operations.CalculateAsync(100, 200, CancellationToken.None));
+                                                             _operations.CalculateAsync(guildId: 100, channelId: 200, ct: CancellationToken.None));
 
         // Assert
         exception.Message.ShouldBe(QuorumMessages.ConfigurationIncomplete);
-        await _members.DidNotReceiveWithAnyArgs().GetMembersAsync(default, default);
+        await _members.DidNotReceiveWithAnyArgs().GetMembersAsync(guildId: default, ct: default);
     }
 
     [Test]
     public async Task CalculateAsync_MemberDataFailure_PreservesError()
     {
         // Arrange
-        await _operations.RegisterAsync(100, 200, "text", 0.5m, CancellationToken.None);
-        await _operations.SetVoterRoleAsync(100, 200, 10, true, CancellationToken.None);
+        await _operations.RegisterAsync(guildId: 100, channelId: 200, "text", proportion: 0.5m, ct: CancellationToken.None);
+        await _operations.SetVoterRoleAsync(guildId: 100, channelId: 200, roleId: 10, shouldAdd: true, ct: CancellationToken.None);
 
-        _members.GetMembersAsync(100, CancellationToken.None)
-            .Returns(Task.FromException<QuorumMember[]>(new BotCommandException(QuorumMessages.MemberDataUnavailable)));
+        _members.GetMembersAsync(guildId: 100, ct: CancellationToken.None)
+           .Returns(Task.FromException<QuorumMember[]>(new BotCommandException(QuorumMessages.MemberDataUnavailable)));
 
         // Act
         var exception =
             await Should.ThrowAsync<BotCommandException>(() =>
-                _operations.CalculateAsync(100, 200, CancellationToken.None));
+                                                             _operations.CalculateAsync(guildId: 100, channelId: 200, ct: CancellationToken.None));
 
         // Assert
         exception.Message.ShouldBe(QuorumMessages.MemberDataUnavailable);
@@ -75,18 +75,18 @@ public sealed class QuorumOperationsTests
     {
         // Arrange
         using var cancellation = new CancellationTokenSource();
-        await _operations.RegisterAsync(100, 200, "forum", 0.625m, cancellation.Token);
-        await _operations.SetVoterRoleAsync(100, 200, 10, true, cancellation.Token);
+        await _operations.RegisterAsync(guildId: 100, channelId: 200, "forum", proportion: 0.625m, ct: cancellation.Token);
+        await _operations.SetVoterRoleAsync(guildId: 100, channelId: 200, roleId: 10, shouldAdd: true, ct: cancellation.Token);
 
-        QuorumMember[] population = [new(1, false, [10]), new(2, false, [10])];
+        QuorumMember[] population = [new(UserId: 1, IsBot: false, [10]), new(UserId: 2, IsBot: false, [10])];
 
-        _members.GetMembersAsync(100, cancellation.Token).Returns(population);
+        _members.GetMembersAsync(guildId: 100, ct: cancellation.Token).Returns(population);
 
         // Act
-        var result = await _operations.CalculateAsync(100, 200, cancellation.Token);
+        var result = await _operations.CalculateAsync(guildId: 100, channelId: 200, ct: cancellation.Token);
 
         // Assert
-        result.ShouldBe(new QuorumCalculation(2, 0.625m, 2));
+        result.ShouldBe(new QuorumCalculation(EligibleVoterCount: 2, Proportion: 0.625m, RequiredVotes: 2));
     }
 
     [TestCase("0")]
@@ -95,15 +95,15 @@ public sealed class QuorumOperationsTests
     public async Task RegisterAsync_InvalidProportion_DoesNotWrite(string proportion)
     {
         // Arrange
-        var value = decimal.Parse(proportion, System.Globalization.CultureInfo.InvariantCulture);
+        var value = decimal.Parse(s: proportion, provider: CultureInfo.InvariantCulture);
 
         // Act
         var exception = await Should.ThrowAsync<ArgumentOutOfRangeException>(() => _operations.RegisterAsync(
-            100,
-            200,
-            "text",
-            value,
-            CancellationToken.None));
+                                                                                 guildId: 100,
+                                                                                 channelId: 200,
+                                                                                 "text",
+                                                                                 proportion: value,
+                                                                                 ct: CancellationToken.None));
 
         // Assert
         exception.ParamName.ShouldBe("proportion");
@@ -114,11 +114,11 @@ public sealed class QuorumOperationsTests
     {
         // Arrange
         using var cancellation = new CancellationTokenSource();
-        await _operations.RegisterAsync(100, 200, "text", 0.5m, cancellation.Token);
-        await _operations.SetVoterRoleAsync(100, 200, 10, true, cancellation.Token);
+        await _operations.RegisterAsync(guildId: 100, channelId: 200, "text", proportion: 0.5m, ct: cancellation.Token);
+        await _operations.SetVoterRoleAsync(guildId: 100, channelId: 200, roleId: 10, shouldAdd: true, ct: cancellation.Token);
 
-        _members.GetMembersAsync(100, cancellation.Token)
-            .Returns(async _ =>
+        _members.GetMembersAsync(guildId: 100, ct: cancellation.Token)
+           .Returns(async _ =>
             {
                 await cancellation.CancelAsync();
                 cancellation.Token.ThrowIfCancellationRequested();
@@ -128,7 +128,7 @@ public sealed class QuorumOperationsTests
 
         // Act / Assert
         await Should.ThrowAsync<OperationCanceledException>(() =>
-            _operations.CalculateAsync(100, 200, cancellation.Token));
+                                                                _operations.CalculateAsync(guildId: 100, channelId: 200, ct: cancellation.Token));
     }
 
     [Test]
@@ -140,6 +140,6 @@ public sealed class QuorumOperationsTests
 
         // Act / Assert
         await Should.ThrowAsync<OperationCanceledException>(() =>
-            _operations.RegisterAsync(100, 200, "text", 0.5m, cancellation.Token));
+                                                                _operations.RegisterAsync(guildId: 100, channelId: 200, "text", proportion: 0.5m, ct: cancellation.Token));
     }
 }

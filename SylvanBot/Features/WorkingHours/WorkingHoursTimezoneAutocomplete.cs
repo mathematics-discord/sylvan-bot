@@ -1,6 +1,6 @@
-namespace SylvanBot.Features.WorkingHours;
-
 using NodaTime;
+
+namespace SylvanBot.Features.WorkingHours;
 
 public sealed class WorkingHoursTimezoneAutocomplete : AutocompleteHandler
 {
@@ -13,11 +13,11 @@ public sealed class WorkingHoursTimezoneAutocomplete : AutocompleteHandler
         var query = interaction.Data.Current.Value?.ToString() ?? string.Empty;
 
         IEnumerable<AutocompleteResult> matches = DateTimeZoneProviders.Tzdb.Ids
-            .Where(id => id.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(id => !id.StartsWith(query, StringComparison.OrdinalIgnoreCase))
-            .ThenBy(id => id, StringComparer.Ordinal)
-            .Take(25)
-            .Select(id => new AutocompleteResult(id, id));
+           .Where(id => id.Contains(value: query, comparisonType: StringComparison.OrdinalIgnoreCase))
+           .OrderBy(id => !id.StartsWith(value: query, comparisonType: StringComparison.OrdinalIgnoreCase))
+           .ThenBy(id => id, comparer: StringComparer.Ordinal)
+           .Take(25)
+           .Select(id => new AutocompleteResult(name: id, value: id));
 
         return Task.FromResult(AutocompletionResult.FromSuccess(matches));
     }

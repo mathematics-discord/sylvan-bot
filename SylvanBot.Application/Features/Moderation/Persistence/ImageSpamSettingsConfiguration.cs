@@ -1,7 +1,7 @@
-﻿namespace SylvanBot.Features.Moderation.Persistence;
-
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace SylvanBot.Features.Moderation.Persistence;
 
 public sealed class ImageSpamSettingsConfiguration : IEntityTypeConfiguration<ImageSpamSettings>
 {
@@ -11,20 +11,24 @@ public sealed class ImageSpamSettingsConfiguration : IEntityTypeConfiguration<Im
             "ImageSpamSettings",
             table =>
             {
-                table.HasCheckConstraint("CK_ImageSpamSettings_RequiredChannelCount_Positive",
+                table.HasCheckConstraint(
+                    "CK_ImageSpamSettings_RequiredChannelCount_Positive",
                     "\"RequiredChannelCount\" > 0");
 
-                table.HasCheckConstraint("CK_ImageSpamSettings_RequiredAttachmentCount_Positive",
+                table.HasCheckConstraint(
+                    "CK_ImageSpamSettings_RequiredAttachmentCount_Positive",
                     "\"RequiredAttachmentCount\" > 0");
 
-                table.HasCheckConstraint("CK_ImageSpamSettings_BurstDurationSeconds_Positive",
+                table.HasCheckConstraint(
+                    "CK_ImageSpamSettings_BurstDurationSeconds_Positive",
                     "\"BurstDurationSeconds\" > 0");
             }
         );
 
         builder.HasKey(x => x.GuildId);
+
         builder.Property(x => x.GuildId).IsRequired().HasConversion<long>().HasColumnType("bigint")
-            .ValueGeneratedNever();
+           .ValueGeneratedNever();
         builder.Property(x => x.RequiredChannelCount).IsRequired();
         builder.Property(x => x.RequiredAttachmentCount).IsRequired();
         builder.Property(x => x.BurstDurationSeconds).IsRequired();

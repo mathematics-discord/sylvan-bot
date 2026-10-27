@@ -1,6 +1,6 @@
-namespace SylvanBot.Gateway;
-
 using System.ComponentModel.DataAnnotations;
+
+namespace SylvanBot.Gateway;
 
 public sealed class DiscordOptions
 {
@@ -10,9 +10,9 @@ public sealed class DiscordOptions
 
     public ulong[] ImageBurstSpamAllowlistedUserIds { get; init; } = [];
 
-    [Range(0, 7)] public int ImageBurstSpamHistoryPruneDays { get; init; } = 1;
+    [Range(minimum: 0, maximum: 7)] public int ImageBurstSpamHistoryPruneDays { get; init; } = 1;
 
-    [Range(1000, 50000)] public int MessageCacheSize { get; init; } = 5000;
+    [Range(minimum: 1000, maximum: 50000)] public int MessageCacheSize { get; init; } = 5000;
 
     [Required] public string Token { get; init; } = string.Empty;
 }

@@ -8,11 +8,11 @@ internal static class WorkingHoursReply
 
         while (message.Length > 0)
         {
-            var length = Math.Min(message.Length, 2000);
+            var length = Math.Min(val1: message.Length, val2: 2000);
 
             if (length < message.Length)
             {
-                var boundary = message.LastIndexOf('\n', length - 1, length);
+                var boundary = message.LastIndexOf(value: '\n', length - 1, count: length);
 
                 if (boundary > 0)
                     length = boundary;
@@ -24,15 +24,13 @@ internal static class WorkingHoursReply
             {
                 await interaction.ModifyOriginalResponseAsync(properties =>
                 {
-                    properties.Content = content;
+                    properties.Content         = content;
                     properties.AllowedMentions = AllowedMentions.None;
                 });
                 first = false;
             }
             else
-            {
-                await interaction.FollowupAsync(content, ephemeral: true, allowedMentions: AllowedMentions.None);
-            }
+                await interaction.FollowupAsync(text: content, ephemeral: true, allowedMentions: AllowedMentions.None);
 
             message = message[length..].TrimStart('\n');
         }

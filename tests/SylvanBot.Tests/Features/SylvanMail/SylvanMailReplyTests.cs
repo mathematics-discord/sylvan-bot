@@ -1,19 +1,18 @@
-namespace SylvanBot.Tests.Features.SylvanMail;
-
-using Shouldly;
 using SylvanBot.Application.Features.SylvanMail;
+
+namespace SylvanBot.Tests.Features.SylvanMail;
 
 [TestFixture]
 public sealed class SylvanMailReplyTests
 {
-    [TestCase("<@42> hello", false, false)]
-    [TestCase("<@!42> hello", false, false)]
-    [TestCase("<@42> hello", true, true)]
-    [TestCase("<@!42> hello", true, false)]
+    [TestCase("<@42> hello", arg2: false, arg3: false)]
+    [TestCase("<@!42> hello", arg2: false, arg3: false)]
+    [TestCase("<@42> hello", arg2: true, arg3: true)]
+    [TestCase("<@!42> hello", arg2: true, arg3: false)]
     public void Parse_ExplicitBodyMention_UsesAnonymousMode(string text, bool reply, bool ping)
     {
         // Act
-        var draft = SylvanMailReply.Parse(text, 42, reply, ping);
+        var draft = SylvanMailReply.Parse(content: text, botId: 42, replyToBot: reply, replyPingEnabled: ping);
 
         // Assert
         draft.ShouldNotBeNull();
@@ -25,7 +24,7 @@ public sealed class SylvanMailReplyTests
     public void Parse_PingedReplyToSylvan_UsesSignedMode()
     {
         // Act
-        var draft = SylvanMailReply.Parse("hello <@99>", 42, replyToBot: true, replyPingEnabled: true);
+        var draft = SylvanMailReply.Parse("hello <@99>", botId: 42, replyToBot: true, replyPingEnabled: true);
 
         // Assert
         draft.ShouldNotBeNull();
@@ -33,13 +32,13 @@ public sealed class SylvanMailReplyTests
         draft.Content.ShouldBe("hello <@99>");
     }
 
-    [TestCase(false, false)]
-    [TestCase(false, true)]
-    [TestCase(true, false)]
+    [TestCase(arg1: false, arg2: false)]
+    [TestCase(arg1: false, arg2: true)]
+    [TestCase(arg1: true, arg2: false)]
     public void Parse_MissingReplyTrigger_LeavesDiscussionUnsent(bool reply, bool ping)
     {
         // Act
-        var draft = SylvanMailReply.Parse("hello <@99>", 42, reply, ping);
+        var draft = SylvanMailReply.Parse("hello <@99>", botId: 42, replyToBot: reply, replyPingEnabled: ping);
 
         // Assert
         draft.ShouldBeNull();
@@ -49,10 +48,10 @@ public sealed class SylvanMailReplyTests
     public void Parse_EditedBodyMention_ReevaluatesSignedMode()
     {
         // Arrange
-        var original = SylvanMailReply.Parse("<@42> hello", 42, replyToBot: true, replyPingEnabled: true);
+        var original = SylvanMailReply.Parse("<@42> hello", botId: 42, replyToBot: true, replyPingEnabled: true);
 
         // Act
-        var edited = SylvanMailReply.Parse("hello", 42, replyToBot: true, replyPingEnabled: true);
+        var edited = SylvanMailReply.Parse("hello", botId: 42, replyToBot: true, replyPingEnabled: true);
 
         // Assert
         original.ShouldNotBeNull().Anonymous.ShouldBeTrue();
@@ -63,7 +62,7 @@ public sealed class SylvanMailReplyTests
     public void Parse_AttachmentOnlyMention_PreservesEmptyBodyForAttachmentValidation()
     {
         // Act
-        var draft = SylvanMailReply.Parse("<@42>", 42, replyToBot: false, replyPingEnabled: false);
+        var draft = SylvanMailReply.Parse("<@42>", botId: 42, replyToBot: false, replyPingEnabled: false);
 
         // Assert
         draft.ShouldNotBeNull();

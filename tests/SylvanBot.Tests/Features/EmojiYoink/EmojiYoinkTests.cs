@@ -1,6 +1,6 @@
-namespace SylvanBot.Tests.Features.EmojiYoink;
-
 using SylvanBot.Features.EmojiYoink;
+
+namespace SylvanBot.Tests.Features.EmojiYoink;
 
 public sealed class EmojiYoinkTests
 {

@@ -1,6 +1,6 @@
-namespace SylvanBot.Features.EmojiYoink;
-
 using SylvanBot.Interactions;
+
+namespace SylvanBot.Features.EmojiYoink;
 
 [DefaultMemberPermissions(GuildPermission.ManageEmojisAndStickers)]
 [RequireUserPermission(GuildPermission.ManageEmojisAndStickers)]
@@ -13,7 +13,7 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
     {
         ErrorOr<Emote> sourceResult = CustomEmojiMentionParser.ParseStrict(emoji);
 
-        await ExecuteAsync(sourceResult, false).ConfigureAwait(false);
+        await ExecuteAsync(sourceResult: sourceResult, rejectLocalSource: false).ConfigureAwait(false);
     }
 
     [MessageCommand("Yoink emoji")]
@@ -21,7 +21,7 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
     {
         ErrorOr<Emote> sourceResult = CustomEmojiMentionParser.ParseMessage(message.Content);
 
-        await ExecuteAsync(sourceResult, true).ConfigureAwait(false);
+        await ExecuteAsync(sourceResult: sourceResult, rejectLocalSource: true).ConfigureAwait(false);
     }
 
     private async Task ExecuteAsync(ErrorOr<Emote> sourceResult, bool rejectLocalSource)
@@ -31,12 +31,14 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
         if (guild is null)
         {
             await RespondAsync(EmojiYoinkErrors.GuildOnly.Description).ConfigureAwait(false);
+
             return;
         }
 
         if (sourceResult.IsError)
         {
             await RespondAsync(sourceResult.FirstError.Description).ConfigureAwait(false);
+
             return;
         }
 
@@ -45,13 +47,14 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
         if (rejectLocalSource && guild.Emotes.Any(emote => emote.Id == source.Id))
         {
             await RespondAsync(EmojiYoinkErrors.SourceAlreadyInGuild.Description).ConfigureAwait(false);
+
             return;
         }
 
         await DeferAsync().ConfigureAwait(false);
 
-        ErrorOr<GuildEmote> result = await importer.ImportAsync(guild, Context.User, source, CancellationToken.None)
-            .ConfigureAwait(false);
+        ErrorOr<GuildEmote> result = await importer.ImportAsync(guild: guild, moderator: Context.User, source: source, ct: CancellationToken.None)
+           .ConfigureAwait(false);
 
         await result.SwitchFirstAsync(
             async created => await FollowupAsync($"Added emoji {created}.").ConfigureAwait(false),

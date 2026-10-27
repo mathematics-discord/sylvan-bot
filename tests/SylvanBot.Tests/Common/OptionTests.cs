@@ -1,6 +1,6 @@
-namespace SylvanBot.Tests.Common;
-
 using SylvanBot.Application.Common;
+
+namespace SylvanBot.Tests.Common;
 
 [TestFixture]
 public sealed class OptionTests
@@ -22,8 +22,8 @@ public sealed class OptionTests
     public void Convert_Some_PreservesCaseAndPayload()
     {
         // Arrange
-        var payload = new object();
-        Some<object> some = new(payload);
+        var          payload = new object();
+        Some<object> some    = new(payload);
 
         // Act
         Option<object> result = some;

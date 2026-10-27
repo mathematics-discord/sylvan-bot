@@ -1,7 +1,7 @@
-namespace SylvanBot.Features.EmojiAnalytics;
-
 using System.Threading.Channels;
 using SylvanBot.Features.EmojiAnalytics.Persistence;
+
+namespace SylvanBot.Features.EmojiAnalytics;
 
 public sealed class EmojiAnalyticsWorker(
     Channel<EmojiUsageIncrement> buffer,
@@ -10,9 +10,9 @@ public sealed class EmojiAnalyticsWorker(
     IOptions<EmojiAnalyticsOptions> options,
     ILogger logger) : BackgroundService
 {
-    private const int BatchSize = 100;
-    private readonly ILogger _logger = logger.ForContext<EmojiAnalyticsWorker>();
-    private readonly EmojiAnalyticsOptions _options = options.Value;
+    private const    int                   BatchSize = 100;
+    private readonly ILogger               _logger   = logger.ForContext<EmojiAnalyticsWorker>();
+    private readonly EmojiAnalyticsOptions _options  = options.Value;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -25,7 +25,7 @@ public sealed class EmojiAnalyticsWorker(
                 var count = await ProcessNextBatchAsync(stoppingToken);
 
                 if (count < BatchSize)
-                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken: stoppingToken);
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -52,28 +52,28 @@ public sealed class EmojiAnalyticsWorker(
             try
             {
                 var guild = await discordClient.GetGuildAsync(
-                    guildBatch.Key,
-                    CacheMode.CacheOnly,
+                    id: guildBatch.Key,
+                    mode: CacheMode.CacheOnly,
                     new RequestOptions { CancelToken = ct });
 
                 if (guild is null)
                     continue;
 
                 EmojiUsageIncrement[] increments = guildBatch
-                    .GroupBy(item => item.EmojiId)
-                    .Select(group => new EmojiUsageIncrement(
-                        guildBatch.Key,
-                        group.Key,
-                        group.Sum(item => item.MessageCount),
-                        group.Sum(item => item.ReactionCount)))
-                    .ToArray();
+                   .GroupBy(item => item.EmojiId)
+                   .Select(group => new EmojiUsageIncrement(
+                               GuildId: guildBatch.Key,
+                               EmojiId: group.Key,
+                               group.Sum(item => item.MessageCount),
+                               group.Sum(item => item.ReactionCount)))
+                   .ToArray();
                 var trackedEmojiIds = guild.Emotes.Select(emote => emote.Id).ToArray();
-                await store.RecordBatchAsync(guildBatch.Key, increments, trackedEmojiIds, ct);
+                await store.RecordBatchAsync(guildId: guildBatch.Key, increments: increments, trackedEmojiIds: trackedEmojiIds, ct: ct);
 
                 _logger.Debug(
                     "Processed {Count} emoji usage increments for guild {GuildId}",
                     guildBatch.Count(),
-                    guildBatch.Key);
+                    propertyValue1: guildBatch.Key);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -82,9 +82,9 @@ public sealed class EmojiAnalyticsWorker(
             catch (Exception ex)
             {
                 _logger.Warning(
-                    ex,
+                    exception: ex,
                     "Failed to process emoji analytics batch for guild {GuildId}; discarding this guild's batch",
-                    guildBatch.Key);
+                    propertyValue: guildBatch.Key);
             }
         }
 

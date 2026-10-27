@@ -1,13 +1,13 @@
-namespace SylvanBot.Gateway;
-
 using Serilog.Events;
+
+namespace SylvanBot.Gateway;
 
 public sealed class DiscordBotHostedService : IHostedService
 {
-    private readonly DiscordSocketClient _discordClient;
+    private readonly DiscordSocketClient                 _discordClient;
     private readonly IEnumerable<IDiscordGatewayHandler> _gatewayHandlers;
-    private readonly ILogger _logger;
-    private readonly DiscordOptions _options;
+    private readonly ILogger                             _logger;
+    private readonly DiscordOptions                      _options;
 
     public DiscordBotHostedService(
         DiscordSocketClient discordClient,
@@ -17,35 +17,37 @@ public sealed class DiscordBotHostedService : IHostedService
         ILogger logger
     )
     {
-        _discordClient = discordClient;
+        _discordClient   = discordClient;
         _gatewayHandlers = gatewayHandlers;
-        _options = options.Value;
-        _logger = logger.ForContext<DiscordBotHostedService>();
+        _options         = options.Value;
+        _logger          = logger.ForContext<DiscordBotHostedService>();
 
         _discordClient.Log += message =>
         {
-            LogDiscordMessage("Gateway", message);
+            LogDiscordMessage("Gateway", message: message);
+
             return Task.CompletedTask;
         };
 
         interactionService.Log += message =>
         {
-            if (message.Exception is not Discord.Interactions.InteractionException)
-                LogDiscordMessage("Interactions", message);
+            if (message.Exception is not InteractionException)
+                LogDiscordMessage("Interactions", message: message);
+
             return Task.CompletedTask;
         };
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        _discordClient.Connected += OnConnectedAsync;
-        _discordClient.Disconnected += OnDisconnectedAsync;
+        _discordClient.Connected              += OnConnectedAsync;
+        _discordClient.Disconnected           += OnDisconnectedAsync;
         _discordClient.GuildMembersDownloaded += OnGuildMembersDownloadedAsync;
 
         foreach (var handler in _gatewayHandlers)
             await handler.InitializeAsync(cancellationToken);
 
-        await _discordClient.LoginAsync(TokenType.Bot, _options.Token);
+        await _discordClient.LoginAsync(tokenType: TokenType.Bot, token: _options.Token);
         await _discordClient.StartAsync();
     }
 
@@ -54,8 +56,8 @@ public sealed class DiscordBotHostedService : IHostedService
         foreach (var handler in _gatewayHandlers.Reverse())
             handler.Unsubscribe();
 
-        _discordClient.Connected -= OnConnectedAsync;
-        _discordClient.Disconnected -= OnDisconnectedAsync;
+        _discordClient.Connected              -= OnConnectedAsync;
+        _discordClient.Disconnected           -= OnDisconnectedAsync;
         _discordClient.GuildMembersDownloaded -= OnGuildMembersDownloadedAsync;
 
         await _discordClient.StopAsync();
@@ -67,29 +69,35 @@ public sealed class DiscordBotHostedService : IHostedService
         var level = message.Severity switch
         {
             LogSeverity.Critical => LogEventLevel.Fatal,
-            LogSeverity.Error => LogEventLevel.Error,
-            LogSeverity.Warning => LogEventLevel.Warning,
-            LogSeverity.Info => LogEventLevel.Information,
-            LogSeverity.Verbose => LogEventLevel.Verbose,
-            _ => LogEventLevel.Debug
+            LogSeverity.Error    => LogEventLevel.Error,
+            LogSeverity.Warning  => LogEventLevel.Warning,
+            LogSeverity.Info     => LogEventLevel.Information,
+            LogSeverity.Verbose  => LogEventLevel.Verbose,
+            _                    => LogEventLevel.Debug,
         };
 
         var source = string.IsNullOrWhiteSpace(message.Source) ? "Unknown" : message.Source;
 
         if (message.Exception is not null)
         {
-            _logger.Write(level, message.Exception, "[{Category}] {Source}: {Message}", category, source,
-                message.Message);
+            _logger.Write(
+                level: level,
+                exception: message.Exception,
+                "[{Category}] {Source}: {Message}",
+                propertyValue0: category,
+                propertyValue1: source,
+                propertyValue2: message.Message);
 
             return;
         }
 
-        _logger.Write(level, "[{Category}] {Source}: {Message}", category, source, message.Message);
+        _logger.Write(level: level, "[{Category}] {Source}: {Message}", propertyValue0: category, propertyValue1: source, propertyValue2: message.Message);
     }
 
     private Task OnConnectedAsync()
     {
         _logger.Information("Gateway connected");
+
         return Task.CompletedTask;
     }
 
@@ -98,7 +106,7 @@ public sealed class DiscordBotHostedService : IHostedService
         if (exception is null)
             _logger.Warning("Gateway disconnected");
         else
-            _logger.Warning(exception, "Gateway disconnected with error");
+            _logger.Warning(exception: exception, "Gateway disconnected with error");
 
         return Task.CompletedTask;
     }

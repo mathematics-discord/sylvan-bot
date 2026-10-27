@@ -1,16 +1,14 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
+using SylvanBot.Application.Common;
+using SylvanBot.Features.Moderation;
 
 namespace SylvanBot.Tests.Features.Moderation;
-
-using System.Collections.Concurrent;
-using SylvanBot.Application.Common;
-using SylvanBot.Common;
-using SylvanBot.Features.Moderation;
 
 [SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements should be documented")]
 public sealed class ImageBurstSpamDetectorTests
 {
-    private static readonly DateTimeOffset BaseTimestamp = new(2026, 5, 31, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset BaseTimestamp = new(year: 2026, month: 5, day: 31, hour: 12, minute: 0, second: 0, offset: TimeSpan.Zero);
 
     [Test]
     public void Observe_AfterDetection_DoesNotTriggerAgainWhileHandlingLockIsActive()
@@ -22,14 +20,14 @@ public sealed class ImageBurstSpamDetectorTests
         {
             [1] = new ImageBurstSpamDetectorOptions
             {
-                Window = 45,
+                Window                   = 45,
                 DistinctChannelThreshold = 4,
-                RequiredAttachmentCount = 2,
-                HandlingLockDuration = TimeSpan.FromMinutes(5),
+                RequiredAttachmentCount  = 2,
+                HandlingLockDuration     = TimeSpan.FromMinutes(5),
             },
         };
 
-        var detector = new ImageBurstSpamDetector(timeProvider, settingsByGuild);
+        var detector = new ImageBurstSpamDetector(timeProvider: timeProvider, settingsByGuild: settingsByGuild);
 
         detector.Observe(CreateMessage(channelId: 10, timestamp: BaseTimestamp));
         detector.Observe(CreateMessage(channelId: 20, timestamp: BaseTimestamp.AddSeconds(1)));
@@ -57,14 +55,14 @@ public sealed class ImageBurstSpamDetectorTests
         {
             [1] = new ImageBurstSpamDetectorOptions
             {
-                Window = 45,
+                Window                   = 45,
                 DistinctChannelThreshold = 4,
-                RequiredAttachmentCount = 2,
-                HandlingLockDuration = TimeSpan.FromMinutes(5),
+                RequiredAttachmentCount  = 2,
+                HandlingLockDuration     = TimeSpan.FromMinutes(5),
             },
         };
 
-        var detector = new ImageBurstSpamDetector(timeProvider, settingsByGuild);
+        var detector = new ImageBurstSpamDetector(timeProvider: timeProvider, settingsByGuild: settingsByGuild);
 
         detector.Observe(CreateMessage(channelId: 10, timestamp: BaseTimestamp));
         detector.Observe(CreateMessage(channelId: 20, timestamp: BaseTimestamp.AddSeconds(10)));
@@ -92,14 +90,14 @@ public sealed class ImageBurstSpamDetectorTests
         {
             [1] = new ImageBurstSpamDetectorOptions
             {
-                Window = 45,
+                Window                   = 45,
                 DistinctChannelThreshold = 4,
-                RequiredAttachmentCount = 2,
-                HandlingLockDuration = TimeSpan.FromMinutes(5),
+                RequiredAttachmentCount  = 2,
+                HandlingLockDuration     = TimeSpan.FromMinutes(5),
             },
         };
 
-        var detector = new ImageBurstSpamDetector(timeProvider, settingsByGuild);
+        var detector = new ImageBurstSpamDetector(timeProvider: timeProvider, settingsByGuild: settingsByGuild);
 
         detector.Observe(CreateMessage(channelId: 10, timestamp: BaseTimestamp));
         detector.Observe(CreateMessage(channelId: 20, timestamp: BaseTimestamp.AddSeconds(1)));
@@ -113,23 +111,6 @@ public sealed class ImageBurstSpamDetectorTests
         result.Value.ShouldBeOfType<None>();
     }
 
-    private static ImageBurstMessage CreateMessage(
-        ulong guildId = 1,
-        ulong userId = 2,
-        ulong channelId = 10,
-        DateTimeOffset? timestamp = null)
-    {
-        return new ImageBurstMessage(
-            guildId,
-            userId,
-            channelId,
-            timestamp ?? BaseTimestamp,
-            [
-                new ImageBurstAttachment("https://cdn.example/a.png"),
-                new ImageBurstAttachment("https://cdn.example/b.png"),
-            ]);
-    }
-
     [Test]
     public void Observe_WithRepeatedChannel_DoesNotIncreaseChannelCount()
     {
@@ -140,14 +121,14 @@ public sealed class ImageBurstSpamDetectorTests
         {
             [1] = new ImageBurstSpamDetectorOptions
             {
-                Window = 45,
+                Window                   = 45,
                 DistinctChannelThreshold = 4,
-                RequiredAttachmentCount = 2,
-                HandlingLockDuration = TimeSpan.FromMinutes(5),
+                RequiredAttachmentCount  = 2,
+                HandlingLockDuration     = TimeSpan.FromMinutes(5),
             },
         };
 
-        var detector = new ImageBurstSpamDetector(timeProvider, settingsByGuild);
+        var detector = new ImageBurstSpamDetector(timeProvider: timeProvider, settingsByGuild: settingsByGuild);
 
         detector.Observe(CreateMessage(channelId: 10, timestamp: BaseTimestamp));
         detector.Observe(CreateMessage(channelId: 10, timestamp: BaseTimestamp.AddSeconds(5)));
@@ -172,25 +153,25 @@ public sealed class ImageBurstSpamDetectorTests
         {
             [1] = new ImageBurstSpamDetectorOptions
             {
-                Window = 45,
+                Window                   = 45,
                 DistinctChannelThreshold = 4,
-                RequiredAttachmentCount = 2,
-                HandlingLockDuration = TimeSpan.FromMinutes(5),
+                RequiredAttachmentCount  = 2,
+                HandlingLockDuration     = TimeSpan.FromMinutes(5),
             },
         };
 
         settingsByGuild[2] = settingsByGuild[1];
 
-        var detector = new ImageBurstSpamDetector(timeProvider, settingsByGuild);
+        var detector = new ImageBurstSpamDetector(timeProvider: timeProvider, settingsByGuild: settingsByGuild);
 
         detector.Observe(CreateMessage(channelId: 10, timestamp: BaseTimestamp));
         detector.Observe(CreateMessage(channelId: 20, timestamp: BaseTimestamp.AddSeconds(1)));
-        detector.Observe(CreateMessage(2, channelId: 30, timestamp: BaseTimestamp.AddSeconds(2)));
-        detector.Observe(CreateMessage(2, channelId: 40, timestamp: BaseTimestamp.AddSeconds(3)));
+        detector.Observe(CreateMessage(guildId: 2, channelId: 30, timestamp: BaseTimestamp.AddSeconds(2)));
+        detector.Observe(CreateMessage(guildId: 2, channelId: 40, timestamp: BaseTimestamp.AddSeconds(3)));
 
         // Act
         Option<ImageBurstDetection> result = detector
-            .Observe(CreateMessage(channelId: 50, timestamp: BaseTimestamp.AddSeconds(4)));
+           .Observe(CreateMessage(channelId: 50, timestamp: BaseTimestamp.AddSeconds(4)));
 
         // Assert
         result.Value.ShouldBeOfType<None>();
@@ -203,7 +184,7 @@ public sealed class ImageBurstSpamDetectorTests
         var timeProvider = new TestTimeProvider(BaseTimestamp);
 
         ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
-        var detector = new ImageBurstSpamDetector(timeProvider, settingsByGuild);
+        var                                                        detector        = new ImageBurstSpamDetector(timeProvider: timeProvider, settingsByGuild: settingsByGuild);
         detector.Observe(CreateMessage(channelId: 10));
         detector.Observe(CreateMessage(channelId: 20));
         detector.Observe(CreateMessage(channelId: 30));
@@ -226,12 +207,12 @@ public sealed class ImageBurstSpamDetectorTests
             [1] = new ImageBurstSpamDetectorOptions { DistinctChannelThreshold = 4 },
             [2] = new ImageBurstSpamDetectorOptions { DistinctChannelThreshold = 2 },
         };
-        var detector = new ImageBurstSpamDetector(timeProvider, settingsByGuild);
+        var detector = new ImageBurstSpamDetector(timeProvider: timeProvider, settingsByGuild: settingsByGuild);
         detector.Observe(CreateMessage(guildId: 1, channelId: 10));
         detector.Observe(CreateMessage(guildId: 2, channelId: 10));
 
         // Act
-        Option<ImageBurstDetection> firstGuildResult = detector.Observe(CreateMessage(guildId: 1, channelId: 20));
+        Option<ImageBurstDetection> firstGuildResult  = detector.Observe(CreateMessage(guildId: 1, channelId: 20));
         Option<ImageBurstDetection> secondGuildResult = detector.Observe(CreateMessage(guildId: 2, channelId: 20));
 
         // Assert
@@ -251,14 +232,14 @@ public sealed class ImageBurstSpamDetectorTests
         {
             [1] = new ImageBurstSpamDetectorOptions
             {
-                Window = 15,
+                Window                   = 15,
                 DistinctChannelThreshold = 3,
-                RequiredAttachmentCount = 2,
-                HandlingLockDuration = TimeSpan.FromMinutes(5),
+                RequiredAttachmentCount  = 2,
+                HandlingLockDuration     = TimeSpan.FromMinutes(5),
             },
         };
 
-        var detector = new ImageBurstSpamDetector(timeProvider, settingsByGuild);
+        var detector = new ImageBurstSpamDetector(timeProvider: timeProvider, settingsByGuild: settingsByGuild);
 
         detector.Observe(CreateMessage(channelId: 908076393198419988, timestamp: BaseTimestamp));
         detector.Observe(CreateMessage(channelId: 903481102591750184, timestamp: BaseTimestamp.AddMilliseconds(2161)));
@@ -273,11 +254,23 @@ public sealed class ImageBurstSpamDetectorTests
         detection.Messages.Count.ShouldBe(3);
     }
 
+    private static ImageBurstMessage CreateMessage(
+        ulong guildId = 1,
+        ulong userId = 2,
+        ulong channelId = 10,
+        DateTimeOffset? timestamp = null) =>
+        new(
+            GuildId: guildId,
+            UserId: userId,
+            ChannelId: channelId,
+            timestamp ?? BaseTimestamp,
+            [
+                new ImageBurstAttachment("https://cdn.example/a.png"),
+                new ImageBurstAttachment("https://cdn.example/b.png"),
+            ]);
+
     private sealed class TestTimeProvider(DateTimeOffset timestamp) : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow()
-        {
-            return timestamp;
-        }
+        public override DateTimeOffset GetUtcNow() => timestamp;
     }
 }

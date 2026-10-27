@@ -7,12 +7,12 @@ public sealed class RoleColourOption
     {
     }
 
-    public DateTimeOffset CreatedAtUtc { get; private set; }
-    public ulong DisplayRoleId { get; private set; }
-    public ulong GuildId { get; private set; }
-    public long OptionId { get; private set; }
-    public ulong SourceRoleId { get; private set; }
-    public DateTimeOffset UpdatedAtUtc { get; private set; }
+    public DateTimeOffset CreatedAtUtc  { get; private set; }
+    public ulong          DisplayRoleId { get; private set; }
+    public ulong          GuildId       { get; private set; }
+    public long           OptionId      { get; private set; }
+    public ulong          SourceRoleId  { get; private set; }
+    public DateTimeOffset UpdatedAtUtc  { get; private set; }
 
     public static ErrorOr<RoleColourOption> Create(ulong guildId, ulong sourceRoleId, ulong displayRoleId)
     {
@@ -20,29 +20,37 @@ public sealed class RoleColourOption
             return Error.Validation("RoleColourOption.GuildRequired", "Guild is required.");
 
         if (sourceRoleId == displayRoleId)
-            return Error.Validation("RoleColourOption.RolesMustDiffer",
+        {
+            return Error.Validation(
+                "RoleColourOption.RolesMustDiffer",
                 "Source and display role IDs must be different.");
+        }
 
         var now = DateTimeOffset.UtcNow;
+
         return new RoleColourOption
         {
-            GuildId = guildId,
-            SourceRoleId = sourceRoleId,
+            GuildId       = guildId,
+            SourceRoleId  = sourceRoleId,
             DisplayRoleId = displayRoleId,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now
+            CreatedAtUtc  = now,
+            UpdatedAtUtc  = now,
         };
     }
 
     public ErrorOr<Success> Update(ulong sourceRoleId, ulong displayRoleId)
     {
         if (sourceRoleId == displayRoleId)
-            return Error.Validation("RoleColourOption.RolesMustDiffer",
+        {
+            return Error.Validation(
+                "RoleColourOption.RolesMustDiffer",
                 "Source and display role IDs must be different.");
+        }
 
-        SourceRoleId = sourceRoleId;
+        SourceRoleId  = sourceRoleId;
         DisplayRoleId = displayRoleId;
-        UpdatedAtUtc = DateTimeOffset.UtcNow;
+        UpdatedAtUtc  = DateTimeOffset.UtcNow;
+
         return Result.Success;
     }
 }

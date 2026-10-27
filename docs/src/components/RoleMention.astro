@@ -2,14 +2,14 @@
 import roles from '../data/roles.json';
 
 interface Props {
-  id: keyof typeof roles;
+    id: keyof typeof roles;
 }
 
-const { id } = Astro.props;
+const {id} = Astro.props;
 const role = roles[id];
 
 if (!role) {
-  throw new Error(`Unknown Discord role ID: ${id}. Add it to src/data/roles.json.`);
+    throw new Error(`Unknown Discord role ID: ${id}. Add it to src/data/roles.json.`);
 }
 ---
 

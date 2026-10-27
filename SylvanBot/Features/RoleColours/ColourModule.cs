@@ -1,14 +1,13 @@
-﻿namespace SylvanBot.Features.RoleColours;
+﻿using System.Text;
 
-using System.Text;
-using SylvanBot.Application.Common;
+namespace SylvanBot.Features.RoleColours;
 
 [Group("colour", "Choose or list display colours.")]
 public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperations operations) : InteractionModuleBase<IInteractionContext>
 {
     private const string SwapPrefix = "colour-swap";
 
-    [ComponentInteraction($"{SwapPrefix}:select:*", true)]
+    [ComponentInteraction($"{SwapPrefix}:select:*", ignoreGroupNames: true)]
     public async Task OnSwapSelectAsync(ulong ownerUserId, string[] values)
     {
         if (!await CanUseMenuAsync(ownerUserId))
@@ -17,13 +16,14 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         if (values.Length != 1 || !ulong.TryParse(values[0], out var selected))
         {
             await RespondAsync("Invalid selection.", ephemeral: true);
+
             return;
         }
 
         await ApplySelectionAsync(selected);
     }
 
-    [ComponentInteraction($"{SwapPrefix}:reset:*", true)]
+    [ComponentInteraction($"{SwapPrefix}:reset:*", ignoreGroupNames: true)]
     public async Task OnResetAsync(ulong ownerUserId)
     {
         if (!await CanUseMenuAsync(ownerUserId))
@@ -38,22 +38,23 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         if (Context.Guild is null)
         {
             await RespondAsync("This command can only be used in a guild.", ephemeral: true);
+
             return;
         }
 
         await DeferAsync(true);
 
         ImmutableArray<IRole> eligible = await colours.ListEligibleColoursAsync(
-            Context.Guild,
-            Context.User.Id,
-            CancellationToken.None
+            guild: Context.Guild,
+            userId: Context.User.Id,
+            ct: CancellationToken.None
         );
 
         if (eligible.Length > 25)
         {
             await FollowupAsync(
                 "You have too many eligible colours for one menu. Contact a server administrator. You can still reset your colour.",
-                components: BuildMenu(Context.User.Id, []),
+                components: BuildMenu(ownerUserId: Context.User.Id, []),
                 ephemeral: true
             );
 
@@ -64,7 +65,7 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
             ? "You do not currently have any colours to select. Use Reset to remove your display colour."
             : "Select a colour to apply it, or use Reset to remove your display colour.";
 
-        await FollowupAsync(prompt, components: BuildMenu(Context.User.Id, eligible), ephemeral: true);
+        await FollowupAsync(text: prompt, components: BuildMenu(ownerUserId: Context.User.Id, eligible: eligible), ephemeral: true);
     }
 
     [SlashCommand("list", "List configured role colour options.")]
@@ -73,15 +74,17 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         if (Context.Guild is null)
         {
             await RespondAsync("This command can only be used in a guild.", ephemeral: true);
+
             return;
         }
 
         ImmutableArray<RoleColourOption> options =
-            await operations.ListConfiguredOptionsAsync(Context.Guild.Id, CancellationToken.None);
+            await operations.ListConfiguredOptionsAsync(guildId: Context.Guild.Id, ct: CancellationToken.None);
 
         if (options.IsEmpty)
         {
             await RespondAsync("No colour options are configured.", ephemeral: true);
+
             return;
         }
 
@@ -95,31 +98,18 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         if (!eligible.IsEmpty)
         {
             var menu = new SelectMenuBuilder()
-                .WithCustomId($"{SwapPrefix}:select:{ownerUserId}")
-                .WithPlaceholder("Choose a colour…")
-                .WithMinValues(1)
-                .WithMaxValues(1);
+               .WithCustomId($"{SwapPrefix}:select:{ownerUserId}")
+               .WithPlaceholder("Choose a colour…")
+               .WithMinValues(1)
+               .WithMaxValues(1);
 
             foreach (var role in eligible)
-                menu.AddOption(role.Name, role.Id.ToString());
+                menu.AddOption(label: role.Name, role.Id.ToString());
 
             components.WithSelectMenu(menu);
         }
 
-        return components.WithButton("Reset", $"{SwapPrefix}:reset:{ownerUserId}", ButtonStyle.Danger).Build();
-    }
-
-    private async Task ApplySelectionAsync(ulong? selected)
-    {
-        await DeferAsync(true);
-
-        ErrorOr<Option<ulong>> result =
-            await colours.TrySetUserColourAsync(Context.Guild, Context.User.Id, selected, CancellationToken.None);
-
-        await FollowupAsync(ResultMessage(result), ephemeral: true);
-
-        if (Context.Interaction is SocketMessageComponent component)
-            await component.ModifyOriginalResponseAsync(message => message.Components = new ComponentBuilder().Build());
+        return components.WithButton("Reset", $"{SwapPrefix}:reset:{ownerUserId}", style: ButtonStyle.Danger).Build();
     }
 
     private static string ResultMessage(ErrorOr<Option<ulong>> result)
@@ -133,31 +123,46 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         return "Your display colour has been removed.";
     }
 
-    private async Task<bool> CanUseMenuAsync(ulong ownerUserId)
-    {
-        if (Context.Guild is null)
-        {
-            await RespondAsync("This command can only be used in a guild.", ephemeral: true);
-            return false;
-        }
-
-        if (Context.User.Id != ownerUserId)
-        {
-            await RespondAsync("This colour selection menu is not for you.", ephemeral: true);
-            return false;
-        }
-
-        return true;
-    }
-
     private static string BuildListResponse(IReadOnlyList<RoleColourOption> options)
     {
         var builder = new StringBuilder("Configured colour options:");
 
         foreach (var option in options)
             builder.AppendLine()
-                .Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
+               .Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
 
         return builder.ToString();
+    }
+
+    private async Task ApplySelectionAsync(ulong? selected)
+    {
+        await DeferAsync(true);
+
+        ErrorOr<Option<ulong>> result =
+            await colours.TrySetUserColourAsync(guild: Context.Guild, userId: Context.User.Id, colourId: selected, ct: CancellationToken.None);
+
+        await FollowupAsync(ResultMessage(result), ephemeral: true);
+
+        if (Context.Interaction is SocketMessageComponent component)
+            await component.ModifyOriginalResponseAsync(message => message.Components = new ComponentBuilder().Build());
+    }
+
+    private async Task<bool> CanUseMenuAsync(ulong ownerUserId)
+    {
+        if (Context.Guild is null)
+        {
+            await RespondAsync("This command can only be used in a guild.", ephemeral: true);
+
+            return false;
+        }
+
+        if (Context.User.Id != ownerUserId)
+        {
+            await RespondAsync("This colour selection menu is not for you.", ephemeral: true);
+
+            return false;
+        }
+
+        return true;
     }
 }

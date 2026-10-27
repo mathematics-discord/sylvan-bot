@@ -1,6 +1,6 @@
-namespace SylvanBot.Tests.Common;
-
 using SylvanBot.Common;
+
+namespace SylvanBot.Tests.Common;
 
 public sealed class MessageChunkerTests
 {
@@ -8,7 +8,7 @@ public sealed class MessageChunkerTests
     public void SplitMessageIntoChunks_WithExactLimit_ReturnsOneChunk()
     {
         // Arrange
-        var message = new string('a', 2000);
+        var message = new string(c: 'a', count: 2000);
 
         // Act
         var chunks = MessageChunker.SplitMessageIntoChunks(message).Value;
@@ -23,7 +23,7 @@ public sealed class MessageChunkerTests
         // Arrange
 
         // Act
-        ErrorOr<string[]> result = MessageChunker.SplitMessageIntoChunks("message", 0);
+        ErrorOr<string[]> result = MessageChunker.SplitMessageIntoChunks("message", chunkSize: 0);
 
         // Assert
         result.IsError.ShouldBeTrue();
@@ -34,7 +34,7 @@ public sealed class MessageChunkerTests
     public void SplitMessageIntoChunks_WithMessageOverLimit_ReturnsTwoChunks()
     {
         // Arrange
-        var message = new string('a', 2001);
+        var message = new string(c: 'a', count: 2001);
 
         // Act
         var chunks = MessageChunker.SplitMessageIntoChunks(message).Value;
@@ -49,12 +49,12 @@ public sealed class MessageChunkerTests
     public void SplitMessageIntoChunks_WithNewlineBeforeLimit_SplitsAtNewline()
     {
         // Arrange
-        var firstLine = new string('a', 10);
-        var secondLine = new string('b', 10);
-        var message = $"{firstLine}\n{secondLine}";
+        var firstLine  = new string(c: 'a', count: 10);
+        var secondLine = new string(c: 'b', count: 10);
+        var message    = $"{firstLine}\n{secondLine}";
 
         // Act
-        var chunks = MessageChunker.SplitMessageIntoChunks(message, 12).Value;
+        var chunks = MessageChunker.SplitMessageIntoChunks(message: message, chunkSize: 12).Value;
 
         // Assert
         chunks.ShouldBe([$"{firstLine}\n", secondLine]);
@@ -67,7 +67,7 @@ public sealed class MessageChunkerTests
         var message = "abcdef";
 
         // Act
-        var chunks = MessageChunker.SplitMessageIntoChunks(message, 3).Value;
+        var chunks = MessageChunker.SplitMessageIntoChunks(message: message, chunkSize: 3).Value;
 
         // Assert
         chunks.ShouldBe(["abc", "def"]);

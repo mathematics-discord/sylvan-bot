@@ -1,7 +1,7 @@
-namespace SylvanBot.Features.RoleColours;
-
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Infrastructure.Data;
+
+namespace SylvanBot.Features.RoleColours;
 
 public sealed class RoleColourOperations(BotDbContext db)
 {
@@ -9,7 +9,7 @@ public sealed class RoleColourOperations(BotDbContext db)
     {
         return (
             await db.RoleColourOptions.AsNoTracking().Where(option => option.GuildId == guildId)
-                .OrderBy(option => option.OptionId).ToArrayAsync(ct)
+               .OrderBy(option => option.OptionId).ToArrayAsync(ct)
         ).ToImmutableArray();
     }
 
@@ -25,8 +25,9 @@ public sealed class RoleColourOperations(BotDbContext db)
             return Error.Validation(description: "Mapping ID must be positive.");
 
         var option = optionId.HasValue
-            ? await db.RoleColourOptions.SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId.Value,
-                ct)
+            ? await db.RoleColourOptions.SingleOrDefaultAsync(
+                o => o.GuildId == guildId && o.OptionId == optionId.Value,
+                cancellationToken: ct)
             : null;
 
         if (optionId.HasValue && option is null)
@@ -39,15 +40,17 @@ public sealed class RoleColourOperations(BotDbContext db)
                     && o.SourceRoleId == sourceRoleId
                     && o.DisplayRoleId == displayRoleId
                     && (!optionId.HasValue || o.OptionId != optionId.Value),
-                ct
+                cancellationToken: ct
             )
         )
             return Error.Conflict(description: "That source already grants this colour.");
 
         var created = option is null;
+
         if (option is null)
         {
-            ErrorOr<RoleColourOption> result = RoleColourOption.Create(guildId, sourceRoleId, displayRoleId);
+            ErrorOr<RoleColourOption> result = RoleColourOption.Create(guildId: guildId, sourceRoleId: sourceRoleId, displayRoleId: displayRoleId);
+
             if (result.IsError)
                 return result.Errors;
 
@@ -56,12 +59,14 @@ public sealed class RoleColourOperations(BotDbContext db)
         }
         else
         {
-            ErrorOr<Success> update = option.Update(sourceRoleId, displayRoleId);
+            ErrorOr<Success> update = option.Update(sourceRoleId: sourceRoleId, displayRoleId: displayRoleId);
+
             if (update.IsError)
                 return update.Errors;
         }
 
         await db.SaveChangesAsync(ct);
+
         return (option, created);
     }
 
@@ -71,12 +76,14 @@ public sealed class RoleColourOperations(BotDbContext db)
             return Error.Validation(description: "Mapping ID must be positive.");
 
         var option =
-            await db.RoleColourOptions.SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId, ct);
+            await db.RoleColourOptions.SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId, cancellationToken: ct);
+
         if (option is null)
             return Error.NotFound(description: $"Colour mapping {optionId} was not found in this guild.");
 
         db.RoleColourOptions.Remove(option);
         await db.SaveChangesAsync(ct);
+
         return option;
     }
 }

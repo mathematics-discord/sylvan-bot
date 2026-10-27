@@ -1,9 +1,9 @@
-namespace SylvanBot.Tests;
-
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using SylvanBot.Gateway;
+
+namespace SylvanBot.Tests;
 
 public sealed class DependencyInjectionTests
 {
@@ -11,20 +11,20 @@ public sealed class DependencyInjectionTests
     public void DiscordOptions_DoNotRequireOrExposeARuntimeGuildAllowlist()
     {
         IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(
+           .AddInMemoryCollection(
                 new Dictionary<string, string?>(StringComparer.Ordinal)
                 {
-                    ["Discord:Token"] = "inert-test-token",
+                    ["Discord:Token"]            = "inert-test-token",
                     ["Discord:MessageCacheSize"] = "1000",
                 }
             )
-            .Build();
+           .Build();
 
         var services = new ServiceCollection();
         services.AddOptions<DiscordOptions>().Bind(configuration.GetSection(DiscordOptions.SectionName));
 
         using var provider = services.BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptions<DiscordOptions>>().Value;
+        var       options  = provider.GetRequiredService<IOptions<DiscordOptions>>().Value;
 
         options.Token.ShouldBe("inert-test-token");
         typeof(DiscordOptions).GetProperty("CommandRegistrationGuildIds").ShouldBeNull();

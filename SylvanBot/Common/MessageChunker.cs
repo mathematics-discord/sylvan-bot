@@ -20,15 +20,16 @@ public static class MessageChunker
             if (remainingLength <= chunkSize)
             {
                 chunks.Enqueue(message[index..]);
+
                 break;
             }
 
-            var window = message.Substring(index, chunkSize);
+            var window  = message.Substring(startIndex: index, length: chunkSize);
             var splitAt = window.LastIndexOf('\n');
 
             var chunkLength = splitAt > 0 ? splitAt + 1 : chunkSize;
 
-            chunks.Enqueue(message.Substring(index, chunkLength));
+            chunks.Enqueue(message.Substring(startIndex: index, length: chunkLength));
             index += chunkLength;
         }
 

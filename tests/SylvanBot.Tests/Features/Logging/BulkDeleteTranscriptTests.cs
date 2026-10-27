@@ -1,8 +1,9 @@
-namespace SylvanBot.Tests.Features.Logging;
-
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using SylvanBot.Features.Logging;
+
+namespace SylvanBot.Tests.Features.Logging;
 
 [TestFixture]
 public sealed class BulkDeleteTranscriptTests
@@ -18,10 +19,10 @@ public sealed class BulkDeleteTranscriptTests
 
         // Assert
         using var document = JsonDocument.Parse(bytes);
-        var row = document.RootElement;
+        var       row      = document.RootElement;
 
         var propertyCount = row.EnumerateObject()
-            .Count();
+           .Count();
 
         propertyCount.ShouldBe(3);
         row.GetProperty("author_id").GetString().ShouldBe("18446744073709551615");
@@ -51,11 +52,11 @@ public sealed class BulkDeleteTranscriptTests
     public void Create_ManyLongMessages_PreservesEveryRecordAndFullContent()
     {
         // Arrange
-        var content = new string('x', 4000);
+        var content = new string(c: 'x', count: 4000);
 
-        (ulong AuthorId, ulong ChannelId, string Content)[] messages = Enumerable.Range(1, 100)
-            .Select(index => (AuthorId: (ulong)index, ChannelId: 268882317391429632UL, Content: content))
-            .ToArray();
+        (ulong AuthorId, ulong ChannelId, string Content)[] messages = Enumerable.Range(start: 1, count: 100)
+           .Select(index => (AuthorId: (ulong)index, ChannelId: 268882317391429632UL, Content: content))
+           .ToArray();
 
         // Act
         var text = Encoding.UTF8.GetString(BulkDeleteTranscript.Create(messages));
@@ -68,8 +69,8 @@ public sealed class BulkDeleteTranscriptTests
         for (var index = 0; index < messages.Length; index++)
         {
             using var document = JsonDocument.Parse(lines[index]);
-            var row = document.RootElement;
-            row.GetProperty("author_id").GetString().ShouldBe((index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            var       row      = document.RootElement;
+            row.GetProperty("author_id").GetString().ShouldBe((index + 1).ToString(CultureInfo.InvariantCulture));
             row.GetProperty("content").GetString().ShouldBe(content);
         }
     }

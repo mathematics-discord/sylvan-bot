@@ -1,32 +1,23 @@
-﻿namespace SylvanBot.Features.Moderation;
-
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Common;
 using SylvanBot.Infrastructure.Data;
+
+namespace SylvanBot.Features.Moderation;
 
 public sealed class ImageSpamSettingsService(
     BotDbContext dbContext,
     ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild)
 {
-    private static ImageBurstSpamDetectorOptions ToOptions(ImageSpamSettings settings) =>
-        new()
-        {
-            Window = settings.BurstDurationSeconds,
-            DistinctChannelThreshold = settings.RequiredChannelCount,
-            RequiredAttachmentCount = settings.RequiredAttachmentCount,
-        };
-
     public async Task<Option<ImageBurstSpamDetectorOptions>> GetCurrentAsync(ulong guildId, CancellationToken ct)
     {
         var settings = await dbContext.ImageSpamSettings
-            .AsNoTracking()
-            .SingleOrDefaultAsync(x => x.GuildId == guildId, ct)
-            .ConfigureAwait(false);
+           .AsNoTracking()
+           .SingleOrDefaultAsync(x => x.GuildId == guildId, cancellationToken: ct)
+           .ConfigureAwait(false);
 
         if (settings is not { IsEnabled: true })
         {
-            settingsByGuild.TryRemove(guildId, out _);
+            settingsByGuild.TryRemove(key: guildId, value: out _);
 
             return new None();
         }
@@ -40,10 +31,10 @@ public sealed class ImageSpamSettingsService(
     public async Task LoadEnabledSettingsAsync(CancellationToken ct)
     {
         List<ImageSpamSettings> settings = await dbContext.ImageSpamSettings
-            .AsNoTracking()
-            .Where(x => x.IsEnabled)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
+           .AsNoTracking()
+           .Where(x => x.IsEnabled)
+           .ToListAsync(ct)
+           .ConfigureAwait(false);
 
         foreach (var setting in settings)
             settingsByGuild[setting.GuildId] = ToOptions(setting);
@@ -57,8 +48,8 @@ public sealed class ImageSpamSettingsService(
         CancellationToken ct)
     {
         var settings = await dbContext.ImageSpamSettings
-            .SingleOrDefaultAsync(x => x.GuildId == guildId, ct)
-            .ConfigureAwait(false);
+           .SingleOrDefaultAsync(x => x.GuildId == guildId, cancellationToken: ct)
+           .ConfigureAwait(false);
 
         if (settings is null)
         {
@@ -66,7 +57,7 @@ public sealed class ImageSpamSettingsService(
             dbContext.ImageSpamSettings.Add(settings);
         }
 
-        settings.Update(requiredChannelCount, requiredAttachmentCount, burstDurationSeconds);
+        settings.Update(requiredChannelCount: requiredChannelCount, requiredAttachmentCount: requiredAttachmentCount, burstDurationSeconds: burstDurationSeconds);
         await dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
 
         var options = ToOptions(settings);
@@ -74,4 +65,12 @@ public sealed class ImageSpamSettingsService(
 
         return options;
     }
+
+    private static ImageBurstSpamDetectorOptions ToOptions(ImageSpamSettings settings) =>
+        new()
+        {
+            Window                   = settings.BurstDurationSeconds,
+            DistinctChannelThreshold = settings.RequiredChannelCount,
+            RequiredAttachmentCount  = settings.RequiredAttachmentCount,
+        };
 }

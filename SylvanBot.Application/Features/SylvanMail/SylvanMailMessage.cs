@@ -1,6 +1,6 @@
-﻿namespace SylvanBot.Application.Features.SylvanMail;
+﻿using System.Collections.Immutable;
 
-using System.Collections.Immutable;
+namespace SylvanBot.Application.Features.SylvanMail;
 
 // Payloads live only for the lifetime of the bounded gateway work item, never in the database.
 public sealed record SylvanMailMessage(

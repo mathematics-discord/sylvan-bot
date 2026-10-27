@@ -1,6 +1,6 @@
-namespace SylvanBot.Tests.Features.Logging;
-
 using SylvanBot.Features.Logging;
+
+namespace SylvanBot.Tests.Features.Logging;
 
 [TestFixture]
 public sealed class MessageEditDifferTests
@@ -10,10 +10,10 @@ public sealed class MessageEditDifferTests
     {
         // Arrange
         const string before = "Hayes";
-        const string after = "hates";
+        const string after  = "hates";
 
         // Act
-        var diff = MessageEditDiffer.BuildDiff(before, after);
+        var diff = MessageEditDiffer.BuildDiff(before: before, after: after);
 
         // Assert
         diff.Before.ShouldBe("\e[1;31mH\e[0ma\e[1;31my\e[0mes");
@@ -25,10 +25,10 @@ public sealed class MessageEditDifferTests
     {
         // Arrange
         const string before = "which are `significant' (disregarding the rest";
-        const string after = "instead (and disregarding the rest";
+        const string after  = "instead (and disregarding the rest";
 
         // Act
-        var diff = MessageEditDiffer.BuildDiff(before, after);
+        var diff = MessageEditDiffer.BuildDiff(before: before, after: after);
 
         // Assert
         diff.Before.ShouldBe("\e[1;31mwhich are `significant' (\e[0mdisregarding the rest");

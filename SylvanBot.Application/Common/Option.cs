@@ -12,12 +12,14 @@ public sealed class Option<T>
     public static implicit operator Option<T>(None value)
     {
         ArgumentNullException.ThrowIfNull(value);
+
         return new Option<T>(value);
     }
 
     public static implicit operator Option<T>(Some<T> value)
     {
         ArgumentNullException.ThrowIfNull(value);
+
         return new Option<T>(value);
     }
 }

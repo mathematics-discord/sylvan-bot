@@ -12,10 +12,9 @@ public sealed class WorkingHoursWorker(
             while (!ct.IsCancellationRequested)
             {
                 foreach (var guild in client.Guilds)
-                {
                     try
                     {
-                        await coordinator.ReconcileAsync(guild.Id, ct);
+                        await coordinator.ReconcileAsync(guildId: guild.Id, ct: ct);
                     }
                     catch (OperationCanceledException) when (ct.IsCancellationRequested)
                     {
@@ -23,11 +22,10 @@ public sealed class WorkingHoursWorker(
                     }
                     catch (Exception ex)
                     {
-                        logger.Error(ex, "Working Hours pass failed for guild {GuildId}", guild.Id);
+                        logger.Error(exception: ex, "Working Hours pass failed for guild {GuildId}", propertyValue: guild.Id);
                     }
-                }
 
-                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken: ct);
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

@@ -1,7 +1,7 @@
-﻿namespace SylvanBot.Features.RoleColours.Persistence;
-
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace SylvanBot.Features.RoleColours.Persistence;
 
 public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<RoleColourOption>
 {
@@ -11,7 +11,8 @@ public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<Rol
             "RoleColourOptions",
             table =>
             {
-                table.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles",
+                table.HasCheckConstraint(
+                    "CK_RoleColourOptions_DifferentRoles",
                     "\"SourceRoleId\" <> \"DisplayRoleId\"");
             }
         );
@@ -27,12 +28,12 @@ public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<Rol
         builder.Property(x => x.UpdatedAtUtc).IsRequired().HasColumnType("timestamp with time zone");
 
         builder
-            .HasIndex(x => new
+           .HasIndex(x => new
             {
                 x.GuildId,
                 x.SourceRoleId,
-                x.DisplayRoleId
+                x.DisplayRoleId,
             })
-            .IsUnique();
+           .IsUnique();
     }
 }

@@ -6,7 +6,8 @@ sidebar:
   order: 0
 ---
 
-Find the command you need on <a href="https://discord.gg/math" target="_blank" rel="noopener noreferrer">Mathematics</a>. Select a guide for examples
+Find the command you need on <a href="https://discord.gg/math" target="_blank" rel="noopener noreferrer">
+Mathematics</a>. Select a guide for examples
 and instructions.
 
 ## Everyone
@@ -24,7 +25,8 @@ and instructions.
 
 ## Administration
 
-- [/config sylvanmail](./sylvanmail/#administrator-configuration) — Select the private mail forum and staff role. The entire
+- [/config sylvanmail](./sylvanmail/#administrator-configuration) — Select the private mail forum and staff role. The
+  entire
   `/config` group requires Administrator.
 
 - [/colour-admin](./color-admin/) — Configure which roles grant access

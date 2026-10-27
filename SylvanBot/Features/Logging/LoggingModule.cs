@@ -1,8 +1,8 @@
-namespace SylvanBot.Features.Logging;
-
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Infrastructure.Data;
+
+namespace SylvanBot.Features.Logging;
 
 [Group("logging", "Moderation logging commands.")]
 [DefaultMemberPermissions(GuildPermission.Administrator)]
@@ -14,9 +14,9 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
 {
     [SlashCommand("config", "View or update moderation logging configuration.")]
     public async Task ConfigAsync(
-        [Summary("enabled", "Whether moderation logging is enabled.")] bool? enabled = null,
-        [Summary("delete-log-channel", "Channel for delete and bulk-delete logs.")]
-        [ChannelTypes(ChannelType.Text, ChannelType.News)]
+        [Summary("enabled", "Whether moderation logging is enabled.")]
+        bool? enabled = null,
+        [Summary("delete-log-channel", "Channel for delete and bulk-delete logs.")] [ChannelTypes(ChannelType.Text, ChannelType.News)]
         IChannel? deleteLogChannel = null,
         [Summary("edit-log-channel", "Channel for edit logs.")] [ChannelTypes(ChannelType.Text, ChannelType.News)]
         IChannel? editLogChannel = null)
@@ -28,7 +28,7 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
         await using var dbContext = await contextFactory.CreateDbContextAsync();
 
         var configuration = await dbContext.LoggingConfigurations
-            .SingleOrDefaultAsync(configuration => configuration.GuildId == Context.Guild.Id);
+           .SingleOrDefaultAsync(configuration => configuration.GuildId == Context.Guild.Id);
 
         var isNew = configuration is null;
         configuration ??= new LoggingConfiguration { GuildId = Context.Guild.Id };
@@ -36,25 +36,25 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
 
         if (hasUpdates)
         {
-            var updatedEnabled = enabled ?? configuration.Enabled;
+            var updatedEnabled     = enabled ?? configuration.Enabled;
             var deleteLogChannelId = deleteLogChannel?.Id ?? configuration.DeleteLogChannelId;
-            var editLogChannelId = editLogChannel?.Id ?? configuration.EditLogChannelId;
+            var editLogChannelId   = editLogChannel?.Id ?? configuration.EditLogChannelId;
 
             var enablingWithoutDestination = updatedEnabled
-                                             && deleteLogChannelId is null
-                                             && editLogChannelId is null;
+                && deleteLogChannelId is null
+                && editLogChannelId is null;
 
             if (enablingWithoutDestination)
             {
                 await ModifyOriginalResponseAsync(response =>
-                    response.Content = "Enable logging only after setting a delete or edit log channel.");
+                                                      response.Content = "Enable logging only after setting a delete or edit log channel.");
 
                 return;
             }
 
-            configuration.Enabled = updatedEnabled;
+            configuration.Enabled            = updatedEnabled;
             configuration.DeleteLogChannelId = deleteLogChannelId;
-            configuration.EditLogChannelId = editLogChannelId;
+            configuration.EditLogChannelId   = editLogChannelId;
 
             if (isNew)
                 dbContext.LoggingConfigurations.Add(configuration);
@@ -82,16 +82,16 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
             return;
 
         await DeferAsync(ephemeral: true);
-        var targetChannel = channel ?? Context.Channel;
-        await using var dbContext = await contextFactory.CreateDbContextAsync();
+        var             targetChannel = channel ?? Context.Channel;
+        await using var dbContext     = await contextFactory.CreateDbContextAsync();
 
         var isExcluded = await dbContext.LoggingExcludedChannels
-            .AnyAsync(excluded => excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
+           .AnyAsync(excluded => excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
 
         if (isExcluded)
         {
             await ModifyOriginalResponseAsync(response =>
-                response.Content = $"<#{targetChannel.Id}> is already excluded from logging.");
+                                                  response.Content = $"<#{targetChannel.Id}> is already excluded from logging.");
 
             return;
         }
@@ -99,15 +99,15 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
         dbContext.LoggingExcludedChannels.Add(
             new LoggingExcludedChannel
             {
-                GuildId = Context.Guild.Id,
-                ChannelId = targetChannel.Id,
+                GuildId       = Context.Guild.Id,
+                ChannelId     = targetChannel.Id,
                 ExcludedAtUtc = DateTimeOffset.UtcNow,
             });
 
         await dbContext.SaveChangesAsync();
 
         await ModifyOriginalResponseAsync(response =>
-            response.Content = $"Logging is now excluded in <#{targetChannel.Id}>.");
+                                              response.Content = $"Logging is now excluded in <#{targetChannel.Id}>.");
     }
 
     [SlashCommand("include", "Enable moderation logging again for a channel.")]
@@ -127,17 +127,17 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
             return;
 
         await DeferAsync(ephemeral: true);
-        var targetChannel = channel ?? Context.Channel;
-        await using var dbContext = await contextFactory.CreateDbContextAsync();
+        var             targetChannel = channel ?? Context.Channel;
+        await using var dbContext     = await contextFactory.CreateDbContextAsync();
 
         var exclusion = await dbContext.LoggingExcludedChannels
-            .SingleOrDefaultAsync(excluded =>
-                excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
+           .SingleOrDefaultAsync(excluded =>
+                                     excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
 
         if (exclusion is null)
         {
             await ModifyOriginalResponseAsync(response =>
-                response.Content = $"<#{targetChannel.Id}> was not excluded from logging.");
+                                                  response.Content = $"<#{targetChannel.Id}> was not excluded from logging.");
 
             return;
         }
@@ -146,7 +146,7 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
         await dbContext.SaveChangesAsync();
 
         await ModifyOriginalResponseAsync(response =>
-            response.Content = $"Logging is enabled again in <#{targetChannel.Id}>.");
+                                              response.Content = $"Logging is enabled again in <#{targetChannel.Id}>.");
     }
 
     [SlashCommand("exclusions", "List channels excluded from moderation logging.")]
@@ -159,11 +159,11 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
         await using var dbContext = await contextFactory.CreateDbContextAsync();
 
         var channelIds = await dbContext.LoggingExcludedChannels
-            .AsNoTracking()
-            .Where(exclusion => exclusion.GuildId == Context.Guild.Id)
-            .OrderBy(exclusion => exclusion.ChannelId)
-            .Select(exclusion => exclusion.ChannelId)
-            .ToArrayAsync();
+           .AsNoTracking()
+           .Where(exclusion => exclusion.GuildId == Context.Guild.Id)
+           .OrderBy(exclusion => exclusion.ChannelId)
+           .Select(exclusion => exclusion.ChannelId)
+           .ToArrayAsync();
 
         if (channelIds.Length == 0)
         {
@@ -172,9 +172,9 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
             return;
         }
 
-        const string heading = "Excluded logging channels:";
+        const string heading   = "Excluded logging channels:";
         List<string> responses = [];
-        var content = heading;
+        var          content   = heading;
 
         foreach (var channelId in channelIds)
         {
@@ -193,10 +193,10 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
         await ModifyOriginalResponseAsync(response => response.Content = responses[0]);
 
         IEnumerable<string> followups = responses
-            .Skip(1);
+           .Skip(1);
 
         foreach (var followup in followups)
-            await FollowupAsync(followup, ephemeral: true);
+            await FollowupAsync(text: followup, ephemeral: true);
     }
 
     private static string FormatConfiguration(LoggingConfiguration configuration)
@@ -210,9 +210,9 @@ public sealed class LoggingModule(IDbContextFactory<BotDbContext> contextFactory
             : $"<#{configuration.EditLogChannelId.Value}>";
 
         return "Logging configuration:\n"
-               + $"- Enabled: {configuration.Enabled}\n"
-               + $"- Delete log channel: {deleteLogChannel}\n"
-               + $"- Edit log channel: {editLogChannel}";
+            + $"- Enabled: {configuration.Enabled}\n"
+            + $"- Delete log channel: {deleteLogChannel}\n"
+            + $"- Edit log channel: {editLogChannel}";
     }
 
     private async Task<bool> ValidateTextContextAsync()

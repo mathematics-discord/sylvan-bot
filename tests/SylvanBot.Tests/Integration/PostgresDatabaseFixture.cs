@@ -1,10 +1,11 @@
-namespace SylvanBot.Tests.Integration;
-
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using SylvanBot.Infrastructure.Data;
 using Testcontainers.PostgreSql;
+
+namespace SylvanBot.Tests.Integration;
 
 [SetUpFixture]
 [SuppressMessage("Structure", "NUnit1028:The non-test method is public")]
@@ -17,20 +18,12 @@ public sealed class PostgresDatabaseFixture
     public static BotDbContext CreateDbContext()
     {
         DbContextOptions<BotDbContext> options = new DbContextOptionsBuilder<BotDbContext>()
-            .UseNpgsql(ConnectionString, postgres => postgres.MigrationsAssembly("SylvanBot"))
-            .EnableSensitiveDataLogging()
-            .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))
-            .Options;
+           .UseNpgsql(connectionString: ConnectionString, postgres => postgres.MigrationsAssembly("SylvanBot"))
+           .EnableSensitiveDataLogging()
+           .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))
+           .Options;
 
         return new BotDbContext(options);
-    }
-
-    internal static IDbContextFactory<BotDbContext> CreateContextFactory()
-    {
-        return new Microsoft.EntityFrameworkCore.Infrastructure.PooledDbContextFactory<BotDbContext>(
-            new DbContextOptionsBuilder<BotDbContext>()
-                .UseNpgsql(ConnectionString, postgres => postgres.MigrationsAssembly("SylvanBot"))
-                .Options);
     }
 
     public static async Task ResetAsync()
@@ -61,5 +54,13 @@ public sealed class PostgresDatabaseFixture
     public async Task OneTimeTearDown()
     {
         await _container.DisposeAsync();
+    }
+
+    internal static IDbContextFactory<BotDbContext> CreateContextFactory()
+    {
+        return new PooledDbContextFactory<BotDbContext>(
+            new DbContextOptionsBuilder<BotDbContext>()
+               .UseNpgsql(connectionString: ConnectionString, postgres => postgres.MigrationsAssembly("SylvanBot"))
+               .Options);
     }
 }

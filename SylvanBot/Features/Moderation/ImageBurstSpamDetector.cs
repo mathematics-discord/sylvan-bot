@@ -1,7 +1,6 @@
-﻿namespace SylvanBot.Features.Moderation;
+﻿using System.Collections.Concurrent;
 
-using System.Collections.Concurrent;
-using SylvanBot.Application.Common;
+namespace SylvanBot.Features.Moderation;
 
 public sealed class ImageBurstSpamDetector(
     TimeProvider timeProvider,
@@ -15,24 +14,25 @@ public sealed class ImageBurstSpamDetector(
 
     public Option<ImageBurstDetection> Observe(ImageBurstMessage message)
     {
-        var key = new ImageBurstBufferKey(message.GuildId, message.UserId);
+        var key = new ImageBurstBufferKey(GuildId: message.GuildId, UserId: message.UserId);
         var now = timeProvider.GetUtcNow();
 
         lock (_gate)
         {
             PruneExpiredLocks(now);
 
-            var isLocked = _handlingLocks.TryGetValue(key, out var lockedUntil) && lockedUntil > now;
+            var isLocked = _handlingLocks.TryGetValue(key: key, out var lockedUntil) && lockedUntil > now;
+
             if (isLocked)
                 return new None();
 
-            if (!settingsByGuild.TryGetValue(message.GuildId, out var options))
+            if (!settingsByGuild.TryGetValue(key: message.GuildId, out var options))
                 return new None();
 
             Queue<ImageBurstMessage> buffer = GetBuffer(key);
 
             buffer.Enqueue(message);
-            PruneOldMessages(buffer, message.Timestamp - TimeSpan.FromSeconds(options.Window));
+            PruneOldMessages(buffer: buffer, message.Timestamp - TimeSpan.FromSeconds(options.Window));
 
             var channelIds = buffer.Select(x => x.ChannelId).Distinct().Order().ToArray();
 
@@ -45,7 +45,7 @@ public sealed class ImageBurstSpamDetector(
                 new ImageBurstDetection(
                     GuildId: message.GuildId,
                     UserId: message.UserId,
-                    Messages: buffer.ToArray(),
+                    buffer.ToArray(),
                     ChannelIds: channelIds));
         }
     }
@@ -58,7 +58,7 @@ public sealed class ImageBurstSpamDetector(
 
     private Queue<ImageBurstMessage> GetBuffer(ImageBurstBufferKey key)
     {
-        if (_buffers.TryGetValue(key, out Queue<ImageBurstMessage>? buffer))
+        if (_buffers.TryGetValue(key: key, out Queue<ImageBurstMessage>? buffer))
             return buffer;
 
         Queue<ImageBurstMessage> newBuffer = new();

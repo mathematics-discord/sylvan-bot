@@ -1,112 +1,112 @@
 @font-face {
-  font-family: 'Source Sans 3';
-  font-style: normal;
-  font-weight: 200 900;
-  font-display: swap;
-  src: url('../assets/fonts/source-sans-3/source-sans-3-regular.ttf') format('truetype');
+    font-family: 'Source Sans 3';
+    font-style: normal;
+    font-weight: 200 900;
+    font-display: swap;
+    src: url('../assets/fonts/source-sans-3/source-sans-3-regular.ttf') format('truetype');
 }
 
 @font-face {
-  font-family: 'Source Sans 3';
-  font-style: italic;
-  font-weight: 200 900;
-  font-display: swap;
-  src: url('../assets/fonts/source-sans-3/source-sans-3-italic.ttf') format('truetype');
+    font-family: 'Source Sans 3';
+    font-style: italic;
+    font-weight: 200 900;
+    font-display: swap;
+    src: url('../assets/fonts/source-sans-3/source-sans-3-italic.ttf') format('truetype');
 }
 
 /* The ratgirl.dev palette. Starlight sets data-theme, including in Auto mode. */
 :root {
-  --paper: #24211f;
-  --ink: #e9ded0;
-  --muted: #b5a89b;
-  --accent: #e3a58b;
-  --line: #484039;
-  --wash: #302923;
-  --code: #36302b;
+    --paper: #24211f;
+    --ink: #e9ded0;
+    --muted: #b5a89b;
+    --accent: #e3a58b;
+    --line: #484039;
+    --wash: #302923;
+    --code: #36302b;
 }
 
 :root[data-theme='light'] {
-  --paper: #f8f5ef;
-  --ink: #40332e;
-  --muted: #76695f;
-  --accent: #9b503a;
-  --line: #ded5c9;
-  --wash: #f0e5d7;
-  --code: #eee7dd;
+    --paper: #f8f5ef;
+    --ink: #40332e;
+    --muted: #76695f;
+    --accent: #9b503a;
+    --line: #ded5c9;
+    --wash: #f0e5d7;
+    --code: #eee7dd;
 }
 
 /* Starlight's white/black tokens mean foreground/background in BOTH modes.
    Map the grey scale by role so UI text stays legible on the warm surfaces. */
 :root,
 :root[data-theme='light'] {
-  --sl-color-white: var(--ink);
-  --sl-color-black: var(--paper);
-  --sl-color-gray-1: var(--ink);
-  --sl-color-gray-2: var(--muted);
-  --sl-color-gray-3: var(--muted);
-  --sl-color-gray-4: var(--muted);
-  --sl-color-gray-5: var(--line);
-  --sl-color-gray-6: var(--wash);
-  --sl-color-gray-7: var(--paper);
-  --sl-color-accent-low: var(--wash);
-  --sl-color-accent: var(--accent);
-  --sl-color-accent-high: var(--accent);
-  --sl-color-text: var(--ink);
-  --sl-color-text-accent: var(--accent);
-  --sl-color-text-invert: var(--paper);
-  --sl-color-bg: var(--paper);
-  --sl-color-bg-nav: var(--paper);
-  --sl-color-bg-sidebar: var(--paper);
-  --sl-color-bg-inline-code: var(--code);
-  --sl-color-bg-accent: var(--accent);
-  --sl-color-hairline: var(--line);
-  --sl-color-hairline-light: var(--line);
-  --sl-color-hairline-shade: var(--line);
-  --sl-color-backdrop-overlay: rgb(36 33 31 / 66%);
-  --sl-shadow-sm: none;
-  --sl-shadow-md: 0 6px 18px rgb(36 26 18 / 6%);
-  --sl-shadow-lg: 0 6px 18px rgb(36 26 18 / 12%);
+    --sl-color-white: var(--ink);
+    --sl-color-black: var(--paper);
+    --sl-color-gray-1: var(--ink);
+    --sl-color-gray-2: var(--muted);
+    --sl-color-gray-3: var(--muted);
+    --sl-color-gray-4: var(--muted);
+    --sl-color-gray-5: var(--line);
+    --sl-color-gray-6: var(--wash);
+    --sl-color-gray-7: var(--paper);
+    --sl-color-accent-low: var(--wash);
+    --sl-color-accent: var(--accent);
+    --sl-color-accent-high: var(--accent);
+    --sl-color-text: var(--ink);
+    --sl-color-text-accent: var(--accent);
+    --sl-color-text-invert: var(--paper);
+    --sl-color-bg: var(--paper);
+    --sl-color-bg-nav: var(--paper);
+    --sl-color-bg-sidebar: var(--paper);
+    --sl-color-bg-inline-code: var(--code);
+    --sl-color-bg-accent: var(--accent);
+    --sl-color-hairline: var(--line);
+    --sl-color-hairline-light: var(--line);
+    --sl-color-hairline-shade: var(--line);
+    --sl-color-backdrop-overlay: rgb(36 33 31 / 66%);
+    --sl-shadow-sm: none;
+    --sl-shadow-md: 0 6px 18px rgb(36 26 18 / 6%);
+    --sl-shadow-lg: 0 6px 18px rgb(36 26 18 / 12%);
 
-  --sl-font: 'Source Sans 3', system-ui, sans-serif;
-  --sl-font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
-  --sl-text-h1: 1.875rem;
-  --sl-text-h2: 1.5rem;
-  --sl-text-h3: 1.25rem;
-  --sl-text-h4: 1.125rem;
-  --sl-text-h5: 1rem;
-  --sl-text-h6: 1rem;
-  --sl-line-height: 1.8;
-  --sl-line-height-headings: 1.4;
-  --sl-content-width: 46.25rem;
-  --sl-sidebar-width: 14rem;
+    --sl-font: 'Source Sans 3', system-ui, sans-serif;
+    --sl-font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+    --sl-text-h1: 1.875rem;
+    --sl-text-h2: 1.5rem;
+    --sl-text-h3: 1.25rem;
+    --sl-text-h4: 1.125rem;
+    --sl-text-h5: 1rem;
+    --sl-text-h6: 1rem;
+    --sl-line-height: 1.8;
+    --sl-line-height-headings: 1.4;
+    --sl-content-width: 46.25rem;
+    --sl-sidebar-width: 14rem;
 }
 
 body {
-  -webkit-font-smoothing: antialiased;
+    -webkit-font-smoothing: antialiased;
 }
 
 /* Starlight otherwise adds spare page width to the table-of-contents column. */
 @media (min-width: 72rem) {
-  .right-sidebar-container {
-    flex: 0 0 var(--sl-sidebar-width);
-    width: var(--sl-sidebar-width);
-  }
+    .right-sidebar-container {
+        flex: 0 0 var(--sl-sidebar-width);
+        width: var(--sl-sidebar-width);
+    }
 
-  .right-sidebar {
-    width: var(--sl-sidebar-width);
-  }
+    .right-sidebar {
+        width: var(--sl-sidebar-width);
+    }
 
-  [data-has-sidebar][data-has-toc] .main-pane {
-    flex: 1;
-    min-width: 0;
-    width: auto;
-    --sl-content-margin-inline: auto;
-  }
+    [data-has-sidebar][data-has-toc] .main-pane {
+        flex: 1;
+        min-width: 0;
+        width: auto;
+        --sl-content-margin-inline: auto;
+    }
 }
 
 ::selection {
-  background: var(--accent);
-  color: var(--paper);
+    background: var(--accent);
+    color: var(--paper);
 }
 
 h1,
@@ -115,87 +115,87 @@ h3,
 h4,
 h5,
 h6 {
-  font-weight: 400;
-  letter-spacing: normal;
+    font-weight: 400;
+    letter-spacing: normal;
 }
 
 /* Keep the personal site's Georgia wordmark separate from the docs font. */
 .site-title {
-  font-family: Georgia, serif;
-  font-size: 1.4375rem;
-  font-weight: 700;
-  letter-spacing: -0.6px;
-  color: var(--ink);
+    font-family: Georgia, serif;
+    font-size: 1.4375rem;
+    font-weight: 700;
+    letter-spacing: -0.6px;
+    color: var(--ink);
 }
 
 .sl-markdown-content a {
-  text-decoration-thickness: 1px;
-  text-underline-offset: 4px;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
 }
 
 .sl-markdown-content a:hover {
-  text-decoration-thickness: 2px;
+    text-decoration-thickness: 2px;
 }
 
 /* Inline Discord-style role labels; keep the role colour local to the mention. */
 .role-mention {
-  --role-color: var(--accent);
-  color: color-mix(in srgb, var(--role-color) 85%, var(--ink));
-  background: color-mix(in srgb, var(--role-color) 10%, var(--paper));
-  border: 1px solid color-mix(in srgb, var(--role-color) 24%, var(--paper));
-  border-radius: 0.3em;
-  padding: 0.05em 0.3em;
-  font-family: var(--sl-font);
-  font-size: 0.88em;
-  white-space: nowrap;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
+    --role-color: var(--accent);
+    color: color-mix(in srgb, var(--role-color) 85%, var(--ink));
+    background: color-mix(in srgb, var(--role-color) 10%, var(--paper));
+    border: 1px solid color-mix(in srgb, var(--role-color) 24%, var(--paper));
+    border-radius: 0.3em;
+    padding: 0.05em 0.3em;
+    font-family: var(--sl-font);
+    font-size: 0.88em;
+    white-space: nowrap;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
 }
 
 :root[data-theme='light'] .role-mention {
-  color: color-mix(in srgb, var(--role-color) 30%, var(--ink));
+    color: color-mix(in srgb, var(--role-color) 30%, var(--ink));
 }
 
 :where(a, button, input, select, summary):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: 3px;
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 3px;
 }
 
 .sidebar-content .large {
-  font-size: 1rem;
-  font-weight: 400;
+    font-size: 1rem;
+    font-weight: 400;
 }
 
 .sidebar-content a:hover,
 .sidebar-content a[aria-current='page'] {
-  color: var(--accent);
-  background: var(--wash);
+    color: var(--accent);
+    background: var(--wash);
 }
 
 .sidebar-content a[aria-current='page'] {
-  font-weight: 400;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 4px;
+    font-weight: 400;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 4px;
 }
 
 starlight-toc a[aria-current='true'] {
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 4px;
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 4px;
 }
 
 site-search button[data-open-modal],
 site-search dialog {
-  border-radius: 5px;
+    border-radius: 5px;
 }
 
 #starlight__search {
-  --pagefind-ui-primary: var(--accent);
-  --pagefind-ui-text: var(--ink);
-  --pagefind-ui-background: var(--paper);
-  --pagefind-ui-border: var(--line);
-  --pagefind-ui-tag: var(--wash);
-  --pagefind-ui-font: var(--sl-font);
+    --pagefind-ui-primary: var(--accent);
+    --pagefind-ui-text: var(--ink);
+    --pagefind-ui-background: var(--paper);
+    --pagefind-ui-border: var(--line);
+    --pagefind-ui-tag: var(--wash);
+    --pagefind-ui-font: var(--sl-font);
 }

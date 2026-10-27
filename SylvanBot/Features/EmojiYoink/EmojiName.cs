@@ -19,8 +19,5 @@ public static class EmojiName
             : EmojiYoinkErrors.InvalidDestinationName;
     }
 
-    private static bool IsValidCharacter(char character)
-    {
-        return character is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '_';
-    }
+    private static bool IsValidCharacter(char character) => character is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '_';
 }

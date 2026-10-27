@@ -1,7 +1,5 @@
 ﻿namespace SylvanBot.Application.Features.WorkingHours;
 
-using ErrorOr;
-
 public sealed class WorkingHoursSettings
 {
     public ulong GuildId { get; set; }
@@ -20,12 +18,13 @@ public sealed class WorkingHoursSettings
             return Error.Validation(description: "Disable Working Hours before changing the ping role.");
 
         var eligible = EligibleRoles
-            .Any(role => role.RoleId == roleId);
+           .Any(role => role.RoleId == roleId);
 
         if (roleId == 0 || roleId == GuildId || eligible)
             return Error.Validation(description: "The ping role cannot be @everyone, an eligible role or an exemption role.");
 
         PingRoleId = roleId;
+
         return Result.Success;
     }
 
@@ -35,7 +34,7 @@ public sealed class WorkingHoursSettings
             return Error.Validation(description: "An eligible role cannot be @everyone or the ping role.");
 
         var role = EligibleRoles
-            .SingleOrDefault(item => item.RoleId == roleId);
+           .SingleOrDefault(item => item.RoleId == roleId);
 
         if (add)
         {
@@ -55,13 +54,14 @@ public sealed class WorkingHoursSettings
             return Error.Validation(description: "Disable Working Hours before removing the last eligible role.");
 
         EligibleRoles.Remove(role);
+
         return Result.Success;
     }
 
     public ErrorOr<Success> ChangeExemptRole(ulong roleId, bool add)
     {
         var role = EligibleRoles
-            .SingleOrDefault(item => item.RoleId == roleId);
+           .SingleOrDefault(item => item.RoleId == roleId);
 
         if (role is null)
         {
@@ -72,6 +72,7 @@ public sealed class WorkingHoursSettings
         }
 
         role.IsExempt = add;
+
         return Result.Success;
     }
 

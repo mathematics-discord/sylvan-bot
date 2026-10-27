@@ -1,7 +1,5 @@
 ﻿namespace SylvanBot.Features.Quorum.Commands;
 
-using SylvanBot.Application.Common;
-
 public static class QuorumChannelResolver
 {
     public static IGuildChannel ResolveChannel(IGuild? currentGuild, IChannel channel)
@@ -25,8 +23,8 @@ public static class QuorumChannelResolver
         return channel switch
         {
             IForumChannel forum => forum,
-            ITextChannel text => text,
-            _ => throw new BotCommandException("Choose a guild text channel or forum channel."),
+            ITextChannel text   => text,
+            _                   => throw new BotCommandException("Choose a guild text channel or forum channel."),
         };
     }
 }

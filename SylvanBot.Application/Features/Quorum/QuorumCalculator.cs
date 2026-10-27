@@ -1,6 +1,6 @@
-﻿namespace SylvanBot.Application.Features.Quorum;
+﻿using SylvanBot.Application.Common;
 
-using SylvanBot.Application.Common;
+namespace SylvanBot.Application.Features.Quorum;
 
 public static class QuorumCalculator
 {
@@ -32,7 +32,7 @@ public static class QuorumCalculator
 
         var requiredVotes = (int)Math.Ceiling(eligibleVoterCount * proportion);
 
-        return new QuorumCalculation(eligibleVoterCount, proportion, requiredVotes);
+        return new QuorumCalculation(EligibleVoterCount: eligibleVoterCount, Proportion: proportion, RequiredVotes: requiredVotes);
     }
 }
 

@@ -7,5 +7,5 @@ public sealed record ImageBurstSpamDetectorOptions
     public TimeSpan HandlingLockDuration { get; init; } = TimeSpan.FromMinutes(3);
 
     public int RequiredAttachmentCount { get; init; } = 2;
-    public int Window { get; init; } = 45;
+    public int Window                  { get; init; } = 45;
 }

@@ -6,14 +6,17 @@ public sealed class ImageSpamSettings
     {
     }
 
-    private ImageSpamSettings(ulong guildId, int requiredChannelCount, int requiredAttachmentCount,
+    private ImageSpamSettings(
+        ulong guildId,
+        int requiredChannelCount,
+        int requiredAttachmentCount,
         int burstDurationSeconds)
     {
-        GuildId = guildId;
-        RequiredChannelCount = requiredChannelCount;
+        GuildId                 = guildId;
+        RequiredChannelCount    = requiredChannelCount;
         RequiredAttachmentCount = requiredAttachmentCount;
-        BurstDurationSeconds = burstDurationSeconds;
-        IsEnabled = true;
+        BurstDurationSeconds    = burstDurationSeconds;
+        IsEnabled               = true;
     }
 
     public int BurstDurationSeconds { get; private set; }
@@ -26,10 +29,7 @@ public sealed class ImageSpamSettings
 
     public int RequiredChannelCount { get; private set; }
 
-    public static ImageSpamSettings CreateDefault(ulong guildId)
-    {
-        return new ImageSpamSettings(guildId, 4, 2, 45);
-    }
+    public static ImageSpamSettings CreateDefault(ulong guildId) => new(guildId: guildId, requiredChannelCount: 4, requiredAttachmentCount: 2, burstDurationSeconds: 45);
 
     public void Disable()
     {
@@ -38,9 +38,9 @@ public sealed class ImageSpamSettings
 
     public void Update(int? requiredChannelCount, int? requiredAttachmentCount, int? burstDurationSeconds)
     {
-        RequiredChannelCount = requiredChannelCount ?? RequiredChannelCount;
+        RequiredChannelCount    = requiredChannelCount ?? RequiredChannelCount;
         RequiredAttachmentCount = requiredAttachmentCount ?? RequiredAttachmentCount;
-        BurstDurationSeconds = burstDurationSeconds ?? BurstDurationSeconds;
-        IsEnabled = true;
+        BurstDurationSeconds    = burstDurationSeconds ?? BurstDurationSeconds;
+        IsEnabled               = true;
     }
 }
