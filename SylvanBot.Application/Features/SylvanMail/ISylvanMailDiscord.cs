@@ -2,9 +2,19 @@
 
 public interface ISylvanMailDiscord
 {
-    Task ValidateForumAsync(ulong guildId, ulong forumId, ulong roleId, CancellationToken ct);
+    Task ValidateForumAsync(ulong guildId, ulong forumId, ulong roleId, CancellationToken ct, bool validatePing = true);
 
-    Task<bool> IsStaffAsync(ulong guildId, ulong authorId, ulong roleId, CancellationToken ct);
+    Task<bool> CanWriteAsync(ulong guildId, ulong threadId, ulong authorId, CancellationToken ct);
+
+    Task<SylvanMailMessage?> ReadDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct);
+
+    Task SetDraftReadyAsync(ulong threadId, ulong messageId, bool ready, CancellationToken ct);
+
+    Task MarkDeliveredAsync(SylvanMailMessage message, CancellationToken ct);
+
+    Task<string> InboundPrefixAsync(ulong guildId, SylvanMailMessage message, CancellationToken ct);
+
+    Task PingAfterGapAsync(SylvanMailSettings settings, ulong threadId, SylvanMailMessage message, CancellationToken ct);
 
     Task<ulong?> FindPostAsync(SylvanMailConversation conversation, CancellationToken ct);
 

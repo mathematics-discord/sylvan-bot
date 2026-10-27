@@ -1,6 +1,5 @@
-﻿namespace SylvanBot.Features.SylvanMail;
+namespace SylvanBot.Features.SylvanMail;
 
-using System.Globalization;
 using System.Threading.Channels;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Gateway;
@@ -13,7 +12,7 @@ public sealed class SylvanMailGatewayHandler(
     : BackgroundService, IDiscordGatewayHandler
 {
     // Bounded, transient work only. This is deliberately not a durable queue or a retry worker.
-    private readonly Channel<SylvanMailMessage> _messages = Channel.CreateBounded<SylvanMailMessage>(
+    private readonly Channel<MailWork> _messages = Channel.CreateBounded<MailWork>(
         new BoundedChannelOptions(64)
         {
             SingleReader = true,
@@ -24,6 +23,8 @@ public sealed class SylvanMailGatewayHandler(
     public Task InitializeAsync(CancellationToken ct)
     {
         client.MessageReceived += ReceivedAsync;
+        client.MessageUpdated += UpdatedAsync;
+        client.ReactionAdded += ReactionAddedAsync;
 
         return Task.CompletedTask;
     }
@@ -31,6 +32,8 @@ public sealed class SylvanMailGatewayHandler(
     public void Unsubscribe()
     {
         client.MessageReceived -= ReceivedAsync;
+        client.MessageUpdated -= UpdatedAsync;
+        client.ReactionAdded -= ReactionAddedAsync;
         _messages.Writer.TryComplete();
     }
 
@@ -44,22 +47,28 @@ public sealed class SylvanMailGatewayHandler(
                 {
                     using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
                     timeout.CancelAfter(TimeSpan.FromMinutes(3));
-                    await workflow.RelayAsync(message, timeout.Token);
+                    if (message.Inbound is not null)
+                        await workflow.RelayAsync(message.Inbound, timeout.Token);
+                    else
+                        await workflow.HandleDraftAsync(message.ChannelId, message.MessageId, message.AuthorId, message.Confirm, timeout.Token);
                 }
                 catch (Exception exception)
                 {
                     logger.Warning(
                         "SylvanMail handling failed for source {SourceId}: {ExceptionType}",
-                        message.SourceMessageId,
+                        message.MessageId,
                         exception.GetType().Name);
 
-                    if (!stoppingToken.IsCancellationRequested && message.GuildId is null)
+                    if (!stoppingToken.IsCancellationRequested && message.Inbound is not null)
+                    {
+                        using var noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                         await discord.ReportAsync(
-                            message,
-                            message.GuildId is null ? null : message.SourceChannelId,
+                            message.Inbound,
+                            null,
                             null,
                             "SylvanMail processing failed or was interrupted. Delivery is unconfirmed; do not assume it arrived. No automatic resend.",
-                            stoppingToken);
+                            noticeTimeout.Token);
+                    }
                 }
             }
         }
@@ -71,72 +80,77 @@ public sealed class SylvanMailGatewayHandler(
 
     private Task ReceivedAsync(SocketMessage source)
     {
-        if (source.Author.IsBot
-            || source.Author.IsWebhook
-            || source.Source != MessageSource.User
-            || source is not SocketUserMessage message
-            || source.Type is not (MessageType.Default or MessageType.Reply))
+        if (source is not IUserMessage message || !IsUserMessage(message))
             return Task.CompletedTask;
 
-        var isDm = source.Channel is IDMChannel;
-        var thread = source.Channel as SocketThreadChannel;
-
-        if (!isDm && thread is null)
-            return Task.CompletedTask;
-
-        var content = source.Content ?? string.Empty;
-
-        if (!isDm)
+        if (source.Channel is IDMChannel)
         {
-            var mention = $"<@{client.CurrentUser.Id}>";
-            var nicknameMention = $"<@!{client.CurrentUser.Id}>";
+            var input = SylvanMailDiscord.ReadMessage(message, guildId: null);
+            var work = new MailWork(source.Channel.Id, source.Id, source.Author.Id, false, input);
 
-            var explicitlyMentioned = content.Contains(mention, StringComparison.Ordinal)
-                                      || content.Contains(nicknameMention, StringComparison.Ordinal);
-
-            if (!explicitlyMentioned)
-                return Task.CompletedTask;
-
-            content = content.Replace(mention, string.Empty, StringComparison.Ordinal)
-                .Replace(nicknameMention, string.Empty, StringComparison.Ordinal);
+            return !_messages.Writer.TryWrite(work) ? RefuseBusyAsync(input) : Task.CompletedTask;
         }
 
-        ImmutableArray<SylvanMailAttachment> attachments = source.Attachments
-            .Select(item => new SylvanMailAttachment(item.Url, item.Filename, item.Size, item.IsSpoiler()))
-            .ToImmutableArray();
+        return QueueDraftAsync(message, edited: false);
+    }
 
-        var unsupported = message.Stickers.Count > 0
-                          || message.Components.Count > 0
-                          || message.Poll is not null
-                          || message.Flags?.HasFlag(MessageFlags.VoiceMessage) == true
-                          || message.Reference?.ReferenceType is { IsSpecified: true, Value: MessageReferenceType.Forward }
-                          || (string.IsNullOrWhiteSpace(content) && attachments.IsEmpty && message.Embeds.Count > 0);
+    private Task UpdatedAsync(Cacheable<IMessage, ulong> before, SocketMessage after, ISocketMessageChannel channel)
+    {
+        // Edits only refresh the draft marker. They can never send a reply.
+        return after is IUserMessage message && IsUserMessage(message) ? QueueDraftAsync(message, edited: true) : Task.CompletedTask;
+    }
 
-        // Escape only the presentation label; relay text is kept verbatim except Sylvan's own mention.
-        var name = Format.Sanitize(source.Author.Username);
-        var timestamp = source.Timestamp.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-        var prefix = $"[{timestamp}] {name}: ";
+    private Task QueueDraftAsync(IUserMessage message, bool edited)
+    {
+        if (message.Channel is not IThreadChannel)
+            return Task.CompletedTask;
 
-        var input = new SylvanMailMessage(
-            source.Id,
-            source.Channel.Id,
-            source.Author.Id,
-            prefix,
-            source.Author.Username,
-            thread?.Guild.Id,
-            content,
-            attachments,
-            unsupported);
+        var hasBodyMention = SylvanMailReply.Parse(message.Content ?? string.Empty, client.CurrentUser.Id, false, false) is not null;
+        var hasReplyPing = message.Type == MessageType.Reply && message.MentionedUserIds.Contains(client.CurrentUser.Id);
 
-        return !_messages.Writer.TryWrite(input)
-            ? RefuseBusyAsync(input)
+        if (!edited && !hasBodyMention && !hasReplyPing)
+            return Task.CompletedTask;
+
+        // The workflow checks the mapped forum before fetching any content.
+        _messages.Writer.TryWrite(new MailWork(message.Channel.Id, message.Id, message.Author.Id, false, null));
+
+        return Task.CompletedTask;
+    }
+
+    private Task ReactionAddedAsync(Cacheable<IUserMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel, SocketReaction reaction)
+    {
+        if (reaction.UserId == client.CurrentUser.Id || !string.Equals(reaction.Emote.Name, SylvanMailDiscord.SendEmoji, StringComparison.Ordinal))
+            return Task.CompletedTask;
+
+        var work = new MailWork(channel.Id, message.Id, reaction.UserId, true, null);
+
+        return !_messages.Writer.TryWrite(work)
+            ? RefuseConfirmationAsync(work)
             : Task.CompletedTask;
+    }
+
+    private static bool IsUserMessage(IUserMessage message) =>
+        !message.Author.IsBot && !message.Author.IsWebhook && message.Source == MessageSource.User
+        && message.Type is MessageType.Default or MessageType.Reply;
+
+    private async Task RefuseConfirmationAsync(MailWork work)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        try
+        {
+            await workflow.RefuseConfirmationAsync(work.ChannelId, work.MessageId, work.AuthorId, timeout.Token);
+        }
+        catch (Exception exception)
+        {
+            logger.Warning("SylvanMail confirmation refusal failed for source {SourceId}: {ExceptionType}",
+                work.MessageId, exception.GetType().Name);
+        }
     }
 
     private async Task RefuseBusyAsync(SylvanMailMessage message)
     {
-        // Refuse overload explicitly without blocking gateway dispatch behind a slow delivery.
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         try
         {
@@ -146,6 +160,9 @@ public sealed class SylvanMailGatewayHandler(
         {
             logger.Warning("SylvanMail overload refusal failed for source {SourceId}: {ExceptionType}",
                 message.SourceMessageId, exception.GetType().Name);
+            await discord.ReportAsync(message, null, null, "Not relayed: SylvanMail is temporarily busy. Please try again later.", timeout.Token);
         }
     }
+
+    private sealed record MailWork(ulong ChannelId, ulong MessageId, ulong AuthorId, bool Confirm, SylvanMailMessage? Inbound);
 }

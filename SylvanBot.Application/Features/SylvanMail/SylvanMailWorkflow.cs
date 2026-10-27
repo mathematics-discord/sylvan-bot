@@ -1,4 +1,4 @@
-﻿namespace SylvanBot.Application.Features.SylvanMail;
+namespace SylvanBot.Application.Features.SylvanMail;
 
 using System.Collections.Immutable;
 using Microsoft.EntityFrameworkCore;
@@ -48,8 +48,94 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
         }
     }
 
+    public async Task HandleDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct)
+    {
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        await LockAsync(db, ct);
+        SylvanMailMessage? message = null;
+
+        try
+        {
+            var conversation = await ActiveConversationAsync(db, threadId, ct);
+
+            if (conversation is null)
+                return;
+
+            message = await discord.ReadDraftAsync(threadId, messageId, authorId, confirm, ct);
+
+            if (message is null)
+                return;
+
+            var recorded = await db.SylvanMailOperations
+                .AnyAsync(item => item.SourceMessageId == messageId, ct);
+
+            if (recorded)
+            {
+                if (confirm)
+                    await RelayLockedAsync(db, message, ct);
+
+                await discord.SetDraftReadyAsync(threadId, messageId, false, ct);
+                return;
+            }
+
+            if (!await discord.CanWriteAsync(conversation.GuildId, threadId, authorId, ct))
+                throw new BotCommandException("Not sent: you no longer have write access to this thread.");
+
+            if (string.IsNullOrEmpty(message.OutboundPrefix))
+                throw new BotCommandException("Not sent: mention Sylvan or reply to Sylvan with the reply ping enabled before confirming.");
+
+            ValidateContent(message);
+
+            if (confirm)
+            {
+                await RelayLockedAsync(db, message, ct);
+                await discord.SetDraftReadyAsync(threadId, messageId, false, ct);
+            }
+            else
+            {
+                await discord.SetDraftReadyAsync(threadId, messageId, true, ct);
+            }
+        }
+        catch (Exception exception) when (message is not null)
+        {
+            using var noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+            if (confirm)
+            {
+                var detail = exception is BotCommandException
+                    ? exception.Message
+                    : "Delivery could not be confirmed. Some content may have arrived; do not assume it is safe to resend.";
+                await discord.ReportAsync(message, threadId, null, detail, noticeTimeout.Token);
+            }
+
+            await discord.SetDraftReadyAsync(threadId, messageId, false, noticeTimeout.Token);
+        }
+        finally
+        {
+            await UnlockAsync(db);
+        }
+    }
+
+    public async Task RefuseConfirmationAsync(ulong threadId, ulong messageId, ulong authorId, CancellationToken ct)
+    {
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        var conversation = await ActiveConversationAsync(db, threadId, ct);
+
+        if (conversation is null)
+            return;
+
+        var message = await discord.ReadDraftAsync(threadId, messageId, authorId, confirm: true, ct);
+
+        if (message is not null)
+            await RefuseBusyAsync(message, ct);
+    }
+
     public async Task RelayAsync(SylvanMailMessage message, CancellationToken ct)
     {
+        // Outbound delivery is reachable only through author confirmation and a fresh draft read.
+        if (message.GuildId is not null)
+            return;
+
         await using var db = await contexts.CreateDbContextAsync(ct);
         await LockAsync(db, ct);
 
@@ -74,7 +160,12 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
             .ToArrayAsync(ct);
 
         if (settings.Length != 1)
+        {
+            if (message.GuildId is null)
+                await discord.ReportAsync(message, null, null, "SylvanMail is unavailable; your message was not relayed.", ct);
+
             return;
+        }
 
         var destination = settings[0];
         var toStaff = message.GuildId is null;
@@ -91,7 +182,7 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
         {
             var authorised = message.GuildId == destination.GuildId
                              && conversation is not null
-                             && await discord.IsStaffAsync(destination.GuildId, message.AuthorId, destination.RoleId, ct);
+                             && await discord.CanWriteAsync(destination.GuildId, message.SourceChannelId, message.AuthorId, ct);
 
             if (!authorised)
                 return;
@@ -117,8 +208,15 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
 
         db.SylvanMailOperations.Add(operation);
         await db.SaveChangesAsync(ct);
-        await ReportAsync(db, message, conversation?.ThreadId, operation, ct);
+        await ReportAsync(db, message, conversation?.ThreadId, operation);
     }
+
+    private static Task<SylvanMailConversation?> ActiveConversationAsync(BotDbContext db, ulong threadId, CancellationToken ct) =>
+        db.SylvanMailConversations
+            .AsNoTracking()
+            .Where(item => item.ThreadId == threadId && !item.Retired)
+            .Where(item => db.SylvanMailSettings.Any(settings => settings.GuildId == item.GuildId && settings.ForumId == item.ForumId))
+            .SingleOrDefaultAsync(ct);
 
     private static async Task LockAsync(BotDbContext db, CancellationToken ct)
     {
@@ -171,8 +269,11 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
                             && !item.Retired,
                     cancellationToken: ct);
 
-            if (conversation is null || !await discord.IsStaffAsync(settings.GuildId, message.AuthorId, settings.RoleId, ct))
+            if (conversation is null)
                 return;
+
+            if (!await discord.CanWriteAsync(settings.GuildId, message.SourceChannelId, message.AuthorId, ct))
+                throw new BotCommandException("Not sent: you no longer have write access to this thread.");
         }
 
         var operation = await db.SylvanMailOperations
@@ -193,11 +294,19 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
                 await db.SaveChangesAsync(ct);
             }
 
-            await ReportAsync(db, message, previousThread, operation, ct);
+            if (string.Equals(operation.State, "Saved", StringComparison.Ordinal))
+            {
+                operation.State = "Unpublished";
+                operation.Detail = "Interrupted before delivery started. No automatic resend.";
+                await db.SaveChangesAsync(ct);
+            }
+
+            await ReportAsync(db, message, previousThread, operation);
 
             return;
         }
 
+        var previousThreadId = conversation?.ThreadId;
         operation = new SylvanMailOperation
         {
             SourceMessageId = message.SourceMessageId,
@@ -213,7 +322,7 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
 
         try
         {
-            await discord.ValidateForumAsync(settings.GuildId, settings.ForumId, settings.RoleId, ct);
+            await discord.ValidateForumAsync(settings.GuildId, settings.ForumId, settings.RoleId, ct, validatePing: false);
             ValidateContent(message);
 
             // Download all attachments before publishing any of this message; retain at most 24 MiB of attachment payload.
@@ -235,17 +344,6 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
             operation.DestinationChannelId = toStaff ? threadId : await discord.OpenDmAsync(conversation.UserId, ct);
             await db.SaveChangesAsync(ct);
 
-            // The first inbound payload must follow the opening embed directly. Its final receipt comes afterwards.
-            // The opening embed explains that messages without a receipt remain unconfirmed after interruption.
-            if (!toStaff)
-            {
-                operation.Detail = "Saved; delivery pending. If interrupted, delivery remains unconfirmed; no automatic resend.";
-                await ReportAsync(db, message, threadId, operation, ct);
-
-                if (operation.ReceiptMessageId is null)
-                    throw new BotCommandException("Not relayed: the staff delivery receipt could not be published.");
-            }
-
             if (toStaff && !conversation.NoticeStarted)
             {
                 conversation.NoticeStarted = true;
@@ -253,14 +351,14 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
 
                 conversation.NoticeMessageId = await discord.SendTextAsync(
                     message.SourceChannelId,
-                    "SylvanMail is in beta: bugs and lost messages are possible. Your DMs to Sylvan reach Senior Moderators in a private staff post. Staff replies are sent by Sylvan; only new messages are relayed, not edits or deletions.",
+                    "SylvanMail is in beta: bugs and lost messages are possible. Your DMs to Sylvan reach staff in a private forum post. Staff replies are sent by Sylvan after the author confirms them; edits and deletions after sending are not relayed.",
                     ct);
 
                 await db.SaveChangesAsync(ct);
             }
 
             // An uncertain notice is not retried, but subsequent messages can still be delivered.
-            var label = toStaff ? message.InboundPrefix : "**Senior Moderators**\n";
+            var label = toStaff ? await discord.InboundPrefixAsync(settings.GuildId, message, ct) : message.OutboundPrefix;
             ImmutableArray<string> chunks = SplitContent(message.Content, 2000 - label.Length);
             var ordinal = 0;
 
@@ -335,20 +433,10 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
                 .SingleOrDefaultAsync(item => item.Id == operation.ConversationId, ct);
         }
 
-        await ReportAsync(db, message, conversation?.ThreadId, operation, ct);
+        await ReportAsync(db, message, conversation?.ThreadId, operation);
 
-        if (toStaff && string.Equals(operation.State, "Delivered", StringComparison.Ordinal))
-        {
-            var previouslyAcknowledged = await db.SylvanMailOperations
-                .AsNoTracking()
-                .AnyAsync(item => item.GuildId == settings.GuildId && item.ConversationId == operation.ConversationId
-                    && item.ToStaff && item.AcknowledgementStarted, ct);
-
-            operation.AcknowledgementStarted = true;
-            await db.SaveChangesAsync(ct);
-            operation.AcknowledgementMessageId = await discord.AcknowledgeAsync(message, first: !previouslyAcknowledged, ct);
-            await db.SaveChangesAsync(ct);
-        }
+        if (toStaff && string.Equals(operation.State, "Delivered", StringComparison.Ordinal) && conversation?.ThreadId == previousThreadId && previousThreadId.HasValue)
+            await discord.PingAfterGapAsync(settings, previousThreadId.Value, message, ct);
     }
 
     private async Task<SylvanMailConversation> ResolveConversationAsync(
@@ -426,9 +514,11 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
 
     private static void ValidateContent(SylvanMailMessage message)
     {
-        var totalBytes = message.Attachments.Sum(item => (long)item.Size);
+        var totalBytes = message.Attachments
+            .Sum(item => (long)item.Size);
 
-        var oversized = message.Attachments.Any(item => item.Size is < 0 or > MaxAttachmentBytes);
+        var oversized = message.Attachments
+            .Any(item => item.Size is < 0 or > MaxAttachmentBytes);
 
         if (message.UnsupportedContent)
             throw new BotCommandException("Not relayed: stickers, polls, voice messages, forwards and interactive content are unsupported. Send text or ordinary attachments.");
@@ -480,9 +570,36 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
         }
     }
 
-    private async Task ReportAsync(BotDbContext db, SylvanMailMessage message, ulong? threadId, SylvanMailOperation op, CancellationToken ct)
+    private async Task ReportAsync(BotDbContext db, SylvanMailMessage message, ulong? threadId, SylvanMailOperation op)
     {
-        op.ReceiptMessageId = await discord.ReportAsync(message, threadId, op, op.Detail, ct);
-        await db.SaveChangesAsync(ct);
+        // Outcome notices still get a bounded attempt when the delivery token has timed out.
+        using var noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var noticeToken = noticeTimeout.Token;
+
+        if (string.Equals(op.State, "Delivered", StringComparison.Ordinal))
+        {
+            if (!op.ToStaff)
+            {
+                await discord.MarkDeliveredAsync(message, noticeToken);
+                return;
+            }
+
+            if (op.AcknowledgementStarted)
+                return;
+
+            var previouslyAcknowledged = await db.SylvanMailOperations
+                .AsNoTracking()
+                .AnyAsync(item => item.GuildId == op.GuildId && item.ConversationId == op.ConversationId
+                    && item.ToStaff && item.AcknowledgementMessageId != null, noticeToken);
+
+            op.AcknowledgementStarted = true;
+            await db.SaveChangesAsync(noticeToken);
+            op.AcknowledgementMessageId = await discord.AcknowledgeAsync(message, first: !previouslyAcknowledged, noticeToken);
+            await db.SaveChangesAsync(noticeToken);
+            return;
+        }
+
+        op.ReceiptMessageId = await discord.ReportAsync(message, threadId, op, op.Detail, noticeToken);
+        await db.SaveChangesAsync(noticeToken);
     }
 }

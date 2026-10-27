@@ -7,11 +7,12 @@ public sealed record SylvanMailMessage(
     ulong SourceMessageId,
     ulong SourceChannelId,
     ulong AuthorId,
-    string InboundPrefix,
+    DateTimeOffset Timestamp,
     string Username,
     ulong? GuildId,
     string Content,
     ImmutableArray<SylvanMailAttachment> Attachments,
-    bool UnsupportedContent);
+    bool UnsupportedContent,
+    string OutboundPrefix = "");
 
 public sealed record SylvanMailAttachment(string Url, string Filename, int Size, bool Spoiler);

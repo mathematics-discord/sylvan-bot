@@ -1,6 +1,7 @@
-﻿namespace SylvanBot.Features.SylvanMail;
+namespace SylvanBot.Features.SylvanMail;
 
 using System.Net;
+using System.Globalization;
 using Discord.Net;
 using Discord.Rest;
 using SylvanBot.Application.Common;
@@ -8,9 +9,11 @@ using SylvanBot.Application.Features.SylvanMail;
 
 public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient http, ILogger logger) : ISylvanMailDiscord
 {
+    public const string SendEmoji = "\U0001F4E4";
+
     private const int MaxAttachmentBytes = 8 * 1024 * 1024;
 
-    public async Task ValidateForumAsync(ulong guildId, ulong forumId, ulong roleId, CancellationToken ct)
+    public async Task ValidateForumAsync(ulong guildId, ulong forumId, ulong roleId, CancellationToken ct, bool validatePing = true)
     {
         var guild = client.GetGuild(guildId);
 
@@ -19,8 +22,8 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
 
         var role = guild.GetRole(roleId);
 
-        if (role is null || role.Id == guild.EveryoneRole.Id || role.IsManaged)
-            throw new BotCommandException("The configured Senior Moderator role cannot be resolved or is not an assignable staff role.");
+        if (validatePing && role is null)
+            throw new BotCommandException("The configured ping role cannot be resolved.");
 
         var forum = await GetForumAsync(guildId, forumId, ct);
         OverwritePermissions? everyone = forum.GetPermissionOverwrite(guild.EveryoneRole);
@@ -29,47 +32,229 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
             throw new BotCommandException(
                 "The forum is exposed: explicitly deny View Channel to @everyone. No permissions or settings were changed.");
 
-        OverwritePermissions? staffAccess = forum.GetPermissionOverwrite(role);
-
-        if (!role.Permissions.Administrator && staffAccess?.ViewChannel != PermValue.Allow)
-            throw new BotCommandException("Explicitly allow the Senior Moderator role to view this forum before enabling SylvanMail.");
-
-        foreach (var overwrite in forum.PermissionOverwrites)
-        {
-            if (overwrite.TargetType != PermissionTarget.User || overwrite.Permissions.ViewChannel != PermValue.Allow)
-                continue;
-
-            var member = guild.GetUser(overwrite.TargetId);
-
-            var permitted = overwrite.TargetId == client.CurrentUser.Id
-                            || member?.GuildPermissions.Administrator == true
-                            || member?.Roles.Any(item => item.Id == roleId) == true;
-
-            if (!permitted)
-                throw new BotCommandException(
-                    "The forum is exposed: a member outside Senior Moderators has a View Channel allow. Remove that access before enabling SylvanMail.");
-        }
-
         var permissions = guild.CurrentUser.GetPermissions(forum);
 
         var sufficient = permissions is { ViewChannel: true, SendMessages: true } and
-        { SendMessagesInThreads: true, ReadMessageHistory: true, AttachFiles: true, ManageThreads: true, EmbedLinks: true };
+            { SendMessagesInThreads: true, ReadMessageHistory: true, AttachFiles: true, ManageThreads: true, EmbedLinks: true, AddReactions: true };
 
         if (!sufficient)
-            throw new BotCommandException("Sylvan needs View Channel, Send Messages (Create Posts), Send Messages in Threads, Read Message History, Attach Files, Manage Threads and Embed Links in the forum.");
+            throw new BotCommandException("Sylvan needs View Channel, Send Messages (Create Posts), Send Messages in Threads, Read Message History, Attach Files, Manage Threads, Embed Links and Add Reactions in the forum.");
 
-        if (!role.IsMentionable && !permissions.MentionEveryone)
-            throw new BotCommandException("Sylvan must be allowed to mention the selected staff role when opening a post (make the role mentionable or grant Mention All Roles here).");
+        var cannotPing = role is not null && (role.Id == guild.EveryoneRole.Id || !role.IsMentionable) && !permissions.MentionEveryone;
+
+        if (validatePing && cannotPing)
+            throw new BotCommandException("Sylvan must be allowed to mention the selected ping role (make the role mentionable or grant Mention All Roles here).");
 
         if (forum.Flags.HasFlag(ChannelFlags.RequireTag) && forum.Tags.Count == 0)
             throw new BotCommandException("The forum requires a tag but has no available tags. No settings changed.");
     }
 
-    public async Task<bool> IsStaffAsync(ulong guildId, ulong authorId, ulong roleId, CancellationToken ct)
+    public async Task<bool> CanWriteAsync(ulong guildId, ulong threadId, ulong authorId, CancellationToken ct)
     {
-        var member = await client.Rest.GetGuildUserAsync(guildId, authorId, Options(ct));
+        var guild = client.GetGuild(guildId);
 
-        return member?.IsBot == false && member.RoleIds.Contains(roleId);
+        if (guild is not { IsConnected: true, HasAllMembers: true })
+            throw new BotCommandException("Guild/member data is not ready; sending permissions cannot be confirmed.");
+
+        var thread = await client.Rest.GetChannelAsync(threadId, Options(ct)) as IThreadChannel;
+        var member = guild.GetUser(authorId);
+
+        if (thread is null || thread.GuildId != guildId || member is null || member.IsBot || thread.IsLocked)
+            return false;
+
+        var permissions = member.GetPermissions(thread);
+        var timedOut = member.TimedOutUntil > DateTimeOffset.UtcNow;
+
+        return permissions.ViewChannel && permissions.SendMessagesInThreads && !timedOut;
+    }
+
+    public async Task<SylvanMailMessage?> ReadDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct)
+    {
+        var channel = await MessageChannelAsync(threadId, ct);
+        var source = await channel.GetMessageAsync(messageId, CacheMode.AllowDownload, Options(ct)) as IUserMessage;
+
+        if (source is null
+            || source.Author.Id != authorId
+            || source.Author.IsBot
+            || source.Author.IsWebhook
+            || source.Type is not (MessageType.Default or MessageType.Reply)
+            || channel is not IThreadChannel thread)
+            return null;
+
+        var hasMarker = source.Reactions.TryGetValue(new Emoji(SendEmoji), out var reaction) && reaction.IsMe;
+
+        if (confirm && !hasMarker)
+            return null;
+
+        var content = source.Content ?? string.Empty;
+        var reply = SylvanMailReply.Parse(content, client.CurrentUser.Id, replyToBot: false, replyPingEnabled: false);
+        var hasReplyPing = source.Type == MessageType.Reply && source.MentionedUserIds.Contains(client.CurrentUser.Id);
+
+        // An explicit body mention wins without depending on the referenced message still being accessible.
+        if (reply is null && hasReplyPing)
+        {
+            var replyToBot = source.ReferencedMessage?.Author.Id == client.CurrentUser.Id;
+
+            if (!replyToBot && source.Reference?.MessageId.IsSpecified == true)
+            {
+                var referenced = await channel.GetMessageAsync(source.Reference.MessageId.Value, CacheMode.AllowDownload, Options(ct));
+                replyToBot = referenced?.Author.Id == client.CurrentUser.Id;
+            }
+
+            reply = SylvanMailReply.Parse(content, client.CurrentUser.Id, replyToBot, replyPingEnabled: true);
+        }
+
+        if (reply is null)
+        {
+            await SetDraftReadyAsync(threadId, messageId, false, ct);
+
+            return ReadMessage(source, thread.GuildId);
+        }
+
+        var prefix = reply.Anonymous ? "From staff: " : $"From {Format.Sanitize(source.Author.Username)}: ";
+
+        return ReadMessage(source, thread.GuildId) with { Content = reply.Content, OutboundPrefix = prefix };
+    }
+
+    public static SylvanMailMessage ReadMessage(IUserMessage source, ulong? guildId)
+    {
+        ImmutableArray<SylvanMailAttachment> attachments = source.Attachments
+            .Select(item => new SylvanMailAttachment(item.Url, item.Filename, item.Size, item.IsSpoiler()))
+            .ToImmutableArray();
+
+        var unsupported = source.Stickers.Count > 0
+                          || source.Components.Count > 0
+                          || source.Poll is not null
+                          || source.Flags?.HasFlag(MessageFlags.VoiceMessage) == true
+                          || source.Reference?.ReferenceType is { IsSpecified: true, Value: MessageReferenceType.Forward }
+                          || (string.IsNullOrWhiteSpace(source.Content) && attachments.IsEmpty && source.Embeds.Count > 0);
+
+        return new SylvanMailMessage(
+            source.Id,
+            source.Channel.Id,
+            source.Author.Id,
+            source.Timestamp,
+            source.Author.Username,
+            guildId,
+            source.Content ?? string.Empty,
+            attachments,
+            unsupported);
+    }
+
+    public async Task SetDraftReadyAsync(ulong threadId, ulong messageId, bool ready, CancellationToken ct)
+    {
+        try
+        {
+            var channel = await MessageChannelAsync(threadId, ct);
+            var message = await channel.GetMessageAsync(messageId, CacheMode.AllowDownload, Options(ct)) as IUserMessage;
+
+            if (message is null)
+                return;
+
+            var emoji = new Emoji(SendEmoji);
+            var marked = message.Reactions.TryGetValue(emoji, out var reaction) && reaction.IsMe;
+
+            if (ready && !marked)
+                await message.AddReactionAsync(emoji, Options(ct));
+            else if (!ready && marked)
+                await message.RemoveReactionAsync(emoji, client.CurrentUser.Id, Options(ct));
+        }
+        catch (Exception exception)
+        {
+            LogFailure("draft reaction", messageId, exception);
+        }
+    }
+
+    public async Task MarkDeliveredAsync(SylvanMailMessage message, CancellationToken ct)
+    {
+        try
+        {
+            var channel = await MessageChannelAsync(message.SourceChannelId, ct);
+            var source = await channel.GetMessageAsync(message.SourceMessageId, CacheMode.AllowDownload, Options(ct)) as IUserMessage;
+
+            if (source is not null)
+                await source.AddReactionAsync(new Emoji("\u2611\uFE0F"), Options(ct));
+
+            await SetDraftReadyAsync(message.SourceChannelId, message.SourceMessageId, false, ct);
+        }
+        catch (Exception exception)
+        {
+            // The payload was delivered; a failed reaction must never turn it into a failed delivery or cause a resend.
+            LogFailure("success reaction", message.SourceMessageId, exception);
+        }
+    }
+
+    public async Task<string> InboundPrefixAsync(ulong guildId, SylvanMailMessage message, CancellationToken ct)
+    {
+        IGuildUser? member;
+
+        try
+        {
+            member = await client.Rest.GetGuildUserAsync(guildId, message.AuthorId, Options(ct));
+        }
+        catch (HttpException exception) when (exception.DiscordCode == DiscordErrorCode.UnknownMember)
+        {
+            member = null;
+        }
+
+        var name = member is null ? Format.Sanitize(message.Username) : $"<@{message.AuthorId}>";
+        var timestamp = message.Timestamp.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+
+        return $"[{timestamp}] {name}: ";
+    }
+
+    public async Task PingAfterGapAsync(SylvanMailSettings settings, ulong threadId, SylvanMailMessage message, CancellationToken ct)
+    {
+        try
+        {
+            var dm = await MessageChannelAsync(message.SourceChannelId, ct);
+            var before = message.SourceMessageId;
+
+            while (true)
+            {
+                IEnumerable<IMessage> page = await dm.GetMessagesAsync(before, Direction.Before, 100, CacheMode.AllowDownload, Options(ct)).FlattenAsync();
+
+                IMessage? previous = null;
+                var oldest = before;
+
+                foreach (var item in page)
+                {
+                    oldest = Math.Min(oldest, item.Id);
+                    var isNewerInbound = item.Author.Id == message.AuthorId && item.Source == MessageSource.User
+                        && (previous is null || item.Id > previous.Id);
+
+                    if (isNewerInbound)
+                        previous = item;
+                }
+
+                if (previous is not null)
+                {
+                    if (message.Timestamp - previous.Timestamp < TimeSpan.FromHours(3))
+                        return;
+
+                    var thread = await MessageChannelAsync(threadId, ct);
+                    var everyone = settings.RoleId == settings.GuildId;
+
+                    var mentions = everyone
+                        ? new AllowedMentions(AllowedMentionTypes.Everyone)
+                        : new AllowedMentions { RoleIds = [settings.RoleId] };
+                    var text = everyone ? "@everyone" : $"<@&{settings.RoleId}>";
+                    await AcceptedAsync(() => thread.SendMessageAsync(text, allowedMentions: mentions, options: Options(ct)));
+
+                    return;
+                }
+
+                if (oldest == before)
+                    return;
+
+                before = oldest;
+            }
+        }
+        catch (Exception exception)
+        {
+            // A ping failure is separate from delivery of the user's message. Never resend the payload for it.
+            LogFailure("inbound gap ping", message.SourceMessageId, exception);
+        }
     }
 
     public async Task<ulong?> FindPostAsync(SylvanMailConversation conversation, CancellationToken ct)
@@ -115,7 +300,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
 
         var embed = new EmbedBuilder()
             .WithTitle($"Case #{conversation.Number}")
-            .WithDescription("Mention Sylvan explicitly to send a staff reply. Messages without a delivery receipt remain unconfirmed.")
+            .WithDescription("Mention Sylvan for an anonymous draft, or reply to Sylvan with the reply ping enabled to sign it. Only the author can click \U0001F4E4 to send the latest draft. \u2611\uFE0F confirms delivery; errors appear here.")
             .WithFooter("Beta · Bugs and lost messages are possible")
             .AddField("User ID", $"```\n{conversation.UserId}\n```", inline: false)
             .AddField("Username", $"```\n{username}\n```", inline: false);
@@ -128,10 +313,12 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         var post = await AcceptedAsync(() => forum.CreatePostAsync(
             username,
             // Discord notifications require the role mention in message content, alongside the embed.
-            text: $"<@&{roleId}>",
+            text: roleId == conversation.GuildId ? "@everyone" : $"<@&{roleId}>",
             embed: embed.Build(),
             options: Options(ct),
-            allowedMentions: new AllowedMentions { RoleIds = [roleId] },
+            allowedMentions: roleId == conversation.GuildId
+                ? new AllowedMentions(AllowedMentionTypes.Everyone)
+                : new AllowedMentions { RoleIds = [roleId] },
             tags: tags));
 
         return post.Id;
@@ -259,12 +446,28 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         var failed = operation is null || operation.State is "Uncertain" or "Partial" or "Refused" or "Unpublished";
         var receiptId = operation?.ReceiptMessageId;
 
-        if (threadId.HasValue)
+        if (toStaff && failed)
+        {
+            try
+            {
+                var guidance = "If the error describes a problem with your text or attachments, fix it and send a new DM. "
+                    + "If SylvanMail is busy, try again later. For partial or uncertain delivery, or any problem you cannot fix yourself, "
+                    + "DM <@203864799870844928> directly or contact another member of staff. Ask them to check what arrived before resending.";
+
+                await SendTextAsync(source.SourceChannelId, $"{detail}\n\n{guidance}", ct);
+            }
+            catch (Exception exception)
+            {
+                LogFailure("user failure notice", source.SourceMessageId, exception);
+            }
+        }
+
+        if (threadId.HasValue && failed)
         {
             try
             {
                 var channel = await MessageChannelAsync(threadId.Value, ct);
-                var report = $"SylvanMail {(toStaff ? "inbound" : "reply")} · source `{source.SourceMessageId}`: {detail}";
+                var report = $"Delivery error · source `{source.SourceMessageId}`: {detail}";
 
                 if (receiptId.HasValue)
                 {
@@ -279,25 +482,20 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
                 }
                 else
                 {
-                    receiptId = await SendTextAsync(threadId.Value, report, ct);
+                    var reference = toStaff ? null : new MessageReference(source.SourceMessageId, source.SourceChannelId, failIfNotExists: false);
+
+                    var sent = await AcceptedAsync(() => channel.SendMessageAsync(
+                        report,
+                        options: Options(ct),
+                        allowedMentions: AllowedMentions.None,
+                        messageReference: reference));
+                    receiptId = sent.Id;
                 }
             }
             catch (Exception exception)
             {
                 LogFailure("receipt", source.SourceMessageId, exception);
             }
-        }
-
-        if (!toStaff || !failed)
-            return receiptId;
-
-        try
-        {
-            await SendTextAsync(source.SourceChannelId, detail, ct);
-        }
-        catch (Exception exception)
-        {
-            LogFailure("user failure notice", source.SourceMessageId, exception);
         }
 
         return receiptId;
@@ -308,19 +506,25 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         try
         {
             var channel = await MessageChannelAsync(source.SourceChannelId, ct);
+
             var text = first
                 ? "Delivered to staff. Please be patient, someone will get to you soon."
                 : "Delivered.";
 
             var reference = new MessageReference(source.SourceMessageId, source.SourceChannelId, failIfNotExists: false);
-            var sent = await AcceptedAsync(() => channel.SendMessageAsync(text,
-                options: Options(ct), allowedMentions: AllowedMentions.None, messageReference: reference));
+
+            var sent = await AcceptedAsync(() => channel.SendMessageAsync(
+                text,
+                options: Options(ct),
+                allowedMentions: AllowedMentions.None,
+                messageReference: reference));
 
             return sent.Id;
         }
         catch (Exception exception)
         {
             LogFailure("acknowledgement", source.SourceMessageId, exception);
+
             return null;
         }
     }
@@ -352,7 +556,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         return null;
     }
 
-    private static RequestOptions Options(CancellationToken ct) => new()
+    private static RequestOptions Options(CancellationToken ct) => new RequestOptions()
     {
         CancelToken = ct,
         RetryMode = RetryMode.AlwaysFail,
@@ -382,7 +586,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
 
     private async Task<IMessageChannel> MessageChannelAsync(ulong channelId, CancellationToken ct)
     {
-        var channel = await client.GetChannelAsync(channelId, options: Options(ct));
+        var channel = await client.Rest.GetChannelAsync(channelId, Options(ct));
 
         return channel as IMessageChannel ?? throw new BotCommandException("The delivery channel is inaccessible.");
     }
