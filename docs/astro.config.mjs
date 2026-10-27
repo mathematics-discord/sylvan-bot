@@ -13,9 +13,29 @@ export default defineConfig({
         locales: {root: {label: 'English', lang: 'en-GB'}},
         customCss: ['./src/styles/theme.css'],
         pagination: false,
-        sidebar: [{slug: 'index', label: 'Introduction'}, {
-            label: "Commands",
-            items: [{autogenerate: {directory: "commands"}}]
-        }, {label: 'ratgirl.dev', link: 'https://ratgirl.dev'},],
+        sidebar: [
+            {slug: 'index', label: 'Introduction'},
+            {slug: 'commands/sylvanmail'},
+            {slug: 'commands', label: 'Command overview'},
+            {
+                label: 'User commands',
+                items: [{slug: 'commands/color'}, {slug: 'commands/working-hours'}],
+            },
+            {
+                label: 'Moderator commands',
+                items: [],
+            },
+            {
+                label: 'Senior moderator commands',
+                items: [],
+            },
+            {
+                label: 'Administrator commands',
+                items: [
+                    {slug: 'commands/color-admin'},
+                    {label: '/config sylvanmail', link: 'https://math.ratgirl.dev/sylvan/commands/sylvanmail/#administrator-configuration'},
+                ],
+            },
+        ],
     }),],
 });

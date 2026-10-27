@@ -1,0 +1,64 @@
+name: Deploy Sylvan documentation
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/deploy-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-sylvan-docs
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+
+      - name: Publish static documentation
+        env:
+          DOCS_DEPLOY_SSH_KEY: ${{ secrets.DOCS_DEPLOY_SSH_KEY }}
+          DOCS_DEPLOY_KNOWN_HOSTS: ${{ secrets.DOCS_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          : "${DOCS_DEPLOY_SSH_KEY:?Missing docs deployment key}"
+          : "${DOCS_DEPLOY_KNOWN_HOSTS:?Missing pinned VPS host key}"
+          umask 077
+          ssh_dir="$RUNNER_TEMP/docs-ssh"
+          mkdir -p "$ssh_dir"
+          trap 'rm -rf "$ssh_dir"' EXIT
+          printf '%s\n' "$DOCS_DEPLOY_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$DOCS_DEPLOY_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          tar -czf "$RUNNER_TEMP/docs.tar.gz" -C dist .
+          ssh -i "$ssh_dir/key" \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$ssh_dir/known_hosts" \
+            -o ConnectTimeout=15 \
+            sylvan-docs-deploy@57.131.51.51 deploy < "$RUNNER_TEMP/docs.tar.gz"
+
+      - name: Verify public documentation
+        run: curl --fail --silent --show-error https://math.ratgirl.dev/sylvan/ -o /dev/null

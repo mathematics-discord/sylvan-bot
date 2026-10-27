@@ -23,6 +23,22 @@ appearance handling. Source Sans 3 variable fonts are self-hosted in
 the fonts with base-aware URLs. The Sylvan wordmark keeps its Georgia font,
 and code keeps its monospace font.
 
+## Deployment
+
+`.github/workflows/deploy-docs.yml` checks, builds and publishes this site
+when `docs/` changes are pushed to `master`. It also supports a manual run
+from `master`. It does not build or deploy the bot.
+
+The repository secrets `DOCS_DEPLOY_SSH_KEY` and `DOCS_DEPLOY_KNOWN_HOSTS`
+provide the dedicated docs SSH key and pinned VPS host key. The VPS account
+can only stream a site archive to `/usr/local/sbin/sylvan-docs-deploy`,
+installed from `deploy/receive.sh`. Updates to that receiver need to be
+installed by a VPS administrator.
+
+Releases live in `/var/www/math/sylvan/releases/`. Deployment switches the
+`current` link atomically and restores the previous release if the public
+page does not match. Apache and certificate configuration are unchanged.
+
 ## Role mentions
 
 Role names and colours live in `src/data/roles.json`, keyed by Discord role

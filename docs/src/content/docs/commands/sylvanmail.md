@@ -1,106 +1,137 @@
 ---
-title: SylvanMail (beta)
-description: Private correspondence with staff through Sylvan.
+title: SylvanMail
+description: Read private messages from members and reply on behalf of staff.
+sidebar:
+  hidden: true
 ---
 
-**SylvanMail is a beta. Live Discord behaviour for this patch has not been verified.**
+SylvanMail lets people contact staff by sending Sylvan a direct message,
+even after leaving the server. Each conversation appears as a post in the
+private staff mail forum. Read the conversation and reply from that post.
 
-DM Sylvan normally to contact staff, including after leaving the server. Incoming DMs are relayed automatically to a
-private forum case titled with your username. The opening embed contains the case number, your raw user ID and username,
-and your user mention when you are a guild member. The configured role is pinged when the case opens.
+## Read incoming mail
 
-Inbound text and attachment captions use the original message time in UTC:
+Sylvan opens a case post named after the sender and notifies the configured
+staff role. The opening message includes the case number, username and user
+ID so you can identify the person contacting you.
 
-- Guild member: `[HH:MM:SS] <@userid>: text` (displayed as a user mention without notifying them).
-- Non-member: `[HH:MM:SS] username: text`.
+Incoming messages and attachments appear in the post with their original
+time in UTC. Messages from current server members show their user mention;
+messages from people outside the server show their username.
 
-After an inbound gap of at least three hours, the next delivered DM in an existing case is accompanied by a separate
-role
-ping. The gap comes from the user's DM message timestamps, ignoring bot replies and acknowledgements. No timer or saved
-last-ping state is used. A new case already has its opening ping and does not get a second one.
+If the person sends another message after a gap of at least three hours,
+Sylvan notifies the staff role again. Staff replies do not reset that gap.
 
-An initial DM explains the beta limitations. After Discord accepts every relayed part, the first successful
-acknowledgement
-in the conversation says **Delivered to staff. Please be patient, someone will get to you soon.** Later successes say
-**Delivered.** Failed, partial and uncertain deliveries receive a DM explaining the outcome. Forum threads contain
-delivery
-errors when needed, without pending notices or routine success receipts. Acknowledgements themselves can fail if Discord
-is unavailable; ambiguous sends are not automatically retried.
+The sender receives a delivery acknowledgement once Discord accepts all
+parts of their message. This confirms delivery, not that staff have read it.
 
-Every DM error includes resolution instructions. Correct rejected text or attachments before sending again, or retry
-later
-if the service is busy. For partial or uncertain delivery, or a problem you cannot resolve, DM user `203864799870844928`
-directly or contact another staff member. Ask staff to check what arrived before resending uncertain content.
+## Reply to a conversation
 
-## Drafting and sending staff replies
+You can reply if you have permission to write in the case post. The role
+Sylvan pings does not control who can send replies.
 
-Anyone with write access to the mapped forum thread can send. The configured ping role does not authorise or restrict
-sending. Discord enforces forum access; SylvanMail does not repeat permission, role, timeout or member-cache checks for
-outgoing replies. Bots and webhooks are ignored.
+### Reply anonymously
 
-1. Mention Sylvan explicitly in the message body to draft an anonymous reply, labelled `From staff:`.
-2. Alternatively, reply to a message from Sylvan with the reply ping enabled to draft a signed reply, labelled
-   `From <username>:`. A reply with the ping disabled does not qualify on its own.
-3. If both triggers are present, the explicit body mention wins and the reply is anonymous.
-4. Sylvan marks a sendable draft with 📤. Posting or editing the draft does not send it. Only its author can click that
-   reaction to send; other people's clicks are ignored.
-5. At confirmation, Sylvan fetches the latest text and attachments, verifies draft ownership, and re-evaluates
-   anonymous versus signed mode. Removing the trigger or making the draft invalid prevents delivery.
-6. Only after Discord accepts every text chunk and attachment does Sylvan add ☑️ to the author's original message.
-   Failed, partial or uncertain deliveries receive an error reply in the thread instead. Repeated clicks do not resend
-   a recorded attempt, including across restarts.
+1. Write your reply in the case post and **mention Sylvan in the message**.
+2. Wait for Sylvan to add 📤 to your message.
+3. Click 📤 on your own message to send it.
 
-Sylvan removes its body mention before delivery. Other mentions are preserved as text without notification. Discussion
-without a send trigger remains in the thread. Edits and deletions after delivery are not synchronised.
+The recipient sees **From staff:** followed by your reply. Sylvan removes
+its own mention from the delivered text.
+
+### Reply with your username
+
+1. Use Discord's **Reply** action on a message from Sylvan in the case post.
+2. Keep the reply ping enabled and write your reply.
+3. Wait for 📤, then click it on your own message to send.
+
+The recipient sees **From &lt;username&gt;:** followed by your reply.
+
+If you also mention Sylvan in the message body, the reply is anonymous.
+Replying with the ping disabled does not prepare a reply unless you mention
+Sylvan in the message body.
+
+### Check whether it was sent
+
+| What you see | What it means |
+| --- | --- |
+| 📤 | Your draft is ready for you to confirm. It has not been sent. |
+| ☑️ | Discord accepted every part of the reply. |
+| An error reply | Delivery failed, was partial, or could not be confirmed. Read the explanation before trying again. |
+
+Posting or editing a draft does not send it. Only the author can confirm
+it, and Sylvan sends the latest text and attachments when they do. Removing
+the mention or reply ping can make the draft ineligible to send.
+
+Ordinary discussion without either reply trigger stays in the staff post.
+Other mentions in a delivered reply do not notify anyone. Editing or
+deleting a message after sending it does not change the recipient's copy.
+
+## Handle a delivery problem
+
+Follow the error message in the case post. If text or attachments were
+rejected, correct them before preparing another reply. If Sylvan is busy,
+try again later. Editing a draft without 📤 asks Sylvan to check it again.
+
+**If delivery was partial or uncertain, check what arrived before sending
+another message.** A missing ☑️ does not prove that nothing was delivered.
+Clicking 📤 again does not resend an attempt Sylvan has already recorded.
+
+People sending DMs receive instructions when delivery fails. For an
+unresolved problem, they are directed to contact user `203864799870844928`
+or another staff member directly.
+
+Archived case posts are reopened when needed. A deleted or inaccessible
+post is replaced when the person next sends a DM; a locked post produces
+an error. Messages interrupted by a shutdown are not automatically replayed,
+and uncertain deliveries are not automatically retried.
+
+## Supported messages
+
+You can send text and ordinary attachments, including an attachment with
+no accompanying text. Staff drafts still need a reply trigger and confirmation.
+
+| Limit | Maximum |
+| --- | --- |
+| Text per message | 16,000 characters |
+| Attachments | 10 |
+| Each attachment | 8 MiB |
+| All attachments together | 24 MiB |
+
+Long text is split into Discord messages. Stickers, polls, voice messages,
+forwarded-message attribution and interactive content are not supported.
 
 ## Administrator configuration
+
+An administrator can select the private forum and notification role:
 
 ```text
 /config sylvanmail enable:<forum-channel> role:<ping-role>
 ```
 
-The `/config` group is Administrator-only in command visibility and at runtime. Both options are required. The role is
-only a ping target: it may be any guild role, including managed roles or @everyone, and does not need forum read access.
-Configuring it never grants forum permissions. The bot must be able to mention the selected role; @everyone requires
-Mention Everyone. Only the selected target is allowed to notify through ping messages.
+Both options are required. The entire `/config` group requires Administrator.
 
-Explicitly deny **View Channel** to `@everyone` on the private forum. Administrators control which other roles and
-members
-can read and write there independently of the ping target. Sylvan needs **View Channel**, **Send Messages (Create
-Posts)**, **Send Messages in Threads**, **Read Message History**, **Attach Files**, **Embed Links**, **Manage Threads**
-and **Add Reactions**. A forum requiring tags uses its first available tag.
+### Set forum access
 
-Only one guild may configure SylvanMail per bot database. Settings take effect immediately. Changing the forum keeps
-historical mappings and posts, stops sending from old posts, and uses the new forum for subsequent DMs. Nothing is moved
-or replayed. Without a configured destination, DM senders receive an unavailable notice. There is no disable command.
+Explicitly deny **View Channel** to `@everyone` on the mail forum, then grant
+the staff roles or members who should read and answer mail the access they
+need. Selecting a notification role does not grant forum permissions.
 
-## Content and delivery
+Sylvan needs **View Channel**, **Send Messages (Create Posts)**,
+**Send Messages in Threads**, **Read Message History**, **Attach Files**,
+**Embed Links**, **Manage Threads** and **Add Reactions**. If the forum
+requires tags, Sylvan uses the first available tag.
 
-Text is split to respect Discord's 2,000-character limit. Ordinary attachments are reuploaded in order, including
-attachment-only drafts with a send trigger. Limits are **16,000 text characters, 10 attachments, 8 MiB per file and 24
-MiB
-total**. Stickers, polls, voice messages, forwarded-message attribution and interactive content are unsupported. A draft
-must pass validation before it receives the send reaction and again when confirmed.
+The notification role can be any server role, including a managed role or
+`@everyone`. Sylvan must be able to mention it; notifying `@everyone`
+requires **Mention Everyone**.
 
-Archived posts are reopened. If the mapped post is deleted, inaccessible, or no longer belongs to the configured forum,
-the next inbound DM retires that mapping and creates a new case post, then relays the message there. Historical linkage
-is retained. Locked posts report an error. Transient network failures do not prove a post is inaccessible. An
-interrupted
-creation with no saved post ID is still reconciled using its case number before another post is created.
+### Change the destination
 
-Success means Discord accepted every part. Source/author IDs, mappings and accepted destination IDs are retained;
-message
-bodies and attachment bytes or URLs are not stored in the database or logged by SylvanMail. Ambiguous requests are not
-blindly retried. An absent success reaction does not prove that nothing arrived; reconcile uncertain attempts before
-resending. A failed reaction never changes the recorded payload outcome or resends the payload.
+Settings take effect immediately. Changing the forum leaves old case posts
+in place and stops replies being sent from them. Subsequent DMs use the new
+forum; old messages are not moved or replayed.
 
-Gateway work is bounded and transient. Events not processed before shutdown are not replayed. A full buffer refuses DM
-relays and confirmation attempts with a busy error when Discord is reachable. If a draft has no send reaction, it has
-not
-been prepared for confirmation; editing it triggers another check. No background recovery or automatic resend is
-provided.
-
-SylvanMail uses Direct Messages, guild message and reaction events. The bot currently enables Message Content;
-confirmation
-fetches the mapped draft over REST so edits and attachments are read at sending time. It does not relay ordinary
-discussion.
+Only one server can configure SylvanMail for a bot database. There is no
+disable command. Without a configured destination, DM senders receive an
+unavailable notice.
