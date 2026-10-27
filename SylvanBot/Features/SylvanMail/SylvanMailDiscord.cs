@@ -36,33 +36,18 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
 
         foreach (var overwrite in forum.PermissionOverwrites)
         {
-            if (overwrite.Permissions.ViewChannel != PermValue.Allow)
+            if (overwrite.TargetType != PermissionTarget.User || overwrite.Permissions.ViewChannel != PermValue.Allow)
                 continue;
 
-            if (overwrite.TargetType == PermissionTarget.Role)
-            {
-                var allowedRole = guild.GetRole(overwrite.TargetId);
+            var member = guild.GetUser(overwrite.TargetId);
 
-                var permitted = overwrite.TargetId == roleId
-                                || allowedRole?.Permissions.Administrator == true
-                                || allowedRole?.Tags?.BotId == client.CurrentUser.Id;
+            var permitted = overwrite.TargetId == client.CurrentUser.Id
+                            || member?.GuildPermissions.Administrator == true
+                            || member?.Roles.Any(item => item.Id == roleId) == true;
 
-                if (!permitted)
-                    throw new BotCommandException(
-                        "The forum is exposed: another non-administrator role has a View Channel allow. Remove that access before enabling SylvanMail.");
-            }
-            else
-            {
-                var member = guild.GetUser(overwrite.TargetId);
-
-                var permitted = overwrite.TargetId == client.CurrentUser.Id
-                                || member?.GuildPermissions.Administrator == true
-                                || member?.Roles.Any(item => item.Id == roleId) == true;
-
-                if (!permitted)
-                    throw new BotCommandException(
-                        "The forum is exposed: a member outside Senior Moderators has a View Channel allow. Remove that access before enabling SylvanMail.");
-            }
+            if (!permitted)
+                throw new BotCommandException(
+                    "The forum is exposed: a member outside Senior Moderators has a View Channel allow. Remove that access before enabling SylvanMail.");
         }
 
         var permissions = guild.CurrentUser.GetPermissions(forum);

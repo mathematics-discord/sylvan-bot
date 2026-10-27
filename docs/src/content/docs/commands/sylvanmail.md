@@ -34,8 +34,9 @@ The entire `/config` group is Administrator-only, both in Discord command visibi
 required; `enable` selects a forum, not a Boolean. The selected role authorises staff replies and is pinged once when a post
 opens. Only members holding that role can send replies through SylvanMail.
 
-Before enabling, explicitly deny **View Channel** to `@everyone` and allow it to the selected role and Sylvan. Other roles
-or member overrides must not expose the forum outside that role, Sylvan and administrators. Sylvan rejects unsafe access
+Before enabling, explicitly deny **View Channel** to `@everyone` and allow it to the selected role and Sylvan. Additional
+roles may also have forum access. Member-specific View Channel allows remain restricted to the selected role's members,
+Sylvan and administrators. Sylvan rejects unsafe member overrides
 without changing any permissions. Member data must be ready. The bot needs **View Channel**, **Send Messages (Create
 Posts)**, **Send Messages in Threads**, **Read Message History**, **Attach Files**, **Embed Links** and **Manage Threads**.
 The staff role must be mentionable by Sylvan. A forum requiring tags uses its first available tag.
