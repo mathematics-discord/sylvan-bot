@@ -1,4 +1,0 @@
-component: Internal
-kind: Changed
-body: Require author confirmation for SylvanMail reply drafts, re-read edited content at confirmation, support anonymous and signed replies, and separate thread write permissions from the ping role. Replace routine thread receipts with success reactions and delivery errors, retain DM outcome notices, format inbound member mentions, and derive three-hour gap pings from DM history.
-time: 2026-10-27T01:32:46.3064126Z
