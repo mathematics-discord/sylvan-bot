@@ -429,6 +429,34 @@ namespace SylvanBot.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SylvanBot.Application.Features.RoleReactions.RoleReaction", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("MessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EmojiKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long>("ChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EmojiText")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("GuildId", "MessageId", "EmojiKey");
+
+                    b.ToTable("RoleReactions", (string)null);
+                });
+
             modelBuilder.Entity("SylvanBot.Application.Features.Quorum.QuorumVoterRole", b =>
                 {
                     b.HasOne("SylvanBot.Application.Features.Quorum.QuorumConfiguration", null)

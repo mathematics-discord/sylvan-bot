@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Quorum;
+using SylvanBot.Application.Features.RoleReactions;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Application.Features.WorkingHours;
 using SylvanBot.Features.EmojiAnalytics;
@@ -24,6 +25,7 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<LoggingConfiguration>   LoggingConfigurations   => Set<LoggingConfiguration>();
     public DbSet<LoggingExcludedChannel> LoggingExcludedChannels => Set<LoggingExcludedChannel>();
     public DbSet<RoleColourOption>       RoleColourOptions       => Set<RoleColourOption>();
+    public DbSet<RoleReaction>           RoleReactions           => Set<RoleReaction>();
 
     public DbSet<QuorumConfiguration> QuorumConfigurations => Set<QuorumConfiguration>();
     public DbSet<QuorumVoterRole>     QuorumVoterRoles     => Set<QuorumVoterRole>();
