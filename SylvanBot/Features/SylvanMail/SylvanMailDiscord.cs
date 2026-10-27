@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using Discord.Net;
 using Discord.Rest;
@@ -86,37 +86,19 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
             throw new BotCommandException("The forum requires a tag but has no available tags. No settings changed.");
     }
 
-    public async Task<bool> CanWriteAsync(ulong guildId, ulong threadId, ulong authorId, CancellationToken ct)
-    {
-        var guild = client.GetGuild(guildId);
-
-        if (guild is not { IsConnected: true, HasAllMembers: true })
-            throw new BotCommandException("Guild/member data is not ready; sending permissions cannot be confirmed.");
-
-        var thread = await client.Rest.GetChannelAsync(id: threadId, Options(ct)) as IThreadChannel;
-        var member = guild.GetUser(authorId);
-
-        if (thread is null || thread.GuildId != guildId || member is null || member.IsBot || thread.IsLocked)
-            return false;
-
-        var permissions = member.GetPermissions(thread);
-        var timedOut    = member.TimedOutUntil > DateTimeOffset.UtcNow;
-
-        return permissions is { ViewChannel: true, SendMessagesInThreads: true } && !timedOut;
-    }
-
     public async Task<SylvanMailMessage?> ReadDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct)
     {
         var channel = await MessageChannelAsync(channelId: threadId, ct: ct);
-        var source  = await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, Options(ct)) as IUserMessage;
 
-        if (source is null
+        if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, Options(ct)) is not IUserMessage source
             || source.Author.Id != authorId
             || source.Author.IsBot
             || source.Author.IsWebhook
             || source.Type is not (MessageType.Default or MessageType.Reply)
             || channel is not IThreadChannel thread)
+        {
             return null;
+        }
 
         var hasMarker = source.Reactions.TryGetValue(new Emoji(SendEmoji), out var reaction) && reaction.IsMe;
 
@@ -158,17 +140,19 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         try
         {
             var channel = await MessageChannelAsync(channelId: threadId, ct: ct);
-            var message = await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, Options(ct)) as IUserMessage;
 
-            if (message is null)
+            if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, Options(ct)) is not IUserMessage message)
                 return;
 
             var emoji  = new Emoji(SendEmoji);
             var marked = message.Reactions.TryGetValue(key: emoji, out var reaction) && reaction.IsMe;
 
-            if (ready && !marked)
+            if (ready == marked)
+                return;
+
+            if (ready)
                 await message.AddReactionAsync(emote: emoji, Options(ct));
-            else if (!ready && marked)
+            else
                 await message.RemoveReactionAsync(emote: emoji, userId: client.CurrentUser.Id, Options(ct));
         }
         catch (Exception exception)
@@ -252,7 +236,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
                         ? new AllowedMentions(AllowedMentionTypes.Everyone)
                         : new AllowedMentions { RoleIds = [settings.RoleId] };
                     var text = everyone ? "@everyone" : $"<@&{settings.RoleId}>";
-                    await AcceptedAsync(() => thread.SendMessageAsync(text: text, allowedMentions: mentions, options: Options(ct)));
+                    await AcceptedAsync(() => thread.SendMessageAsync(text: text, options: Options(ct), allowedMentions: mentions));
 
                     return;
                 }
@@ -356,16 +340,16 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         if (thread.IsLocked)
             throw new BotCommandException("The mapped post is locked. No replacement was created and no message was relayed.");
 
-        if (thread.IsArchived)
+        if (!thread.IsArchived)
+            return true;
+
+        try
         {
-            try
-            {
-                await thread.ModifyAsync(properties => properties.Archived = false, Options(ct));
-            }
-            catch (HttpException exception) when (exception.DiscordCode == DiscordErrorCode.UnknownChannel || exception.HttpCode == HttpStatusCode.Forbidden)
-            {
-                return false;
-            }
+            await thread.ModifyAsync(properties => properties.Archived = false, Options(ct));
+        }
+        catch (HttpException exception) when (exception.DiscordCode == DiscordErrorCode.UnknownChannel || exception.HttpCode == HttpStatusCode.Forbidden)
+        {
+            return false;
         }
 
         return true;
@@ -463,7 +447,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         {
             try
             {
-                var guidance = "If the error describes a problem with your text or attachments, fix it and send a new DM. "
+                const string guidance = "If the error describes a problem with your text or attachments, fix it and send a new DM. "
                     + "If SylvanMail is busy, try again later. For partial or uncertain delivery, or any problem you cannot fix yourself, "
                     + "DM <@203864799870844928> directly or contact another member of staff. Ask them to check what arrived before resending.";
 
@@ -475,40 +459,40 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
             }
         }
 
-        if (threadId.HasValue && failed)
+        if (!threadId.HasValue || !failed)
+            return receiptId;
+
+        try
         {
-            try
-            {
-                var channel = await MessageChannelAsync(channelId: threadId.Value, ct: ct);
-                var report  = $"Delivery error · source `{source.SourceMessageId}`: {detail}";
+            var channel = await MessageChannelAsync(channelId: threadId.Value, ct: ct);
+            var report  = $"Delivery error · source `{source.SourceMessageId}`: {detail}";
 
-                if (receiptId.HasValue)
-                {
-                    await channel.ModifyMessageAsync(
-                        messageId: receiptId.Value,
-                        properties =>
-                        {
-                            properties.Content         = report;
-                            properties.AllowedMentions = AllowedMentions.None;
-                        },
-                        Options(ct));
-                }
-                else
-                {
-                    var reference = toStaff ? null : new MessageReference(messageId: source.SourceMessageId, channelId: source.SourceChannelId, failIfNotExists: false);
-
-                    var sent = await AcceptedAsync(() => channel.SendMessageAsync(
-                                                       text: report,
-                                                       options: Options(ct),
-                                                       allowedMentions: AllowedMentions.None,
-                                                       messageReference: reference));
-                    receiptId = sent.Id;
-                }
-            }
-            catch (Exception exception)
+            if (receiptId.HasValue)
             {
-                LogFailure("receipt", sourceId: source.SourceMessageId, exception: exception);
+                await channel.ModifyMessageAsync(
+                    messageId: receiptId.Value,
+                    properties =>
+                    {
+                        properties.Content         = report;
+                        properties.AllowedMentions = AllowedMentions.None;
+                    },
+                    Options(ct));
             }
+            else
+            {
+                var reference = toStaff ? null : new MessageReference(messageId: source.SourceMessageId, channelId: source.SourceChannelId, failIfNotExists: false);
+
+                var sent = await AcceptedAsync(() => channel.SendMessageAsync(
+                                                   text: report,
+                                                   options: Options(ct),
+                                                   allowedMentions: AllowedMentions.None,
+                                                   messageReference: reference));
+                receiptId = sent.Id;
+            }
+        }
+        catch (Exception exception)
+        {
+            LogFailure("receipt", sourceId: source.SourceMessageId, exception: exception);
         }
 
         return receiptId;

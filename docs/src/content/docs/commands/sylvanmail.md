@@ -35,7 +35,8 @@ directly or contact another staff member. Ask staff to check what arrived before
 ## Drafting and sending staff replies
 
 Anyone with write access to the mapped forum thread can send. The configured ping role does not authorise or restrict
-sending. Bots and webhooks are ignored.
+sending. Discord enforces forum access; SylvanMail does not repeat permission, role, timeout or member-cache checks for
+outgoing replies. Bots and webhooks are ignored.
 
 1. Mention Sylvan explicitly in the message body to draft an anonymous reply, labelled `From staff:`.
 2. Alternatively, reply to a message from Sylvan with the reply ping enabled to draft a signed reply, labelled
@@ -43,7 +44,7 @@ sending. Bots and webhooks are ignored.
 3. If both triggers are present, the explicit body mention wins and the reply is anonymous.
 4. Sylvan marks a sendable draft with 📤. Posting or editing the draft does not send it. Only its author can click that
    reaction to send; other people's clicks are ignored.
-5. At confirmation, Sylvan fetches the latest text and attachments, checks current thread write access, and re-evaluates
+5. At confirmation, Sylvan fetches the latest text and attachments, verifies draft ownership, and re-evaluates
    anonymous versus signed mode. Removing the trigger or making the draft invalid prevents delivery.
 6. Only after Discord accepts every text chunk and attachment does Sylvan add ☑️ to the author's original message.
    Failed, partial or uncertain deliveries receive an error reply in the thread instead. Repeated clicks do not resend

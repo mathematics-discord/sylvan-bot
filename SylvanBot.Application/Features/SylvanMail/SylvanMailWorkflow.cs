@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Common;
 using SylvanBot.Infrastructure.Data;
@@ -79,9 +79,6 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
                 return;
             }
 
-            if (!await discord.CanWriteAsync(guildId: conversation.GuildId, threadId: threadId, authorId: authorId, ct: ct))
-                throw new BotCommandException("Not sent: you no longer have write access to this thread.");
-
             if (string.IsNullOrEmpty(message.OutboundPrefix))
                 throw new BotCommandException("Not sent: mention Sylvan or reply to Sylvan with the reply ping enabled before confirming.");
 
@@ -93,7 +90,9 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
                 await discord.SetDraftReadyAsync(threadId: threadId, messageId: messageId, ready: false, ct: ct);
             }
             else
+            {
                 await discord.SetDraftReadyAsync(threadId: threadId, messageId: messageId, ready: true, ct: ct);
+            }
         }
         catch (Exception exception) when (message is not null)
         {
@@ -108,6 +107,9 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
             }
 
             await discord.SetDraftReadyAsync(threadId: threadId, messageId: messageId, ready: false, ct: noticeTimeout.Token);
+
+            if (exception is not BotCommandException)
+                throw;
         }
         finally
         {
@@ -179,11 +181,9 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
 
         if (!toStaff)
         {
-            var authorised = message.GuildId == destination.GuildId
-                && conversation is not null
-                && await discord.CanWriteAsync(guildId: destination.GuildId, threadId: message.SourceChannelId, authorId: message.AuthorId, ct: ct);
+            var mappedCase = message.GuildId == destination.GuildId && conversation is not null;
 
-            if (!authorised)
+            if (!mappedCase)
                 return;
         }
 
@@ -223,7 +223,7 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_lock({LockId})", cancellationToken: ct);
     }
 
-    private static Task UnlockAsync(BotDbContext db) =>
+    private static Task<int> UnlockAsync(BotDbContext db) =>
         db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_unlock({LockId})", cancellationToken: CancellationToken.None);
 
     private static void ValidateContent(SylvanMailMessage message)
@@ -299,9 +299,9 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
             return;
         }
 
-        var                     settings     = destinations[0];
-        var                     toStaff      = message.GuildId is null;
-        SylvanMailConversation? conversation = null;
+        var                     settings = destinations[0];
+        var                     toStaff  = message.GuildId is null;
+        SylvanMailConversation? conversation;
 
         if (toStaff)
         {
@@ -328,9 +328,6 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
 
             if (conversation is null)
                 return;
-
-            if (!await discord.CanWriteAsync(guildId: settings.GuildId, threadId: message.SourceChannelId, authorId: message.AuthorId, ct: ct))
-                throw new BotCommandException("Not sent: you no longer have write access to this thread.");
         }
 
         var operation = await db.SylvanMailOperations
@@ -380,7 +377,10 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
 
         try
         {
-            await discord.ValidateForumAsync(guildId: settings.GuildId, forumId: settings.ForumId, roleId: settings.RoleId, ct: ct, validatePing: false);
+            // Discord already accepted outgoing drafts; only inbound delivery needs destination validation.
+            if (toStaff)
+                await discord.ValidateForumAsync(guildId: settings.GuildId, forumId: settings.ForumId, roleId: settings.RoleId, ct: ct, validatePing: false);
+
             ValidateContent(message);
 
             // Download all attachments before publishing any of this message; retain at most 24 MiB of attachment payload.
@@ -391,8 +391,6 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
 
             if (toStaff)
                 conversation = await ResolveConversationAsync(db: db, settings: settings, message: message, operation: operation, ct: ct);
-            else if (!await discord.OpenPostAsync(conversation!, ct: ct))
-                throw new BotCommandException("The mapped post was deleted; this reply was not sent.");
 
             var threadId = conversation!.ThreadId!.Value;
             operation.DestinationChannelId = toStaff ? threadId : await discord.OpenDmAsync(userId: conversation.UserId, ct: ct);
@@ -417,12 +415,14 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
             var                    ordinal = 0;
 
             foreach (var chunk in chunks)
+            {
                 await PublishAsync(
                     db: db,
                     op: operation,
                     ordinal: ordinal++,
                     () => discord.SendTextAsync(channelId: operation.DestinationChannelId.Value, label + chunk, ct: ct),
                     ct: ct);
+            }
 
             for (var index = 0; index < message.Attachments.Length; index++)
             {
@@ -526,42 +526,42 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
         operation.ConversationId = conversation.Id;
         await db.SaveChangesAsync(ct);
 
-        if (conversation.ThreadId is null)
+        if (conversation.ThreadId is not null)
+            return conversation;
+
+        if (conversation.CreationStarted)
         {
-            if (conversation.CreationStarted)
+            conversation.ThreadId = await discord.FindPostAsync(conversation: conversation, ct: ct);
+
+            if (conversation.ThreadId is null)
             {
-                conversation.ThreadId = await discord.FindPostAsync(conversation: conversation, ct: ct);
-
-                if (conversation.ThreadId is null)
-                {
-                    throw new BotCommandException(
-                        "An earlier post creation has an uncertain outcome. No replacement was created; staff must reconcile the saved attempt.");
-                }
+                throw new BotCommandException(
+                    "An earlier post creation has an uncertain outcome. No replacement was created; staff must reconcile the saved attempt.");
             }
-            else
-            {
-                conversation.CreationStarted = true;
-                await db.SaveChangesAsync(ct);
-
-                try
-                {
-                    conversation.ThreadId = await discord.CreatePostAsync(conversation: conversation, roleId: settings.RoleId, username: message.Username, ct: ct);
-                }
-                catch (BotCommandException)
-                {
-                    // A definite refusal made no post. Only ambiguous requests require marker reconciliation.
-                    conversation.CreationStarted = false;
-                    await db.SaveChangesAsync(CancellationToken.None);
-
-                    throw;
-                }
-            }
-
+        }
+        else
+        {
+            conversation.CreationStarted = true;
             await db.SaveChangesAsync(ct);
 
-            if (!await discord.OpenPostAsync(conversation: conversation, ct: ct))
-                throw new BotCommandException("The post disappeared before relay. This message was not sent.");
+            try
+            {
+                conversation.ThreadId = await discord.CreatePostAsync(conversation: conversation, roleId: settings.RoleId, username: message.Username, ct: ct);
+            }
+            catch (BotCommandException)
+            {
+                // A definite refusal made no post. Only ambiguous requests require marker reconciliation.
+                conversation.CreationStarted = false;
+                await db.SaveChangesAsync(CancellationToken.None);
+
+                throw;
+            }
         }
+
+        await db.SaveChangesAsync(ct);
+
+        if (!await discord.OpenPostAsync(conversation: conversation, ct: ct))
+            throw new BotCommandException("The post disappeared before relay. This message was not sent.");
 
         return conversation;
     }

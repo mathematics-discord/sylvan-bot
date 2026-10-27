@@ -1,4 +1,4 @@
-using System.Threading.Channels;
+﻿using System.Threading.Channels;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Gateway;
 
@@ -55,9 +55,11 @@ public sealed class SylvanMailGatewayHandler(
                 catch (Exception exception)
                 {
                     logger.Warning(
-                        "SylvanMail handling failed for source {SourceId}: {ExceptionType}",
-                        propertyValue0: message.MessageId,
-                        propertyValue1: exception.GetType().Name);
+                        "SylvanMail handling failed for source {SourceId} in channel {ChannelId} by author {AuthorId}: {ExceptionType}",
+                        message.MessageId,
+                        message.ChannelId,
+                        message.AuthorId,
+                        exception.GetType().Name);
 
                     if (!stoppingToken.IsCancellationRequested && message.Inbound is not null)
                     {
@@ -79,25 +81,20 @@ public sealed class SylvanMailGatewayHandler(
     }
 
     private static bool IsUserMessage(IUserMessage message) =>
-        !message.Author.IsBot
-        && !message.Author.IsWebhook
-        && message.Source == MessageSource.User
-        && message.Type is MessageType.Default or MessageType.Reply;
+        message is { Author.IsBot: false, Author.IsWebhook: false, Source: MessageSource.User, Type: MessageType.Default or MessageType.Reply };
 
     private Task ReceivedAsync(SocketMessage source)
     {
         if (source is not IUserMessage message || !IsUserMessage(message))
             return Task.CompletedTask;
 
-        if (source.Channel is IDMChannel)
-        {
-            var input = SylvanMailDiscord.ReadMessage(source: message, guildId: null);
-            var work  = new MailWork(ChannelId: source.Channel.Id, MessageId: source.Id, AuthorId: source.Author.Id, Confirm: false, Inbound: input);
+        if (source.Channel is not IDMChannel)
+            return QueueDraftAsync(message: message, edited: false);
 
-            return !_messages.Writer.TryWrite(work) ? RefuseBusyAsync(input) : Task.CompletedTask;
-        }
+        var input = SylvanMailDiscord.ReadMessage(source: message, guildId: null);
+        var work  = new MailWork(ChannelId: source.Channel.Id, MessageId: source.Id, AuthorId: source.Author.Id, Confirm: false, Inbound: input);
 
-        return QueueDraftAsync(message: message, edited: false);
+        return !_messages.Writer.TryWrite(work) ? RefuseBusyAsync(input) : Task.CompletedTask;
     }
 
     private Task UpdatedAsync(Cacheable<IMessage, ulong> before, SocketMessage after, ISocketMessageChannel channel) =>

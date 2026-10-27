@@ -1,0 +1,4 @@
+component: Internal
+kind: Fixed
+body: Remove redundant permission preflights from outgoing SylvanMail replies. Trust Discord to enforce forum access while preserving mapped-case validation, author-only confirmation and duplicate-send protection. Stop reopening threads for outgoing DMs and surface unexpected draft failures in logs.
+time: 2026-10-27T03:14:31.6698367Z

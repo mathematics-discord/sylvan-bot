@@ -4,8 +4,6 @@ public interface ISylvanMailDiscord
 {
     Task ValidateForumAsync(ulong guildId, ulong forumId, ulong roleId, CancellationToken ct, bool validatePing = true);
 
-    Task<bool> CanWriteAsync(ulong guildId, ulong threadId, ulong authorId, CancellationToken ct);
-
     Task<SylvanMailMessage?> ReadDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct);
 
     Task SetDraftReadyAsync(ulong threadId, ulong messageId, bool ready, CancellationToken ct);
