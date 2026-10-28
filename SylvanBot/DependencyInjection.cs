@@ -109,6 +109,9 @@ public static class DependencyInjection
             services.AddSingleton<MessageSnapshotCache>();
             services.AddSingleton<MessageCacheMaintenanceWorker>();
             services.AddHostedService(sp => sp.GetRequiredService<MessageCacheMaintenanceWorker>());
+            services.AddSingleton<LoggingScopeResolver>();
+            services.AddSingleton<ModerationAuditLookup>();
+            services.AddSingleton<ModerationLogPublisher>();
             services.AddSingleton<ModerationLoggingGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ModerationLoggingGatewayHandler>());
             services.AddHostedService(sp => sp.GetRequiredService<ModerationLoggingGatewayHandler>());
