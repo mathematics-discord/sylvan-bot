@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.17 - 2026-10-28
+## Moderation
+### Added
+- Retain eligible message snapshots for 24 hours across bot restarts so edit and deletion logs can preserve recent evidence after deployments.
 # v0.1.16 - 2026-10-27
 ## Administration
 ### Added
