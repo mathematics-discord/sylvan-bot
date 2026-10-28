@@ -7,10 +7,15 @@ public sealed class Ticket
     public const int CommentLimit = 3000;
 
     public long Id { get; init; }
+
     public ulong GuildId { get; init; }
+
     public long Number { get; init; }
+
     public TicketAction Action { get; init; }
+
     public ulong? SubjectUserId { get; init; }
+
     public ulong? ModeratorUserId { get; init; }
 
     [StringLength(CommentLimit)]
@@ -24,56 +29,140 @@ public sealed class Ticket
                     nameof(value),
                     $"Ticket comments cannot exceed {CommentLimit:N0} characters.");
 
+            if (!string.Equals(field, value, StringComparison.Ordinal))
+                ClearApproval();
+
             field = value;
         }
     }
 
     public DateTimeOffset? CreatedAtUtc { get; init; }
+
     public TicketStatus? Status { get; set; }
-    public long? DurationSeconds { get; set; }
+
+    public long? DurationSeconds
+    {
+        get;
+        set
+        {
+            if (field != value)
+                ClearApproval();
+
+            field = value;
+        }
+    }
+
+    public ulong? ApprovedByUserId { get; set; }
+
+    public DateTimeOffset? ApprovedAtUtc { get; set; }
+
+    public bool HidePending { get; set; }
+
     public ulong? RoleId { get; init; }
+
     public bool Hidden { get; set; }
+
     public ulong? ChannelId { get; set; }
+
     public ulong? MessageId { get; set; }
+
     public ulong? PreviousChannelId { get; set; }
+
     public ulong? PreviousMessageId { get; set; }
+
     public bool PublicationPending { get; set; }
+
     public ulong? LastModifiedByUserId { get; set; }
+
     public DateTimeOffset? LastModifiedAtUtc { get; set; }
+
     public int Version { get; set; }
 
     public ulong? SourceAuditId { get; init; }
+
     public ulong? LastAuditId { get; set; }
+
     public string? AuditReason { get; init; }
-    public bool DurationKnown { get; set; }
+
+    public bool DurationKnown
+    {
+        get;
+        set
+        {
+            if (field != value)
+                ClearApproval();
+
+            field = value;
+        }
+    }
+
     public DateTimeOffset? ExpiresAtUtc { get; set; }
+
     public TicketCompletion? Completion { get; set; }
+
     public long? SupersededByNumber { get; set; }
+
     public int? PublishedVersion { get; set; }
+
     public Guid? PendingOperationId { get; set; }
+
     public DateTimeOffset? PendingExpiryUtc { get; set; }
+
     public ulong? PendingEditorUserId { get; set; }
+
     public DateTimeOffset? PendingRequestedAtUtc { get; set; }
+
     public bool PendingOperationAttempted { get; set; }
+
     public bool ExpirySuspended { get; set; }
+
+    public void ClearApproval()
+    {
+        ApprovedByUserId = null;
+        ApprovedAtUtc = null;
+    }
+
+    public void Approve(TicketActor actor, int expectedVersion)
+    {
+        if (actor.GuildId != GuildId || actor.UserId == 0 || (actor is { IsAdministrator: false, CanViewAuditLog: false }))
+            throw new Common.BotCommandException("Approval requires Administrator or View Audit Log.");
+
+        if (Version != expectedVersion)
+            throw new Common.BotCommandException("This ticket changed. Refresh it before approving.");
+
+        if (Action is not (TicketAction.Ban or TicketAction.Timeout or TicketAction.VoiceMute)
+            || Hidden || HidePending || PendingOperationId is not null
+            || string.IsNullOrWhiteSpace(Comment) || !DurationKnown
+            || (Action == TicketAction.Timeout && DurationSeconds is not > 0)
+            || Completion == TicketCompletion.Pending)
+            throw new Common.BotCommandException("Complete the ticket details and resolve pending changes before approving.");
+
+        if (ApprovedAtUtc is not null)
+            return;
+
+        ApprovedByUserId = actor.UserId;
+        ApprovedAtUtc = DateTimeOffset.UtcNow;
+        Version++;
+    }
 
     public bool CanCorrect(TicketActor actor)
     {
         if (actor.GuildId != GuildId || actor.UserId == 0)
             return false;
 
-        if (Hidden && !actor.IsAdministrator && !actor.CanViewAuditLog)
+        if (Hidden && actor is { IsAdministrator: false, CanViewAuditLog: false })
             return false;
 
         if (actor.IsAdministrator || actor.CanViewAuditLog)
             return true;
 
-        return ModeratorUserId == actor.UserId && (Action switch
+        return ModeratorUserId == actor.UserId && Action switch
         {
             TicketAction.Timeout => actor.CanTimeoutMembers,
+            TicketAction.VoiceMute => actor.CanMuteMembers,
             TicketAction.Ban => actor.CanBanMembers,
             _ => false,
-        });
+        };
     }
 
     public void UpdateCompletion()

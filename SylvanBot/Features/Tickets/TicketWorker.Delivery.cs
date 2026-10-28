@@ -9,6 +9,28 @@ using SylvanBot.Application.Infrastructure.Data;
 
 public sealed partial class TicketWorker
 {
+    private static async Task PrepareDeliveryAsync(BotDbContext dbContext, TicketModerator moderator, Ticket ticket, bool changedHead, CancellationToken cancellationToken)
+    {
+        var interval = await dbContext.TicketConfigurations
+            .Where(configuration => configuration.GuildId == ticket.GuildId)
+            .Select(configuration => configuration.ReminderIntervalSeconds)
+            .SingleAsync(cancellationToken);
+
+        moderator.ActiveTicketId = ticket.Id;
+
+        if (changedHead)
+        {
+            moderator.PromptMessageId = null;
+            moderator.PromptVersion = null;
+        }
+
+        // Persist backoff even for blocked DMs or an uncertain send.
+        moderator.NextDeliveryUtc = DateTimeOffset.UtcNow.AddSeconds(interval);
+        moderator.LastAttemptedVersion = ticket.Version;
+        moderator.Version++;
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task ProcessModeratorsAsync(CancellationToken cancellationToken)
     {
         ulong afterUserId = 0;
@@ -27,12 +49,14 @@ public sealed partial class TicketWorker
                                     || moderator.NextDeliveryUtc != null)
                 .Select(moderator => moderator.UserId);
 
+            var cursor = afterUserId;
+
             List<ulong> users = await dbContext.Tickets
-                .Where(ticket => ticket.Completion == TicketCompletion.Pending && ticket.ModeratorUserId != null
+                .Where(ticket => !ticket.Hidden && ticket.Completion == TicketCompletion.Pending && ticket.ModeratorUserId != null
                                  && enabledGuilds.Contains(ticket.GuildId))
                 .Select(ticket => ticket.ModeratorUserId!.Value)
                 .Union(moderatorsWithDelivery)
-                .Where(userId => userId > afterUserId)
+                .Where(userId => userId > cursor)
                 .OrderBy(userId => userId)
                 .Take(100)
                 .ToListAsync(cancellationToken);
@@ -100,7 +124,7 @@ public sealed partial class TicketWorker
 
         var ticket = await dbContext.Tickets
             .AsNoTracking()
-            .Where(ticket => ticket.ModeratorUserId == userId && ticket.Completion == TicketCompletion.Pending
+            .Where(ticket => ticket.ModeratorUserId == userId && !ticket.Hidden && ticket.Completion == TicketCompletion.Pending
                              && enabledGuilds.Contains(ticket.GuildId))
             .OrderBy(ticket => ticket.CreatedAtUtc)
             .ThenBy(ticket => ticket.Id)
@@ -114,6 +138,11 @@ public sealed partial class TicketWorker
             return;
         }
 
+        await DeliverPromptAsync(dbContext, moderator, ticket, enabledGuilds, cancellationToken);
+    }
+
+    private async Task DeliverPromptAsync(BotDbContext dbContext, TicketModerator moderator, Ticket ticket, IQueryable<ulong> enabledGuilds, CancellationToken cancellationToken)
+    {
         var changedHead = moderator.ActiveTicketId != ticket.Id;
         var due = changedHead
                   || moderator.NextDeliveryUtc is null
@@ -123,26 +152,10 @@ public sealed partial class TicketWorker
         if (!due)
             return;
 
+        var userId = moderator.UserId;
         var previousChannelId = moderator.ChannelId;
         var previousPromptId = moderator.PromptMessageId;
-        var interval = await dbContext.TicketConfigurations
-            .Where(configuration => configuration.GuildId == ticket.GuildId)
-            .Select(configuration => configuration.ReminderIntervalSeconds)
-            .SingleAsync(cancellationToken);
-
-        moderator.ActiveTicketId = ticket.Id;
-
-        if (changedHead)
-        {
-            moderator.PromptMessageId = null;
-            moderator.PromptVersion = null;
-        }
-
-        // Persist backoff even for blocked DMs or an uncertain send.
-        moderator.NextDeliveryUtc = DateTimeOffset.UtcNow.AddSeconds(interval);
-        moderator.LastAttemptedVersion = ticket.Version;
-        moderator.Version++;
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await PrepareDeliveryAsync(dbContext, moderator, ticket, changedHead, cancellationToken);
 
         var actor = await discord.GetActorAsync(ticket.GuildId, userId, cancellationToken);
 
@@ -152,7 +165,7 @@ public sealed partial class TicketWorker
         await workflow.ShowAsync(actor, ticket.Number, ticket.Hidden, cancellationToken);
         var user = await client.Rest.GetUserAsync(userId, Options(cancellationToken));
 
-        if (user is null || user.IsBot)
+        if (user?.IsBot != false)
             return;
 
         var channel = await user.CreateDMChannelAsync(Options(cancellationToken));
@@ -162,7 +175,7 @@ public sealed partial class TicketWorker
 
         var stillCurrent = await dbContext.Tickets
             .AnyAsync(current => current.Id == ticket.Id && current.GuildId == ticket.GuildId
-                                 && current.Version == ticket.Version && current.Completion == TicketCompletion.Pending
+                                 && current.Version == ticket.Version && !current.Hidden && current.Completion == TicketCompletion.Pending
                                  && enabledGuilds.Contains(current.GuildId), cancellationToken);
 
         if (!stillCurrent)
@@ -185,14 +198,14 @@ public sealed partial class TicketWorker
     {
         var guildName = client.GetGuild(ticket.GuildId)?.Name ?? ticket.GuildId.ToString(CultureInfo.InvariantCulture);
         var text = new StringBuilder()
-            .AppendLine($"**{guildName} — Ticket #{ticket.Number}**")
-            .AppendLine(TicketPresentation.CompletionText(ticket))
+            .AppendLine(CultureInfo.InvariantCulture, $"**{guildName} — Ticket #{ticket.Number}**")
+            .AppendLine(TicketPresentation.OperationalDetails(ticket))
             .AppendLine("Send ordinary DM text to complete this ticket, for example `1 day 8 hours, breaking rules`.")
             .AppendLine(ticket.Action == TicketAction.Timeout
                 ? "The observed timeout duration is already filled in; a comment alone retains it. Explicit duration edits change the live timeout."
                 : "Use `permanent, comment` for a permanent ban. Finite durations schedule an unban.")
             .AppendLine("Durations run from the original action time. An elapsed duration expires an active action immediately.")
-            .AppendLine($"Alternatively, start your message with `{ticket.GuildId}/{ticket.Number} `, or use `/ticket set` in that server.");
+            .AppendLine(CultureInfo.InvariantCulture, $"Alternatively, start your message with `{ticket.GuildId}/{ticket.Number} `, or use `/ticket set` in that server.");
 
         if (ticket.SubjectUserId is not null)
         {
@@ -232,8 +245,8 @@ public sealed partial class TicketWorker
         while (true)
         {
             IAsyncEnumerable<IReadOnlyCollection<IMessage>> request = beforeId is null
-                ? channel.GetMessagesAsync(100, options: Options(cancellationToken))
-                : channel.GetMessagesAsync(beforeId.Value, Direction.Before, 100, options: Options(cancellationToken));
+                ? channel.GetMessagesAsync(options: Options(cancellationToken))
+                : channel.GetMessagesAsync(beforeId.Value, Direction.Before, options: Options(cancellationToken));
 
             IEnumerable<IMessage> page = await request.FlattenAsync();
 
@@ -303,7 +316,7 @@ public sealed partial class TicketWorker
                 text = text[prefix.Length..];
 
             var details = TicketDetails.ParseReply(text);
-            var actor = new TicketActor(ticket.GuildId, userId, false, false);
+            var actor = new TicketActor(ticket.GuildId, userId, IsAdministrator: false, CanTimeoutMembers: false);
             var reply = new TicketReply(channel.Id, message.Id, referenceId, ticket.Version);
             var change = await workflow.SetModerationAsync(actor, ticket.Number, details, reply, cancellationToken);
             await SendOutcomeAsync(channel, TicketPresentation.Change(change), cancellationToken);

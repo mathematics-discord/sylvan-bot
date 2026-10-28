@@ -1,0 +1,4 @@
+component: Moderation
+kind: Changed
+body: Display ban, timeout and voice-mute tickets as coloured embeds with editable details, reviewer approval and controls to reverse and hide the moderation action.
+time: 2026-10-28T23:09:59.892222+00:00

@@ -9,7 +9,7 @@ using SylvanBot.Application.Features.Tickets;
 
 public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTicket
 {
-    private readonly IDiscordClient client = socketClient;
+    private readonly IDiscordClient _client = socketClient;
 
     public async Task CheckChannelAsync(
         TicketActor actor,
@@ -20,7 +20,7 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
         var options = Options(cancellationToken);
 
         var gld = await socketClient.Rest.GetGuildAsync(actor.GuildId, options)
-                  ?? throw new BotCommandException("Sylvan could not access this server.");
+            ?? throw new BotCommandException("Sylvan could not access this server.");
 
         var ch = await GetChannelAsync(actor.GuildId, channelId, cancellationToken);
         var moderator = await gld.GetUserAsync(actor.UserId, options);
@@ -69,15 +69,24 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
 
         var permissions = member.GuildPermissions;
 
-        return new TicketActor(guildId, userId, permissions.Administrator, permissions.ModerateMembers,
-            permissions.BanMembers, permissions.KickMembers, permissions.MuteMembers, permissions.DeafenMembers,
-            permissions.ManageRoles, permissions.ViewAuditLog);
+        return new TicketActor(
+            guildId,
+            userId,
+            permissions.Administrator,
+            permissions.ModerateMembers,
+            permissions.BanMembers,
+            permissions.KickMembers,
+            permissions.MuteMembers,
+            permissions.DeafenMembers,
+            permissions.ManageRoles,
+            permissions.ViewAuditLog);
     }
 
     public async Task<DateTimeOffset?> GetTimeoutAsync(ulong guildId, ulong userId, CancellationToken cancellationToken)
     {
         var guild = await socketClient.Rest.GetGuildAsync(guildId, Options(cancellationToken));
         var member = await guild.GetUserAsync(userId, Options(cancellationToken));
+
         return member?.TimedOutUntil;
     }
 
@@ -97,16 +106,54 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
             await member.ModifyAsync(properties => properties.TimedOutUntil = expiry, options);
         }
         catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.BadRequest
-                                               or System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.NotFound)
+                                                                    or System.Net.HttpStatusCode.Forbidden
+                                                                    or System.Net.HttpStatusCode.NotFound)
         {
-            throw new BotCommandException("Discord rejected the timeout change. Check permissions, hierarchy and the current member state.", exception);
+            throw new BotCommandException(
+                "Discord rejected the timeout change. Check permissions, hierarchy and the current member state.",
+                exception);
         }
     }
 
     public async Task<bool> IsBannedAsync(ulong guildId, ulong userId, CancellationToken cancellationToken)
     {
         var guild = await socketClient.Rest.GetGuildAsync(guildId, Options(cancellationToken));
+
         return await guild.GetBanAsync(userId, Options(cancellationToken)) is not null;
+    }
+
+    public async Task RevertVoiceMuteAsync(Ticket ticket, CancellationToken cancellationToken)
+    {
+        var guild = await socketClient.Rest.GetGuildAsync(ticket.GuildId, Options(cancellationToken));
+        var member = ticket.SubjectUserId is null ? null : await guild.GetUserAsync(ticket.SubjectUserId.Value, Options(cancellationToken));
+
+        if (member is null || !member.IsMuted)
+            return;
+
+        IEnumerable<RestAuditLogEntry> entries = await guild
+           .GetAuditLogsAsync(100, Options(cancellationToken), actionType: ActionType.MemberUpdated)
+           .FlattenAsync();
+
+        var latest = entries
+           .OrderByDescending(entry => entry.Id)
+           .FirstOrDefault(entry => entry.Data is MemberUpdateAuditLogData update
+                               && update.Target?.Id == ticket.SubjectUserId
+                               && update.Before.Mute != update.After.Mute);
+
+        if (latest?.Id != ticket.SourceAuditId)
+            throw new BotCommandException("The original voice mute cannot be confirmed in recent audit history. The ticket remains visible.");
+
+        var options = Options(cancellationToken);
+        options.AuditLogReason = $"Hide ticket {ticket.Number}: requested by {ticket.LastModifiedByUserId}";
+
+        try
+        {
+            await member.ModifyAsync(properties => properties.Mute = false, options);
+        }
+        catch (HttpException exception)
+        {
+            throw new BotCommandException("Voice unmute failed. Check permissions and that the member is connected to voice, then retry.", exception);
+        }
     }
 
     public async Task UnbanAsync(Ticket ticket, Guid operationId, CancellationToken cancellationToken)
@@ -123,7 +170,7 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
             await guild.RemoveBanAsync(ticket.SubjectUserId.Value, options);
         }
         catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.BadRequest
-                                               or System.Net.HttpStatusCode.Forbidden)
+                                                                    or System.Net.HttpStatusCode.Forbidden)
         {
             throw new BotCommandException("Discord rejected the scheduled unban. Check Sylvan's Ban Members permission.", exception);
         }
@@ -138,7 +185,7 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
             throw new BotCommandException("This ticket belongs to another server.");
 
         var options = Options(cancellationToken);
-        var gld = await client.GetGuildAsync(actor.GuildId, options: options);
+        var gld = await _client.GetGuildAsync(actor.GuildId, options: options);
         var moderator = gld is null ? null : await gld.GetUserAsync(actor.UserId, options: options);
 
         if (gld is null || moderator is null)
@@ -168,7 +215,7 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
                     return publication;
             }
             catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.NotFound
-                                                      or System.Net.HttpStatusCode.Forbidden)
+                                                                        or System.Net.HttpStatusCode.Forbidden)
             {
                 // Keep the association in storage, but do not offer an unavailable jump link.
             }
@@ -180,6 +227,18 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
     public async Task<TicketMessage> PublishAsync(Ticket ticket, ulong channelId, CancellationToken cancellationToken)
     {
         var ch = await GetChannelAsync(ticket.GuildId, channelId, cancellationToken);
+
+        if (TicketPresentation.UsesModerationEmbed(ticket))
+        {
+            var published = await ch.SendMessageAsync(
+                embed: TicketPresentation.Describe(ticket),
+                components: TicketPresentation.Buttons(ticket),
+                allowedMentions: AllowedMentions.None,
+                options: Options(cancellationToken));
+
+            return new TicketMessage(ch.Id, published.Id);
+        }
+
         var components = TicketPresentation.ChannelMessage(ticket);
         IUserMessage msg;
 
@@ -212,8 +271,24 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
         var ch = await GetChannelAsync(ticket.GuildId, publication.ChannelId, cancellationToken);
         var msg = await ch.GetMessageAsync(publication.MessageId, options: Options(cancellationToken));
 
-        if (msg is null || msg.Author.Id != client.CurrentUser.Id)
+        if (msg is null || msg.Author.Id != _client.CurrentUser.Id)
             return false;
+
+        if (TicketPresentation.UsesModerationEmbed(ticket))
+        {
+            await ch.ModifyMessageAsync(
+                publication.MessageId,
+                properties =>
+                {
+                    properties.Content = string.Empty;
+                    properties.Embeds = new[] { TicketPresentation.Describe(ticket) };
+                    properties.Components = TicketPresentation.Buttons(ticket);
+                    properties.AllowedMentions = AllowedMentions.None;
+                },
+                Options(cancellationToken));
+
+            return true;
+        }
 
         var oversized = ticket.Comment?.Length > TicketPresentation.InlineCommentLimit;
         await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(ticket.Comment ?? string.Empty));
@@ -249,7 +324,7 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
             if (msg is null)
                 return true;
 
-            if (msg.Author.Id != client.CurrentUser.Id)
+            if (msg.Author.Id != _client.CurrentUser.Id)
                 return false;
 
             await ch.DeleteMessageAsync(publication.MessageId, Options(cancellationToken));
@@ -290,11 +365,11 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
         while (true)
         {
             IEnumerable<RestAuditLogEntry> page = await guild.GetAuditLogsAsync(100, Options(cancellationToken), beforeId: beforeId)
-                .FlattenAsync();
+               .FlattenAsync();
 
             List<RestAuditLogEntry> ordered = page
-                .OrderByDescending(entry => entry.Id)
-                .ToList();
+               .OrderByDescending(entry => entry.Id)
+               .ToList();
 
             if (ordered.Count == 0)
                 break;
@@ -312,8 +387,8 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
         }
 
         List<RestAuditLogEntry> chronological = entries
-            .OrderBy(entry => entry.Id)
-            .ToList();
+           .OrderBy(entry => entry.Id)
+           .ToList();
 
         var observations = ImmutableArray.CreateBuilder<TicketObservation>();
 
@@ -343,21 +418,42 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
         }
 
         var permanentBotAction = ownBot
-                                 && entry.Reason?.StartsWith("Permanent, Automatic image-burst spam detection:", StringComparison.Ordinal) == true;
+            && entry.Reason?.StartsWith("Permanent, Automatic image-burst spam detection:", StringComparison.Ordinal) == true;
 
-        if (entry.Data is BanAuditLogData ban)
+        switch (entry.Data)
         {
-            return new TicketObservation(guildId, entry.Id, TicketAction.Ban, ban.Target?.Id, actor?.Id,
-                actor?.IsBot == true, entry.Reason, entry.CreatedAt, OperationId: operationId,
-                PermanentBotAction: permanentBotAction);
+            case BanAuditLogData ban:
+                return new TicketObservation(
+                    guildId,
+                    entry.Id,
+                    TicketAction.Ban,
+                    ban.Target?.Id,
+                    actor?.Id,
+                    actor?.IsBot == true,
+                    entry.Reason,
+                    entry.CreatedAt,
+                    OperationId: operationId,
+                    PermanentBotAction: permanentBotAction);
+            case UnbanAuditLogData unban:
+                return new TicketObservation(
+                    guildId,
+                    entry.Id,
+                    TicketAction.Ban,
+                    unban.Target?.Id,
+                    actor?.Id,
+                    actor?.IsBot == true,
+                    entry.Reason,
+                    entry.CreatedAt,
+                    Removed: true,
+                    OperationId: operationId);
         }
 
-        if (entry.Data is UnbanAuditLogData unban)
-        {
-            return new TicketObservation(guildId, entry.Id, TicketAction.Ban, unban.Target?.Id, actor?.Id,
-                actor?.IsBot == true, entry.Reason, entry.CreatedAt, Removed: true, OperationId: operationId);
-        }
+        return ObserveTimeout(guildId, entry, operationId);
+    }
 
+    private static TicketObservation? ObserveTimeout(ulong guildId, RestAuditLogEntry entry, Guid? operationId)
+    {
+        var actor = entry.User;
         if (entry.Data is not MemberUpdateAuditLogData update)
             return null;
 
@@ -369,13 +465,25 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
 
         var removed = expiry is null || expiry <= entry.CreatedAt;
 
-        return new TicketObservation(guildId, entry.Id, TicketAction.Timeout, update.Target?.Id, actor?.Id,
-            actor?.IsBot == true, entry.Reason, entry.CreatedAt, removed, previous, expiry, operationId);
+        return new TicketObservation(
+            guildId,
+            entry.Id,
+            TicketAction.Timeout,
+            update.Target?.Id,
+            actor?.Id,
+            actor?.IsBot == true,
+            entry.Reason,
+            entry.CreatedAt,
+            removed,
+            previous,
+            expiry,
+            operationId);
     }
 
-    private static RequestOptions Options(CancellationToken cancellationToken) => new()
-    {
-        CancelToken = cancellationToken,
-        RetryMode = RetryMode.AlwaysFail,
-    };
+    private static RequestOptions Options(CancellationToken cancellationToken)
+        => new RequestOptions
+        {
+            CancelToken = cancellationToken,
+            RetryMode = RetryMode.AlwaysFail,
+        };
 }

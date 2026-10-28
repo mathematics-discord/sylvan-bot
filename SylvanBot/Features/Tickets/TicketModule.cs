@@ -175,6 +175,24 @@ public sealed class TicketModule(
                     return;
                 }
 
+                if (TicketPresentation.UsesModerationEmbed(ticket))
+                {
+                    var duration = ticket.DurationKnown ? "permanent" : string.Empty;
+
+                    if (ticket.DurationSeconds is not null)
+                        duration = $"{ticket.DurationSeconds} seconds";
+
+                    await RespondWithModalAsync(
+                        $"ticket-moderation-edit:{actor.GuildId}:{actor.UserId}:{ticket.Number}:{ticket.Version}",
+                        new TicketModerationEditModal
+                        {
+                            Title = $"Edit Ticket #{ticket.Number}",
+                            Comment = ticket.Comment ?? string.Empty,
+                            Duration = duration,
+                        });
+                    return;
+                }
+
                 await RespondWithModalAsync(
                     $"ticket-edit:{actor.GuildId}:{actor.UserId}:{ticket.Number}:{ticket.Version}",
                     new TicketEditModal
@@ -185,6 +203,37 @@ public sealed class TicketModule(
                     });
             },
             defer: false);
+
+    [ComponentInteraction("ticket:approve:*:*", true)]
+    public Task ApproveButtonAsync(long number, int version)
+        => ExecuteAsync(async (actor, cancellationToken) =>
+        {
+            var change = await workflow.ApproveAsync(actor, number, version, cancellationToken);
+            await ReplyToChangeAsync(change);
+            worker.Wake();
+        });
+
+    [ComponentInteraction("ticket:moderation-hide:*:*", true)]
+    public Task HideModerationButtonAsync(long number, int version)
+        => ExecuteAsync(async (actor, cancellationToken) =>
+        {
+            var change = await workflow.HideModerationAsync(actor, number, version, cancellationToken);
+            await ReplyToChangeAsync(change, hiding: true);
+            worker.Wake();
+        });
+
+    [ModalInteraction("ticket-moderation-edit:*:*:*:*", true)]
+    public Task SubmitModerationEditAsync(ulong guildId, ulong ownerId, long number, int version, TicketModerationEditModal modal)
+        => ExecuteAsync(async (actor, cancellationToken) =>
+        {
+            if (actor.GuildId != guildId || actor.UserId != ownerId)
+                throw new BotCommandException("This editor belongs to another moderator or server.");
+
+            var details = TicketDetails.ParseFields(string.IsNullOrWhiteSpace(modal.Duration) ? null : modal.Duration, modal.Comment);
+            var change = await workflow.SetModerationAsync(actor, number, details, reply: null, cancellationToken, expectedVersion: version);
+            await ReplyToChangeAsync(change);
+            worker.Wake();
+        });
 
     [ModalInteraction("ticket-edit:*:*:*:*", true)]
     public Task SubmitEditAsync(ulong guildId, ulong ownerId, long number, int version, TicketEditModal modal)
@@ -329,7 +378,7 @@ public sealed class TicketModule(
             {
                 text.AppendLine();
                 text.AppendLine("**Hidden**");
-                text.AppendLine(string.Join(", ", hiddenIds));
+                text.AppendJoin(", ", hiddenIds).AppendLine();
                 text.AppendLine();
             }
         }
@@ -369,7 +418,9 @@ public sealed class TicketModule(
 
         await ModifyOriginalResponseAsync(properties =>
         {
-            properties.Content = jumpLink;
+            properties.Content = TicketPresentation.UsesModerationEmbed(ticket)
+                ? jumpLink + "\n" + TicketPresentation.OperationalDetails(ticket)
+                : jumpLink;
             properties.Embed = TicketPresentation.Describe(ticket);
             properties.Components = TicketPresentation.Buttons(ticket);
             properties.AllowedMentions = AllowedMentions.None;

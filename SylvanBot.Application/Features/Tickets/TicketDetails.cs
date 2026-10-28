@@ -4,17 +4,37 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Common;
 
-public sealed record TicketDetails(bool HasDuration, long? DurationSeconds, string? Comment)
+public sealed record TicketDetails
 {
-    private static readonly Regex Permanent = new(
+    private static readonly Regex Permanent = new Regex(
         @"\A\s*(?:permanent|perm|p)\b[\s,;:]*",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         TimeSpan.FromMilliseconds(100));
 
-    private static readonly Regex DurationItem = new(
+    private static readonly Regex DurationItem = new Regex(
         @"\G\s*(?<amount>[+-]?[0-9]+)\s*(?<unit>seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|months?|years?|y)(?![\p{L}])[\s,;:]*",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         TimeSpan.FromMilliseconds(100));
+
+    public TicketDetails(bool hasDuration, long? durationSeconds, string? comment)
+    {
+        HasDuration = hasDuration;
+        DurationSeconds = durationSeconds;
+        Comment = comment;
+    }
+
+    public bool HasDuration { get; init; }
+
+    public long? DurationSeconds { get; init; }
+
+    public string? Comment { get; init; }
+
+    public void Deconstruct(out bool hasDuration, out long? durationSeconds, out string? comment)
+    {
+        hasDuration = HasDuration;
+        durationSeconds = DurationSeconds;
+        comment = Comment;
+    }
 
     static public TicketDetails ParseReply(string text)
     {

@@ -16,7 +16,8 @@ public sealed partial class TicketWorkflow
             await using var readContext = await contextFactory.CreateDbContextAsync(cancellationToken);
 
             var enabled = await readContext.TicketConfigurations
-                .AnyAsync(configuration => configuration.GuildId == guildId && configuration.Enabled
+                .AnyAsync(
+                    configuration => configuration.GuildId == guildId && configuration.Enabled
                                            && configuration.DestinationChannelId != null, cancellationToken);
 
             if (!enabled)
@@ -24,9 +25,11 @@ public sealed partial class TicketWorkflow
 
             var now = DateTimeOffset.UtcNow;
 
+            var cursor = afterId;
+
             List<long> ids = await readContext.Tickets
-                .Where(ticket => ticket.GuildId == guildId && ticket.SourceAuditId != null && ticket.Id > afterId
-                                 && (ticket.PendingOperationId != null
+                .Where(ticket => ticket.GuildId == guildId && ticket.SourceAuditId != null && ticket.Id > cursor
+                                 && (ticket.HidePending || ticket.PendingOperationId != null
                                      || (!ticket.ExpirySuspended && (ticket.Status == TicketStatus.Active || ticket.Status == TicketStatus.ExpirationFailed)
                                          && ticket.ExpiresAtUtc <= now)
                                      || (!ticket.Hidden && !ticket.PublicationPending
@@ -53,8 +56,11 @@ public sealed partial class TicketWorkflow
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError("Recovery failed for ticket record {TicketId} in guild {GuildId} ({FailureType})",
-                        id, guildId, exception.GetType().Name);
+                    logger.LogError(
+                        "Recovery failed for ticket record {TicketId} in guild {GuildId} ({FailureType})",
+                        id,
+                        guildId,
+                        exception.GetType().Name);
                 }
             }
 
@@ -73,7 +79,8 @@ public sealed partial class TicketWorkflow
                 .Where(ticket => ticket.GuildId == guildId && ticket.SourceAuditId != null && ticket.Action == TicketAction.Ban
                                  && !ticket.ExpirySuspended
                                  && (ticket.Status == TicketStatus.Active || ticket.Status == TicketStatus.ExpirationFailed))
-                .ExecuteUpdateAsync(setters => setters
+                .ExecuteUpdateAsync(
+                    setters => setters
                     .SetProperty(ticket => ticket.ExpirySuspended, true)
                     .SetProperty(ticket => ticket.PendingOperationId, (Guid?)null)
                     .SetProperty(ticket => ticket.PendingRequestedAtUtc, (DateTimeOffset?)null)
@@ -95,12 +102,14 @@ public sealed partial class TicketWorkflow
 
         await RequireEnabledAsync(dbContext, actor.GuildId, cancellationToken);
 
+        IQueryable<ulong> enabledGuilds = dbContext.TicketConfigurations
+            .Where(configuration => configuration.Enabled && configuration.DestinationChannelId != null)
+            .Select(configuration => configuration.GuildId);
+
         var head = await dbContext.Tickets
             .AsNoTracking()
-            .Where(ticket => ticket.ModeratorUserId == actor.UserId && ticket.Completion == TicketCompletion.Pending
-                             && dbContext.TicketConfigurations
-                                 .Any(configuration => configuration.GuildId == ticket.GuildId && configuration.Enabled
-                                                       && configuration.DestinationChannelId != null))
+            .Where(ticket => ticket.ModeratorUserId == actor.UserId && !ticket.Hidden && ticket.Completion == TicketCompletion.Pending
+                             && enabledGuilds.Contains(ticket.GuildId))
             .OrderBy(ticket => ticket.CreatedAtUtc)
             .ThenBy(ticket => ticket.Id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -137,7 +146,8 @@ public sealed partial class TicketWorkflow
             await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
 
             var enabled = await dbContext.TicketConfigurations
-                .AnyAsync(configuration => configuration.GuildId == guildId && configuration.Enabled
+                .AnyAsync(
+                    configuration => configuration.GuildId == guildId && configuration.Enabled
                                            && configuration.DestinationChannelId != null, cancellationToken);
 
             if (!enabled)
@@ -145,6 +155,23 @@ public sealed partial class TicketWorkflow
 
             var ticket = await dbContext.Tickets
                 .SingleAsync(ticket => ticket.GuildId == guildId && ticket.Id == id, cancellationToken);
+
+            if (ticket.HidePending && auditCurrent)
+            {
+                try
+                {
+                    await FinishHideAsync(dbContext, ticket, cancellationToken);
+                }
+                catch (BotCommandException)
+                {
+                    ticket.HidePending = ticket.PendingOperationId is not null;
+                    ticket.Version++;
+                    await SaveModerationAsync(dbContext, ticket, cancellationToken);
+                    throw;
+                }
+
+                return;
+            }
 
             await RecoverModerationAsync(dbContext, ticket, auditCurrent, cancellationToken);
 
@@ -168,9 +195,11 @@ public sealed partial class TicketWorkflow
         CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
+
         // A disable/re-enable between the scan and this operation invalidates its coverage.
         auditCurrent = auditCurrent && await dbContext.TicketConfigurations
-            .AnyAsync(configuration => configuration.GuildId == ticket.GuildId && configuration.Enabled
+            .AnyAsync(
+                configuration => configuration.GuildId == ticket.GuildId && configuration.Enabled
                                        && configuration.CaptureFromUtc != null
                                        && configuration.LastAuditScanAtUtc >= configuration.CaptureFromUtc, cancellationToken);
 
@@ -189,56 +218,7 @@ public sealed partial class TicketWorkflow
             return "The details were saved, but expiry could not be reconciled. Recovery will reconsider it on a later pass.";
 
         if (ticket.PendingOperationId is not null)
-        {
-            DateTimeOffset? liveExpiry = null;
-            bool confirmed;
-            bool originalActionUnchanged;
-
-            if (ticket.Action == TicketAction.Timeout)
-            {
-                liveExpiry = await discord.GetTimeoutAsync(ticket.GuildId, ticket.SubjectUserId.Value, cancellationToken);
-                confirmed = ticket.PendingExpiryUtc > now
-                    ? liveExpiry == ticket.PendingExpiryUtc
-                    : liveExpiry is null || liveExpiry <= now;
-                originalActionUnchanged = IsActive(ticket) && ticket.ExpiresAtUtc > now && liveExpiry == ticket.ExpiresAtUtc;
-            }
-            else
-            {
-                confirmed = !await discord.IsBannedAsync(ticket.GuildId, ticket.SubjectUserId.Value, cancellationToken);
-                // Active refers to the original audit identity. Newer bans/removals cancel
-                // its request during audit ingestion, even if a request was attempted.
-                originalActionUnchanged = IsActive(ticket) && !superseded;
-            }
-
-            if (confirmed)
-            {
-                DateTimeOffset? expiry = ticket.PendingExpiryUtc > now ? ticket.PendingExpiryUtc : null;
-                ticket.ConfirmOperation(expiry);
-                await SaveModerationAsync(dbContext, ticket, cancellationToken);
-                return ticket.Status == TicketStatus.Expired ? "The action has expired." : "The live timeout change was confirmed.";
-            }
-
-            var timeoutEnded = ticket.Action == TicketAction.Timeout && (liveExpiry is null || liveExpiry <= now);
-
-            if (timeoutEnded)
-            {
-                ticket.Status = ticket.ExpiresAtUtc <= now ? TicketStatus.Expired : TicketStatus.Reverted;
-                ticket.ClearOperation();
-                ticket.Version++;
-                ticket.UpdateCompletion();
-                await SaveModerationAsync(dbContext, ticket, cancellationToken);
-                return "The timeout ended before the correction could be confirmed. The request was cancelled.";
-            }
-
-            // Give delayed audit entries a pass to arrive. Keep the operation marker:
-            // this is reconciliation on the normal cadence, not exactly-once execution.
-            var awaitingAudit = ticket.PendingOperationAttempted && ticket.PendingRequestedAtUtc > now.AddSeconds(-30);
-
-            if (originalActionUnchanged && !awaitingAudit)
-                return await ApplyOperationAsync(dbContext, ticket, cancellationToken);
-
-            return "The Discord change is still uncertain. Recovery will reconcile it on a later pass.";
-        }
+            return await RecoverPendingOperationAsync(dbContext, ticket, ticket.SubjectUserId.Value, now, superseded, cancellationToken);
 
         if (!IsActive(ticket) || ticket.ExpiresAtUtc is null || ticket.ExpiresAtUtc > now)
             return null;
@@ -273,5 +253,58 @@ public sealed partial class TicketWorkflow
         ticket.PrepareOperation(expiry: null, editorUserId: null);
         await SaveModerationAsync(dbContext, ticket, cancellationToken);
         return await ApplyOperationAsync(dbContext, ticket, cancellationToken);
+    }
+
+    private async Task<string?> RecoverPendingOperationAsync(BotDbContext dbContext, Ticket ticket, ulong subjectUserId, DateTimeOffset now, bool superseded, CancellationToken cancellationToken)
+    {
+        DateTimeOffset? liveExpiry = null;
+        bool confirmed;
+        bool originalActionUnchanged;
+
+        if (ticket.Action == TicketAction.Timeout)
+        {
+            liveExpiry = await discord.GetTimeoutAsync(ticket.GuildId, subjectUserId, cancellationToken);
+            confirmed = ticket.PendingExpiryUtc > now
+                ? liveExpiry == ticket.PendingExpiryUtc
+                : liveExpiry is null || liveExpiry <= now;
+            originalActionUnchanged = IsActive(ticket) && ticket.ExpiresAtUtc > now && liveExpiry == ticket.ExpiresAtUtc;
+        }
+        else
+        {
+            confirmed = !await discord.IsBannedAsync(ticket.GuildId, subjectUserId, cancellationToken);
+
+            // Active refers to the original audit identity. Newer bans/removals cancel
+            // its request during audit ingestion, even if a request was attempted.
+            originalActionUnchanged = IsActive(ticket) && !superseded;
+        }
+
+        if (confirmed)
+        {
+            DateTimeOffset? expiry = ticket.PendingExpiryUtc > now ? ticket.PendingExpiryUtc : null;
+            ticket.ConfirmOperation(expiry);
+            await SaveModerationAsync(dbContext, ticket, cancellationToken);
+            return ticket.Status == TicketStatus.Expired ? "The action has expired." : "The live timeout change was confirmed.";
+        }
+
+        var timeoutEnded = ticket.Action == TicketAction.Timeout && (liveExpiry is null || liveExpiry <= now);
+
+        if (timeoutEnded)
+        {
+            ticket.Status = ticket.ExpiresAtUtc <= now ? TicketStatus.Expired : TicketStatus.Reverted;
+            ticket.ClearOperation();
+            ticket.Version++;
+            ticket.UpdateCompletion();
+            await SaveModerationAsync(dbContext, ticket, cancellationToken);
+            return "The timeout ended before the correction could be confirmed. The request was cancelled.";
+        }
+
+        // Give delayed audit entries a pass to arrive. Keep the operation marker:
+        // this is reconciliation on the normal cadence, not exactly-once execution.
+        var awaitingAudit = ticket.PendingOperationAttempted && ticket.PendingRequestedAtUtc > now.AddSeconds(-30);
+
+        if (originalActionUnchanged && !awaitingAudit)
+            return await ApplyOperationAsync(dbContext, ticket, cancellationToken);
+
+        return "The Discord change is still uncertain. Recovery will reconcile it on a later pass.";
     }
 }

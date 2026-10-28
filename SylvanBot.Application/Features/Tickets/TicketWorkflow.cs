@@ -12,7 +12,7 @@ public sealed partial class TicketWorkflow(
     ILogger<TicketWorkflow> logger)
     : IDisposable
 {
-    private readonly SemaphoreSlim _publicationLock = new(1, 1);
+    private readonly SemaphoreSlim _publicationLock = new SemaphoreSlim(1, 1);
 
     // Shared configuration, lookup and history.
     public async Task<TicketConfiguration> ConfigureAsync(
@@ -32,7 +32,7 @@ public sealed partial class TicketWorkflow(
             await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
 
             var configuration = await dbContext.TicketConfigurations
-                .SingleOrDefaultAsync(configuration => configuration.GuildId == actor.GuildId, cancellationToken);
+               .SingleOrDefaultAsync(configuration => configuration.GuildId == actor.GuildId, cancellationToken);
 
             var isNew = configuration is null;
             configuration ??= new TicketConfiguration { GuildId = actor.GuildId };
@@ -60,20 +60,7 @@ public sealed partial class TicketWorkflow(
                 configuration.CaptureFromUtc = DateTimeOffset.UtcNow;
 
             if (configuration.Enabled != updatedEnabled)
-            {
-                List<TicketModerator> moderators = await dbContext.TicketModerators
-                    .Where(moderator => dbContext.Tickets
-                        .Any(ticket => ticket.Id == moderator.ActiveTicketId && ticket.GuildId == actor.GuildId))
-                    .ToListAsync(cancellationToken);
-
-                foreach (var moderator in moderators)
-                {
-                    moderator.PromptVersion = null;
-                    moderator.LastAttemptedVersion = null;
-                    moderator.NextDeliveryUtc = null;
-                    moderator.Version++;
-                }
-            }
+                await InvalidateGuildDeliveryAsync(dbContext, actor.GuildId, cancellationToken);
 
             configuration.Enabled = updatedEnabled;
             configuration.DestinationChannelId = destination;
@@ -82,21 +69,7 @@ public sealed partial class TicketWorkflow(
             if (isNew)
                 dbContext.TicketConfigurations.Add(configuration);
 
-            try
-            {
-                await dbContext.SaveChangesAsync(cancellationToken);
-            }
-            catch (Exception exception)
-            {
-                logger.LogError(
-                    "Ticket configuration save in guild {GuildId} could not be confirmed ({FailureType})",
-                    actor.GuildId,
-                    exception.GetType().Name);
-
-                throw new BotCommandException(
-                    "Saving ticket configuration could not be confirmed. Read /ticket-admin config before changing it again.",
-                    exception);
-            }
+            await SaveConfigurationAsync(dbContext, actor.GuildId, cancellationToken);
 
             return configuration;
         }
@@ -138,15 +111,14 @@ public sealed partial class TicketWorkflow(
         await RequireEnabledAsync(dbContext, actor.GuildId, cancellationToken);
 
         var ticket = await dbContext.Tickets
-            .AsNoTracking()
-            .Where(ticket => ticket.GuildId == actor.GuildId && ticket.Hidden == hidden)
-            .SingleOrDefaultAsync(
+           .AsNoTracking()
+           .Where(ticket => ticket.GuildId == actor.GuildId && ticket.Hidden == hidden)
+           .SingleOrDefaultAsync(
                 ticket =>
                     (ticket.ChannelId == publication.ChannelId && ticket.MessageId == publication.MessageId)
                     || (ticket.PreviousChannelId == publication.ChannelId
                         && ticket.PreviousMessageId == publication.MessageId),
-                cancellationToken
-            );
+                cancellationToken);
 
         if (ticket is null)
             return Optional<Ticket>.None;
@@ -178,22 +150,21 @@ public sealed partial class TicketWorkflow(
         await RequireEnabledAsync(dbContext, actor.GuildId, cancellationToken);
 
         List<Ticket> tickets = await dbContext.Tickets
-            .AsNoTracking()
-            .Where(ticket =>
-                ticket.GuildId == actor.GuildId
-                && ticket.SubjectUserId == subjectUserId
-                && (!hidden || ticket.Hidden)
-                && (canViewHidden || !ticket.Hidden)
-            )
-            .OrderByDescending(ticket => ticket.CreatedAtUtc)
-            .ThenByDescending(ticket => ticket.Id)
-            .Skip((page - 1) * 10)
-            .Take(11)
-            .ToListAsync(cancellationToken);
+           .AsNoTracking()
+           .Where(ticket =>
+                      ticket.GuildId == actor.GuildId
+                      && ticket.SubjectUserId == subjectUserId
+                      && (!hidden || ticket.Hidden)
+                      && (canViewHidden || !ticket.Hidden))
+           .OrderByDescending(ticket => ticket.CreatedAtUtc)
+           .ThenByDescending(ticket => ticket.Id)
+           .Skip((page - 1) * 10)
+           .Take(11)
+           .ToListAsync(cancellationToken);
 
         ImmutableArray<Ticket> visiblePage = tickets
-            .Take(10)
-            .ToImmutableArray();
+           .Take(10)
+           .ToImmutableArray();
 
         foreach (var ticket in visiblePage)
             await CheckReadAsync(dbContext, actor, ticket, cancellationToken);
@@ -240,8 +211,8 @@ public sealed partial class TicketWorkflow(
             await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
 
             var number = await dbContext.Database
-                .SqlQuery<long>($"SELECT nextval('ticket_numbers') AS \"Value\"")
-                .SingleAsync(cancellationToken);
+               .SqlQuery<long>($"SELECT nextval('ticket_numbers') AS \"Value\"")
+               .SingleAsync(cancellationToken);
 
             var ticket = new Ticket
             {
@@ -288,9 +259,13 @@ public sealed partial class TicketWorkflow(
         await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
 
         var ticket = await FindAsync(dbContext, actor.GuildId, number, tracking: false, cancellationToken)
-                     ?? throw new BotCommandException("No matching ticket in this server.");
+            ?? throw new BotCommandException("No matching ticket in this server.");
 
-        RequireNoteMutation(actor, ticket);
+        if (ticket.Action == TicketAction.Note)
+            RequireNoteMutation(actor, ticket);
+        else
+            RequireModerationCorrection(actor, ticket);
+
         await CheckReadAsync(dbContext, actor, ticket, cancellationToken);
 
         return ticket;
@@ -307,18 +282,22 @@ public sealed partial class TicketWorkflow(
         await RequireEnabledAsync(dbContext, actor.GuildId, cancellationToken);
 
         var ticket = await dbContext.Tickets
-                         .AsNoTracking()
-                         .Where(ticket => ticket.GuildId == actor.GuildId)
-                         .SingleOrDefaultAsync(
-                             ticket =>
-                                 (ticket.ChannelId == publication.ChannelId
-                                  && ticket.MessageId == publication.MessageId)
-                                 || (ticket.PreviousChannelId == publication.ChannelId
-                                     && ticket.PreviousMessageId == publication.MessageId),
-                             cancellationToken)
-                     ?? throw new BotCommandException("No ticket in this server is associated with that message.");
+               .AsNoTracking()
+               .Where(ticket => ticket.GuildId == actor.GuildId)
+               .SingleOrDefaultAsync(
+                    ticket =>
+                        (ticket.ChannelId == publication.ChannelId
+                            && ticket.MessageId == publication.MessageId)
+                        || (ticket.PreviousChannelId == publication.ChannelId
+                            && ticket.PreviousMessageId == publication.MessageId),
+                    cancellationToken)
+            ?? throw new BotCommandException("No ticket in this server is associated with that message.");
 
-        RequireNoteMutation(actor, ticket);
+        if (ticket.Action == TicketAction.Note)
+            RequireNoteMutation(actor, ticket);
+        else
+            RequireModerationCorrection(actor, ticket);
+
         await discord.CheckChannelAsync(actor, publication.ChannelId, publishing: false, cancellationToken);
         await CheckReadAsync(dbContext, actor, ticket, cancellationToken);
 
@@ -372,6 +351,120 @@ public sealed partial class TicketWorkflow(
             expectedVersion: null,
             cancellationToken);
 
+    public void Dispose() => _publicationLock.Dispose();
+
+    private static async Task InvalidateGuildDeliveryAsync(BotDbContext dbContext, ulong guildId, CancellationToken cancellationToken)
+    {
+        IQueryable<Ticket> guildTickets = dbContext.Tickets.Where(ticket => ticket.GuildId == guildId);
+
+        List<TicketModerator> moderators = await dbContext.TicketModerators
+           .Where(moderator => guildTickets.Any(ticket => ticket.Id == moderator.ActiveTicketId))
+           .ToListAsync(cancellationToken);
+
+        foreach (var moderator in moderators)
+        {
+            moderator.PromptVersion = null;
+            moderator.LastAttemptedVersion = null;
+            moderator.NextDeliveryUtc = null;
+            moderator.Version++;
+        }
+    }
+
+    private static void RequireNotePermission(TicketActor actor)
+    {
+        var canManageNotes = actor.GuildId != 0
+            && actor.UserId != 0
+            && (actor.IsAdministrator || actor.CanTimeoutMembers);
+
+        if (!canManageNotes)
+            throw new BotCommandException(
+                "Creating or changing notes requires Moderate Members or Administrator permission.");
+    }
+
+    private static void RequireNoteMutation(TicketActor actor, Ticket ticket)
+    {
+        RequireStaff(actor);
+        RequireHiddenAccess(actor, ticket.Hidden);
+
+        if (ticket.Action != TicketAction.Note)
+            throw new BotCommandException("This ticket type is read-only. Only notes can be changed or hidden.");
+
+        RequireNotePermission(actor);
+    }
+
+    private static void ValidateNoteComment(string comment, string? existingComment = null)
+    {
+        if (string.IsNullOrWhiteSpace(comment))
+            throw new BotCommandException("A note comment must contain non-whitespace text. Nothing was changed.");
+
+        if (comment.Length > Ticket.CommentLimit - (existingComment?.Length ?? 0))
+            throw new BotCommandException(
+                $"Ticket comments cannot exceed {Ticket.CommentLimit:N0} characters, "
+                + "including existing text and the newline when appending. "
+                + "Nothing was changed.");
+    }
+
+    private static async Task<TicketConfiguration> RequireEnabledAsync(
+        BotDbContext dbContext,
+        ulong guildId,
+        CancellationToken cancellationToken)
+    {
+        var configuration = await dbContext.TicketConfigurations
+           .AsNoTracking()
+           .SingleOrDefaultAsync(configuration => configuration.GuildId == guildId, cancellationToken);
+
+        if (configuration is not { Enabled: true })
+            throw new BotCommandException("Tickets are disabled in this server.");
+
+        if (configuration.DestinationChannelId is null)
+            throw new BotCommandException("Configure a tickets channel before using tickets in this server.");
+
+        return configuration;
+    }
+
+    private static async Task<Ticket?> FindAsync(
+        BotDbContext dbContext,
+        ulong guildId,
+        long number,
+        bool tracking,
+        CancellationToken cancellationToken)
+    {
+        if (number <= 0)
+            throw new BotCommandException("Provide a positive ticket number.");
+
+        await RequireEnabledAsync(dbContext, guildId, cancellationToken);
+
+        IQueryable<Ticket> query = dbContext.Tickets
+           .Where(ticket => ticket.GuildId == guildId && ticket.Number == number);
+
+        if (!tracking)
+            query = query.AsNoTracking();
+
+        return await query
+           .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    private static void RequireStaff(TicketActor actor)
+    {
+        var staff = actor.IsAdministrator
+            || actor.CanTimeoutMembers
+            || actor.CanBanMembers
+            || actor.CanKickMembers
+            || actor.CanMuteMembers
+            || actor.CanDeafenMembers
+            || actor.CanManageRoles
+            || actor.CanViewAuditLog;
+
+        if (actor.GuildId == 0 || actor.UserId == 0 || !staff)
+            throw new BotCommandException("Staff permission is required to access tickets in this server.");
+    }
+
+    private static void RequireHiddenAccess(TicketActor actor, bool hidden)
+    {
+        if (hidden && actor is { IsAdministrator: false, CanViewAuditLog: false })
+            throw new BotCommandException("Accessing hidden tickets requires the View Audit Log permission.");
+    }
+
     private async Task<TicketChange> CorrectNoteAsync(
         TicketActor actor,
         long number,
@@ -390,7 +483,7 @@ public sealed partial class TicketWorkflow(
             await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
 
             var ticket = await FindAsync(dbContext, actor.GuildId, number, tracking: true, cancellationToken)
-                         ?? throw new BotCommandException("No matching ticket in this server.");
+                ?? throw new BotCommandException("No matching ticket in this server.");
 
             RequireNoteMutation(actor, ticket);
             await CheckReadAsync(dbContext, actor, ticket, cancellationToken);
@@ -426,27 +519,7 @@ public sealed partial class TicketWorkflow(
             ticket.LastModifiedByUserId = actor.UserId;
             ticket.LastModifiedAtUtc = DateTimeOffset.UtcNow;
 
-            try
-            {
-                await dbContext.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateConcurrencyException dbException)
-            {
-                throw new BotCommandException(
-                    "This note changed while you were editing it. Your changes were not saved. Read it again before editing.",
-                    dbException);
-            }
-            catch (Exception exception)
-            {
-                LogFailure(ticket, "saving correction", exception);
-
-                throw new BotCommandException(
-                    $"Saving changes to ticket #{ticket.Number} could not be confirmed. "
-                    + "No publication update or removal was attempted. "
-                    + $"Check /ticket show id:{ticket.Number} or /ticket showhidden id:{ticket.Number} "
-                    + "before repeating the change.",
-                    exception);
-            }
+            await SaveNoteCorrectionAsync(dbContext, ticket, cancellationToken);
 
             if (hidden == true)
                 return await RemoveCopiesAsync(ticket, cancellationToken);
@@ -462,40 +535,6 @@ public sealed partial class TicketWorkflow(
         }
     }
 
-    private static void RequireNotePermission(TicketActor actor)
-    {
-        var canManageNotes = actor.GuildId != 0
-                             && actor.UserId != 0
-                             && (actor.IsAdministrator || actor.CanTimeoutMembers);
-
-        if (!canManageNotes)
-            throw new BotCommandException(
-                "Creating or changing notes requires Moderate Members or Administrator permission.");
-    }
-
-    private static void RequireNoteMutation(TicketActor actor, Ticket ticket)
-    {
-        RequireStaff(actor);
-        RequireHiddenAccess(actor, ticket.Hidden);
-
-        if (ticket.Action != TicketAction.Note)
-            throw new BotCommandException("This ticket type is read-only. Only notes can be changed or hidden.");
-
-        RequireNotePermission(actor);
-    }
-
-    private static void ValidateNoteComment(string comment, string? existingComment = null)
-    {
-        if (string.IsNullOrWhiteSpace(comment))
-            throw new BotCommandException("A note comment must contain non-whitespace text. Nothing was changed.");
-
-        if (comment.Length > Ticket.CommentLimit - (existingComment?.Length ?? 0))
-            throw new BotCommandException(
-                $"Ticket comments cannot exceed {Ticket.CommentLimit:N0} characters, "
-                + "including existing text and the newline when appending. "
-                + "Nothing was changed.");
-    }
-
     // Shared publication and message associations; callers own action-specific rules.
     private async Task<ulong> CorrectionChannelAsync(
         BotDbContext dbContext,
@@ -506,9 +545,9 @@ public sealed partial class TicketWorkflow(
         var channelId = ticket.ChannelId;
 
         channelId ??= await dbContext.TicketConfigurations
-            .Where(configuration => configuration.GuildId == actor.GuildId)
-            .Select(configuration => configuration.DestinationChannelId)
-            .SingleOrDefaultAsync(cancellationToken);
+           .Where(configuration => configuration.GuildId == actor.GuildId)
+           .Select(configuration => configuration.DestinationChannelId)
+           .SingleOrDefaultAsync(cancellationToken);
 
         if (channelId is null)
             throw new BotCommandException(
@@ -664,73 +703,12 @@ public sealed partial class TicketWorkflow(
         var channelId = ticket.ChannelId;
 
         channelId ??= await dbContext.TicketConfigurations
-            .Where(configuration => configuration.GuildId == actor.GuildId)
-            .Select(configuration => configuration.DestinationChannelId)
-            .SingleOrDefaultAsync(cancellationToken);
+           .Where(configuration => configuration.GuildId == actor.GuildId)
+           .Select(configuration => configuration.DestinationChannelId)
+           .SingleOrDefaultAsync(cancellationToken);
 
         if (channelId is not null)
             await discord.CheckChannelAsync(actor, channelId.Value, publishing: false, cancellationToken);
-    }
-
-    private static async Task<TicketConfiguration> RequireEnabledAsync(
-        BotDbContext dbContext,
-        ulong guildId,
-        CancellationToken cancellationToken)
-    {
-        var configuration = await dbContext.TicketConfigurations
-            .AsNoTracking()
-            .SingleOrDefaultAsync(configuration => configuration.GuildId == guildId, cancellationToken);
-
-        if (configuration is not { Enabled: true })
-            throw new BotCommandException("Tickets are disabled in this server.");
-
-        if (configuration.DestinationChannelId is null)
-            throw new BotCommandException("Configure a tickets channel before using tickets in this server.");
-
-        return configuration;
-    }
-
-    private static async Task<Ticket?> FindAsync(
-        BotDbContext dbContext,
-        ulong guildId,
-        long number,
-        bool tracking,
-        CancellationToken cancellationToken)
-    {
-        if (number <= 0)
-            throw new BotCommandException("Provide a positive ticket number.");
-
-        await RequireEnabledAsync(dbContext, guildId, cancellationToken);
-
-        IQueryable<Ticket> query = dbContext.Tickets
-            .Where(ticket => ticket.GuildId == guildId && ticket.Number == number);
-
-        if (!tracking)
-            query = query.AsNoTracking();
-
-        return await query
-            .SingleOrDefaultAsync(cancellationToken);
-    }
-
-    private static void RequireStaff(TicketActor actor)
-    {
-        var staff = actor.IsAdministrator
-                    || actor.CanTimeoutMembers
-                    || actor.CanBanMembers
-                    || actor.CanKickMembers
-                    || actor.CanMuteMembers
-                    || actor.CanDeafenMembers
-                    || actor.CanManageRoles
-                    || actor.CanViewAuditLog;
-
-        if (actor.GuildId == 0 || actor.UserId == 0 || !staff)
-            throw new BotCommandException("Staff permission is required to access tickets in this server.");
-    }
-
-    private static void RequireHiddenAccess(TicketActor actor, bool hidden)
-    {
-        if (hidden && actor is { IsAdministrator: false, CanViewAuditLog: false })
-            throw new BotCommandException("Accessing hidden tickets requires the View Audit Log permission.");
     }
 
     private void LogFailure(Ticket ticket, string operation, Exception exception)
@@ -741,9 +719,50 @@ public sealed partial class TicketWorkflow(
             ticket.Number,
             ticket.GuildId,
             operation,
-            exception.GetType().Name
-        );
+            exception.GetType().Name);
     }
 
-    public void Dispose() => _publicationLock.Dispose();
+    private async Task SaveNoteCorrectionAsync(BotDbContext dbContext, Ticket ticket, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException dbException)
+        {
+            throw new BotCommandException(
+                "This note changed while you were editing it. Your changes were not saved. Read it again before editing.",
+                dbException);
+        }
+        catch (Exception exception)
+        {
+            LogFailure(ticket, "saving correction", exception);
+
+            throw new BotCommandException(
+                $"Saving changes to ticket #{ticket.Number} could not be confirmed. "
+                + "No publication update or removal was attempted. "
+                + $"Check /ticket show id:{ticket.Number} or /ticket showhidden id:{ticket.Number} "
+                + "before repeating the change.",
+                exception);
+        }
+    }
+
+    private async Task SaveConfigurationAsync(BotDbContext dbContext, ulong guildId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                "Ticket configuration save in guild {GuildId} could not be confirmed ({FailureType})",
+                guildId,
+                exception.GetType().Name);
+
+            throw new BotCommandException(
+                "Saving ticket configuration could not be confirmed. Read /ticket-admin config before changing it again.",
+                exception);
+        }
+    }
 }
