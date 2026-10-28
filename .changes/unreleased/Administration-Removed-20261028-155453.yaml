@@ -1,4 +1,0 @@
-component: Administration
-kind: Removed
-body: Remove the Quorum commands and their saved configuration. The database migration deletes Quorum settings and voter-role mappings; back up the database before upgrading if these records are needed.
-time: 2026-10-28T15:54:53.3269097Z

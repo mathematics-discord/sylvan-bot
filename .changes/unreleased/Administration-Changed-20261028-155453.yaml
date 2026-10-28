@@ -1,4 +1,0 @@
-component: Administration
-kind: Changed
-body: Move logging, Working Hours, role-colour and image-spam settings under /config. All configuration commands now require Administrator permission. Logging setup is available at /config logs setup; personal /working-hours and /colour commands are unchanged.
-time: 2026-10-28T15:54:53.2819378Z
