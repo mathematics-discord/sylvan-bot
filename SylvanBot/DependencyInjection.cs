@@ -170,6 +170,8 @@ public static class DependencyInjection
                 sp.GetRequiredService<DiscordSocketClient>(),
                 new InteractionServiceConfig { AutoServiceScopes = true, ThrowOnError = false, EnableAutocompleteHandlers = true }));
 
+            services.AddSingleton<InteractionDiagnostics>();
+            services.AddSingleton<InteractionCommandRegistrar>();
             services.AddSingleton<DiscordInteractionHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordInteractionHandler>());
             services.AddSingleton<HttpClient>();
