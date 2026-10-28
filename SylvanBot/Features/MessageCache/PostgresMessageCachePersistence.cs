@@ -2,7 +2,6 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Infrastructure.Data;
-using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Features.MessageCache;
 
@@ -29,13 +28,13 @@ public sealed class PostgresMessageCachePersistence(IDbContextFactory<BotDbConte
                 var pageAfterId = lastId;
 
                 List<CachedMessage> rows = await db
-                    .CachedMessages.AsNoTracking()
-                    .Where(message =>
-                        message.BotId == botId && message.GuildId == guildId && message.ExpiresAtUtc > now && message.MessageId > pageAfterId
+                   .CachedMessages.AsNoTracking()
+                   .Where(message =>
+                              message.BotId == botId && message.GuildId == guildId && message.ExpiresAtUtc > now && message.MessageId > pageAfterId
                     )
-                    .OrderBy(message => message.MessageId)
-                    .Take(1000)
-                    .ToListAsync(ct);
+                   .OrderBy(message => message.MessageId)
+                   .Take(1000)
+                   .ToListAsync(ct);
 
                 foreach (var row in rows)
                     snapshots.Add(ReadSnapshot(row));
@@ -57,12 +56,24 @@ public sealed class PostgresMessageCachePersistence(IDbContextFactory<BotDbConte
 
         await db.Database.ExecuteSqlInterpolatedAsync(
             $"""
-            INSERT INTO cached_messages (bot_id, guild_id, message_id, created_at_utc, expires_at_utc, snapshot)
-            VALUES ({(long)botId}, {(long)snapshot.GuildId}, {(long)
-                snapshot.MessageId}, {snapshot.CreatedAtUtc}, {snapshot.ExpiresAtUtc}, CAST({json} AS jsonb))
-            ON CONFLICT (bot_id, guild_id, message_id) DO UPDATE SET snapshot = EXCLUDED.snapshot
-            """,
-            ct
+             INSERT INTO cached_messages (bot_id, guild_id, message_id, created_at_utc, expires_at_utc, snapshot)
+             VALUES ({
+                 (long)botId
+             }, {
+                 (long)snapshot.GuildId
+             }, {
+                 (long)
+                 snapshot.MessageId
+             }, {
+                 snapshot.CreatedAtUtc
+             }, {
+                 snapshot.ExpiresAtUtc
+             }, CAST({
+                 json
+             } AS jsonb))
+             ON CONFLICT (bot_id, guild_id, message_id) DO UPDATE SET snapshot = EXCLUDED.snapshot
+             """,
+            cancellationToken: ct
         );
     }
 
@@ -71,8 +82,8 @@ public sealed class PostgresMessageCachePersistence(IDbContextFactory<BotDbConte
         await using var db = await dbContextFactory.CreateDbContextAsync(ct);
 
         await db
-            .CachedMessages.Where(message => message.BotId == botId && message.GuildId == guildId && message.MessageId == messageId)
-            .ExecuteDeleteAsync(ct);
+           .CachedMessages.Where(message => message.BotId == botId && message.GuildId == guildId && message.MessageId == messageId)
+           .ExecuteDeleteAsync(ct);
     }
 
     public async Task DeleteExpiredAsync(DateTimeOffset now, CancellationToken ct)
@@ -87,7 +98,7 @@ public sealed class PostgresMessageCachePersistence(IDbContextFactory<BotDbConte
         try
         {
             var snapshot =
-                JsonSerializer.Deserialize<CachedMessageSnapshot>(row.SnapshotJson, SnapshotJsonOptions)
+                JsonSerializer.Deserialize<CachedMessageSnapshot>(json: row.SnapshotJson, options: SnapshotJsonOptions)
                 ?? throw new InvalidDataException("Stored message snapshot is null.");
 
             var consistent =
@@ -105,10 +116,8 @@ public sealed class PostgresMessageCachePersistence(IDbContextFactory<BotDbConte
             IEnumerable<MessageAttachment?> attachments = snapshot.Attachments;
 
             foreach (var attachment in attachments)
-            {
                 if (attachment is null || string.IsNullOrWhiteSpace(attachment.Url) || attachment.Size < 0)
                     throw new InvalidDataException("Stored attachment metadata is invalid.");
-            }
 
             return snapshot;
         }

@@ -29,6 +29,8 @@ public sealed class EmojiYoinkTests
         var failure = result.Error.ShouldBeOfType<OperationFailureException>();
         failure.Category.ShouldBe(OperationFailureCategory.Validation);
         failure.Code.ShouldBe("EmojiYoink.InvalidDestinationName");
-        failure.Message.ShouldBe("The emoji name must become 2–32 ASCII letters, digits, or underscores after removing a Discord disambiguation suffix.");
+
+        failure.Message.ShouldBe(
+            "The emoji name must become 2–32 ASCII letters, digits, or underscores after removing a Discord disambiguation suffix.");
     }
 }

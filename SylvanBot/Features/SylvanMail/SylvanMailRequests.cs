@@ -5,7 +5,7 @@ namespace SylvanBot.Features.SylvanMail;
 
 internal static class SylvanMailRequests
 {
-    public static RequestOptions Options(CancellationToken ct) => new RequestOptions() { CancelToken = ct, RetryMode = RetryMode.AlwaysFail };
+    public static RequestOptions Options(CancellationToken ct) => new RequestOptions { CancelToken = ct, RetryMode = RetryMode.AlwaysFail };
 
     public static async Task<T> AcceptedAsync<T>(Func<Task<T>> send)
     {

@@ -2,13 +2,10 @@
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.RoleReactions;
 using SylvanBot.Application.Infrastructure.Data;
-using SylvanBot.Infrastructure.Data;
 using static SylvanBot.Features.RoleReactions.RoleReactionInput;
 using static SylvanBot.Features.RoleReactions.RoleReactionPolicy;
 
 namespace SylvanBot.Features.RoleReactions;
-
-using DotNext;
 
 public sealed class RoleReactionCoordinator(
     DiscordSocketClient client,
@@ -35,14 +32,14 @@ public sealed class RoleReactionCoordinator(
             await using var db = await contextFactory.CreateDbContextAsync(ct);
 
             var mapping = await db.RoleReactions
-                .AsNoTracking()
-                .SingleOrDefaultAsync(
+               .AsNoTracking()
+               .SingleOrDefaultAsync(
                     mapping =>
                         mapping.GuildId == guildId
                         && mapping.ChannelId == channelId
                         && mapping.MessageId == messageId
                         && mapping.EmojiKey == emojiKey,
-                    ct);
+                    cancellationToken: ct);
 
             if (mapping is null)
                 return;
@@ -54,12 +51,12 @@ public sealed class RoleReactionCoordinator(
 
             var request = new RequestOptions { CancelToken = ct, AuditLogReason = $"Role reaction on message {messageId}" };
 
-            var member = guild.GetUser(userId) ?? (IGuildUser?)await client.Rest.GetGuildUserAsync(guildId, userId, request);
+            var member = guild.GetUser(userId) ?? (IGuildUser?)await client.Rest.GetGuildUserAsync(guildId: guildId, id: userId, options: request);
 
             if (member?.IsBot != false)
                 return;
 
-            await UpdateRoleAsync(guild, member, mapping, added, request);
+            await UpdateRoleAsync(guild: guild, member: member, mapping: mapping, added: added, request: request);
         }
         finally
         {
@@ -71,11 +68,11 @@ public sealed class RoleReactionCoordinator(
     {
         var role = guild.GetRole(mapping.RoleId);
 
-        Optional<string> roleError = role switch
+        DotNext.Optional<string> roleError = role switch
         {
-            null => new Optional<string>("The target must be an existing, ordinary role other than @everyone."),
-            _ when added => ValidateRole(guild, role),
-            _ => ValidateManageableRole(guild, role),
+            null => new DotNext.Optional<string>("The target must be an existing, ordinary role other than @everyone."),
+            _ when added => ValidateRole(guild: guild, role: role),
+            _ => ValidateManageableRole(guild: guild, role: role),
         };
 
         if (roleError is { HasValue: true, Value: var reason })
@@ -94,14 +91,14 @@ public sealed class RoleReactionCoordinator(
         try
         {
             if (added)
-                await member.AddRoleAsync(mapping.RoleId, request);
+                await member.AddRoleAsync(roleId: mapping.RoleId, options: request);
             else
-                await member.RemoveRoleAsync(mapping.RoleId, request);
+                await member.RemoveRoleAsync(roleId: mapping.RoleId, options: request);
         }
         catch (HttpException exception)
         {
             logger.Warning(
-                exception,
+                exception: exception,
                 "Could not update role {RoleId} for member {UserId} in guild {GuildId} from reaction on message {MessageId}",
                 mapping.RoleId,
                 member.Id,

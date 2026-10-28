@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using SylvanBot.Application.Infrastructure.Data;
-using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Tests.Features.RoleColours;
 
@@ -16,8 +15,8 @@ public sealed class RoleColourSchemaCompatibilityTests
         // Arrange
         using var db = new BotDbContext(
             new DbContextOptionsBuilder<BotDbContext>()
-                .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused", postgres => postgres.MigrationsAssembly("SylvanBot"))
-                .Options
+               .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused", postgres => postgres.MigrationsAssembly("SylvanBot"))
+               .Options
         );
 
         var migrations = db.GetService<IMigrationsAssembly>();
@@ -31,8 +30,8 @@ public sealed class RoleColourSchemaCompatibilityTests
 
         // Assert
         db.GetService<IMigrationsModelDiffer>()
-            .GetDifferences(migrationModel.GetRelationalModel(), currentModel.GetRelationalModel())
-            .ShouldBeEmpty();
+           .GetDifferences(migrationModel.GetRelationalModel(), currentModel.GetRelationalModel())
+           .ShouldBeEmpty();
 
         db.Database.HasPendingModelChanges().ShouldBeFalse();
     }

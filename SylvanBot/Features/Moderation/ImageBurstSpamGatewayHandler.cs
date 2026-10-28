@@ -2,8 +2,6 @@
 
 namespace SylvanBot.Features.Moderation;
 
-using DotNext;
-
 public sealed class ImageBurstSpamGatewayHandler(
     DiscordSocketClient discordClient,
     ImageBurstSpamDetector detector,
@@ -52,7 +50,7 @@ public sealed class ImageBurstSpamGatewayHandler(
             userId: detection.UserId,
             pruneDays: _options.ImageBurstSpamHistoryPruneDays,
             reason: reason,
-            options: new RequestOptions { CancelToken = lifetime.ApplicationStopping });
+            new RequestOptions { CancelToken = lifetime.ApplicationStopping });
 
         _logger.Warning(
             "Banned user {UserId} for image-burst spam across {ChannelCount} channels",
@@ -64,12 +62,14 @@ public sealed class ImageBurstSpamGatewayHandler(
     {
         try
         {
-            Optional<ImageBurstMessage> qualifyingResult = TryCreateQualifyingMessage(message);
+            DotNext.Optional<ImageBurstMessage> qualifyingResult = TryCreateQualifyingMessage(message);
 
             if (qualifyingResult is not { HasValue: true, Value: var qualifyingMessage })
                 return;
 
-            Optional<ImageBurstDetection> detectionResult = detector.Observe(qualifyingMessage, settings.Current(qualifyingMessage.GuildId));
+            DotNext.Optional<ImageBurstDetection> detectionResult = detector.Observe(
+                message: qualifyingMessage,
+                settings.Current(qualifyingMessage.GuildId));
 
             if (detectionResult is not { HasValue: true, Value: var detection })
                 return;
@@ -85,9 +85,9 @@ public sealed class ImageBurstSpamGatewayHandler(
     private bool IsExempt(SocketGuildUser user)
     {
         return _options.ImageBurstSpamAllowlistedUserIds.Contains(user.Id)
-               || user.Roles
-                   .Any(role => _options.ImageBurstSpamAllowlistedRoleIds.Contains(role.Id))
-               || HasStaffPermissions(user.GuildPermissions);
+            || user.Roles
+               .Any(role => _options.ImageBurstSpamAllowlistedRoleIds.Contains(role.Id))
+            || HasStaffPermissions(user.GuildPermissions);
     }
 
     private void Subscribe()
@@ -95,7 +95,7 @@ public sealed class ImageBurstSpamGatewayHandler(
         discordClient.MessageReceived += HandleMessageReceivedAsync;
     }
 
-    private Optional<ImageBurstMessage> TryCreateQualifyingMessage(SocketMessage message)
+    private DotNext.Optional<ImageBurstMessage> TryCreateQualifyingMessage(SocketMessage message)
     {
         if (message is not SocketUserMessage userMessage)
             return default;
@@ -122,10 +122,10 @@ public sealed class ImageBurstSpamGatewayHandler(
             return default;
 
         ImageBurstAttachment[] attachments = userMessage.Attachments
-            .Select(x => new ImageBurstAttachment(x.Url))
-            .ToArray();
+           .Select(x => new ImageBurstAttachment(x.Url))
+           .ToArray();
 
-        return new Optional<ImageBurstMessage>(
+        return new DotNext.Optional<ImageBurstMessage>(
             new ImageBurstMessage(
                 GuildId: channel.Guild.Id,
                 UserId: guildUser.Id,

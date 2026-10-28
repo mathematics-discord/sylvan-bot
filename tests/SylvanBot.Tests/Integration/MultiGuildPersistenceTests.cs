@@ -1,10 +1,8 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Moderation;
 using SylvanBot.Features.Moderation;
 using SylvanBot.Features.RoleColours;
-using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Tests.Integration;
 
@@ -26,13 +24,13 @@ public sealed class MultiGuildPersistenceTests
 
         var guildA = (
                 await operations.UpsertMappingAsync(guildId: 1, optionId: null, sourceRoleId: 10, displayRoleId: 20, ct: CancellationToken.None))
-            .Value
-            .Option;
+           .Value
+           .Option;
 
         var guildB = (
                 await operations.UpsertMappingAsync(guildId: 2, optionId: null, sourceRoleId: 10, displayRoleId: 20, ct: CancellationToken.None))
-            .Value
-            .Option;
+           .Value
+           .Option;
 
         (await operations.ListConfiguredOptionsAsync(guildId: 1, ct: CancellationToken.None)).Single().OptionId.ShouldBe(guildA.OptionId);
 
@@ -68,10 +66,10 @@ public sealed class MultiGuildPersistenceTests
         await using var readback = PostgresDatabaseFixture.CreateDbContext();
 
         var persistedA = await readback.ImageSpamSettings
-            .SingleAsync(x => x.GuildId == 1);
+           .SingleAsync(x => x.GuildId == 1);
 
         var persistedB = await readback.ImageSpamSettings
-            .SingleAsync(x => x.GuildId == 2);
+           .SingleAsync(x => x.GuildId == 2);
 
         (persistedA.RequiredChannelCount, persistedA.RequiredAttachmentCount, persistedA.BurstDurationSeconds).ShouldBe((4, 2, 45));
 
@@ -85,5 +83,4 @@ public sealed class MultiGuildPersistenceTests
 
         (publishedB.DistinctChannelThreshold, publishedB.RequiredAttachmentCount, publishedB.Window).ShouldBe((2, 5, 60));
     }
-
 }

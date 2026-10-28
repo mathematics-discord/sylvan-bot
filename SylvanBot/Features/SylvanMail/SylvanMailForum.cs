@@ -6,8 +6,6 @@ using static SylvanBot.Features.SylvanMail.SylvanMailRequests;
 
 namespace SylvanBot.Features.SylvanMail;
 
-using DotNext;
-
 public sealed class SylvanMailForum(DiscordSocketClient client) : ISylvanMailForum
 {
     public async Task ValidateForumAsync(ulong guildId, ulong forumId, ulong roleId, CancellationToken ct, bool validatePing = true)
@@ -26,46 +24,52 @@ public sealed class SylvanMailForum(DiscordSocketClient client) : ISylvanMailFor
         OverwritePermissions? everyone = forum.GetPermissionOverwrite(guild.EveryoneRole);
 
         if (guild.EveryoneRole.Permissions.Administrator || everyone?.ViewChannel != PermValue.Deny)
+        {
             throw new BotCommandException(
                 "The forum is exposed: explicitly deny View Channel to @everyone. No permissions or settings were changed.");
+        }
 
         var permissions = guild.CurrentUser.GetPermissions(forum);
 
         var sufficient =
             permissions
                 is { ViewChannel: true, SendMessages: true }
-                and
-                {
-                    SendMessagesInThreads: true,
-                    ReadMessageHistory: true,
-                    AttachFiles: true,
-                    ManageThreads: true,
-                    EmbedLinks: true,
-                    AddReactions: true,
-                };
+                   and
+                   {
+                       SendMessagesInThreads: true,
+                       ReadMessageHistory: true,
+                       AttachFiles: true,
+                       ManageThreads: true,
+                       EmbedLinks: true,
+                       AddReactions: true,
+                   };
 
         if (!sufficient)
+        {
             throw new BotCommandException(
                 "Sylvan needs View Channel, Send Messages (Create Posts), Send Messages in Threads, Read Message History, Attach Files, Manage Threads, Embed Links and Add Reactions in the forum.");
+        }
 
         var cannotPing = role is not null && (role.Id == guild.EveryoneRole.Id || !role.IsMentionable) && !permissions.MentionEveryone;
 
         if (validatePing && cannotPing)
+        {
             throw new BotCommandException(
                 "Sylvan must be allowed to mention the selected ping role (make the role mentionable or grant Mention All Roles here).");
+        }
 
         if (forum.Flags.HasFlag(ChannelFlags.RequireTag) && forum.Tags.Count == 0)
             throw new BotCommandException("The forum requires a tag but has no available tags. No settings changed.");
     }
 
-    public async Task<Optional<ulong>> FindPostAsync(ulong guildId, ulong forumId, long number, CancellationToken ct)
+    public async Task<DotNext.Optional<ulong>> FindPostAsync(ulong guildId, ulong forumId, long number, CancellationToken ct)
     {
         var forum = await GetForumAsync(guildId: guildId, forumId: forumId, ct: ct);
         IReadOnlyCollection<IThreadChannel> active = await forum.GetActiveThreadsAsync(Options(ct));
         var found = await FindMatchingPostAsync(posts: active, number: number, ct: ct);
 
         if (found.HasValue)
-            return new Optional<ulong>(found.Value);
+            return new DotNext.Optional<ulong>(found.Value);
 
         DateTimeOffset? before = null;
 
@@ -77,7 +81,7 @@ public sealed class SylvanMailForum(DiscordSocketClient client) : ISylvanMailFor
             found = await FindMatchingPostAsync(posts: archived, number: number, ct: ct);
 
             if (found.HasValue)
-                return new Optional<ulong>(found.Value);
+                return new DotNext.Optional<ulong>(found.Value);
 
             if (archived.Count < 100)
                 break;
@@ -99,12 +103,12 @@ public sealed class SylvanMailForum(DiscordSocketClient client) : ISylvanMailFor
         ForumTag[] tags = forum.Flags.HasFlag(ChannelFlags.RequireTag) ? [forum.Tags.First()] : [];
 
         var embed = new EmbedBuilder()
-            .WithTitle($"Case #{post.Number}")
-            .WithDescription(
+           .WithTitle($"Case #{post.Number}")
+           .WithDescription(
                 "Mention Sylvan for an anonymous draft, or reply to Sylvan with the reply ping enabled to sign it. Only the author can click \U0001F4E4 to send the latest draft. \u2611\uFE0F confirms delivery; errors appear here.")
-            .WithFooter("Beta · Bugs and lost messages are possible")
-            .AddField("User ID", $"```\n{post.UserId}\n```", inline: false)
-            .AddField("Username", $"```\n{username}\n```", inline: false);
+           .WithFooter("Beta · Bugs and lost messages are possible")
+           .AddField("User ID", $"```\n{post.UserId}\n```", inline: false)
+           .AddField("Username", $"```\n{username}\n```", inline: false);
 
         var member = client.GetGuild(post.GuildId)?.GetUser(post.UserId);
 
@@ -112,16 +116,16 @@ public sealed class SylvanMailForum(DiscordSocketClient client) : ISylvanMailFor
             embed.AddField("Member", value: member.Mention, inline: false);
 
         var created = await AcceptedAsync(() =>
-            forum.CreatePostAsync(
-                title: username,
-                // Discord notifications require the role mention in message content, alongside the embed.
-                text: roleId == post.GuildId ? "@everyone" : $"<@&{roleId}>",
-                embed: embed.Build(),
-                options: Options(ct),
-                allowedMentions: roleId == post.GuildId
-                    ? new AllowedMentions(AllowedMentionTypes.Everyone)
-                    : new AllowedMentions { RoleIds = [roleId] },
-                tags: tags));
+                                              forum.CreatePostAsync(
+                                                  title: username,
+                                                  // Discord notifications require the role mention in message content, alongside the embed.
+                                                  text: roleId == post.GuildId ? "@everyone" : $"<@&{roleId}>",
+                                                  embed: embed.Build(),
+                                                  options: Options(ct),
+                                                  allowedMentions: roleId == post.GuildId
+                                                      ? new AllowedMentions(AllowedMentionTypes.Everyone)
+                                                      : new AllowedMentions { RoleIds = [roleId] },
+                                                  tags: tags));
 
         return created.Id;
     }
@@ -165,7 +169,7 @@ public sealed class SylvanMailForum(DiscordSocketClient client) : ISylvanMailFor
     private async Task<ulong?> FindMatchingPostAsync(IEnumerable<IThreadChannel> posts, long number, CancellationToken ct)
     {
         IEnumerable<IThreadChannel> ownPosts = posts
-            .Where(post => post.OwnerId == client.CurrentUser.Id);
+           .Where(post => post.OwnerId == client.CurrentUser.Id);
 
         var caseReference = $"Case #{number}";
 
@@ -178,7 +182,7 @@ public sealed class SylvanMailForum(DiscordSocketClient client) : ISylvanMailFor
                 continue;
 
             var matchesEmbed = starter.Embeds
-                .Any(embed => string.Equals(a: embed.Title, b: caseReference, comparisonType: StringComparison.Ordinal));
+               .Any(embed => string.Equals(a: embed.Title, b: caseReference, comparisonType: StringComparison.Ordinal));
 
             var matches = matchesEmbed || starter.Content.EndsWith($"\n{caseReference}", comparisonType: StringComparison.Ordinal);
 

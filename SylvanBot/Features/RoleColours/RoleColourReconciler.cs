@@ -2,11 +2,8 @@
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.RoleColours;
 using SylvanBot.Application.Infrastructure.Data;
-using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Features.RoleColours;
-
-using DotNext;
 
 // Live Discord roles are the equipped state. Colour writes are serialized per guild.
 public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbContextFactory, ILogger logger, DiscordSocketClient discordClient)
@@ -24,14 +21,14 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
 
     public async Task<ImmutableArray<IRole>> ListEligibleColoursAsync(IGuild guild, ulong userId, CancellationToken ct)
     {
-        Optional<IGuildUser> memberResult = await ReadMemberAsync(guild: guild, userId: userId, new RequestOptions { CancelToken = ct });
+        DotNext.Optional<IGuildUser> memberResult = await ReadMemberAsync(guild: guild, userId: userId, new RequestOptions { CancelToken = ct });
 
         return memberResult is { HasValue: true, Value: var member }
             ? EligibleColours(guild: guild, roles: member.RoleIds, await ReadMappingsAsync(guildId: guild.Id, ct: ct))
             : [];
     }
 
-    public async Task<Result<Optional<ulong>>> TrySetUserColourAsync(IGuild guild, ulong userId, ulong? colourId, CancellationToken ct)
+    public async Task<Result<DotNext.Optional<ulong>>> TrySetUserColourAsync(IGuild guild, ulong userId, ulong? colourId, CancellationToken ct)
     {
         var gate = _guildGates.GetOrAdd(key: guild.Id, _ => new SemaphoreSlim(initialCount: 1, maxCount: 1));
         await gate.WaitAsync(ct);
@@ -52,8 +49,9 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
                 propertyValue0: guild.Id,
                 propertyValue1: userId);
 
-            return new Result<Optional<ulong>>(
-                OperationFailureException.Failure(description: "Discord could not complete the colour update. Your roles may have changed; please try again."));
+            return new Result<DotNext.Optional<ulong>>(
+                OperationFailureException.Failure(
+                    description: "Discord could not complete the colour update. Your roles may have changed; please try again."));
         }
         finally
         {
@@ -61,12 +59,12 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
         }
     }
 
-    public async Task<Result<Optional<ulong>>> ReconcileUserRolesAsync(
+    public async Task<Result<DotNext.Optional<ulong>>> ReconcileUserRolesAsync(
         IGuild guild,
         ulong userId,
         CancellationToken ct,
-        Optional<ImmutableArray<ulong>> previousRoleIds,
-        Optional<ImmutableArray<RoleColourOption>> previousMappings)
+        DotNext.Optional<ImmutableArray<ulong>> previousRoleIds,
+        DotNext.Optional<ImmutableArray<RoleColourOption>> previousMappings)
     {
         var gate = _guildGates.GetOrAdd(key: guild.Id, _ => new SemaphoreSlim(initialCount: 1, maxCount: 1));
         await gate.WaitAsync(ct);
@@ -92,8 +90,9 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
                 propertyValue0: guild.Id,
                 propertyValue1: userId);
 
-            return new Result<Optional<ulong>>(
-                OperationFailureException.Failure(description: "Discord could not complete the colour update. Your roles may have changed; please try again."));
+            return new Result<DotNext.Optional<ulong>>(
+                OperationFailureException.Failure(
+                    description: "Discord could not complete the colour update. Your roles may have changed; please try again."));
         }
         finally
         {
@@ -102,7 +101,10 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
     }
 
     // Old mappings are a temporary snapshot from the admin command, never persisted.
-    public async Task<int> ReconcileGuildAsync(IGuild guild, CancellationToken ct, Optional<ImmutableArray<RoleColourOption>> previousMappings)
+    public async Task<int> ReconcileGuildAsync(
+        IGuild guild,
+        CancellationToken ct,
+        DotNext.Optional<ImmutableArray<RoleColourOption>> previousMappings)
     {
         try
         {
@@ -126,22 +128,22 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
             foreach (var member in members)
             {
                 var participates = HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: current)
-                    .Any();
+                   .Any();
 
                 var participated = HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: old)
-                    .Any();
+                   .Any();
 
                 if (!participates && !participated)
                     continue;
 
-                Result<Optional<ulong>> result = await ReconcileUserRolesAsync(
+                Result<DotNext.Optional<ulong>> result = await ReconcileUserRolesAsync(
                     guild: guild,
                     userId: member.Id,
                     ct: ct,
-                    previousRoleIds: new Optional<ImmutableArray<ulong>>(
+                    new DotNext.Optional<ImmutableArray<ulong>>(
                         member.RoleIds
-                            .ToImmutableArray()),
-                    previousMappings: new Optional<ImmutableArray<RoleColourOption>>(old));
+                           .ToImmutableArray()),
+                    new DotNext.Optional<ImmutableArray<RoleColourOption>>(old));
 
                 if (!result.IsSuccessful)
                     incomplete++;
@@ -187,11 +189,11 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
     private static ImmutableArray<IRole> EligibleColours(IGuild guild, IReadOnlyCollection<ulong> roles, ImmutableArray<RoleColourOption> mappings) =>
     [
         .. HeldGrants(guildId: guild.Id, roles: roles, mappings: mappings)
-            .Where(o => ValidateMapping(guild: guild, sourceId: o.SourceRoleId, colourId: o.DisplayRoleId).IsSuccessful)
-            .Select(o => guild.GetRole(o.DisplayRoleId))
-            .DistinctBy(role => role.Id)
-            .OrderBy(role => role.Name, comparer: StringComparer.OrdinalIgnoreCase)
-            .ThenBy(role => role.Id),
+           .Where(o => ValidateMapping(guild: guild, sourceId: o.SourceRoleId, colourId: o.DisplayRoleId).IsSuccessful)
+           .Select(o => guild.GetRole(o.DisplayRoleId))
+           .DistinctBy(role => role.Id)
+           .OrderBy(role => role.Name, comparer: StringComparer.OrdinalIgnoreCase)
+           .ThenBy(role => role.Id),
     ];
 
     private static bool HoldsSource(ulong guildId, IReadOnlyCollection<ulong> roles, ulong sourceId) =>
@@ -203,7 +205,7 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
         ImmutableArray<RoleColourOption> mappings)
     {
         return mappings
-            .Where(o => HoldsSource(guildId: guildId, roles: roles, sourceId: o.SourceRoleId));
+           .Where(o => HoldsSource(guildId: guildId, roles: roles, sourceId: o.SourceRoleId));
     }
 
     private static async Task RemoveColoursAsync(IGuildUser member, IEnumerable<ulong> colours, RequestOptions request)
@@ -212,7 +214,8 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
             await member.RemoveRoleAsync(roleId: roleId, options: request);
     }
 
-    private static Optional<ulong> SoleColour(HashSet<ulong> colours) => colours.Count == 1 ? new Optional<ulong>(colours.Single()) : default;
+    private static DotNext.Optional<ulong> SoleColour(HashSet<ulong> colours) =>
+        colours.Count == 1 ? new DotNext.Optional<ulong>(colours.Single()) : default;
 
     private static OperationFailureException RolesChangedError() =>
         OperationFailureException.Failure(description: "Discord roles changed during the update. Please check your roles and try again.");
@@ -220,21 +223,21 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
     private static HashSet<ulong> ManagedDisplayRoles(IReadOnlyCollection<ulong> roles, IEnumerable<RoleColourOption> mappings)
     {
         HashSet<ulong> displayRoleIds = mappings
-            .Select(mapping => mapping.DisplayRoleId)
-            .ToHashSet();
+           .Select(mapping => mapping.DisplayRoleId)
+           .ToHashSet();
 
         return roles
-            .Where(displayRoleIds.Contains)
-            .ToHashSet();
+           .Where(displayRoleIds.Contains)
+           .ToHashSet();
     }
 
-    private async Task<Result<Optional<ulong>>> SetUserColourAsync(IGuild guild, ulong userId, ulong? colourId, CancellationToken ct)
+    private async Task<Result<DotNext.Optional<ulong>>> SetUserColourAsync(IGuild guild, ulong userId, ulong? colourId, CancellationToken ct)
     {
         var request = new RequestOptions { CancelToken = ct };
-        Optional<IGuildUser> memberResult = await ReadMemberAsync(guild: guild, userId: userId, request: request);
+        DotNext.Optional<IGuildUser> memberResult = await ReadMemberAsync(guild: guild, userId: userId, request: request);
 
         if (memberResult is not { HasValue: true, Value: var member })
-            return new Result<Optional<ulong>>(OperationFailureException.NotFound(description: "The member is no longer in this guild."));
+            return new Result<DotNext.Optional<ulong>>(OperationFailureException.NotFound(description: "The member is no longer in this guild."));
 
         ImmutableArray<RoleColourOption> mappings = await ReadMappingsAsync(guildId: guild.Id, ct: ct);
 
@@ -243,16 +246,18 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
             ImmutableArray<IRole> eligible = EligibleColours(guild: guild, roles: member.RoleIds, mappings: mappings);
 
             if (!eligible
-                    .Any(role => role.Id == colourId.Value))
-                return new Result<Optional<ulong>>(
+               .Any(role => role.Id == colourId.Value))
+            {
+                return new Result<DotNext.Optional<ulong>>(
                     OperationFailureException.Validation(description: "That colour is no longer available to you."));
+            }
         }
 
         HashSet<ulong> worn = ManagedDisplayRoles(roles: member.RoleIds, mappings: mappings);
 
         HashSet<ulong> remove = worn
-            .Where(id => id != colourId)
-            .ToHashSet();
+           .Where(id => id != colourId)
+           .ToHashSet();
         var addColour = colourId.HasValue && !worn.Contains(colourId.Value);
 
         if (remove.Count == 0 && !addColour)
@@ -263,36 +268,36 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
         if (addColour)
             await member.AddRoleAsync(roleId: colourId!.Value, options: request);
 
-        Optional<IGuildUser> actualResult = await ReadMemberAsync(guild: guild, userId: userId, request: request);
+        DotNext.Optional<IGuildUser> actualResult = await ReadMemberAsync(guild: guild, userId: userId, request: request);
 
         if (actualResult is not { HasValue: true, Value: var actual })
-            return new Result<Optional<ulong>>(RolesChangedError());
+            return new Result<DotNext.Optional<ulong>>(RolesChangedError());
 
         HashSet<ulong> actualColours = ManagedDisplayRoles(roles: actual.RoleIds, mappings: mappings);
 
         if (colourId.HasValue)
         {
             if (actualColours.Count != 1 || !actualColours.Contains(colourId.Value))
-                return new Result<Optional<ulong>>(RolesChangedError());
+                return new Result<DotNext.Optional<ulong>>(RolesChangedError());
         }
         else if (actualColours.Count != 0)
-            return new Result<Optional<ulong>>(RolesChangedError());
+            return new Result<DotNext.Optional<ulong>>(RolesChangedError());
 
         return SoleColour(actualColours);
     }
 
-    private async Task<Result<Optional<ulong>>> ProcessRoleColourReconciliation(
+    private async Task<Result<DotNext.Optional<ulong>>> ProcessRoleColourReconciliation(
         IGuild guild,
         ulong userId,
-        Optional<ImmutableArray<ulong>> previousRoleIds,
-        Optional<ImmutableArray<RoleColourOption>> previousMappings,
+        DotNext.Optional<ImmutableArray<ulong>> previousRoleIds,
+        DotNext.Optional<ImmutableArray<RoleColourOption>> previousMappings,
         CancellationToken ct)
     {
         var request = new RequestOptions { CancelToken = ct };
-        Optional<IGuildUser> memberResult = await ReadMemberAsync(guild: guild, userId: userId, request: request);
+        DotNext.Optional<IGuildUser> memberResult = await ReadMemberAsync(guild: guild, userId: userId, request: request);
 
         if (memberResult is not { HasValue: true, Value: var member })
-            return new Result<Optional<ulong>>(OperationFailureException.NotFound(description: "The member is no longer in this guild."));
+            return new Result<DotNext.Optional<ulong>>(OperationFailureException.NotFound(description: "The member is no longer in this guild."));
 
         ImmutableArray<RoleColourOption> mappings = await ReadMappingsAsync(guildId: guild.Id, ct: ct);
         ImmutableArray<RoleColourOption> old = previousMappings is { HasValue: true, Value: var supplied } ? supplied : mappings;
@@ -300,38 +305,43 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
         HashSet<ulong> worn = ManagedDisplayRoles(
             roles: member.RoleIds,
             mappings
-                .Concat(old));
+               .Concat(old));
 
-        var holdsGrant = HeldGrants(guild.Id, member.RoleIds, mappings)
-            .Any();
+        var holdsGrant = HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: mappings)
+           .Any();
 
-        HashSet<ulong> eligible = EligibleColours(guild, member.RoleIds, mappings)
-            .Select(role => role.Id)
-            .ToHashSet();
+        HashSet<ulong> eligible = EligibleColours(guild: guild, roles: member.RoleIds, mappings: mappings)
+           .Select(role => role.Id)
+           .ToHashSet();
 
         IReadOnlyCollection<ulong> before = previousRoleIds is { HasValue: true, Value: var roles } ? roles : member.RoleIds;
 
-        HashSet<ulong> previouslyGranted = HeldGrants(guild.Id, before, old)
-            .Select(mapping => mapping.DisplayRoleId)
-            .ToHashSet();
-        IReadOnlySet<ulong> remove = RoleColourSelection.Removals(worn, holdsGrant, eligible, previouslyGranted);
+        HashSet<ulong> previouslyGranted = HeldGrants(guildId: guild.Id, roles: before, mappings: old)
+           .Select(mapping => mapping.DisplayRoleId)
+           .ToHashSet();
+
+        IReadOnlySet<ulong> remove = RoleColourSelection.Removals(
+            worn: worn,
+            holdsGrant: holdsGrant,
+            eligible: eligible,
+            previouslyGranted: previouslyGranted);
 
         if (remove.Count == 0)
             return SoleColour(worn);
 
         await RemoveColoursAsync(member: member, colours: remove, request: request);
-        Optional<IGuildUser> actualResult = await ReadMemberAsync(guild: guild, userId: userId, request: request);
+        DotNext.Optional<IGuildUser> actualResult = await ReadMemberAsync(guild: guild, userId: userId, request: request);
 
         if (actualResult is not { HasValue: true, Value: var actual })
-            return new Result<Optional<ulong>>(RolesChangedError());
+            return new Result<DotNext.Optional<ulong>>(RolesChangedError());
 
         HashSet<ulong> actualColours = ManagedDisplayRoles(
             roles: actual.RoleIds,
             mappings
-                .Concat(old));
+               .Concat(old));
 
         if (actualColours.Overlaps(remove))
-            return new Result<Optional<ulong>>(RolesChangedError());
+            return new Result<DotNext.Optional<ulong>>(RolesChangedError());
 
         return SoleColour(actualColours);
     }
@@ -341,21 +351,21 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
         await using var db = await dbContextFactory.CreateDbContextAsync(ct);
 
         RoleColourOption[] mappings = await db.RoleColourOptions
-            .AsNoTracking()
-            .Where(o => o.GuildId == guildId)
-            .ToArrayAsync(ct);
+           .AsNoTracking()
+           .Where(o => o.GuildId == guildId)
+           .ToArrayAsync(ct);
 
         return mappings
-            .ToImmutableArray();
+           .ToImmutableArray();
     }
 
-    private async Task<Optional<IGuildUser>> ReadMemberAsync(IGuild guild, ulong userId, RequestOptions request)
+    private async Task<DotNext.Optional<IGuildUser>> ReadMemberAsync(IGuild guild, ulong userId, RequestOptions request)
     {
         var member =
             guild is SocketGuild
                 ? await discordClient.Rest.GetGuildUserAsync(guildId: guild.Id, id: userId, options: request)
                 : await guild.GetUserAsync(id: userId, mode: CacheMode.AllowDownload, options: request);
 
-        return member is null ? default : new Optional<IGuildUser>(member);
+        return member is null ? default : new DotNext.Optional<IGuildUser>(member);
     }
 }

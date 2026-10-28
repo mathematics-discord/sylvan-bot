@@ -70,9 +70,9 @@ public sealed class DiscordInteractionHandler(
             var result = await interactionService.ExecuteCommandAsync(context: context, services: services);
 
             diagnostics
-                .CreateInteractionDiagnosticsLogger(context)
-                .ForContext("event_kind", "interaction.dispatch_completed")
-                .Debug("Interaction dispatched in {DispatchMs} ms", propertyValue: stopwatch.Elapsed.TotalMilliseconds);
+               .CreateInteractionDiagnosticsLogger(context)
+               .ForContext("event_kind", "interaction.dispatch_completed")
+               .Debug("Interaction dispatched in {DispatchMs} ms", propertyValue: stopwatch.Elapsed.TotalMilliseconds);
 
             if (!result.IsSuccess)
                 await CompleteInteractionAsync(command: null, context: context, result: result);
@@ -96,15 +96,15 @@ public sealed class DiscordInteractionHandler(
         try
         {
             interactionLogger = diagnostics
-                .CreateInteractionDiagnosticsLogger(context)
-                .ForContext("event_kind", "interaction.execution_completed")
-                .ForContext("command_module", value: command?.Module.Name)
-                .ForContext("command_group", value: command?.Module.SlashGroupName)
-                .ForContext("command_name", value: command?.Name)
-                .ForContext("user_id", value: context.User.Id)
-                .ForContext("guild_id", value: context.Guild?.Id)
-                .ForContext("channel_id", value: context.Channel?.Id)
-                .ForContext("total_ms", Math.Round(value: stopwatch.Elapsed.TotalMilliseconds, digits: 2));
+               .CreateInteractionDiagnosticsLogger(context)
+               .ForContext("event_kind", "interaction.execution_completed")
+               .ForContext("command_module", value: command?.Module.Name)
+               .ForContext("command_group", value: command?.Module.SlashGroupName)
+               .ForContext("command_name", value: command?.Name)
+               .ForContext("user_id", value: context.User.Id)
+               .ForContext("guild_id", value: context.Guild?.Id)
+               .ForContext("channel_id", value: context.Channel?.Id)
+               .ForContext("total_ms", Math.Round(value: stopwatch.Elapsed.TotalMilliseconds, digits: 2));
 
             if (result.IsSuccess)
             {
@@ -113,15 +113,15 @@ public sealed class DiscordInteractionHandler(
                 return;
             }
 
-            var message = InteractionFailureResponder.DescribeFailure(result, interactionLogger);
+            var message = InteractionFailureResponder.DescribeFailure(result: result, interactionLogger: interactionLogger);
 
             await InteractionFailureResponder.RespondToFailureAsync(interaction: context.Interaction, message: message);
         }
         catch (Exception ex)
         {
             interactionLogger
-                .ForContext("event_kind", "interaction.response_failed")
-                .Warning(exception: ex, "Failed to complete interaction error handling");
+               .ForContext("event_kind", "interaction.response_failed")
+               .Warning(exception: ex, "Failed to complete interaction error handling");
         }
     }
 }

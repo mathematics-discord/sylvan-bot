@@ -9,10 +9,7 @@ public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<Rol
     {
         builder.ToTable(
             "RoleColourOptions",
-            table =>
-            {
-                table.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\"");
-            }
+            table => { table.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\""); }
         );
 
         builder.HasKey(x => x.OptionId);
@@ -26,12 +23,12 @@ public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<Rol
         builder.Property(x => x.UpdatedAtUtc).IsRequired().HasColumnType("timestamp with time zone");
 
         builder
-            .HasIndex(x => new
+           .HasIndex(x => new
             {
                 x.GuildId,
                 x.SourceRoleId,
                 x.DisplayRoleId,
             })
-            .IsUnique();
+           .IsUnique();
     }
 }

@@ -20,8 +20,10 @@ public sealed class WorkingHoursSettings
         var eligible = EligibleRoles.Any(role => role.RoleId == roleId);
 
         if (roleId == 0 || roleId == GuildId || eligible)
+        {
             return new Result<ValueTuple>(
                 OperationFailureException.Validation(description: "The ping role cannot be @everyone, an eligible role or an exemption role."));
+        }
 
         PingRoleId = roleId;
 
@@ -31,8 +33,10 @@ public sealed class WorkingHoursSettings
     public Result<ValueTuple> ChangeEligibleRole(ulong roleId, bool add)
     {
         if (roleId == 0 || roleId == GuildId || roleId == PingRoleId)
+        {
             return new Result<ValueTuple>(
                 OperationFailureException.Validation(description: "An eligible role cannot be @everyone or the ping role."));
+        }
 
         var role = EligibleRoles.SingleOrDefault(item => item.RoleId == roleId);
 
@@ -48,12 +52,16 @@ public sealed class WorkingHoursSettings
             return new Result<ValueTuple>(default(ValueTuple));
 
         if (role.IsExempt)
+        {
             return new Result<ValueTuple>(
                 OperationFailureException.Validation(description: "Remove this role's exemption before removing its eligibility."));
+        }
 
         if (Enabled && EligibleRoles.Count == 1)
+        {
             return new Result<ValueTuple>(
                 OperationFailureException.Validation(description: "Disable Working Hours before removing the last eligible role."));
+        }
 
         EligibleRoles.Remove(role);
 

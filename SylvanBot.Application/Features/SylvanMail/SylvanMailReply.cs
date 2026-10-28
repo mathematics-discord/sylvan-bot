@@ -14,9 +14,9 @@ public sealed record SylvanMailReply(string Content, bool Anonymous)
         if (explicitMention)
         {
             var body = content
-                .Replace(oldValue: mention, newValue: string.Empty, comparisonType: StringComparison.Ordinal)
-                .Replace(oldValue: nicknameMention, newValue: string.Empty, comparisonType: StringComparison.Ordinal)
-                .Trim();
+               .Replace(oldValue: mention, newValue: string.Empty, comparisonType: StringComparison.Ordinal)
+               .Replace(oldValue: nicknameMention, newValue: string.Empty, comparisonType: StringComparison.Ordinal)
+               .Trim();
 
             return new SylvanMailReply(Content: body, Anonymous: true);
         }

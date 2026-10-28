@@ -54,9 +54,9 @@ public sealed class BulkDeleteTranscriptTests
         var content = new string(c: 'x', count: 4000);
 
         (ulong AuthorId, ulong ChannelId, string Content)[] messages = Enumerable
-            .Range(start: 1, count: 100)
-            .Select(index => (AuthorId: (ulong)index, ChannelId: 268882317391429632UL, Content: content))
-            .ToArray();
+           .Range(start: 1, count: 100)
+           .Select(index => (AuthorId: (ulong)index, ChannelId: 268882317391429632UL, Content: content))
+           .ToArray();
 
         // Act
         var text = Encoding.UTF8.GetString(BulkDeleteTranscript.Create(messages));

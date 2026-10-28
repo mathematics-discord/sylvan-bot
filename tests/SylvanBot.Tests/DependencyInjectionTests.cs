@@ -11,14 +11,14 @@ public sealed class DependencyInjectionTests
     public void DiscordOptions_DoNotRequireOrExposeARuntimeGuildAllowlist()
     {
         IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(
+           .AddInMemoryCollection(
                 new Dictionary<string, string?>(StringComparer.Ordinal)
                 {
                     ["Discord:Token"] = "inert-test-token",
                     ["Discord:MessageCacheSize"] = "1000",
                 }
             )
-            .Build();
+           .Build();
 
         var services = new ServiceCollection();
         services.AddOptions<DiscordOptions>().Bind(configuration.GetSection(DiscordOptions.SectionName));

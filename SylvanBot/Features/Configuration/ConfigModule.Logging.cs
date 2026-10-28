@@ -2,8 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Logging;
 using SylvanBot.Application.Infrastructure.Data;
-using SylvanBot.Features.Logging;
-using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Features.Configuration;
 
@@ -32,8 +30,8 @@ public sealed partial class ConfigModule
             await using var dbContext = await contextFactory.CreateDbContextAsync();
 
             var configuration = await dbContext.LoggingConfigurations
-                .SingleOrDefaultAsync(configuration =>
-                    configuration.GuildId == Context.Guild.Id);
+               .SingleOrDefaultAsync(configuration =>
+                                         configuration.GuildId == Context.Guild.Id);
             var isNew = configuration is null;
             configuration ??= new LoggingConfiguration { GuildId = Context.Guild.Id };
             var hasUpdates = enabled is not null || deleteLogChannel is not null || editLogChannel is not null;
@@ -49,7 +47,7 @@ public sealed partial class ConfigModule
                 if (enablingWithoutDestination)
                 {
                     await ModifyOriginalResponseAsync(response =>
-                        response.Content = "Enable logging only after setting a delete or edit log channel.");
+                                                          response.Content = "Enable logging only after setting a delete or edit log channel.");
 
                     return;
                 }
@@ -89,8 +87,8 @@ public sealed partial class ConfigModule
             await using var dbContext = await contextFactory.CreateDbContextAsync();
 
             var isExcluded = await dbContext.LoggingExcludedChannels
-                .AnyAsync(excluded =>
-                    excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
+               .AnyAsync(excluded =>
+                             excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
 
             if (isExcluded)
             {
@@ -133,8 +131,8 @@ public sealed partial class ConfigModule
             await using var dbContext = await contextFactory.CreateDbContextAsync();
 
             var exclusion = await dbContext.LoggingExcludedChannels
-                .SingleOrDefaultAsync(excluded =>
-                    excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
+               .SingleOrDefaultAsync(excluded =>
+                                         excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
 
             if (exclusion is null)
             {
@@ -159,11 +157,11 @@ public sealed partial class ConfigModule
             await using var dbContext = await contextFactory.CreateDbContextAsync();
 
             var channelIds = await dbContext.LoggingExcludedChannels
-                .AsNoTracking()
-                .Where(exclusion => exclusion.GuildId == Context.Guild.Id)
-                .OrderBy(exclusion => exclusion.ChannelId)
-                .Select(exclusion => exclusion.ChannelId)
-                .ToArrayAsync();
+               .AsNoTracking()
+               .Where(exclusion => exclusion.GuildId == Context.Guild.Id)
+               .OrderBy(exclusion => exclusion.ChannelId)
+               .Select(exclusion => exclusion.ChannelId)
+               .ToArrayAsync();
 
             if (channelIds.Length == 0)
             {
@@ -193,7 +191,7 @@ public sealed partial class ConfigModule
             await ModifyOriginalResponseAsync(response => response.Content = responses[0]);
 
             IEnumerable<string> followups = responses
-                .Skip(1);
+               .Skip(1);
 
             foreach (var followup in followups)
                 await FollowupAsync(text: followup, ephemeral: true);
@@ -206,9 +204,9 @@ public sealed partial class ConfigModule
             var editLogChannel = configuration.EditLogChannelId is null ? "unset" : $"<#{configuration.EditLogChannelId.Value}>";
 
             return "Logging configuration:\n"
-                   + $"- Enabled: {configuration.Enabled}\n"
-                   + $"- Delete log channel: {deleteLogChannel}\n"
-                   + $"- Edit log channel: {editLogChannel}";
+                + $"- Enabled: {configuration.Enabled}\n"
+                + $"- Delete log channel: {deleteLogChannel}\n"
+                + $"- Edit log channel: {editLogChannel}";
         }
 
         private async Task<bool> ValidateTextContextAsync()

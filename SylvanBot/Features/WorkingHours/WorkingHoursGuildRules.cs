@@ -5,6 +5,12 @@ namespace SylvanBot.Features.WorkingHours;
 
 public sealed class WorkingHoursGuildRules(DiscordSocketClient client)
 {
+    public static bool IsEligible(WorkingHoursSettings settings, IGuildUser member)
+    {
+        return settings.EligibleRoles
+           .Any(role => member.RoleIds.Contains(role.RoleId));
+    }
+
     public ICollection<string> ConfigurationProblems(WorkingHoursSettings settings, SocketGuild? guild)
     {
         List<string> problems = [];
@@ -52,10 +58,4 @@ public sealed class WorkingHoursGuildRules(DiscordSocketClient client)
 
     public bool IsReady([NotNullWhen(true)] SocketGuild? guild) =>
         client.ConnectionState == ConnectionState.Connected && guild is { IsConnected: true, HasAllMembers: true };
-
-    public static bool IsEligible(WorkingHoursSettings settings, IGuildUser member)
-    {
-        return settings.EligibleRoles
-            .Any(role => member.RoleIds.Contains(role.RoleId));
-    }
 }

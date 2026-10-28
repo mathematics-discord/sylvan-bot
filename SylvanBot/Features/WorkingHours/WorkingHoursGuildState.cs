@@ -4,7 +4,7 @@ namespace SylvanBot.Features.WorkingHours;
 
 public sealed class WorkingHoursGuildState : IDisposable
 {
-    public SemaphoreSlim Gate { get; } = new SemaphoreSlim(1, 1);
+    public SemaphoreSlim Gate { get; } = new SemaphoreSlim(initialCount: 1, maxCount: 1);
 
     private Lock Sync { get; } = new Lock();
     private Dictionary<ulong, bool> Members { get; } = new Dictionary<ulong, bool>();
@@ -16,13 +16,17 @@ public sealed class WorkingHoursGuildState : IDisposable
     public void Invalidate()
     {
         lock (Sync)
+        {
             Seeded = false;
+        }
     }
 
     public void Observe(IGuildUser member)
     {
         lock (Sync)
+        {
             IndexMember(member);
+        }
     }
 
     public void MemberLeft(ulong memberId)
@@ -37,19 +41,25 @@ public sealed class WorkingHoursGuildState : IDisposable
     public void ForgetMember(ulong memberId)
     {
         lock (Sync)
+        {
             Members.Remove(memberId);
+        }
     }
 
     public ISet<ulong> MemberIds()
     {
         lock (Sync)
+        {
             return new HashSet<ulong>(Members.Keys);
+        }
     }
 
     public bool ConsumeLoss(ulong memberId)
     {
         lock (Sync)
+        {
             return Losses.Remove(memberId);
+        }
     }
 
     public ulong[] TakeLosses(ulong? onlyMember)
@@ -60,7 +70,7 @@ public sealed class WorkingHoursGuildState : IDisposable
                 return Losses.Remove(memberId) ? [memberId] : [];
 
             var losses = Losses
-                .ToArray();
+               .ToArray();
             Losses.Clear();
 
             return losses;
@@ -70,33 +80,18 @@ public sealed class WorkingHoursGuildState : IDisposable
     public void RestoreLosses(IEnumerable<ulong> members)
     {
         lock (Sync)
+        {
             Losses.UnionWith(members);
+        }
     }
 
     public void Dispose() => Gate.Dispose();
 
-    private void IndexMember(IGuildUser member)
-    {
-        var eligible = EligibleRoles.Overlaps(member.RoleIds);
-
-        var lostEligibility = Members.GetValueOrDefault(member.Id) && !eligible;
-
-        if (lostEligibility)
-            Losses.Add(member.Id);
-
-        var hasTarget = PingRoleId is { } target && member.RoleIds.Contains(target);
-
-        if (eligible || hasTarget)
-            Members[member.Id] = eligible;
-        else
-            Members.Remove(member.Id);
-    }
-
     public void PublishSettingsAndSeed(WorkingHoursSettings settings, SocketGuild? guild, bool ready)
     {
         HashSet<ulong> eligibleRoles = settings.EligibleRoles
-            .Select(role => role.RoleId)
-            .ToHashSet();
+           .Select(role => role.RoleId)
+           .ToHashSet();
 
         lock (Sync)
         {
@@ -111,9 +106,9 @@ public sealed class WorkingHoursGuildState : IDisposable
                 return;
 
             var previousEligible = Members
-                .Where(pair => pair.Value)
-                .Select(pair => pair.Key)
-                .ToArray();
+               .Where(pair => pair.Value)
+               .Select(pair => pair.Key)
+               .ToArray();
             Members.Clear();
 
             foreach (var member in guild.Users)
@@ -133,5 +128,22 @@ public sealed class WorkingHoursGuildState : IDisposable
 
             Seeded = true;
         }
+    }
+
+    private void IndexMember(IGuildUser member)
+    {
+        var eligible = EligibleRoles.Overlaps(member.RoleIds);
+
+        var lostEligibility = Members.GetValueOrDefault(member.Id) && !eligible;
+
+        if (lostEligibility)
+            Losses.Add(member.Id);
+
+        var hasTarget = PingRoleId is { } target && member.RoleIds.Contains(target);
+
+        if (eligible || hasTarget)
+            Members[member.Id] = eligible;
+        else
+            Members.Remove(member.Id);
     }
 }

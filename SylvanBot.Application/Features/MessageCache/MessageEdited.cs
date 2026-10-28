@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using SylvanBot.Application.Common;
 
 namespace SylvanBot.Application.Features.MessageCache;
 

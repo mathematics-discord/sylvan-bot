@@ -2,8 +2,6 @@
 
 namespace SylvanBot.Features.Logging;
 
-using DotNext;
-
 using DownloadedAttachment = ModerationLogComponents.DownloadedAttachment;
 
 public sealed class ModerationLogPublisher(
@@ -20,51 +18,6 @@ public sealed class ModerationLogPublisher(
 
     private readonly ILogger _logger = logger.ForContext<ModerationLogPublisher>();
     private readonly LoggingOptions _options = options.Value;
-
-    private static async Task SendLogAsync(
-        IMessageChannel logChannel,
-        IReadOnlyCollection<DownloadedAttachment> attachments,
-        CancellationToken ct,
-        string? text = null,
-        MessageComponent? components = null)
-    {
-        ct.ThrowIfCancellationRequested();
-        var flags = components is null ? MessageFlags.SuppressNotification : CompactLogMessageFlags;
-        var request = new RequestOptions { CancelToken = ct };
-
-        if (attachments.Count == 0)
-        {
-            await logChannel.SendMessageAsync(
-                text: text,
-                options: request,
-                allowedMentions: AllowedMentions.None,
-                components: components,
-                flags: flags);
-
-            return;
-        }
-
-        List<FileAttachment> files = [];
-
-        try
-        {
-            foreach (var attachment in attachments)
-                files.Add(new FileAttachment(new MemoryStream(buffer: attachment.Bytes, writable: false), fileName: attachment.FileName));
-
-            await logChannel.SendFilesAsync(
-                attachments: files,
-                text: text,
-                options: request,
-                allowedMentions: AllowedMentions.None,
-                components: components,
-                flags: flags);
-        }
-        finally
-        {
-            foreach (var file in files)
-                file.Dispose();
-        }
-    }
 
     public async Task PublishEditAsync(
         ulong guildId,
@@ -169,9 +122,9 @@ public sealed class ModerationLogPublisher(
             : $"Bulk delete in <#{sourceChannel.Id}> at {timestamp}. Moderator could not be determined.";
 
         ImmutableArray<(ulong AuthorId, ulong ChannelId, string Content)> rows = messages
-            .Where(message => message.ExpiresAtUtc > DateTimeOffset.UtcNow)
-            .Select(message => (message.AuthorId, message.ChannelId, message.Content))
-            .ToImmutableArray();
+           .Where(message => message.ExpiresAtUtc > DateTimeOffset.UtcNow)
+           .Select(message => (message.AuthorId, message.ChannelId, message.Content))
+           .ToImmutableArray();
 
         if (rows.IsEmpty)
             return false;
@@ -181,6 +134,51 @@ public sealed class ModerationLogPublisher(
         await SendLogAsync(logChannel: logChannel, [transcript], ct: ct, text: text);
 
         return true;
+    }
+
+    private static async Task SendLogAsync(
+        IMessageChannel logChannel,
+        IReadOnlyCollection<DownloadedAttachment> attachments,
+        CancellationToken ct,
+        string? text = null,
+        MessageComponent? components = null)
+    {
+        ct.ThrowIfCancellationRequested();
+        var flags = components is null ? MessageFlags.SuppressNotification : CompactLogMessageFlags;
+        var request = new RequestOptions { CancelToken = ct };
+
+        if (attachments.Count == 0)
+        {
+            await logChannel.SendMessageAsync(
+                text: text,
+                options: request,
+                allowedMentions: AllowedMentions.None,
+                components: components,
+                flags: flags);
+
+            return;
+        }
+
+        List<FileAttachment> files = [];
+
+        try
+        {
+            foreach (var attachment in attachments)
+                files.Add(new FileAttachment(new MemoryStream(buffer: attachment.Bytes, writable: false), fileName: attachment.FileName));
+
+            await logChannel.SendFilesAsync(
+                attachments: files,
+                text: text,
+                options: request,
+                allowedMentions: AllowedMentions.None,
+                components: components,
+                flags: flags);
+        }
+        finally
+        {
+            foreach (var file in files)
+                file.Dispose();
+        }
     }
 
     private async Task<int> DownloadAttachmentsAsync(
@@ -195,7 +193,7 @@ public sealed class ModerationLogPublisher(
         var remainingBytes = MaxUploadAttachmentBytes - uploadedBytes;
 
         IEnumerable<MessageAttachment> candidates = deletedMessage.Attachments
-            .Take(_options.MaxAttachmentCountPerMessage);
+           .Take(_options.MaxAttachmentCountPerMessage);
 
         foreach (var attachment in candidates)
         {
@@ -213,7 +211,7 @@ public sealed class ModerationLogPublisher(
 
             try
             {
-                Optional<byte[]> downloadResult = await AttachmentEvidenceDownloader.TryDownloadAsync(
+                DotNext.Optional<byte[]> downloadResult = await AttachmentEvidenceDownloader.TryDownloadAsync(
                     httpClient: httpClient,
                     url: url,
                     maxBytes: maxBytes,
@@ -249,8 +247,8 @@ public sealed class ModerationLogPublisher(
             var request = new RequestOptions { CancelToken = lookupTimeout.Token };
 
             IEnumerable<IMessage> messages = await sourceChannel
-                .GetMessagesAsync(fromMessageId: deletedMessageId, dir: Direction.Before, limit: 1, options: request)
-                .FlattenAsync();
+               .GetMessagesAsync(fromMessageId: deletedMessageId, dir: Direction.Before, limit: 1, options: request)
+               .FlattenAsync();
 
             var precedingMessage = messages.FirstOrDefault();
 

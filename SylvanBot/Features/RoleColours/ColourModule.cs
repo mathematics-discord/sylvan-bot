@@ -3,8 +3,6 @@ using SylvanBot.Application.Features.RoleColours;
 
 namespace SylvanBot.Features.RoleColours;
 
-using DotNext;
-
 [Group("colour", "Choose or list display colours.")]
 public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperations operations) : InteractionModuleBase<IInteractionContext>
 {
@@ -100,10 +98,10 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         if (!eligible.IsEmpty)
         {
             var menu = new SelectMenuBuilder()
-                .WithCustomId($"{SwapPrefix}:select:{ownerUserId}")
-                .WithPlaceholder("Choose a colour…")
-                .WithMinValues(1)
-                .WithMaxValues(1);
+               .WithCustomId($"{SwapPrefix}:select:{ownerUserId}")
+               .WithPlaceholder("Choose a colour…")
+               .WithMinValues(1)
+               .WithMaxValues(1);
 
             foreach (var role in eligible)
                 menu.AddOption(label: role.Name, role.Id.ToString());
@@ -114,7 +112,7 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         return components.WithButton("Reset", $"{SwapPrefix}:reset:{ownerUserId}", style: ButtonStyle.Danger).Build();
     }
 
-    private static string ResultMessage(Result<Optional<ulong>> result)
+    private static string ResultMessage(Result<DotNext.Optional<ulong>> result)
     {
         if (!result.IsSuccessful)
             return result.Error!.Message;
@@ -139,7 +137,7 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
     {
         await DeferAsync(true);
 
-        Result<Optional<ulong>> result = await colours.TrySetUserColourAsync(
+        Result<DotNext.Optional<ulong>> result = await colours.TrySetUserColourAsync(
             guild: Context.Guild,
             userId: Context.User.Id,
             colourId: selected,

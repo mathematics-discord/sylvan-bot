@@ -5,6 +5,8 @@ const release = import.meta.env.DOCS_RELEASE;
 ---
 
 <div class="site-brand">
-  <DefaultSiteTitle><slot /></DefaultSiteTitle>
-  {release && <span class="site-release" aria-label={`Release ${release}`}>v{release}</span>}
+    <DefaultSiteTitle>
+        <slot/>
+    </DefaultSiteTitle>
+    {release && <span class="site-release" aria-label={`Release ${release}`}>v{release}</span>}
 </div>

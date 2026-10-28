@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Common;
 using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Application.Features.SylvanMail;
@@ -16,11 +15,11 @@ public sealed class SylvanMailConfiguration(IDbContextFactory<BotDbContext> cont
             await forum.ValidateForumAsync(guildId: guildId, forumId: forumId, roleId: roleId, ct: ct);
 
             SylvanMailSettings[] settings = await db.SylvanMailSettings
-                .Take(2)
-                .ToArrayAsync(ct);
+               .Take(2)
+               .ToArrayAsync(ct);
 
             var conflicting = settings
-                .Any(item => item.GuildId != guildId);
+               .Any(item => item.GuildId != guildId);
 
             if (settings.Length > 1 || conflicting)
                 throw new BotCommandException("SylvanMail already has a different guild destination. No settings changed.");

@@ -1,6 +1,6 @@
-﻿namespace SylvanBot.Features.Moderation;
+﻿using System.Runtime.InteropServices;
 
-using DotNext;
+namespace SylvanBot.Features.Moderation;
 
 public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
 {
@@ -11,7 +11,7 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
 
     private readonly Dictionary<ImageBurstBufferKey, DateTimeOffset> _handlingLocks = [];
 
-    public Optional<ImageBurstDetection> Observe(ImageBurstMessage message, Optional<ImageBurstSpamDetectorOptions> settings)
+    public DotNext.Optional<ImageBurstDetection> Observe(ImageBurstMessage message, DotNext.Optional<ImageBurstSpamDetectorOptions> settings)
     {
         var key = new ImageBurstBufferKey(GuildId: message.GuildId, UserId: message.UserId);
         var now = timeProvider.GetUtcNow();
@@ -34,22 +34,22 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
             PruneOldMessages(buffer: buffer, message.Timestamp - TimeSpan.FromSeconds(options.Window));
 
             var channelIds = buffer
-                .Select(x => x.ChannelId)
-                .Distinct()
-                .Order()
-                .ToArray();
+               .Select(x => x.ChannelId)
+               .Distinct()
+               .Order()
+               .ToArray();
 
             if (channelIds.Length < options.DistinctChannelThreshold)
                 return default;
 
             _handlingLocks[key] = now + options.HandlingLockDuration;
 
-            return new Optional<ImageBurstDetection>(
+            return new DotNext.Optional<ImageBurstDetection>(
                 new ImageBurstDetection(
                     GuildId: message.GuildId,
                     UserId: message.UserId,
                     buffer
-                        .ToArray(),
+                       .ToArray(),
                     ChannelIds: channelIds));
         }
     }
@@ -74,14 +74,14 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
     private void PruneExpiredLocks(DateTimeOffset now)
     {
         ImageBurstBufferKey[] expiredKeys = _handlingLocks
-            .Where(x => x.Value <= now)
-            .Select(x => x.Key)
-            .ToArray();
+           .Where(x => x.Value <= now)
+           .Select(x => x.Key)
+           .ToArray();
 
         foreach (var key in expiredKeys)
             _handlingLocks.Remove(key);
     }
 
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Auto)]
+    [StructLayout(LayoutKind.Auto)]
     private readonly record struct ImageBurstBufferKey(ulong GuildId, ulong UserId);
 }

@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Logging;
 using SylvanBot.Application.Infrastructure.Data;
-using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Features.Logging;
 
@@ -11,7 +10,7 @@ public sealed class LoggingScopeResolver(DiscordSocketClient discordClient, IDbC
 
     public async Task<IMessageChannel?> GetLogChannelAsync(ulong guildId, IChannel sourceChannel, bool forEdits, CancellationToken ct)
     {
-        var configuration = await GetConfigurationAsync(guildId, sourceChannel, ct);
+        var configuration = await GetConfigurationAsync(guildId: guildId, sourceChannel: sourceChannel, ct: ct);
         var destinationChannelId = forEdits ? configuration?.EditLogChannelId : configuration?.DeleteLogChannelId;
 
         if (destinationChannelId is null)
@@ -50,8 +49,8 @@ public sealed class LoggingScopeResolver(DiscordSocketClient discordClient, IDbC
         await using var db = await dbContextFactory.CreateDbContextAsync(ct);
 
         var configuration = await db.LoggingConfigurations
-            .AsNoTracking()
-            .SingleOrDefaultAsync(configuration => configuration.GuildId == guildId, ct);
+           .AsNoTracking()
+           .SingleOrDefaultAsync(configuration => configuration.GuildId == guildId, cancellationToken: ct);
 
         var enabled =
             configuration is { Enabled: true } && (configuration.EditLogChannelId is not null || configuration.DeleteLogChannelId is not null);
@@ -62,8 +61,8 @@ public sealed class LoggingScopeResolver(DiscordSocketClient discordClient, IDbC
         var outputChannel = scopeIds.Contains(configuration.DeleteLogChannelId ?? 0) || scopeIds.Contains(configuration.EditLogChannelId ?? 0);
 
         var excluded = await db.LoggingExcludedChannels
-            .AsNoTracking()
-            .AnyAsync(channel => channel.GuildId == guildId && scopeIds.Contains(channel.ChannelId), ct);
+           .AsNoTracking()
+           .AnyAsync(channel => channel.GuildId == guildId && scopeIds.Contains(channel.ChannelId), cancellationToken: ct);
 
         return outputChannel || excluded ? null : configuration;
     }

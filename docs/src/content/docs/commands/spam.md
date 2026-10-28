@@ -20,11 +20,11 @@ not been configured for the server.
 /config image-spam number-of-channels:3 attachment-count:2 burst-duration:10
 ```
 
-| Option | Meaning |
-| --- | --- |
-| `number-of-channels` | How many distinct channels must be involved in a burst. |
-| `attachment-count` | How many attachments a message needs before it counts towards detection. |
-| `burst-duration` | The time window for a burst, in seconds. |
+| Option               | Meaning                                                                  |
+|----------------------|--------------------------------------------------------------------------|
+| `number-of-channels` | How many distinct channels must be involved in a burst.                  |
+| `attachment-count`   | How many attachments a message needs before it counts towards detection. |
+| `burst-duration`     | The time window for a burst, in seconds.                                 |
 
 Every supplied value must be a whole number greater than zero. All options
 are optional: supply only the settings you want to change. If no settings

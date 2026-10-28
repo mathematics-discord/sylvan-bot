@@ -5,8 +5,6 @@ using static SylvanBot.Features.SylvanMail.SylvanMailRequests;
 
 namespace SylvanBot.Features.SylvanMail;
 
-using DotNext;
-
 public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient http, ILogger logger) : ISylvanMailDiscord
 {
     private const int MaxAttachmentBytes = 8 * 1024 * 1024;
@@ -34,7 +32,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
     {
         try
         {
-            var dm = await MessageChannelAsync(client, channelId: message.SourceChannelId, ct: ct);
+            var dm = await MessageChannelAsync(client: client, channelId: message.SourceChannelId, ct: ct);
             var before = message.SourceMessageId;
 
             while (true)
@@ -45,7 +43,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
                         limit: 100,
                         mode: CacheMode.AllowDownload,
                         Options(ct))
-                    .FlattenAsync();
+                   .FlattenAsync();
 
                 IMessage? previous = null;
                 var oldest = before;
@@ -66,7 +64,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
                     if (message.Timestamp - previous.Timestamp < TimeSpan.FromHours(3))
                         return;
 
-                    var thread = await MessageChannelAsync(client, channelId: threadId, ct: ct);
+                    var thread = await MessageChannelAsync(client: client, channelId: threadId, ct: ct);
                     var everyone = roleId == guildId;
 
                     var mentions = everyone ? new AllowedMentions(AllowedMentionTypes.Everyone) : new AllowedMentions { RoleIds = [roleId] };
@@ -85,7 +83,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         catch (Exception exception)
         {
             // A ping failure is separate from delivery of the user's message. Never resend the payload for it.
-            LogFailure(logger, "inbound gap ping", sourceId: message.SourceMessageId, exception: exception);
+            LogFailure(logger: logger, "inbound gap ping", sourceId: message.SourceMessageId, exception: exception);
         }
     }
 
@@ -103,7 +101,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
 
     public async Task<ulong> SendTextAsync(ulong channelId, string text, CancellationToken ct)
     {
-        var channel = await MessageChannelAsync(client, channelId: channelId, ct: ct);
+        var channel = await MessageChannelAsync(client: client, channelId: channelId, ct: ct);
         var sent = await AcceptedAsync(() => channel.SendMessageAsync(text: text, options: Options(ct), allowedMentions: AllowedMentions.None));
 
         return sent.Id;
@@ -111,12 +109,12 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
 
     public async Task<ulong> SendAttachmentAsync(ulong channelId, SylvanMailAttachment attachment, byte[] bytes, string label, CancellationToken ct)
     {
-        var channel = await MessageChannelAsync(client, channelId: channelId, ct: ct);
+        var channel = await MessageChannelAsync(client: client, channelId: channelId, ct: ct);
         await using var stream = new MemoryStream(buffer: bytes, writable: false);
         using var file = new FileAttachment(stream: stream, Path.GetFileName(attachment.Filename), isSpoiler: attachment.Spoiler);
 
         var sent = await AcceptedAsync(() =>
-            channel.SendFilesAsync([file], text: label, options: Options(ct), allowedMentions: AllowedMentions.None));
+                                           channel.SendFilesAsync([file], text: label, options: Options(ct), allowedMentions: AllowedMentions.None));
 
         return sent.Id;
     }
@@ -161,7 +159,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
             return destination.Length != attachment.Size
                 ? throw new BotCommandException("Not relayed: an attachment download was incomplete or its size changed.")
                 : destination
-                    .ToArray();
+                   .ToArray();
         }
         catch (HttpRequestException ex)
         {
@@ -169,10 +167,10 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         }
     }
 
-    public async Task<Optional<ulong>> ReportAsync(
+    public async Task<DotNext.Optional<ulong>> ReportAsync(
         SylvanMailMessage source,
-        Optional<ulong> threadId,
-        Optional<ulong> receiptId,
+        DotNext.Optional<ulong> threadId,
+        DotNext.Optional<ulong> receiptId,
         string detail,
         CancellationToken ct)
     {
@@ -191,7 +189,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
             }
             catch (Exception exception)
             {
-                LogFailure(logger, "user failure notice", sourceId: source.SourceMessageId, exception: exception);
+                LogFailure(logger: logger, "user failure notice", sourceId: source.SourceMessageId, exception: exception);
             }
         }
 
@@ -200,7 +198,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
 
         try
         {
-            var channel = await MessageChannelAsync(client, channelId: destinationThread, ct: ct);
+            var channel = await MessageChannelAsync(client: client, channelId: destinationThread, ct: ct);
             var report = $"Delivery error · source `{source.SourceMessageId}`: {detail}";
 
             if (receiptId is { HasValue: true, Value: var existingReceipt })
@@ -221,36 +219,44 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
                     : new MessageReference(messageId: source.SourceMessageId, channelId: source.SourceChannelId, failIfNotExists: false);
 
                 var sent = await AcceptedAsync(() =>
-                    channel.SendMessageAsync(text: report, options: Options(ct), allowedMentions: AllowedMentions.None, messageReference: reference));
-                receiptId = new Optional<ulong>(sent.Id);
+                                                   channel.SendMessageAsync(
+                                                       text: report,
+                                                       options: Options(ct),
+                                                       allowedMentions: AllowedMentions.None,
+                                                       messageReference: reference));
+                receiptId = new DotNext.Optional<ulong>(sent.Id);
             }
         }
         catch (Exception exception)
         {
-            LogFailure(logger, "receipt", sourceId: source.SourceMessageId, exception: exception);
+            LogFailure(logger: logger, "receipt", sourceId: source.SourceMessageId, exception: exception);
         }
 
         return receiptId;
     }
 
-    public async Task<Optional<ulong>> AcknowledgeAsync(SylvanMailMessage source, bool first, CancellationToken ct)
+    public async Task<DotNext.Optional<ulong>> AcknowledgeAsync(SylvanMailMessage source, bool first, CancellationToken ct)
     {
         try
         {
-            var channel = await MessageChannelAsync(client, channelId: source.SourceChannelId, ct: ct);
+            var channel = await MessageChannelAsync(client: client, channelId: source.SourceChannelId, ct: ct);
 
             var text = first ? "Delivered to staff. Please be patient, someone will get to you soon." : "Delivered.";
 
             var reference = new MessageReference(messageId: source.SourceMessageId, channelId: source.SourceChannelId, failIfNotExists: false);
 
             var sent = await AcceptedAsync(() =>
-                channel.SendMessageAsync(text: text, options: Options(ct), allowedMentions: AllowedMentions.None, messageReference: reference));
+                                               channel.SendMessageAsync(
+                                                   text: text,
+                                                   options: Options(ct),
+                                                   allowedMentions: AllowedMentions.None,
+                                                   messageReference: reference));
 
-            return new Optional<ulong>(sent.Id);
+            return new DotNext.Optional<ulong>(sent.Id);
         }
         catch (Exception exception)
         {
-            LogFailure(logger, "acknowledgement", sourceId: source.SourceMessageId, exception: exception);
+            LogFailure(logger: logger, "acknowledgement", sourceId: source.SourceMessageId, exception: exception);
 
             return default;
         }

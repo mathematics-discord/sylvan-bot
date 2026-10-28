@@ -53,10 +53,10 @@ Sylvan in the message body.
 
 ### Check whether it was sent
 
-| What you see | What it means |
-| --- | --- |
-| 📤 | Your draft is ready for you to confirm. It has not been sent. |
-| ☑️ | Discord accepted every part of the reply. |
+| What you see   | What it means                                                                                      |
+|----------------|----------------------------------------------------------------------------------------------------|
+| 📤             | Your draft is ready for you to confirm. It has not been sent.                                      |
+| ☑️             | Discord accepted every part of the reply.                                                          |
 | An error reply | Delivery failed, was partial, or could not be confirmed. Read the explanation before trying again. |
 
 Posting or editing a draft does not send it. Only the author can confirm
@@ -91,12 +91,12 @@ and uncertain deliveries are not automatically retried.
 You can send text and ordinary attachments, including an attachment with
 no accompanying text. Staff drafts still need a reply trigger and confirmation.
 
-| Limit | Maximum |
-| --- | --- |
-| Text per message | 16,000 characters |
-| Attachments | 10 |
-| Each attachment | 8 MiB |
-| All attachments together | 24 MiB |
+| Limit                    | Maximum           |
+|--------------------------|-------------------|
+| Text per message         | 16,000 characters |
+| Attachments              | 10                |
+| Each attachment          | 8 MiB             |
+| All attachments together | 24 MiB            |
 
 Long text is split into Discord messages. Stickers, polls, voice messages,
 forwarded-message attribution and interactive content are not supported.

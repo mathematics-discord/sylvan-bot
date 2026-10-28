@@ -54,8 +54,8 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
         await DeferAsync().ConfigureAwait(false);
 
         Result<GuildEmote> result = await importer
-            .ImportAsync(guild: guild, moderator: Context.User, source: source, ct: CancellationToken.None)
-            .ConfigureAwait(false);
+           .ImportAsync(guild: guild, moderator: Context.User, source: source, ct: CancellationToken.None)
+           .ConfigureAwait(false);
 
         if (result.IsSuccessful)
             await FollowupAsync($"Added emoji {result.Value}.").ConfigureAwait(false);

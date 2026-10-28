@@ -32,7 +32,11 @@ public sealed class ModerationAuditLookup(DiscordSocketClient discordClient, ILo
                     await Task.Delay(TimeSpan.FromSeconds(attempt), cancellationToken: lookupTimeout.Token);
 
                 RestAuditLogEntry[] matchingEntries = await FindBulkDeleteEntriesAsync(
-                    guild, channelId, originalMessageCount, deletedAt, request);
+                    guild: guild,
+                    channelId: channelId,
+                    originalMessageCount: originalMessageCount,
+                    deletedAt: deletedAt,
+                    request: request);
 
                 if (matchingEntries.Length == 1)
                     return matchingEntries[0].User?.Id;
@@ -82,26 +86,26 @@ public sealed class ModerationAuditLookup(DiscordSocketClient discordClient, ILo
         RequestOptions request)
     {
         IEnumerable<RestAuditLogEntry> bulkEntries = await guild
-            .GetAuditLogsAsync(limit: 20, options: request, actionType: ActionType.MessageBulkDeleted)
-            .FlattenAsync();
+           .GetAuditLogsAsync(limit: 20, options: request, actionType: ActionType.MessageBulkDeleted)
+           .FlattenAsync();
 
         return bulkEntries
-            .Where(entry => Math.Abs((entry.CreatedAt - deletedAt).TotalSeconds) <= 10)
-            .Where(entry =>
-                entry.Data is MessageBulkDeleteAuditLogData data && data.ChannelId == channelId && data.MessageCount == originalMessageCount)
-            .ToArray();
+           .Where(entry => Math.Abs((entry.CreatedAt - deletedAt).TotalSeconds) <= 10)
+           .Where(entry =>
+                      entry.Data is MessageBulkDeleteAuditLogData data && data.ChannelId == channelId && data.MessageCount == originalMessageCount)
+           .ToArray();
     }
 
     private static async Task<ulong?> FindBanModeratorAsync(SocketGuild guild, ulong authorId, DateTimeOffset deletedAt, RequestOptions request)
     {
         IEnumerable<RestAuditLogEntry> entries = await guild
-            .GetAuditLogsAsync(limit: 20, options: request, actionType: ActionType.Ban)
-            .FlattenAsync();
+           .GetAuditLogsAsync(limit: 20, options: request, actionType: ActionType.Ban)
+           .FlattenAsync();
 
         RestAuditLogEntry[] matchingEntries = entries
-            .Where(entry => Math.Abs((entry.CreatedAt - deletedAt).TotalSeconds) <= 10)
-            .Where(entry => entry.Data is BanAuditLogData data && data.Target?.Id == authorId)
-            .ToArray();
+           .Where(entry => Math.Abs((entry.CreatedAt - deletedAt).TotalSeconds) <= 10)
+           .Where(entry => entry.Data is BanAuditLogData data && data.Target?.Id == authorId)
+           .ToArray();
 
         return matchingEntries.Length == 1 ? matchingEntries[0].User?.Id : null;
     }

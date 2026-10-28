@@ -3,8 +3,6 @@ using SylvanBot.Interactions;
 
 namespace SylvanBot.Features.Configuration;
 
-using DotNext;
-
 public sealed partial class ConfigModule
 {
     [Group("working-hours", "Administer Working Hours for this guild")]
@@ -58,7 +56,7 @@ public sealed partial class ConfigModule
             Result<string> result = await coordinator.UpdateAsync(
                 guildId: Context.Guild.Id,
                 change: change,
-                roleId: role is null ? default : new Optional<ulong>(role.Id),
+                role is null ? default : new DotNext.Optional<ulong>(role.Id),
                 ct: lifetime.ApplicationStopping);
             await WorkingHoursReply.SendAsync(interaction: Context.Interaction, !result.IsSuccessful ? result.Error!.Message : result.Value);
         }

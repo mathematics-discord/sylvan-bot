@@ -16,11 +16,11 @@ To set destinations and enable logging:
 /config logs setup enabled:true delete-log-channel:#deleted-messages edit-log-channel:#edited-messages
 ```
 
-| Option | What it changes |
-| --- | --- |
-| `enabled` | Enables or disables moderation logging. |
+| Option               | What it changes                                      |
+|----------------------|------------------------------------------------------|
+| `enabled`            | Enables or disables moderation logging.              |
 | `delete-log-channel` | Destination for deleted messages and bulk deletions. |
-| `edit-log-channel` | Destination for message edits. |
+| `edit-log-channel`   | Destination for message edits.                       |
 
 All options are optional. Omitted settings stay as they are. Destinations
 can be text or announcement channels. Set at least one destination before

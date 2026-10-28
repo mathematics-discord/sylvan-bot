@@ -1,8 +1,8 @@
+using Discord.Rest;
 using Microsoft.EntityFrameworkCore;
 using Serilog.Events;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Infrastructure.Data;
-using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Gateway;
 
@@ -60,26 +60,30 @@ public sealed class DiscordBotHostedService : IHostedService
         {
             var bot = await _discordClient.Rest.GetApplicationInfoAsync(new RequestOptions { CancelToken = cancellationToken });
 
-            IEnumerable<Discord.Rest.RestUserGuild> guilds = await _discordClient
-                .Rest.GetGuildSummariesAsync(options: new RequestOptions { CancelToken = cancellationToken })
-                .FlattenAsync();
+            IEnumerable<RestUserGuild> guilds = await _discordClient
+               .Rest.GetGuildSummariesAsync(options: new RequestOptions { CancelToken = cancellationToken })
+               .FlattenAsync();
 
             var guildIds = guilds.Select(guild => guild.Id).ToArray();
 
             await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
             var configuredGuilds = await db
-                .LoggingConfigurations.AsNoTracking()
-                .Where(configuration => configuration.Enabled && guildIds.Contains(configuration.GuildId))
-                .Select(configuration => configuration.GuildId)
-                .ToArrayAsync(cancellationToken);
+               .LoggingConfigurations.AsNoTracking()
+               .Where(configuration => configuration.Enabled && guildIds.Contains(configuration.GuildId))
+               .Select(configuration => configuration.GuildId)
+               .ToArrayAsync(cancellationToken);
 
-            await _cache.InitializeAsync(bot.Id, configuredGuilds.ToImmutableArray(), cancellationToken);
-            _logger.Information("Message cache hydrated for bot {BotId} across {GuildCount} configured guilds", bot.Id, configuredGuilds.Length);
+            await _cache.InitializeAsync(botId: bot.Id, configuredGuilds.ToImmutableArray(), ct: cancellationToken);
+
+            _logger.Information(
+                "Message cache hydrated for bot {BotId} across {GuildCount} configured guilds",
+                propertyValue0: bot.Id,
+                propertyValue1: configuredGuilds.Length);
         }
         catch (Exception exception)
         {
-            _logger.Error("Message cache hydration failed: {ExceptionType}; gateway startup aborted", exception.GetType().Name);
+            _logger.Error("Message cache hydration failed: {ExceptionType}; gateway startup aborted", propertyValue: exception.GetType().Name);
 
             throw;
         }

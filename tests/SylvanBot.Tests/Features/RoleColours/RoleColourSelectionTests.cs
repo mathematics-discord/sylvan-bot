@@ -12,7 +12,7 @@ public sealed class RoleColourSelectionTests
         HashSet<ulong> eligible = new HashSet<ulong> { 10, 20 };
 
         // Act
-        IReadOnlySet<ulong> removals = RoleColourSelection.Removals(worn, holdsGrant: true, eligible, new HashSet<ulong>());
+        IReadOnlySet<ulong> removals = RoleColourSelection.Removals(worn: worn, holdsGrant: true, eligible: eligible, new HashSet<ulong>());
 
         // Assert
         removals.ShouldBeEmpty();
@@ -25,10 +25,10 @@ public sealed class RoleColourSelectionTests
         HashSet<ulong> worn = new HashSet<ulong> { 10, 20 };
 
         // Act
-        IReadOnlySet<ulong> removals = RoleColourSelection.Removals(worn, holdsGrant: true, worn, new HashSet<ulong>());
+        IReadOnlySet<ulong> removals = RoleColourSelection.Removals(worn: worn, holdsGrant: true, eligible: worn, new HashSet<ulong>());
 
         // Assert
-        removals.ShouldBe(worn, ignoreOrder: true);
+        removals.ShouldBe(expected: worn, ignoreOrder: true);
     }
 
     [Test]
@@ -39,7 +39,7 @@ public sealed class RoleColourSelectionTests
         HashSet<ulong> previous = new HashSet<ulong> { 10 };
 
         // Act
-        IReadOnlySet<ulong> removals = RoleColourSelection.Removals(worn, holdsGrant: false, new HashSet<ulong>(), previous);
+        IReadOnlySet<ulong> removals = RoleColourSelection.Removals(worn: worn, holdsGrant: false, new HashSet<ulong>(), previouslyGranted: previous);
 
         // Assert
         removals.ShouldBe(new ulong[] { 10 });

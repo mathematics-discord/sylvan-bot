@@ -6,10 +6,11 @@ namespace SylvanBot.Application.Features.RoleReactions.Persistence;
 /// <summary>Configures persisted reaction role mappings.</summary>
 public sealed class RoleReactionConfiguration : IEntityTypeConfiguration<RoleReaction>
 {
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public void Configure(EntityTypeBuilder<RoleReaction> builder)
     {
         builder.ToTable("RoleReactions");
+
         builder.HasKey(mapping => new
         {
             mapping.GuildId,

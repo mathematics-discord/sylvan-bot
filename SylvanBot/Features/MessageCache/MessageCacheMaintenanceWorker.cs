@@ -34,10 +34,12 @@ public sealed class MessageCacheMaintenanceWorker(MessageSnapshotCache cache, IL
                 catch (Exception exception)
                 {
                     Interlocked.Increment(ref _failures);
-                    _logger.Warning("Message-cache maintenance failed: {ExceptionType}", exception.GetType().Name);
+                    _logger.Warning("Message-cache maintenance failed: {ExceptionType}", propertyValue: exception.GetType().Name);
                 }
             }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
     }
 }

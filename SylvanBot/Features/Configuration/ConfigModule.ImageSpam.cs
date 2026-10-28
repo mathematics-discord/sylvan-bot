@@ -2,8 +2,6 @@
 
 namespace SylvanBot.Features.Configuration;
 
-using DotNext;
-
 public sealed partial class ConfigModule
 {
     [SlashCommand("image-spam", "View or update image spam detection settings.")]
@@ -37,19 +35,19 @@ public sealed partial class ConfigModule
 
         await DeferAsync(ephemeral: true);
         var showCurrent = numberOfChannels is null && attachmentCount is null && burstDuration is null;
-        Optional<ImageBurstSpamDetectorOptions> settingsResult;
+        DotNext.Optional<ImageBurstSpamDetectorOptions> settingsResult;
 
         if (showCurrent)
-            settingsResult = await settingsService.GetCurrentAsync(Context.Guild.Id, lifetime.ApplicationStopping);
+            settingsResult = await settingsService.GetCurrentAsync(guildId: Context.Guild.Id, ct: lifetime.ApplicationStopping);
         else
         {
             var saved = await settingsService.UpsertAsync(
-                Context.Guild.Id,
-                numberOfChannels,
-                attachmentCount,
-                burstDuration,
-                lifetime.ApplicationStopping);
-            settingsResult = new Optional<ImageBurstSpamDetectorOptions>(saved);
+                guildId: Context.Guild.Id,
+                requiredChannelCount: numberOfChannels,
+                requiredAttachmentCount: attachmentCount,
+                burstDurationSeconds: burstDuration,
+                ct: lifetime.ApplicationStopping);
+            settingsResult = new DotNext.Optional<ImageBurstSpamDetectorOptions>(saved);
         }
 
         if (settingsResult is not { HasValue: true, Value: var settings })

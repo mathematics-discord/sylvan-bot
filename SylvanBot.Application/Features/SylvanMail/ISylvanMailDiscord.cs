@@ -1,6 +1,4 @@
-﻿using SylvanBot.Application.Common;
-
-namespace SylvanBot.Application.Features.SylvanMail;
+﻿namespace SylvanBot.Application.Features.SylvanMail;
 
 public interface ISylvanMailDiscord
 {
@@ -16,7 +14,12 @@ public interface ISylvanMailDiscord
 
     Task<byte[]> DownloadAsync(SylvanMailAttachment attachment, CancellationToken ct);
 
-    Task<Optional<ulong>> ReportAsync(SylvanMailMessage source, Optional<ulong> threadId, Optional<ulong> receiptId, string detail, CancellationToken ct);
+    Task<Optional<ulong>> ReportAsync(
+        SylvanMailMessage source,
+        Optional<ulong> threadId,
+        Optional<ulong> receiptId,
+        string detail,
+        CancellationToken ct);
 
     Task<Optional<ulong>> AcknowledgeAsync(SylvanMailMessage source, bool first, CancellationToken ct);
 }

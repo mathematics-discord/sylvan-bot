@@ -17,7 +17,6 @@ and instructions.
 - [/colour](./color/) — Choose or reset your display colour, or list the
   server's colour options.
 
-
 ## Moderator commands
 
 - [/working-hours](./working-hours/) — Set your daily availability and

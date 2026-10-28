@@ -32,7 +32,8 @@ Discord.NET's detached update objects lose the distinction between omitted and c
 its default WebSocket provider preserves update-field presence during typed event dispatch. It requests Discord's
 uncompressed JSON transport rather than implementing another streaming decompressor. This increases gateway bandwidth;
 it introduces no REST fetch for edits and stores no raw frames. Missing fields retain known snapshot values; explicit
-empty content or attachment lists clear them. An eligible edit can seed a miss only when author, content, attachments and timestamp state are supplied.
+empty content or attachment lists clear them. An eligible edit can seed a miss only when author, content, attachments and timestamp state are
+supplied.
 Omitted attachments are never treated as empty. A seed cannot supply an invented before version.
 
 Application inputs distinguish a complete `MessageReceived` from a partial `MessageEdited`. Edited fields use

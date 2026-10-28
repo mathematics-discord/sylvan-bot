@@ -1,6 +1,5 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
-using SylvanBot.Application.Common;
 using SylvanBot.Features.Moderation;
 
 namespace SylvanBot.Tests.Features.Moderation;
@@ -23,7 +22,7 @@ public sealed class ImageBurstSpamDetectorTests
         // Arrange
         var timeProvider = new TestTimeProvider(BaseTimestamp);
 
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>()
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>
         {
             [1] = new ImageBurstSpamDetectorOptions
             {
@@ -65,7 +64,7 @@ public sealed class ImageBurstSpamDetectorTests
         // Arrange
         var timeProvider = new TestTimeProvider(BaseTimestamp);
 
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>()
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>
         {
             [1] = new ImageBurstSpamDetectorOptions
             {
@@ -106,7 +105,7 @@ public sealed class ImageBurstSpamDetectorTests
         // Arrange
         var timeProvider = new TestTimeProvider(BaseTimestamp);
 
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>()
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>
         {
             [1] = new ImageBurstSpamDetectorOptions
             {
@@ -143,7 +142,7 @@ public sealed class ImageBurstSpamDetectorTests
         // Arrange
         var timeProvider = new TestTimeProvider(BaseTimestamp);
 
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>()
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>
         {
             [1] = new ImageBurstSpamDetectorOptions
             {
@@ -184,7 +183,7 @@ public sealed class ImageBurstSpamDetectorTests
         // Arrange
         var timeProvider = new TestTimeProvider(BaseTimestamp);
 
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>()
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>
         {
             [1] = new ImageBurstSpamDetectorOptions
             {
@@ -207,11 +206,11 @@ public sealed class ImageBurstSpamDetectorTests
 
         detector.Observe(
             CreateMessage(guildId: 2, channelId: 30, timestamp: BaseTimestamp.AddSeconds(2)),
-            settingsByGuild.TryGetValue(2, out var secondOptions) ? new Optional<ImageBurstSpamDetectorOptions>(secondOptions) : default);
+            settingsByGuild.TryGetValue(key: 2, out var secondOptions) ? new Optional<ImageBurstSpamDetectorOptions>(secondOptions) : default);
 
         detector.Observe(
             CreateMessage(guildId: 2, channelId: 40, timestamp: BaseTimestamp.AddSeconds(3)),
-            settingsByGuild.TryGetValue(2, out var otherOptions) ? new Optional<ImageBurstSpamDetectorOptions>(otherOptions) : default);
+            settingsByGuild.TryGetValue(key: 2, out var otherOptions) ? new Optional<ImageBurstSpamDetectorOptions>(otherOptions) : default);
 
         // Act
         Optional<ImageBurstDetection> result = detector.Observe(
@@ -228,12 +227,12 @@ public sealed class ImageBurstSpamDetectorTests
         var timeProvider = new TestTimeProvider(BaseTimestamp);
 
         var detector = new ImageBurstSpamDetector(timeProvider: timeProvider);
-        detector.Observe(CreateMessage(channelId: 10), default);
-        detector.Observe(CreateMessage(channelId: 20), default);
-        detector.Observe(CreateMessage(channelId: 30), default);
+        detector.Observe(CreateMessage(channelId: 10), settings: default);
+        detector.Observe(CreateMessage(channelId: 20), settings: default);
+        detector.Observe(CreateMessage(channelId: 30), settings: default);
 
         // Act
-        Optional<ImageBurstDetection> result = detector.Observe(CreateMessage(channelId: 40), default);
+        Optional<ImageBurstDetection> result = detector.Observe(CreateMessage(channelId: 40), settings: default);
 
         // Assert
         result.IsUndefined.ShouldBeTrue();
@@ -245,7 +244,7 @@ public sealed class ImageBurstSpamDetectorTests
         // Arrange
         var timeProvider = new TestTimeProvider(BaseTimestamp);
 
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>()
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>
         {
             [1] = new ImageBurstSpamDetectorOptions { DistinctChannelThreshold = 4 },
             [2] = new ImageBurstSpamDetectorOptions { DistinctChannelThreshold = 2 },
@@ -275,7 +274,7 @@ public sealed class ImageBurstSpamDetectorTests
         // Arrange
         var timeProvider = new TestTimeProvider(BaseTimestamp);
 
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>()
+        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>
         {
             [1] = new ImageBurstSpamDetectorOptions
             {

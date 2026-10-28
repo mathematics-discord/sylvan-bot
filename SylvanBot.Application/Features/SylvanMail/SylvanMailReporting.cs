@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Common;
 using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Application.Features.SylvanMail;
@@ -25,8 +24,8 @@ public sealed class SylvanMailReporting(ISylvanMailDiscord discord, ISylvanMailD
                 return;
 
             var previouslyAcknowledged = await db.SylvanMailOperations
-                .AsNoTracking()
-                .AnyAsync(
+               .AsNoTracking()
+               .AnyAsync(
                     item =>
                         item.GuildId == op.GuildId
                         && item.ConversationId == op.ConversationId
@@ -44,7 +43,13 @@ public sealed class SylvanMailReporting(ISylvanMailDiscord discord, ISylvanMailD
 
         Optional<ulong> thread = threadId is { } target ? new Optional<ulong>(target) : default;
         Optional<ulong> previousReceipt = op.ReceiptMessageId is { } previous ? new Optional<ulong>(previous) : default;
-        Optional<ulong> receipt = await discord.ReportAsync(message, thread, previousReceipt, op.Detail, noticeToken);
+
+        Optional<ulong> receipt = await discord.ReportAsync(
+            source: message,
+            threadId: thread,
+            receiptId: previousReceipt,
+            detail: op.Detail,
+            ct: noticeToken);
         op.ReceiptMessageId = receipt is { HasValue: true, Value: var receiptId } ? receiptId : null;
         await db.SaveChangesAsync(noticeToken);
     }

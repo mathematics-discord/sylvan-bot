@@ -7,7 +7,7 @@ public sealed class RoleReactionRuntime : IDisposable
 {
     private readonly ConcurrentDictionary<ulong, SemaphoreSlim> _gates = new ConcurrentDictionary<ulong, SemaphoreSlim>();
 
-    public SemaphoreSlim ForGuild(ulong guildId) => _gates.GetOrAdd(guildId, _ => new SemaphoreSlim(1, 1));
+    public SemaphoreSlim ForGuild(ulong guildId) => _gates.GetOrAdd(key: guildId, _ => new SemaphoreSlim(initialCount: 1, maxCount: 1));
 
     public void Dispose()
     {

@@ -1,5 +1,3 @@
-using SylvanBot.Application.Common;
-
 namespace SylvanBot.Application.Features.MessageCache;
 
 public sealed record MessageEdit

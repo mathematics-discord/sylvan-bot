@@ -14,11 +14,11 @@ public sealed class WorkingHoursTimezoneAutocomplete : AutocompleteHandler
         var query = interaction.Data.Current.Value?.ToString() ?? string.Empty;
 
         IEnumerable<AutocompleteResult> matches = DateTimeZoneProviders
-            .Tzdb.Ids.Where(id => id.Contains(value: query, comparisonType: StringComparison.OrdinalIgnoreCase))
-            .OrderBy(id => !id.StartsWith(value: query, comparisonType: StringComparison.OrdinalIgnoreCase))
-            .ThenBy(id => id, comparer: StringComparer.Ordinal)
-            .Take(25)
-            .Select(id => new AutocompleteResult(name: id, value: id));
+           .Tzdb.Ids.Where(id => id.Contains(value: query, comparisonType: StringComparison.OrdinalIgnoreCase))
+           .OrderBy(id => !id.StartsWith(value: query, comparisonType: StringComparison.OrdinalIgnoreCase))
+           .ThenBy(id => id, comparer: StringComparer.Ordinal)
+           .Take(25)
+           .Select(id => new AutocompleteResult(name: id, value: id));
 
         return Task.FromResult(AutocompletionResult.FromSuccess(matches));
     }

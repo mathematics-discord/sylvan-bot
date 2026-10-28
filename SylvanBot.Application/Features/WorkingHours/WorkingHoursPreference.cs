@@ -11,7 +11,9 @@ public sealed class WorkingHoursPreference
         MemberId = memberId;
     }
 
-    private WorkingHoursPreference() { }
+    private WorkingHoursPreference()
+    {
+    }
 
     public ulong GuildId { get; private set; }
 

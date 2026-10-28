@@ -1,11 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.WorkingHours;
 using SylvanBot.Application.Infrastructure.Data;
-using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Features.WorkingHours;
-
-using DotNext;
 
 public sealed class WorkingHoursConfiguration(
     DiscordSocketClient client,
@@ -15,7 +12,7 @@ public sealed class WorkingHoursConfiguration(
     WorkingHoursReconciler reconciler
 )
 {
-    public async Task<Result<string>> UpdateAsync(ulong guildId, WorkingConditionsChange change, Optional<ulong> roleId, CancellationToken ct)
+    public async Task<Result<string>> UpdateAsync(ulong guildId, WorkingConditionsChange change, DotNext.Optional<ulong> roleId, CancellationToken ct)
     {
         var state = runtime.ForGuild(guildId);
         await state.Gate.WaitAsync(ct);
@@ -35,7 +32,7 @@ public sealed class WorkingHoursConfiguration(
                 db.WorkingHoursSettings.Add(settings);
 
             await db.SaveChangesAsync(ct);
-            Optional<int> pending = await reconciler.ReconcileSavedAsync(db: db, settings: settings, state: state, ct: ct);
+            DotNext.Optional<int> pending = await reconciler.ReconcileSavedAsync(db: db, settings: settings, state: state, ct: ct);
 
             var message = change switch
             {
@@ -58,10 +55,10 @@ public sealed class WorkingHoursConfiguration(
 
     private static Task<WorkingHoursSettings?> LoadSettingsAsync(BotDbContext db, ulong guildId, CancellationToken ct) =>
         db.WorkingHoursSettings
-            .Include(settings => settings.EligibleRoles)
-            .SingleOrDefaultAsync(settings => settings.GuildId == guildId, cancellationToken: ct);
+           .Include(settings => settings.EligibleRoles)
+           .SingleOrDefaultAsync(settings => settings.GuildId == guildId, cancellationToken: ct);
 
-    private Result<ValueTuple> ApplyConfigurationChange(WorkingHoursSettings settings, WorkingConditionsChange change, Optional<ulong> roleId)
+    private Result<ValueTuple> ApplyConfigurationChange(WorkingHoursSettings settings, WorkingConditionsChange change, DotNext.Optional<ulong> roleId)
     {
         var guild = client.GetGuild(settings.GuildId);
 
@@ -72,21 +69,25 @@ public sealed class WorkingHoursConfiguration(
             var available = client.ConnectionState == ConnectionState.Connected && guild is { IsConnected: true };
 
             if (!available || role is null)
+            {
                 return new Result<ValueTuple>(
                     OperationFailureException.Validation(description: "The selected role is unavailable in this guild. No settings changed."));
+            }
 
             if (change == WorkingConditionsChange.PingRole && role.IsManaged)
+            {
                 return new Result<ValueTuple>(
                     OperationFailureException.Validation(description: "An integration-managed role cannot be the ping role."));
+            }
         }
 
         Result<ValueTuple> validation = (change, roleId) switch
         {
             (WorkingConditionsChange.PingRole, { HasValue: true, Value: var id }) => settings.SetPingRole(id),
-            (WorkingConditionsChange.AddEligible, { HasValue: true, Value: var id }) => settings.ChangeEligibleRole(id, add: true),
-            (WorkingConditionsChange.RemoveEligible, { HasValue: true, Value: var id }) => settings.ChangeEligibleRole(id, add: false),
-            (WorkingConditionsChange.AddExempt, { HasValue: true, Value: var id }) => settings.ChangeExemptRole(id, add: true),
-            (WorkingConditionsChange.RemoveExempt, { HasValue: true, Value: var id }) => settings.ChangeExemptRole(id, add: false),
+            (WorkingConditionsChange.AddEligible, { HasValue: true, Value: var id }) => settings.ChangeEligibleRole(roleId: id, add: true),
+            (WorkingConditionsChange.RemoveEligible, { HasValue: true, Value: var id }) => settings.ChangeEligibleRole(roleId: id, add: false),
+            (WorkingConditionsChange.AddExempt, { HasValue: true, Value: var id }) => settings.ChangeExemptRole(roleId: id, add: true),
+            (WorkingConditionsChange.RemoveExempt, { HasValue: true, Value: var id }) => settings.ChangeExemptRole(roleId: id, add: false),
             (WorkingConditionsChange.Enable or WorkingConditionsChange.Disable, _) => new Result<ValueTuple>(default(ValueTuple)),
             _ => new Result<ValueTuple>(OperationFailureException.Validation(description: "Choose a role for this configuration change.")),
         };
@@ -112,7 +113,7 @@ public sealed class WorkingHoursConfiguration(
 
                 break;
             default:
-                throw new ArgumentOutOfRangeException(nameof(change), change, message: null);
+                throw new ArgumentOutOfRangeException(nameof(change), actualValue: change, message: null);
         }
 
         return new Result<ValueTuple>(default(ValueTuple));

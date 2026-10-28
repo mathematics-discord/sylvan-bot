@@ -19,7 +19,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
 
         _logger.Debug(
             "Importing emoji in guild {GuildId} for moderator {ModeratorUserId} ({ModeratorUsername}) from source {SourceEmojiId} "
-                + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}",
+            + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}",
             guild.Id,
             moderator.Id,
             moderator.Username,
@@ -33,7 +33,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
 
         if (!downloadResult.IsSuccessful)
         {
-            LogFailure(guild: guild, moderator: moderator, source: source, destinationName: destinationName, error: downloadResult.Error!);
+            LogFailure(guild: guild, moderator: moderator, source: source, destinationName: destinationName, downloadResult.Error!);
 
             return new Result<GuildEmote>(downloadResult.Error!);
         }
@@ -56,7 +56,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
 
         if (!result.IsSuccessful)
         {
-            LogFailure(guild: guild, moderator: moderator, source: source, destinationName: destinationName, error: result.Error!);
+            LogFailure(guild: guild, moderator: moderator, source: source, destinationName: destinationName, result.Error!);
 
             return new Result<GuildEmote>(result.Error!);
         }
@@ -65,7 +65,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
 
         _logger.Information(
             "Moderator {ModeratorUsername} ({ModeratorUserId}) added emoji {EmojiName} ({CreatedEmojiId}) to guild {GuildId} "
-                + "from source {SourceEmojiId}; animated={IsAnimated}",
+            + "from source {SourceEmojiId}; animated={IsAnimated}",
             moderator.Username,
             moderator.Id,
             created.Name,
@@ -98,7 +98,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
     {
         _logger.Warning(
             "Emoji import failed in guild {GuildId} for moderator {ModeratorUserId} ({ModeratorUsername}) from source {SourceEmojiId} "
-                + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}; error code={ErrorCode}; category={ErrorCategory}; description={ErrorDescription}",
+            + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}; error code={ErrorCode}; category={ErrorCategory}; description={ErrorDescription}",
             guild.Id,
             moderator.Id,
             moderator.Username,
@@ -121,8 +121,8 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
         try
         {
             using var response = await httpClient
-                .GetAsync(requestUri: cdnUri, completionOption: HttpCompletionOption.ResponseHeadersRead, cancellationToken: ct)
-                .ConfigureAwait(false);
+               .GetAsync(requestUri: cdnUri, completionOption: HttpCompletionOption.ResponseHeadersRead, cancellationToken: ct)
+               .ConfigureAwait(false);
 
             if (response.StatusCode == HttpStatusCode.NotFound)
                 return new Result<MemoryStream>(EmojiYoinkErrors.SourceUnavailable);

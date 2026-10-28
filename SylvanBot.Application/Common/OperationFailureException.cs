@@ -11,29 +11,33 @@ public sealed class OperationFailureException(string code, string description, O
 
     /// <summary>Creates a validation failure.</summary>
     public static OperationFailureException Validation(string code = "General.Validation", string description = "A validation error has occurred.") =>
-        new OperationFailureException(code, description, OperationFailureCategory.Validation);
+        new OperationFailureException(code: code, description: description, category: OperationFailureCategory.Validation);
 
     /// <summary>Creates a conflict failure.</summary>
     public static OperationFailureException Conflict(string code = "General.Conflict", string description = "A conflict error has occurred.") =>
-        new OperationFailureException(code, description, OperationFailureCategory.Conflict);
+        new OperationFailureException(code: code, description: description, category: OperationFailureCategory.Conflict);
 
     /// <summary>Creates a notfound failure.</summary>
     public static OperationFailureException NotFound(string code = "General.NotFound", string description = "A 'Not Found' error has occurred.") =>
-        new OperationFailureException(code, description, OperationFailureCategory.NotFound);
+        new OperationFailureException(code: code, description: description, category: OperationFailureCategory.NotFound);
 
     /// <summary>Creates a forbidden failure.</summary>
     public static OperationFailureException Forbidden(string code = "General.Forbidden", string description = "A 'Forbidden' error has occurred.") =>
-        new OperationFailureException(code, description, OperationFailureCategory.Forbidden);
+        new OperationFailureException(code: code, description: description, category: OperationFailureCategory.Forbidden);
 
     /// <summary>Creates a failure failure.</summary>
     public static OperationFailureException Failure(string code = "General.Failure", string description = "A failure has occurred.") =>
-        new OperationFailureException(code, description, OperationFailureCategory.Failure);
+        new OperationFailureException(code: code, description: description, category: OperationFailureCategory.Failure);
 
     /// <summary>Creates a unexpected failure.</summary>
-    public static OperationFailureException Unexpected(string code = "General.Unexpected", string description = "An unexpected error has occurred.") =>
-        new OperationFailureException(code, description, OperationFailureCategory.Unexpected);
+    public static OperationFailureException Unexpected(
+        string code = "General.Unexpected",
+        string description = "An unexpected error has occurred.") =>
+        new OperationFailureException(code: code, description: description, category: OperationFailureCategory.Unexpected);
 
     /// <summary>Creates a unauthorized failure.</summary>
-    public static OperationFailureException Unauthorized(string code = "General.Unauthorized", string description = "An 'Unauthorized' error has occurred.") =>
-        new OperationFailureException(code, description, OperationFailureCategory.Unauthorized);
+    public static OperationFailureException Unauthorized(
+        string code = "General.Unauthorized",
+        string description = "An 'Unauthorized' error has occurred.") =>
+        new OperationFailureException(code: code, description: description, category: OperationFailureCategory.Unauthorized);
 }

@@ -13,9 +13,30 @@ public sealed class InteractionCommandRegistrar(
 
     public async Task LoadModulesAsync()
     {
-        await interactionService.AddModulesAsync(typeof(HelloModule).Assembly, services);
-        _logger.Information("Registered {InteractionModuleCount} interaction modules", interactionService.Modules.Count);
+        await interactionService.AddModulesAsync(assembly: typeof(HelloModule).Assembly, services: services);
+        _logger.Information("Registered {InteractionModuleCount} interaction modules", propertyValue: interactionService.Modules.Count);
         LogRegisteredInteractionCommands();
+    }
+
+    public async Task RegisterCommandsAsync()
+    {
+        _logger.Information("Registering application commands in {GuildCount} guilds", propertyValue: discordClient.Guilds.Count);
+
+        foreach (var guild in discordClient.Guilds)
+            await RegisterCommandsToGuildAsync(guild);
+    }
+
+    public async Task RegisterCommandsToGuildAsync(SocketGuild guild)
+    {
+        try
+        {
+            await interactionService.RegisterCommandsToGuildAsync(guildId: guild.Id, deleteMissing: true);
+            _logger.Information("Application commands registered to guild {GuildId}", propertyValue: guild.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(exception: ex, "Failed to register application commands to guild {GuildId}", propertyValue: guild.Id);
+        }
     }
 
     private static IEnumerable<ModuleInfo> EnumerateModules(IEnumerable<ModuleInfo> modules)
@@ -37,23 +58,41 @@ public sealed class InteractionCommandRegistrar(
         {
             commands.AddRange(
                 module.SlashCommands
-                    .Select(command =>
-                        DescribeCommand("Slash", module, command, module.SlashGroupName, wildcards: null, modalType: null)));
+                   .Select(command =>
+                               DescribeCommand(
+                                   "Slash",
+                                   module: module,
+                                   command: command,
+                                   slashGroup: module.SlashGroupName,
+                                   wildcards: null,
+                                   modalType: null)));
 
             commands.AddRange(
                 module.ContextCommands
-                    .Select(command =>
-                        DescribeCommand("Context", module, command, slashGroup: null, wildcards: null, modalType: null)));
+                   .Select(command =>
+                               DescribeCommand("Context", module: module, command: command, slashGroup: null, wildcards: null, modalType: null)));
 
             commands.AddRange(
                 module.ComponentCommands
-                    .Select(command =>
-                        DescribeCommand("Component", module, command, slashGroup: null, command.SupportsWildCards, modalType: null)));
+                   .Select(command =>
+                               DescribeCommand(
+                                   "Component",
+                                   module: module,
+                                   command: command,
+                                   slashGroup: null,
+                                   wildcards: command.SupportsWildCards,
+                                   modalType: null)));
 
             commands.AddRange(
                 module.ModalCommands
-                    .Select(command =>
-                        DescribeCommand("Modal", module, command, slashGroup: null, command.SupportsWildCards, command.Modal.Type.FullName)));
+                   .Select(command =>
+                               DescribeCommand(
+                                   "Modal",
+                                   module: module,
+                                   command: command,
+                                   slashGroup: null,
+                                   wildcards: command.SupportsWildCards,
+                                   modalType: command.Modal.Type.FullName)));
         }
 
         return commands;
@@ -81,10 +120,10 @@ public sealed class InteractionCommandRegistrar(
     private void LogRegisteredInteractionCommands()
     {
         ModuleInfo[] modules = EnumerateModules(interactionService.Modules)
-            .ToArray();
+           .ToArray();
 
         var moduleDetails = modules
-            .Select(module => new
+           .Select(module => new
             {
                 module.Name,
                 module.SlashGroupName,
@@ -93,7 +132,7 @@ public sealed class InteractionCommandRegistrar(
                 ComponentCommandCount = module.ComponentCommands.Count,
                 ModalCommandCount = module.ModalCommands.Count,
             })
-            .ToArray();
+           .ToArray();
 
         IReadOnlyCollection<object> commandDetails = DescribeCommands(modules);
 
@@ -109,26 +148,5 @@ public sealed class InteractionCommandRegistrar(
             "Registered interaction command details. Modules={@InteractionModules} Commands={@InteractionCommands}",
             propertyValue0: moduleDetails,
             propertyValue1: commandDetails);
-    }
-
-    public async Task RegisterCommandsAsync()
-    {
-        _logger.Information("Registering application commands in {GuildCount} guilds", propertyValue: discordClient.Guilds.Count);
-
-        foreach (var guild in discordClient.Guilds)
-            await RegisterCommandsToGuildAsync(guild);
-    }
-
-    public async Task RegisterCommandsToGuildAsync(SocketGuild guild)
-    {
-        try
-        {
-            await interactionService.RegisterCommandsToGuildAsync(guildId: guild.Id, deleteMissing: true);
-            _logger.Information("Application commands registered to guild {GuildId}", propertyValue: guild.Id);
-        }
-        catch (Exception ex)
-        {
-            _logger.Error(exception: ex, "Failed to register application commands to guild {GuildId}", propertyValue: guild.Id);
-        }
     }
 }

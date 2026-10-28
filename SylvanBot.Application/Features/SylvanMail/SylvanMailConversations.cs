@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Common;
 using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Application.Features.SylvanMail;
@@ -14,13 +13,17 @@ public sealed class SylvanMailConversations(ISylvanMailForum forum)
         CancellationToken ct)
     {
         var conversation = await db.SylvanMailConversations
-            .SingleOrDefaultAsync(
+           .SingleOrDefaultAsync(
                 item => item.GuildId == settings.GuildId && item.ForumId == settings.ForumId && item.UserId == message.AuthorId && !item.Retired,
                 cancellationToken: ct);
 
         if (conversation?.ThreadId is { } existingThread)
         {
-            var accessible = await forum.OpenPostAsync(conversation.GuildId, conversation.ForumId, existingThread, ct);
+            var accessible = await forum.OpenPostAsync(
+                guildId: conversation.GuildId,
+                forumId: conversation.ForumId,
+                threadId: existingThread,
+                ct: ct);
 
             if (!accessible)
             {
@@ -48,7 +51,7 @@ public sealed class SylvanMailConversations(ISylvanMailForum forum)
         if (conversation.ThreadId is not null)
             return conversation;
 
-        await CreateOrRecoverPostAsync(db, conversation, settings.RoleId, message.Username, ct);
+        await CreateOrRecoverPostAsync(db: db, conversation: conversation, roleId: settings.RoleId, username: message.Username, ct: ct);
 
         return conversation;
     }
@@ -84,7 +87,7 @@ public sealed class SylvanMailConversations(ISylvanMailForum forum)
             try
             {
                 conversation.ThreadId = await forum.CreatePostAsync(
-                    post: new SylvanMailPost
+                    new SylvanMailPost
                     {
                         GuildId = conversation.GuildId,
                         ForumId = conversation.ForumId,
@@ -107,7 +110,11 @@ public sealed class SylvanMailConversations(ISylvanMailForum forum)
 
         await db.SaveChangesAsync(ct);
 
-        var accessible = await forum.OpenPostAsync(conversation.GuildId, conversation.ForumId, conversation.ThreadId.GetValueOrDefault(), ct);
+        var accessible = await forum.OpenPostAsync(
+            guildId: conversation.GuildId,
+            forumId: conversation.ForumId,
+            conversation.ThreadId.GetValueOrDefault(),
+            ct: ct);
 
         if (!accessible)
             throw new BotCommandException("The post disappeared before relay. This message was not sent.");

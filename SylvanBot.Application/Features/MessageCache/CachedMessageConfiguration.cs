@@ -32,6 +32,7 @@ public sealed class CachedMessageConfiguration : IEntityTypeConfiguration<Cached
         builder.Property(message => message.SnapshotJson).HasColumnName("snapshot").HasColumnType("jsonb");
 
         builder.HasIndex(message => message.ExpiresAtUtc);
+
         builder.HasIndex(message => new
         {
             message.BotId,

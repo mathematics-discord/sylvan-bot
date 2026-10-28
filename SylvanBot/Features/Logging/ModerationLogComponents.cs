@@ -23,14 +23,15 @@ internal static class ModerationLogComponents
             (before, after) = MessageEditDiffer.BuildDiff(before: beforeContent, after: afterContent);
 
         var blockLength = (MaxComponentTextLength - header.Length - 1) / 2;
+
         var content =
             $"{CodeBlock(value: before, maxLength: blockLength, ansi: true)}\n{CodeBlock(value: after, maxLength: blockLength, ansi: true)}";
 
         var components = new ComponentBuilderV2(
             new ContainerBuilder()
-                .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
-                .WithSeparator(new SeparatorBuilder())
-                .WithTextDisplay(new TextDisplayBuilder().WithContent(content))
+               .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
+               .WithSeparator(new SeparatorBuilder())
+               .WithTextDisplay(new TextDisplayBuilder().WithContent(content))
         ).Build();
 
         return new ModerationLogMessage(Components: components, Attachments: ImmutableArray<DownloadedAttachment>.Empty);
@@ -58,9 +59,9 @@ internal static class ModerationLogComponents
         var contentBlock = CodeBlock(value: content, maxLength: contentLength, ansi: false);
 
         var container = new ContainerBuilder()
-            .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
-            .WithSeparator(new SeparatorBuilder())
-            .WithTextDisplay(new TextDisplayBuilder().WithContent(contentBlock + attachmentNotice));
+           .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
+           .WithSeparator(new SeparatorBuilder())
+           .WithTextDisplay(new TextDisplayBuilder().WithContent(contentBlock + attachmentNotice));
 
         if (attachments.Count > 0)
             AddAttachmentComponents(container: container, attachments: attachments);

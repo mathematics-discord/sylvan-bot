@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Moderation;
 using SylvanBot.Features.Moderation;
 
@@ -36,7 +35,7 @@ public sealed class ImageSpamSettingsServiceTests
         await using var readback = PostgresDatabaseFixture.CreateDbContext();
 
         var persisted = await readback.ImageSpamSettings
-            .SingleAsync(x => x.GuildId == 1);
+           .SingleAsync(x => x.GuildId == 1);
 
         (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds).ShouldBe((4, 2, 45));
         persisted.IsEnabled.ShouldBeTrue();
@@ -77,7 +76,7 @@ public sealed class ImageSpamSettingsServiceTests
         await using var readback = PostgresDatabaseFixture.CreateDbContext();
 
         var persisted = await readback.ImageSpamSettings
-            .SingleAsync(x => x.GuildId == 1);
+           .SingleAsync(x => x.GuildId == 1);
 
         (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds).ShouldBe(
             (expectedChannels, expectedAttachments, expectedSeconds));
@@ -128,7 +127,12 @@ public sealed class ImageSpamSettingsServiceTests
         db.ImageSpamSettings.Remove(settings);
         await db.SaveChangesAsync();
 
-        var otherGuildOptions = await service.UpsertAsync(2, null, null, 90, CancellationToken.None);
+        var otherGuildOptions = await service.UpsertAsync(
+            guildId: 2,
+            requiredChannelCount: null,
+            requiredAttachmentCount: null,
+            burstDurationSeconds: 90,
+            ct: CancellationToken.None);
 
         // Act
         Optional<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(guildId: 1, ct: CancellationToken.None);
@@ -154,7 +158,12 @@ public sealed class ImageSpamSettingsServiceTests
         settings.Disable();
         await db.SaveChangesAsync();
 
-        var otherGuildOptions = await service.UpsertAsync(2, null, null, 90, CancellationToken.None);
+        var otherGuildOptions = await service.UpsertAsync(
+            guildId: 2,
+            requiredChannelCount: null,
+            requiredAttachmentCount: null,
+            burstDurationSeconds: 90,
+            ct: CancellationToken.None);
 
         // Act
         Optional<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(guildId: 1, ct: CancellationToken.None);
@@ -212,12 +221,12 @@ public sealed class ImageSpamSettingsServiceTests
 
         // Act
         var exception = await Should.ThrowAsync<DbUpdateException>(() =>
-            service.UpsertAsync(
-                guildId: 1,
-                requiredChannelCount: 0,
-                requiredAttachmentCount: null,
-                burstDurationSeconds: null,
-                ct: CancellationToken.None));
+                                                                       service.UpsertAsync(
+                                                                           guildId: 1,
+                                                                           requiredChannelCount: 0,
+                                                                           requiredAttachmentCount: null,
+                                                                           burstDurationSeconds: null,
+                                                                           ct: CancellationToken.None));
         // Assert
         var postgresException = exception.InnerException.ShouldBeOfType<PostgresException>();
         postgresException.SqlState.ShouldBe(PostgresErrorCodes.CheckViolation);
@@ -225,7 +234,7 @@ public sealed class ImageSpamSettingsServiceTests
         await using var readback = PostgresDatabaseFixture.CreateDbContext();
 
         var persisted = await readback.ImageSpamSettings
-            .SingleOrDefaultAsync(x => x.GuildId == 1);
+           .SingleOrDefaultAsync(x => x.GuildId == 1);
         Optional<ImageBurstSpamDetectorOptions> published = service.Current(1);
         (published is { HasValue: true }).ShouldBe(hasExistingSettings);
 
@@ -241,8 +250,6 @@ public sealed class ImageSpamSettingsServiceTests
             (current.DistinctChannelThreshold, current.RequiredAttachmentCount, current.Window).ShouldBe((4, 2, 45));
         }
         else
-        {
             persisted.ShouldBeNull();
-        }
     }
 }

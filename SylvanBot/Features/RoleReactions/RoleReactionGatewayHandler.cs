@@ -37,7 +37,6 @@ public sealed class RoleReactionGatewayHandler(DiscordSocketClient client, RoleR
         try
         {
             await foreach (var work in _reactions.Reader.ReadAllAsync(stoppingToken))
-            {
                 try
                 {
                     await coordinator.ProcessReactionAsync(
@@ -57,7 +56,7 @@ public sealed class RoleReactionGatewayHandler(DiscordSocketClient client, RoleR
                 catch (Exception exception)
                 {
                     logger.Error(
-                        exception,
+                        exception: exception,
                         "Role reaction failed in guild {GuildId} on message {MessageId} for member {UserId} and emoji {Emoji}",
                         work.GuildId,
                         work.MessageId,
@@ -65,7 +64,6 @@ public sealed class RoleReactionGatewayHandler(DiscordSocketClient client, RoleR
                         work.Emote.ToString()
                     );
                 }
-            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -73,15 +71,17 @@ public sealed class RoleReactionGatewayHandler(DiscordSocketClient client, RoleR
         }
     }
 
-    private Task AddedAsync(Cacheable<IUserMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel, SocketReaction reaction)
-    {
-        return Enqueue(message.Id, channel.Id, reaction, added: true);
-    }
+    private Task AddedAsync(Cacheable<IUserMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel, SocketReaction reaction) => Enqueue(
+        messageId: message.Id,
+        channelId: channel.Id,
+        reaction: reaction,
+        added: true);
 
-    private Task RemovedAsync(Cacheable<IUserMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel, SocketReaction reaction)
-    {
-        return Enqueue(message.Id, channel.Id, reaction, added: false);
-    }
+    private Task RemovedAsync(Cacheable<IUserMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel, SocketReaction reaction) => Enqueue(
+        messageId: message.Id,
+        channelId: channel.Id,
+        reaction: reaction,
+        added: false);
 
     private Task Enqueue(ulong messageId, ulong channelId, SocketReaction reaction, bool added)
     {
@@ -90,15 +90,21 @@ public sealed class RoleReactionGatewayHandler(DiscordSocketClient client, RoleR
         if (botReaction || reaction.Channel is not IGuildChannel guildChannel)
             return Task.CompletedTask;
 
-        var work = new ReactionWork(guildChannel.GuildId, channelId, messageId, reaction.UserId, reaction.Emote, added);
+        var work = new ReactionWork(
+            GuildId: guildChannel.GuildId,
+            ChannelId: channelId,
+            MessageId: messageId,
+            UserId: reaction.UserId,
+            Emote: reaction.Emote,
+            Added: added);
 
         if (!_reactions.Writer.TryWrite(work))
         {
             logger.Warning(
                 "Role reaction queue full or closed in guild {GuildId} on message {MessageId} for member {UserId}; toggle the reaction to retry",
-                work.GuildId,
-                messageId,
-                reaction.UserId
+                propertyValue0: work.GuildId,
+                propertyValue1: messageId,
+                propertyValue2: reaction.UserId
             );
         }
 

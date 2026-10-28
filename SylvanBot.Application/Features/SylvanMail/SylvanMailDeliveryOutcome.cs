@@ -1,6 +1,4 @@
-﻿using SylvanBot.Application.Common;
-
-namespace SylvanBot.Application.Features.SylvanMail;
+﻿namespace SylvanBot.Application.Features.SylvanMail;
 
 public sealed record SylvanMailDeliveryOutcome
 {

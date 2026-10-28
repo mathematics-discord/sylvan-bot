@@ -3,8 +3,6 @@ using static SylvanBot.Features.SylvanMail.SylvanMailRequests;
 
 namespace SylvanBot.Features.SylvanMail;
 
-using DotNext;
-
 public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger) : ISylvanMailDrafts
 {
     public const string SendEmoji = "\U0001F4E4";
@@ -12,9 +10,9 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
     public static SylvanMailMessage ReadMessage(IUserMessage source, ulong? guildId)
     {
         ImmutableArray<SylvanMailAttachment> attachments = source
-            .Attachments
-            .Select(item => new SylvanMailAttachment(Url: item.Url, Filename: item.Filename, Size: item.Size, item.IsSpoiler()))
-            .ToImmutableArray();
+           .Attachments
+           .Select(item => new SylvanMailAttachment(Url: item.Url, Filename: item.Filename, Size: item.Size, item.IsSpoiler()))
+           .ToImmutableArray();
 
         var unsupported =
             source.Stickers.Count > 0
@@ -36,9 +34,14 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
             UnsupportedContent: unsupported);
     }
 
-    public async Task<Optional<SylvanMailMessage>> ReadDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct)
+    public async Task<DotNext.Optional<SylvanMailMessage>> ReadDraftAsync(
+        ulong threadId,
+        ulong messageId,
+        ulong authorId,
+        bool confirm,
+        CancellationToken ct)
     {
-        var channel = await MessageChannelAsync(client, channelId: threadId, ct: ct);
+        var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct);
 
         if (channel is not IThreadChannel thread)
             return default;
@@ -81,12 +84,12 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         {
             await SetDraftReadyAsync(threadId: threadId, messageId: messageId, ready: false, ct: ct);
 
-            return new Optional<SylvanMailMessage>(ReadMessage(source: source, guildId: thread.GuildId));
+            return new DotNext.Optional<SylvanMailMessage>(ReadMessage(source: source, guildId: thread.GuildId));
         }
 
         var prefix = reply.Anonymous ? "From staff: " : $"From {Format.Sanitize(source.Author.Username)}: ";
 
-        return new Optional<SylvanMailMessage>(
+        return new DotNext.Optional<SylvanMailMessage>(
             ReadMessage(source: source, guildId: thread.GuildId) with
             {
                 Content = reply.Content,
@@ -98,7 +101,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
     {
         try
         {
-            var channel = await MessageChannelAsync(client, channelId: threadId, ct: ct);
+            var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct);
 
             if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, Options(ct)) is not IUserMessage message)
                 return;
@@ -116,7 +119,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         }
         catch (Exception exception)
         {
-            LogFailure(logger, "draft reaction", sourceId: messageId, exception: exception);
+            LogFailure(logger: logger, "draft reaction", sourceId: messageId, exception: exception);
         }
     }
 
@@ -124,7 +127,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
     {
         try
         {
-            var channel = await MessageChannelAsync(client, channelId: message.SourceChannelId, ct: ct);
+            var channel = await MessageChannelAsync(client: client, channelId: message.SourceChannelId, ct: ct);
 
             if (await channel.GetMessageAsync(id: message.SourceMessageId, mode: CacheMode.AllowDownload, Options(ct)) is IUserMessage source)
                 await source.AddReactionAsync(new Emoji("\u2611\uFE0F"), Options(ct));
@@ -134,7 +137,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         catch (Exception exception)
         {
             // The payload was delivered; a failed reaction must never turn it into a failed delivery or cause a resend.
-            LogFailure(logger, "success reaction", sourceId: message.SourceMessageId, exception: exception);
+            LogFailure(logger: logger, "success reaction", sourceId: message.SourceMessageId, exception: exception);
         }
     }
 }

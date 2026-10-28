@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Common;
 using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Application.Features.SylvanMail;
@@ -29,7 +28,7 @@ public sealed class SylvanMailDraftWorkflow(
             if (observed is not { HasValue: true, Value: var message })
                 return;
 
-            await ProcessDraftAsync(db, message, confirm, ct);
+            await ProcessDraftAsync(db: db, message: message, confirm: confirm, ct: ct);
         }
         catch (Exception exception) when (observed is { HasValue: true, Value: var message })
         {
@@ -44,7 +43,7 @@ public sealed class SylvanMailDraftWorkflow(
 
                 await discord.ReportAsync(
                     source: message,
-                    threadId: new Optional<ulong>(threadId),
+                    new Optional<ulong>(threadId),
                     receiptId: default,
                     detail: detail,
                     ct: noticeTimeout.Token);
@@ -82,16 +81,16 @@ public sealed class SylvanMailDraftWorkflow(
 
     private static Task<SylvanMailConversation?> ActiveConversationAsync(BotDbContext db, ulong threadId, CancellationToken ct) =>
         db.SylvanMailConversations
-            .AsNoTracking()
-            .Where(item => item.ThreadId == threadId && !item.Retired)
-            .Where(item => db.SylvanMailSettings
-                .Any(settings => settings.GuildId == item.GuildId && settings.ForumId == item.ForumId))
-            .SingleOrDefaultAsync(ct);
+           .AsNoTracking()
+           .Where(item => item.ThreadId == threadId && !item.Retired)
+           .Where(item => db.SylvanMailSettings
+                     .Any(settings => settings.GuildId == item.GuildId && settings.ForumId == item.ForumId))
+           .SingleOrDefaultAsync(ct);
 
     private async Task ProcessDraftAsync(BotDbContext db, SylvanMailMessage message, bool confirm, CancellationToken ct)
     {
         var recorded = await db.SylvanMailOperations
-            .AnyAsync(item => item.SourceMessageId == message.SourceMessageId, cancellationToken: ct);
+           .AnyAsync(item => item.SourceMessageId == message.SourceMessageId, cancellationToken: ct);
 
         if (recorded)
         {
@@ -114,8 +113,6 @@ public sealed class SylvanMailDraftWorkflow(
             await drafts.SetDraftReadyAsync(threadId: message.SourceChannelId, messageId: message.SourceMessageId, ready: false, ct: ct);
         }
         else
-        {
             await drafts.SetDraftReadyAsync(threadId: message.SourceChannelId, messageId: message.SourceMessageId, ready: true, ct: ct);
-        }
     }
 }

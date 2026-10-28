@@ -77,9 +77,7 @@ internal static class CommandRegistrationTool
                         IReadOnlyCollection<RestGlobalCommand> remaining = await client.BulkOverwriteGlobalCommands([]);
 
                         if (remaining.Count != 0)
-                        {
                             throw new InvalidOperationException("Discord returned commands after clearing global scope.");
-                        }
 
                         Console.WriteLine($"Cleared global scope: {commands.Count} application commands removed.");
                     }
@@ -111,9 +109,7 @@ internal static class CommandRegistrationTool
                         IReadOnlyCollection<RestGuildCommand> remaining = await client.BulkOverwriteGuildCommands([], guildId: guildId);
 
                         if (remaining.Count != 0)
-                        {
                             throw new InvalidOperationException($"Discord returned commands after clearing guild {guildId} scope.");
-                        }
 
                         Console.WriteLine($"Cleared guild {guildId} scope: {commands.Count} application commands removed.");
                     }
@@ -155,9 +151,7 @@ internal static class CommandRegistrationTool
             Console.WriteLine($"{indent}{option.Type} {option.Name} (required: {option.IsRequired}): {option.Description}");
 
             if (option.Choices.Count > 0)
-            {
                 Console.WriteLine($"{indent}  Choices: {string.Join(", ", option.Choices.Select(choice => $"{choice.Name}={choice.Value}"))}");
-            }
 
             if (option.IsAutocomplete == true)
                 Console.WriteLine($"{indent}  Autocomplete: true");

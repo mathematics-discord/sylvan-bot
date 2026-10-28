@@ -1,14 +1,14 @@
 ﻿<component name="ProjectRunConfigurationManager">
     <configuration default="false" name="Sylvan Bot Local with database" type="LaunchSettings" factoryName=".NET Launch Settings Profile">
-        <option name="LAUNCH_PROFILE_PROJECT_FILE_PATH" value="$PROJECT_DIR$/SylvanBot/SylvanBot.csproj" />
-        <option name="LAUNCH_PROFILE_NAME" value="SylvanBot.Local" />
+        <option name="LAUNCH_PROFILE_PROJECT_FILE_PATH" value="$PROJECT_DIR$/SylvanBot/SylvanBot.csproj"/>
+        <option name="LAUNCH_PROFILE_NAME" value="SylvanBot.Local"/>
         <method v="2">
-            <option name="Build" />
+            <option name="Build"/>
             <option
-                name="RunConfigurationTask"
-                enabled="true"
-                run_configuration_name="Start local database"
-                run_configuration_type="ShConfigurationType"
+                    name="RunConfigurationTask"
+                    enabled="true"
+                    run_configuration_name="Start local database"
+                    run_configuration_type="ShConfigurationType"
             />
         </method>
     </configuration>

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Globalization;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Features.Logging;
@@ -55,11 +55,16 @@ public sealed class MessageCacheSamplingWorker(
                 }
                 catch (Exception ex)
                 {
-                    _logger.Warning("Message-cache sampling failed for run {ProcessRunId}: {ExceptionType}", _processRunId, ex.GetType().Name);
+                    _logger.Warning(
+                        "Message-cache sampling failed for run {ProcessRunId}: {ExceptionType}",
+                        propertyValue0: _processRunId,
+                        propertyValue1: ex.GetType().Name);
                 }
             }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+        }
     }
 
     private static ChannelMeasurement CollectChannel(
@@ -75,7 +80,7 @@ public sealed class MessageCacheSamplingWorker(
         return new ChannelMeasurement(
             guildId.ToString(CultureInfo.InvariantCulture),
             channel.Id.ToString(CultureInfo.InvariantCulture),
-            CachedMessageCount: measurement?.Count ?? 0,
+            measurement?.Count ?? 0,
             OldestMessageCreatedAtUtc: measurement?.OldestCreatedAtUtc,
             OldestMessageExpiresAtUtc: measurement?.OldestExpiresAtUtc
         );
@@ -112,9 +117,9 @@ public sealed class MessageCacheSamplingWorker(
             cachedGuildMembers += guild.Users.Count;
 
             IEnumerable<ISocketMessageChannel> channels = guild
-                .Channels.Concat(guild.ThreadChannels)
-                .DistinctBy(channel => channel.Id)
-                .OfType<ISocketMessageChannel>();
+               .Channels.Concat(guild.ThreadChannels)
+               .DistinctBy(channel => channel.Id)
+               .OfType<ISocketMessageChannel>();
 
             foreach (var channel in channels)
             {
@@ -151,18 +156,18 @@ public sealed class MessageCacheSamplingWorker(
             return;
 
         var snapshotLogger = _logger
-            .ForContext("ProcessRunId", value: _processRunId)
-            .ForContext("CollectedAtUtc", value: collectedAtUtc)
-            .ForContext("RetentionHours", value: 24)
-            .ForContext("CacheReady", value: cache.Ready)
-            .ForContext("HandlingFailures", value: loggingHandler.Failures)
-            .ForContext("MaintenanceFailures", value: maintenance.Failures)
-            .ForContext("SampledChannelCount", value: channels.Count)
-            .ForContext("PopulatedChannelCount", value: populatedChannels)
-            .ForContext("TotalCachedMessages", value: totalCachedMessages)
-            .ForContext("CachedGuildMemberCount", value: cachedGuildMembers)
-            .ForContext("ProcessWorkingSetBytes", value: workingSetBytes)
-            .ForContext("ProcessUptime", value: uptime);
+           .ForContext("ProcessRunId", value: _processRunId)
+           .ForContext("CollectedAtUtc", value: collectedAtUtc)
+           .ForContext("RetentionHours", value: 24)
+           .ForContext("CacheReady", value: cache.Ready)
+           .ForContext("HandlingFailures", value: loggingHandler.Failures)
+           .ForContext("MaintenanceFailures", value: maintenance.Failures)
+           .ForContext("SampledChannelCount", value: channels.Count)
+           .ForContext("PopulatedChannelCount", value: populatedChannels)
+           .ForContext("TotalCachedMessages", value: totalCachedMessages)
+           .ForContext("CachedGuildMemberCount", value: cachedGuildMembers)
+           .ForContext("ProcessWorkingSetBytes", value: workingSetBytes)
+           .ForContext("ProcessUptime", value: uptime);
 
         snapshotLogger.ForContext("MessageCacheSample", value: true).Debug("Message-cache snapshot: {@Channels}", propertyValue: channels);
 

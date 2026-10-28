@@ -29,9 +29,9 @@ public static class WorkingHoursResponses
         {
             // Usernames are text, never mentions or code-block delimiters.
             var plain = username
-                .Replace("`", newValue: string.Empty, comparisonType: StringComparison.Ordinal)
-                .Replace("\r", newValue: string.Empty, comparisonType: StringComparison.Ordinal)
-                .Replace("\n", newValue: string.Empty, comparisonType: StringComparison.Ordinal);
+               .Replace("`", newValue: string.Empty, comparisonType: StringComparison.Ordinal)
+               .Replace("\r", newValue: string.Empty, comparisonType: StringComparison.Ordinal)
+               .Replace("\n", newValue: string.Empty, comparisonType: StringComparison.Ordinal);
 
             return ($"```text\n@{plain} is not in the time file.\nThis incident will be reported.\n```", []);
         }
@@ -67,8 +67,8 @@ public static class WorkingHoursResponses
         {
             messages.Add(
                 "Your availability declaration has been accepted. However, People & Culture has identified a concerning discrepancy between your revolutionary potential and your proposed contribution.\n\n"
-                    + "Under the principles of Ratgirlist-Marxist-Juche Thought, each moderator is encouraged to exercise self-reliance, demonstrate collective responsibility, and voluntarily exceed their mandatory commitments. Please reflect on whether your availability meaningfully advances the emancipation of the posting masses.\n\n"
-                    + "A positive attitude is no substitute for material participation, comrade. We look forward to seeing this reflected in your next declaration."
+                + "Under the principles of Ratgirlist-Marxist-Juche Thought, each moderator is encouraged to exercise self-reliance, demonstrate collective responsibility, and voluntarily exceed their mandatory commitments. Please reflect on whether your availability meaningfully advances the emancipation of the posting masses.\n\n"
+                + "A positive attitude is no substitute for material participation, comrade. We look forward to seeing this reflected in your next declaration."
             );
         }
         else

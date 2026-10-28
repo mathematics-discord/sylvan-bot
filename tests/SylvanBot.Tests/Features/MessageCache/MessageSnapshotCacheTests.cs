@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.MessageCache;
 
 namespace SylvanBot.Tests.Features.MessageCache;
@@ -7,7 +6,16 @@ namespace SylvanBot.Tests.Features.MessageCache;
 [TestFixture]
 public sealed class MessageSnapshotCacheTests
 {
-    private static readonly DateTimeOffset Created = new DateTimeOffset(2026, 10, 28, 0, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset Created = new DateTimeOffset(
+        year: 2026,
+        month: 10,
+        day: 28,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        offset: TimeSpan.Zero);
+
+    private static ulong Id => (ulong)(Created.ToUnixTimeMilliseconds() - 1420070400000) << 22;
 
     [Test]
     public async Task Edit_Restart_DoesNotExtendOriginalExpiry()
@@ -15,18 +23,18 @@ public sealed class MessageSnapshotCacheTests
         // Arrange
         var clock = new CacheClock(Created.AddHours(23));
         var persistence = new MemoryPersistence();
-        using var cache = new MessageSnapshotCache(persistence, clock);
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
-        await cache.ReceiveAsync(Received("original"), CancellationToken.None);
+        using var cache = new MessageSnapshotCache(persistence: persistence, timeProvider: clock);
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("original"), ct: CancellationToken.None);
 
         // Act
-        await cache.EditAsync(Edit("edited") with { EditedAtUtc = new Optional<DateTimeOffset?>(clock.GetUtcNow()) }, CancellationToken.None);
-        using var restarted = new MessageSnapshotCache(persistence, clock);
-        await restarted.InitializeAsync(1, [10], CancellationToken.None);
-        ImmutableArray<CachedMessageSnapshot> restored = await restarted.BeginDeleteAsync(10, [Id], CancellationToken.None);
+        await cache.EditAsync(Edit("edited") with { EditedAtUtc = new Optional<DateTimeOffset?>(clock.GetUtcNow()) }, ct: CancellationToken.None);
+        using var restarted = new MessageSnapshotCache(persistence: persistence, timeProvider: clock);
+        await restarted.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        ImmutableArray<CachedMessageSnapshot> restored = await restarted.BeginDeleteAsync(guildId: 10, [Id], ct: CancellationToken.None);
         clock.Now = Created.AddHours(24);
-        ImmutableArray<CachedMessageSnapshot> expired = await restarted.BeginDeleteAsync(10, [Id], CancellationToken.None);
-        Optional<MessageEdit> oldEdit = await restarted.EditAsync(Edit("too late"), CancellationToken.None);
+        ImmutableArray<CachedMessageSnapshot> expired = await restarted.BeginDeleteAsync(guildId: 10, [Id], ct: CancellationToken.None);
+        Optional<MessageEdit> oldEdit = await restarted.EditAsync(Edit("too late"), ct: CancellationToken.None);
 
         // Assert
         restored.Single().ExpiresAtUtc.ShouldBe(Created.AddHours(24));
@@ -43,9 +51,9 @@ public sealed class MessageSnapshotCacheTests
     {
         // Arrange
         var persistence = new MemoryPersistence();
-        using var cache = new MessageSnapshotCache(persistence, new CacheClock(Created.AddHours(1)));
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
-        await cache.ReceiveAsync(Received("original"), CancellationToken.None);
+        using var cache = new MessageSnapshotCache(persistence: persistence, new CacheClock(Created.AddHours(1)));
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("original"), ct: CancellationToken.None);
 
         // Act
         Optional<MessageEdit> partial = await cache.EditAsync(
@@ -55,7 +63,7 @@ public sealed class MessageSnapshotCacheTests
                 Eligible = default,
                 Content = default,
             },
-            CancellationToken.None
+            ct: CancellationToken.None
         );
 
         Optional<MessageEdit> cleared = await cache.EditAsync(
@@ -64,16 +72,17 @@ public sealed class MessageSnapshotCacheTests
                 Attachments = new Optional<ImmutableArray<MessageAttachment>>([]),
                 EditedAtUtc = new Optional<DateTimeOffset?>(Created.AddMinutes(5)),
             },
-            CancellationToken.None
+            ct: CancellationToken.None
         );
 
         // Assert
         partial
-            .Value.Before.Value.Content.ShouldBe("original");
+           .Value.Before.Value.Content.ShouldBe("original");
         partial.Value.After.ShouldNotBeNull().Content.ShouldBe("original");
         partial.Value.After.Attachments.Length.ShouldBe(1);
+
         cleared
-            .Value.Before.Value.Attachments.Length.ShouldBe(1);
+           .Value.Before.Value.Attachments.Length.ShouldBe(1);
         cleared.Value.After.ShouldNotBeNull().Content.ShouldBeEmpty();
         cleared.Value.After.Attachments.ShouldBeEmpty();
     }
@@ -83,28 +92,30 @@ public sealed class MessageSnapshotCacheTests
     {
         // Arrange
         using var cache = new MessageSnapshotCache(new MemoryPersistence(), new CacheClock(Created.AddHours(1)));
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
-        await cache.ReceiveAsync(Received("one"), CancellationToken.None);
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("one"), ct: CancellationToken.None);
 
         // Act
-        Optional<MessageEdit> first = await cache.EditAsync(Edit("two"), CancellationToken.None);
-        await cache.ReceiveAsync(Received("one"), CancellationToken.None);
+        Optional<MessageEdit> first = await cache.EditAsync(Edit("two"), ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("one"), ct: CancellationToken.None);
+
         Optional<MessageEdit> second = await cache.EditAsync(
             Edit("three") with
             {
                 EditedAtUtc = new Optional<DateTimeOffset?>(Created.AddMinutes(2)),
             },
-            CancellationToken.None
+            ct: CancellationToken.None
         );
-        await cache.EditAsync(Edit("stale") with { EditedAtUtc = new Optional<DateTimeOffset?>(Created.AddMinutes(1)) }, CancellationToken.None);
-        await cache.ReceiveAsync(Received("one"), CancellationToken.None);
+        await cache.EditAsync(Edit("stale") with { EditedAtUtc = new Optional<DateTimeOffset?>(Created.AddMinutes(1)) }, ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("one"), ct: CancellationToken.None);
 
         // Assert
         first
-            .Value.Before.Value.Content.ShouldBe("one");
+           .Value.Before.Value.Content.ShouldBe("one");
+
         second
-            .Value.Before.Value.Content.ShouldBe("two");
-        (await cache.BeginDeleteAsync(10, [Id], CancellationToken.None)).Single().Content.ShouldBe("three");
+           .Value.Before.Value.Content.ShouldBe("two");
+        (await cache.BeginDeleteAsync(guildId: 10, [Id], ct: CancellationToken.None)).Single().Content.ShouldBe("three");
     }
 
     [Test]
@@ -112,8 +123,8 @@ public sealed class MessageSnapshotCacheTests
     {
         // Arrange
         using var cache = new MessageSnapshotCache(new MemoryPersistence(), new CacheClock(Created.AddHours(1)));
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
-        await cache.ReceiveAsync(Received("original"), CancellationToken.None);
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("original"), ct: CancellationToken.None);
         var timestamp = Created.AddMinutes(5);
 
         // Act
@@ -126,27 +137,29 @@ public sealed class MessageSnapshotCacheTests
                 CreatedAtUtc = Created,
                 EditedAtUtc = new Optional<DateTimeOffset?>(null),
             },
-            CancellationToken.None
+            ct: CancellationToken.None
         );
 
-        await cache.EditAsync(Edit("first edit") with { EditedAtUtc = new Optional<DateTimeOffset?>(timestamp) }, CancellationToken.None);
-        Optional<MessageEdit> omitted = await cache.EditAsync(Edit("second edit"), CancellationToken.None);
+        await cache.EditAsync(Edit("first edit") with { EditedAtUtc = new Optional<DateTimeOffset?>(timestamp) }, ct: CancellationToken.None);
+        Optional<MessageEdit> omitted = await cache.EditAsync(Edit("second edit"), ct: CancellationToken.None);
+
         Optional<MessageEdit> staleNull = await cache.EditAsync(
             Edit("stale") with
             {
                 EditedAtUtc = new Optional<DateTimeOffset?>(null),
             },
-            CancellationToken.None
+            ct: CancellationToken.None
         );
 
         // Assert
         unedited.Value.After.ShouldNotBeNull().EditedAtUtc.ShouldBeNull();
         unedited.Value.After.Content.ShouldBe("original");
         omitted.Value.After.ShouldNotBeNull().EditedAtUtc.ShouldBe(timestamp);
+
         omitted
-            .Value.Before.Value.Content.ShouldBe("first edit");
+           .Value.Before.Value.Content.ShouldBe("first edit");
         staleNull.IsUndefined.ShouldBeTrue();
-        (await cache.BeginDeleteAsync(10, [Id], CancellationToken.None)).Single().Content.ShouldBe("second edit");
+        (await cache.BeginDeleteAsync(guildId: 10, [Id], ct: CancellationToken.None)).Single().Content.ShouldBe("second edit");
     }
 
     [Test]
@@ -154,8 +167,8 @@ public sealed class MessageSnapshotCacheTests
     {
         // Arrange
         var persistence = new MemoryPersistence();
-        using var cache = new MessageSnapshotCache(persistence, new CacheClock(Created.AddHours(1)));
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
+        using var cache = new MessageSnapshotCache(persistence: persistence, new CacheClock(Created.AddHours(1)));
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
 
         var partial = new MessageEdited
         {
@@ -167,7 +180,7 @@ public sealed class MessageSnapshotCacheTests
         };
 
         // Act
-        Optional<MessageEdit> result = await cache.EditAsync(partial, CancellationToken.None);
+        Optional<MessageEdit> result = await cache.EditAsync(message: partial, ct: CancellationToken.None);
 
         // Assert
         result.IsUndefined.ShouldBeTrue();
@@ -179,13 +192,13 @@ public sealed class MessageSnapshotCacheTests
     {
         // Arrange
         var persistence = new MemoryPersistence { SaveRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously) };
-        using var cache = new MessageSnapshotCache(persistence, new CacheClock(Created.AddHours(1)));
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
+        using var cache = new MessageSnapshotCache(persistence: persistence, new CacheClock(Created.AddHours(1)));
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
 
         // Act
-        var create = cache.ReceiveAsync(Received("evidence"), CancellationToken.None);
+        var create = cache.ReceiveAsync(Received("evidence"), ct: CancellationToken.None);
         await persistence.SaveStarted.Task;
-        Task<ImmutableArray<CachedMessageSnapshot>> delete = cache.BeginDeleteAsync(10, [Id], CancellationToken.None);
+        Task<ImmutableArray<CachedMessageSnapshot>> delete = cache.BeginDeleteAsync(guildId: 10, [Id], ct: CancellationToken.None);
         var waiting = !delete.IsCompleted;
         persistence.SaveRelease.SetResult();
         await create;
@@ -202,17 +215,17 @@ public sealed class MessageSnapshotCacheTests
     {
         // Arrange
         var persistence = new MemoryPersistence();
-        using var cache = new MessageSnapshotCache(persistence, new CacheClock(Created.AddHours(1)));
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
-        await cache.ReceiveAsync(Received("durable"), CancellationToken.None);
+        using var cache = new MessageSnapshotCache(persistence: persistence, new CacheClock(Created.AddHours(1)));
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("durable"), ct: CancellationToken.None);
         persistence.FailSave = true;
 
         // Act
-        await Should.ThrowAsync<InvalidOperationException>(() => cache.EditAsync(Edit("failed"), CancellationToken.None));
+        await Should.ThrowAsync<InvalidOperationException>(() => cache.EditAsync(Edit("failed"), ct: CancellationToken.None));
         persistence.FailSave = false;
         persistence.SaveRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         using var cancellation = new CancellationTokenSource();
-        Task<Optional<MessageEdit>> write = cache.EditAsync(Edit("cancelled"), cancellation.Token);
+        Task<Optional<MessageEdit>> write = cache.EditAsync(Edit("cancelled"), ct: cancellation.Token);
         cancellation.Cancel();
         await Should.ThrowAsync<OperationCanceledException>(() => write);
 
@@ -226,19 +239,19 @@ public sealed class MessageSnapshotCacheTests
         // Arrange
         var persistence = new MemoryPersistence();
         var clock = new CacheClock(Created.AddHours(1));
-        using var cache = new MessageSnapshotCache(persistence, clock);
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
-        await cache.ReceiveAsync(Received("evidence"), CancellationToken.None);
+        using var cache = new MessageSnapshotCache(persistence: persistence, timeProvider: clock);
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("evidence"), ct: CancellationToken.None);
 
         // Act
-        await cache.BeginDeleteAsync(10, [Id], CancellationToken.None);
+        await cache.BeginDeleteAsync(guildId: 10, [Id], ct: CancellationToken.None);
         // No acknowledgement: publication failed. A later event can still use the frozen snapshot.
-        await cache.EditAsync(Edit("delayed edit"), CancellationToken.None);
-        ImmutableArray<CachedMessageSnapshot> retry = await cache.BeginDeleteAsync(10, [Id], CancellationToken.None);
+        await cache.EditAsync(Edit("delayed edit"), ct: CancellationToken.None);
+        ImmutableArray<CachedMessageSnapshot> retry = await cache.BeginDeleteAsync(guildId: 10, [Id], ct: CancellationToken.None);
         persistence.FailDelete = true;
-        await Should.ThrowAsync<InvalidOperationException>(() => cache.CompleteDeleteAsync(retry, CancellationToken.None));
-        await cache.ReceiveAsync(Received("delayed create"), CancellationToken.None);
-        ImmutableArray<CachedMessageSnapshot> duplicate = await cache.BeginDeleteAsync(10, [Id], CancellationToken.None);
+        await Should.ThrowAsync<InvalidOperationException>(() => cache.CompleteDeleteAsync(snapshots: retry, ct: CancellationToken.None));
+        await cache.ReceiveAsync(Received("delayed create"), ct: CancellationToken.None);
+        ImmutableArray<CachedMessageSnapshot> duplicate = await cache.BeginDeleteAsync(guildId: 10, [Id], ct: CancellationToken.None);
         persistence.FailDelete = false;
         await cache.PruneAsync(CancellationToken.None);
 
@@ -254,20 +267,21 @@ public sealed class MessageSnapshotCacheTests
     {
         // Arrange
         var persistence = new MemoryPersistence();
-        using var original = new MessageSnapshotCache(persistence, new CacheClock(Created.AddHours(1)));
-        await original.InitializeAsync(1, [10], CancellationToken.None);
-        await original.ReceiveAsync(Received("before restart"), CancellationToken.None);
+        using var original = new MessageSnapshotCache(persistence: persistence, new CacheClock(Created.AddHours(1)));
+        await original.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        await original.ReceiveAsync(Received("before restart"), ct: CancellationToken.None);
         persistence.LoadRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var restarted = new MessageSnapshotCache(persistence, new CacheClock(Created.AddHours(2)));
+        using var restarted = new MessageSnapshotCache(persistence: persistence, new CacheClock(Created.AddHours(2)));
 
         // Act
-        var initialize = restarted.InitializeAsync(1, [10], CancellationToken.None);
+        var initialize = restarted.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+
         Task<Optional<MessageEdit>> edit = restarted.EditAsync(
             Edit("after restart") with
             {
                 EditedAtUtc = new Optional<DateTimeOffset?>(Created.AddHours(2)),
             },
-            CancellationToken.None
+            ct: CancellationToken.None
         );
         var waiting = !edit.IsCompleted && !restarted.Ready;
         persistence.LoadRelease.SetResult();
@@ -276,8 +290,9 @@ public sealed class MessageSnapshotCacheTests
 
         // Assert
         waiting.ShouldBeTrue();
+
         result
-            .Value.Before.Value.Content.ShouldBe("before restart");
+           .Value.Before.Value.Content.ShouldBe("before restart");
         result.Value.After.ShouldNotBeNull().Content.ShouldBe("after restart");
     }
 
@@ -287,18 +302,18 @@ public sealed class MessageSnapshotCacheTests
         // Arrange
         var persistence = new MemoryPersistence();
         var clock = new CacheClock(Created.AddHours(1));
-        using var original = new MessageSnapshotCache(persistence, clock);
-        await original.InitializeAsync(1, [10], CancellationToken.None);
-        await original.ReceiveAsync(Received("other bot"), CancellationToken.None);
-        using var restarted = new MessageSnapshotCache(persistence, clock);
+        using var original = new MessageSnapshotCache(persistence: persistence, timeProvider: clock);
+        await original.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        await original.ReceiveAsync(Received("other bot"), ct: CancellationToken.None);
+        using var restarted = new MessageSnapshotCache(persistence: persistence, timeProvider: clock);
         persistence.FailLoad = true;
 
         // Act
-        await Should.ThrowAsync<InvalidOperationException>(() => restarted.InitializeAsync(2, [10], CancellationToken.None));
+        await Should.ThrowAsync<InvalidOperationException>(() => restarted.InitializeAsync(botId: 2, [10], ct: CancellationToken.None));
         var failedReadiness = restarted.Ready;
-        await Should.ThrowAsync<InvalidOperationException>(() => restarted.ReceiveAsync(Received("not ready"), CancellationToken.None));
+        await Should.ThrowAsync<InvalidOperationException>(() => restarted.ReceiveAsync(Received("not ready"), ct: CancellationToken.None));
         persistence.FailLoad = false;
-        await restarted.InitializeAsync(2, [20], CancellationToken.None);
+        await restarted.InitializeAsync(botId: 2, [20], ct: CancellationToken.None);
 
         Optional<MessageEdit> seeded = await restarted.EditAsync(
             Edit("current") with
@@ -307,7 +322,7 @@ public sealed class MessageSnapshotCacheTests
                 Attachments = new Optional<ImmutableArray<MessageAttachment>>([]),
                 EditedAtUtc = new Optional<DateTimeOffset?>(null),
             },
-            CancellationToken.None
+            ct: CancellationToken.None
         );
 
         // Assert
@@ -321,25 +336,27 @@ public sealed class MessageSnapshotCacheTests
     {
         // Arrange
         var persistence = new MemoryPersistence();
-        using var cache = new MessageSnapshotCache(persistence, new CacheClock(Created.AddHours(1)));
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
+        using var cache = new MessageSnapshotCache(persistence: persistence, new CacheClock(Created.AddHours(1)));
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
         var partial = Edit("known content") with { EditedAtUtc = new Optional<DateTimeOffset?>(null) };
 
         // Act
-        Optional<MessageEdit> missingAttachments = await cache.EditAsync(partial, CancellationToken.None);
+        Optional<MessageEdit> missingAttachments = await cache.EditAsync(message: partial, ct: CancellationToken.None);
+
         Optional<MessageEdit> missingTimestamp = await cache.EditAsync(
             Edit("known content") with
             {
                 Attachments = new Optional<ImmutableArray<MessageAttachment>>([]),
             },
-            CancellationToken.None
+            ct: CancellationToken.None
         );
+
         Optional<MessageEdit> complete = await cache.EditAsync(
             partial with
             {
                 Attachments = new Optional<ImmutableArray<MessageAttachment>>([]),
             },
-            CancellationToken.None
+            ct: CancellationToken.None
         );
 
         // Assert
@@ -356,9 +373,9 @@ public sealed class MessageSnapshotCacheTests
     {
         // Arrange
         var clock = new CacheClock(Created.AddHours(1));
-        using var cache = new MessageSnapshotCache(new MemoryPersistence(), clock);
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
-        await cache.ReceiveAsync(Received("evidence"), CancellationToken.None);
+        using var cache = new MessageSnapshotCache(new MemoryPersistence(), timeProvider: clock);
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("evidence"), ct: CancellationToken.None);
 
         // Act
         ImmutableArray<CachedChannelStatistics> live = await cache.GetStatisticsAsync(CancellationToken.None);
@@ -378,13 +395,13 @@ public sealed class MessageSnapshotCacheTests
         // Arrange
         var clock = new CacheClock(Created.AddHours(23));
         var persistence = new MemoryPersistence();
-        using var cache = new MessageSnapshotCache(persistence, clock);
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
-        await cache.ReceiveAsync(Received("original"), CancellationToken.None);
+        using var cache = new MessageSnapshotCache(persistence: persistence, timeProvider: clock);
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("original"), ct: CancellationToken.None);
         persistence.SaveRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // Act
-        Task<Optional<MessageEdit>> edit = cache.EditAsync(Edit("current"), CancellationToken.None);
+        Task<Optional<MessageEdit>> edit = cache.EditAsync(Edit("current"), ct: CancellationToken.None);
         clock.Now = Created.AddHours(24);
         persistence.SaveRelease.SetResult();
         Optional<MessageEdit> result = await edit;
@@ -394,19 +411,17 @@ public sealed class MessageSnapshotCacheTests
         (await cache.GetStatisticsAsync(CancellationToken.None)).ShouldBeEmpty();
     }
 
-    private static ulong Id => (ulong)(Created.ToUnixTimeMilliseconds() - 1420070400000) << 22;
-
     [Test]
     public async Task Receive_ExpiryDuringWrite_DoesNotPublishExpiredSnapshot()
     {
         // Arrange
         var clock = new CacheClock(Created.AddHours(23));
         var persistence = new MemoryPersistence { SaveRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously) };
-        using var cache = new MessageSnapshotCache(persistence, clock);
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
+        using var cache = new MessageSnapshotCache(persistence: persistence, timeProvider: clock);
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
 
         // Act
-        var write = cache.ReceiveAsync(Received("expires while saving"), CancellationToken.None);
+        var write = cache.ReceiveAsync(Received("expires while saving"), ct: CancellationToken.None);
         await persistence.SaveStarted.Task;
         clock.Now = Created.AddHours(24);
         persistence.SaveRelease.SetResult();
@@ -423,11 +438,11 @@ public sealed class MessageSnapshotCacheTests
     {
         // Arrange
         using var cache = new MessageSnapshotCache(new MemoryPersistence(), new CacheClock(Created.AddHours(1)));
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
 
         // Act
-        await cache.BeginDeleteAsync(10, [Id], CancellationToken.None);
-        await cache.ReceiveAsync(Received("late create"), CancellationToken.None);
+        await cache.BeginDeleteAsync(guildId: 10, [Id], ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("late create"), ct: CancellationToken.None);
 
         // Assert
         (await cache.GetStatisticsAsync(CancellationToken.None)).ShouldBeEmpty();
@@ -438,14 +453,16 @@ public sealed class MessageSnapshotCacheTests
     {
         // Arrange
         var persistence = new MemoryPersistence();
-        using var cache = new MessageSnapshotCache(persistence, new CacheClock(Created.AddHours(1)));
-        await cache.InitializeAsync(1, [10], CancellationToken.None);
-        await cache.ReceiveAsync(Received("published"), CancellationToken.None);
-        ImmutableArray<CachedMessageSnapshot> deletion = await cache.BeginDeleteAsync(10, [Id], CancellationToken.None);
+        using var cache = new MessageSnapshotCache(persistence: persistence, new CacheClock(Created.AddHours(1)));
+        await cache.InitializeAsync(botId: 1, [10], ct: CancellationToken.None);
+        await cache.ReceiveAsync(Received("published"), ct: CancellationToken.None);
+        ImmutableArray<CachedMessageSnapshot> deletion = await cache.BeginDeleteAsync(guildId: 10, [Id], ct: CancellationToken.None);
 
         // Act
-        await Should.ThrowAsync<OperationCanceledException>(() => cache.CompleteDeleteAsync(deletion, new CancellationToken(canceled: true)));
-        ImmutableArray<CachedMessageSnapshot> duplicate = await cache.BeginDeleteAsync(10, [Id], CancellationToken.None);
+        await Should.ThrowAsync<OperationCanceledException>(() => cache.CompleteDeleteAsync(
+                                                                snapshots: deletion,
+                                                                new CancellationToken(canceled: true)));
+        ImmutableArray<CachedMessageSnapshot> duplicate = await cache.BeginDeleteAsync(guildId: 10, [Id], ct: CancellationToken.None);
         await cache.PruneAsync(CancellationToken.None);
 
         // Assert
@@ -464,7 +481,7 @@ public sealed class MessageSnapshotCacheTests
             Eligible = true,
             Content = content,
             EditedAtUtc = null,
-            Attachments = [new MessageAttachment("https://example.invalid/image", null, "image/png", 100)],
+            Attachments = [new MessageAttachment("https://example.invalid/image", ProxyUrl: null, "image/png", Size: 100)],
         };
 
     private static MessageEdited Edit(string content) =>
@@ -516,8 +533,8 @@ public sealed class MessageSnapshotCacheTests
                 await LoadRelease.Task.WaitAsync(ct);
 
             return Rows.Where(pair => pair.Key.BotId == botId && guildIds.Contains(pair.Key.GuildId) && pair.Value.ExpiresAtUtc > now)
-                .Select(pair => pair.Value)
-                .ToImmutableArray();
+               .Select(pair => pair.Value)
+               .ToImmutableArray();
         }
 
         public async Task SaveAsync(ulong botId, CachedMessageSnapshot snapshot, CancellationToken ct)
@@ -548,8 +565,8 @@ public sealed class MessageSnapshotCacheTests
         public Task DeleteExpiredAsync(DateTimeOffset now, CancellationToken ct)
         {
             ImmutableArray<(ulong BotId, ulong GuildId, ulong MessageId)> expired = Rows.Where(pair => pair.Value.ExpiresAtUtc <= now)
-                .Select(pair => pair.Key)
-                .ToImmutableArray();
+               .Select(pair => pair.Key)
+               .ToImmutableArray();
 
             foreach (var key in expired)
                 Rows.Remove(key);

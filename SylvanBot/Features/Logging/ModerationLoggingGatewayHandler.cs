@@ -5,8 +5,6 @@ using SylvanBot.Gateway;
 
 namespace SylvanBot.Features.Logging;
 
-using DotNext;
-
 public sealed class ModerationLoggingGatewayHandler(
     DiscordSocketClient discordClient,
     LoggingScopeResolver scope,
@@ -63,7 +61,7 @@ public sealed class ModerationLoggingGatewayHandler(
 
                 try
                 {
-                    await ProcessAsync(work, timeout.Token);
+                    await ProcessAsync(work: work, ct: timeout.Token);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -72,7 +70,11 @@ public sealed class ModerationLoggingGatewayHandler(
                 catch (OperationCanceledException) when (timeout.IsCancellationRequested)
                 {
                     Interlocked.Increment(ref _failures);
-                    _logger.Warning("Message handling timed out for guild {GuildId}, channel {ChannelId}", work.GuildId, work.ChannelId);
+
+                    _logger.Warning(
+                        "Message handling timed out for guild {GuildId}, channel {ChannelId}",
+                        propertyValue0: work.GuildId,
+                        propertyValue1: work.ChannelId);
                 }
                 catch (Exception exception)
                 {
@@ -107,17 +109,21 @@ public sealed class ModerationLoggingGatewayHandler(
             return Task.CompletedTask;
 
         ImmutableArray<MessageAttachment> attachments = message
-            .Attachments
-            .Select(attachment => new MessageAttachment(attachment.Url, attachment.ProxyUrl, attachment.ContentType, attachment.Size))
-            .ToImmutableArray();
+           .Attachments
+           .Select(attachment => new MessageAttachment(
+                       Url: attachment.Url,
+                       ProxyUrl: attachment.ProxyUrl,
+                       ContentType: attachment.ContentType,
+                       Size: attachment.Size))
+           .ToImmutableArray();
 
         var valid = attachments
-            .All(attachment => !string.IsNullOrWhiteSpace(attachment.Url) && attachment.Size >= 0);
+           .All(attachment => !string.IsNullOrWhiteSpace(attachment.Url) && attachment.Size >= 0);
 
         if (!valid || message.Content is not { } content)
         {
             Interlocked.Increment(ref _failures);
-            _logger.Warning("Invalid received message metadata for {MessageId}; cache observation skipped", message.Id);
+            _logger.Warning("Invalid received message metadata for {MessageId}; cache observation skipped", propertyValue: message.Id);
 
             return Task.CompletedTask;
         }
@@ -144,7 +150,7 @@ public sealed class ModerationLoggingGatewayHandler(
             return Task.CompletedTask;
 
         // Never infer absence from Discord.NET's detached defaults (notably the empty attachment array).
-        Optional<MessageEdited> observation = updatePayload.Current;
+        DotNext.Optional<MessageEdited> observation = updatePayload.Current;
 
         if (observation is not { HasValue: true, Value: var payload })
             return Task.CompletedTask;
@@ -154,7 +160,7 @@ public sealed class ModerationLoggingGatewayHandler(
         if (!matchesEvent)
         {
             Interlocked.Increment(ref _failures);
-            _logger.Warning("Message update field presence unavailable for {MessageId}; update skipped", after.Id);
+            _logger.Warning("Message update field presence unavailable for {MessageId}; update skipped", propertyValue: after.Id);
 
             return Task.CompletedTask;
         }
@@ -163,23 +169,23 @@ public sealed class ModerationLoggingGatewayHandler(
         {
             GuildId = guildChannel.GuildId,
             ChannelId = channel.Id,
-            AuthorId = after.Author.Id == 0 ? default : new Optional<ulong>(after.Author.Id),
-            Eligible = after.Author.Id == 0 ? default : new Optional<bool>(IsQualifyingUserMessage(after)),
+            AuthorId = after.Author.Id == 0 ? default : new DotNext.Optional<ulong>(after.Author.Id),
+            Eligible = after.Author.Id == 0 ? default : new DotNext.Optional<bool>(IsQualifyingUserMessage(after)),
         };
 
         return QueueAsync(new EditedWork(edited));
     }
 
     private Task DispatchMessageDeletedAsync(Cacheable<IMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel) =>
-        QueueDeleteAsync(channel.Id, [message.Id], bulk: false);
+        QueueDeleteAsync(channelId: channel.Id, [message.Id], bulk: false);
 
     private Task DispatchMessagesBulkDeletedAsync(IReadOnlyCollection<Cacheable<IMessage, ulong>> messages, Cacheable<IMessageChannel, ulong> channel)
     {
         ImmutableArray<ulong> ids = messages
-            .Select(message => message.Id)
-            .ToImmutableArray();
+           .Select(message => message.Id)
+           .ToImmutableArray();
 
-        return QueueDeleteAsync(channel.Id, ids, bulk: true);
+        return QueueDeleteAsync(channelId: channel.Id, ids: ids, bulk: true);
     }
 
     private Task QueueDeleteAsync(ulong channelId, ImmutableArray<ulong> ids, bool bulk)
@@ -187,7 +193,8 @@ public sealed class ModerationLoggingGatewayHandler(
         if (discordClient.GetChannel(channelId) is not IGuildChannel channel)
             return Task.CompletedTask;
 
-        return QueueAsync(new DeletionWork(channel.GuildId, channelId, ids, DateTimeOffset.UtcNow, bulk));
+        return QueueAsync(
+            new DeletionWork(GuildId: channel.GuildId, ChannelId: channelId, DeletedMessageIds: ids, DeletedAt: DateTimeOffset.UtcNow, Bulk: bulk));
     }
 
     private async Task QueueAsync(CacheWork work)
@@ -195,7 +202,7 @@ public sealed class ModerationLoggingGatewayHandler(
         try
         {
             // Await admission only. Sustained overload applies bounded backpressure to gateway dispatch.
-            await _work.Writer.WriteAsync(work, _stoppingToken);
+            await _work.Writer.WriteAsync(item: work, cancellationToken: _stoppingToken);
         }
         catch (OperationCanceledException) when (_stoppingToken.IsCancellationRequested)
         {
@@ -216,12 +223,12 @@ public sealed class ModerationLoggingGatewayHandler(
 
         if (work is DeletionWork deletion)
         {
-            await ProcessDeletionAsync(deletion, sourceChannel, ct);
+            await ProcessDeletionAsync(work: deletion, sourceChannel: sourceChannel, ct: ct);
 
             return;
         }
 
-        var configuration = await scope.GetConfigurationAsync(work.GuildId, sourceChannel, ct);
+        var configuration = await scope.GetConfigurationAsync(guildId: work.GuildId, sourceChannel: sourceChannel, ct: ct);
 
         if (configuration is null)
             return;
@@ -229,11 +236,11 @@ public sealed class ModerationLoggingGatewayHandler(
         switch (work)
         {
             case ReceivedWork received:
-                await cache.ReceiveAsync(received.Message, ct);
+                await cache.ReceiveAsync(message: received.Message, ct: ct);
 
                 break;
             case EditedWork edited:
-                await ProcessEditAsync(edited.Message, sourceChannel, ct);
+                await ProcessEditAsync(edited: edited.Message, sourceChannel: sourceChannel, ct: ct);
 
                 break;
         }
@@ -241,7 +248,7 @@ public sealed class ModerationLoggingGatewayHandler(
 
     private async Task ProcessEditAsync(MessageEdited edited, IMessageChannel sourceChannel, CancellationToken ct)
     {
-        Optional<MessageEdit> result = await cache.EditAsync(edited, ct);
+        DotNext.Optional<MessageEdit> result = await cache.EditAsync(message: edited, ct: ct);
 
         if (result is not { HasValue: true, Value: var change })
             return;
@@ -249,23 +256,29 @@ public sealed class ModerationLoggingGatewayHandler(
         var after = change.After;
         var beforeContent = change.Before is { HasValue: true, Value: var before } ? before.Content : null;
 
-        var contentChanged = edited.Content is { HasValue: true } && !string.Equals(beforeContent, after.Content, StringComparison.Ordinal);
+        var contentChanged = edited.Content is { HasValue: true }
+            && !string.Equals(a: beforeContent, b: after.Content, comparisonType: StringComparison.Ordinal);
 
         if (contentChanged)
+        {
             await publisher.PublishEditAsync(
-                edited.GuildId,
-                sourceChannel,
-                after.AuthorId,
+                guildId: edited.GuildId,
+                sourceChannel: sourceChannel,
+                authorId: after.AuthorId,
                 $"https://discord.com/channels/{edited.GuildId}/{edited.ChannelId}/{after.MessageId}",
-                beforeContent,
-                after.Content,
-                after.ExpiresAtUtc,
-                ct);
+                beforeContent: beforeContent,
+                afterContent: after.Content,
+                expiresAtUtc: after.ExpiresAtUtc,
+                ct: ct);
+        }
     }
 
     private async Task ProcessDeletionAsync(DeletionWork work, IMessageChannel sourceChannel, CancellationToken ct)
     {
-        ImmutableArray<CachedMessageSnapshot> snapshots = await cache.BeginDeleteAsync(work.GuildId, work.DeletedMessageIds, ct);
+        ImmutableArray<CachedMessageSnapshot> snapshots = await cache.BeginDeleteAsync(
+            guildId: work.GuildId,
+            messageIds: work.DeletedMessageIds,
+            ct: ct);
 
         if (snapshots.IsEmpty)
             return;
@@ -275,35 +288,35 @@ public sealed class ModerationLoggingGatewayHandler(
         if (work.Bulk)
         {
             var authors = snapshots
-                .Select(message => message.AuthorId)
-                .Distinct()
-                .Take(2)
-                .ToArray();
+               .Select(message => message.AuthorId)
+               .Distinct()
+               .Take(2)
+               .ToArray();
 
             // Uncached IDs may belong to another author, including an excluded bot or webhook.
             var soleAuthorKnown = authors.Length == 1 && snapshots.Length == work.DeletedMessageIds.Length;
 
             published = await publisher.PublishBulkDeletionAsync(
-                snapshots,
-                sourceChannel,
-                work.DeletedMessageIds.Length,
+                messages: snapshots,
+                sourceChannel: sourceChannel,
+                originalMessageCount: work.DeletedMessageIds.Length,
                 soleAuthorKnown ? authors[0] : null,
-                work.DeletedAt,
-                ct);
+                deletedAt: work.DeletedAt,
+                ct: ct);
         }
         else
-            published = await publisher.PublishDeletionAsync(work.GuildId, sourceChannel, snapshots[0], ct);
+            published = await publisher.PublishDeletionAsync(guildId: work.GuildId, sourceChannel: sourceChannel, snapshots[0], ct: ct);
 
         if (published)
-            await cache.CompleteDeleteAsync(snapshots, ct);
+            await cache.CompleteDeleteAsync(snapshots: snapshots, ct: ct);
     }
 
     private abstract record CacheWork(ulong GuildId, ulong ChannelId);
 
-    private sealed record ReceivedWork(MessageReceived Message) : CacheWork(Message.GuildId, Message.ChannelId);
+    private sealed record ReceivedWork(MessageReceived Message) : CacheWork(GuildId: Message.GuildId, ChannelId: Message.ChannelId);
 
-    private sealed record EditedWork(MessageEdited Message) : CacheWork(Message.GuildId, Message.ChannelId);
+    private sealed record EditedWork(MessageEdited Message) : CacheWork(GuildId: Message.GuildId, ChannelId: Message.ChannelId);
 
     private sealed record DeletionWork(ulong GuildId, ulong ChannelId, ImmutableArray<ulong> DeletedMessageIds, DateTimeOffset DeletedAt, bool Bulk)
-        : CacheWork(GuildId, ChannelId);
+        : CacheWork(GuildId: GuildId, ChannelId: ChannelId);
 }

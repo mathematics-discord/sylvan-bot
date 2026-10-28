@@ -12,22 +12,22 @@
         <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
     </PropertyGroup>
     <Target
-        Name="StartLocalDatabase"
-        BeforeTargets="Build"
-        Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(Configuration)' == 'Debug' and '$(DesignTimeBuild)' != 'true'"
+            Name="StartLocalDatabase"
+            BeforeTargets="Build"
+            Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(Configuration)' == 'Debug' and '$(DesignTimeBuild)' != 'true'"
     >
-        <Exec Command="docker compose --env-file .env -f docker-compose.yml up -d --wait db" WorkingDirectory="$(MSBuildProjectDirectory)/.." />
+        <Exec Command="docker compose --env-file .env -f docker-compose.yml up -d --wait db" WorkingDirectory="$(MSBuildProjectDirectory)/.."/>
     </Target>
     <ItemGroup>
-        <ProjectReference Include="..\SylvanBot.Application\SylvanBot.Application.csproj" />
+        <ProjectReference Include="..\SylvanBot.Application\SylvanBot.Application.csproj"/>
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="DiffPlex" />
-        <PackageReference Include="Discord.Net.Interactions" />
-        <PackageReference Include="Discord.Net.WebSocket" />
-        <PackageReference Include="DotNetEnv" />
-        <PackageReference Include="DotNext" />
-        <PackageReference Include="JetBrains.Annotations" />
+        <PackageReference Include="DiffPlex"/>
+        <PackageReference Include="Discord.Net.Interactions"/>
+        <PackageReference Include="Discord.Net.WebSocket"/>
+        <PackageReference Include="DotNetEnv"/>
+        <PackageReference Include="DotNext"/>
+        <PackageReference Include="JetBrains.Annotations"/>
         <PackageReference Include="Meziantou.Analyzer">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -36,13 +36,13 @@
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-        <PackageReference Include="Microsoft.Extensions.Hosting" />
-        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-        <PackageReference Include="Serilog" />
-        <PackageReference Include="Serilog.Extensions.Hosting" />
-        <PackageReference Include="Serilog.Sinks.Console" />
-        <PackageReference Include="Serilog.Sinks.File" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
+        <PackageReference Include="Microsoft.Extensions.Hosting"/>
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL"/>
+        <PackageReference Include="Serilog"/>
+        <PackageReference Include="Serilog.Extensions.Hosting"/>
+        <PackageReference Include="Serilog.Sinks.Console"/>
+        <PackageReference Include="Serilog.Sinks.File"/>
     </ItemGroup>
 </Project>

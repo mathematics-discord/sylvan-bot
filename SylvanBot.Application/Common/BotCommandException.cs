@@ -3,8 +3,12 @@
 public sealed class BotCommandException : Exception
 {
     public BotCommandException(string message)
-        : base(message) { }
+        : base(message)
+    {
+    }
 
     public BotCommandException(string message, Exception innerException)
-        : base(message: message, innerException: innerException) { }
+        : base(message: message, innerException: innerException)
+    {
+    }
 }

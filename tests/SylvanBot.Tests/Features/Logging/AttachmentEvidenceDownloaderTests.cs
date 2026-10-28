@@ -1,6 +1,5 @@
 ﻿using System.Net;
 using Serilog.Core;
-using SylvanBot.Application.Common;
 using SylvanBot.Features.Logging;
 
 namespace SylvanBot.Tests.Features.Logging;
@@ -116,13 +115,13 @@ public sealed class AttachmentEvidenceDownloaderTests
 
         // Act
         var exception = await Should.ThrowAsync<OperationCanceledException>(() =>
-            AttachmentEvidenceDownloader.TryDownloadAsync(
-                httpClient: httpClient,
-                "https://example.invalid/attachment",
-                maxBytes: 4,
-                logger: Logger.None,
-                ct: cancellation.Token
-            )
+                                                                                AttachmentEvidenceDownloader.TryDownloadAsync(
+                                                                                    httpClient: httpClient,
+                                                                                    "https://example.invalid/attachment",
+                                                                                    maxBytes: 4,
+                                                                                    logger: Logger.None,
+                                                                                    ct: cancellation.Token
+                                                                                )
         );
 
         // Assert
@@ -136,8 +135,8 @@ public sealed class AttachmentEvidenceDownloaderTests
         httpClient.BaseAddress = new Uri("https://example.invalid");
 
         return await AttachmentEvidenceDownloader
-            .TryDownloadAsync(httpClient: httpClient, "/attachment", maxBytes: maxBytes, logger: Logger.None, ct: CancellationToken.None)
-            .ConfigureAwait(false);
+           .TryDownloadAsync(httpClient: httpClient, "/attachment", maxBytes: maxBytes, logger: Logger.None, ct: CancellationToken.None)
+           .ConfigureAwait(false);
     }
 
     private sealed class StaticResponseHandler(byte[] body, long? declaredLength, HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
@@ -188,7 +187,9 @@ public sealed class AttachmentEvidenceDownloaderTests
             set => throw new NotSupportedException();
         }
 
-        public override void Flush() { }
+        public override void Flush()
+        {
+        }
 
         public override int Read(byte[] buffer, int offset, int count)
         {

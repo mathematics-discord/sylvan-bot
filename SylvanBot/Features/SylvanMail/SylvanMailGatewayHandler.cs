@@ -51,20 +51,25 @@ public sealed class SylvanMailGatewayHandler(
                     switch (message)
                     {
                         case InboundMail inbound:
-                            await workflow.RelayAsync(inbound.Message, timeout.Token);
+                            await workflow.RelayAsync(message: inbound.Message, ct: timeout.Token);
 
                             break;
                         case DraftUpdated draft:
-                            await drafts.HandleDraftAsync(draft.ChannelId, draft.MessageId, draft.AuthorId, confirm: false, timeout.Token);
+                            await drafts.HandleDraftAsync(
+                                threadId: draft.ChannelId,
+                                messageId: draft.MessageId,
+                                authorId: draft.AuthorId,
+                                confirm: false,
+                                ct: timeout.Token);
 
                             break;
                         case DraftConfirmed confirmation:
                             await drafts.HandleDraftAsync(
-                                confirmation.ChannelId,
-                                confirmation.MessageId,
-                                confirmation.AuthorId,
+                                threadId: confirmation.ChannelId,
+                                messageId: confirmation.MessageId,
+                                authorId: confirmation.AuthorId,
                                 confirm: true,
-                                timeout.Token);
+                                ct: timeout.Token);
 
                             break;
                     }
@@ -130,7 +135,7 @@ public sealed class SylvanMailGatewayHandler(
             return Task.CompletedTask;
 
         // The workflow checks the mapped forum before fetching any content.
-        _messages.Writer.TryWrite(new DraftUpdated(message.Channel.Id, message.Id, message.Author.Id));
+        _messages.Writer.TryWrite(new DraftUpdated(ChannelId: message.Channel.Id, MessageId: message.Id, AuthorId: message.Author.Id));
 
         return Task.CompletedTask;
     }
@@ -142,7 +147,7 @@ public sealed class SylvanMailGatewayHandler(
             || !string.Equals(a: reaction.Emote.Name, b: SylvanMailDrafts.SendEmoji, comparisonType: StringComparison.Ordinal))
             return Task.CompletedTask;
 
-        var work = new DraftConfirmed(channel.Id, message.Id, reaction.UserId);
+        var work = new DraftConfirmed(ChannelId: channel.Id, MessageId: message.Id, AuthorId: reaction.UserId);
 
         return !_messages.Writer.TryWrite(work) ? RefuseConfirmationAsync(work) : Task.CompletedTask;
     }
@@ -192,8 +197,8 @@ public sealed class SylvanMailGatewayHandler(
             {
                 logger.Warning(
                     "SylvanMail overload notice failed for source {SourceId}: {ExceptionType}",
-                    message.SourceMessageId,
-                    noticeException.GetType().Name);
+                    propertyValue0: message.SourceMessageId,
+                    propertyValue1: noticeException.GetType().Name);
             }
         }
     }
@@ -205,26 +210,31 @@ public sealed class SylvanMailGatewayHandler(
         try
         {
             await discord.ReportAsync(
-                message,
+                source: message,
                 threadId: default,
                 receiptId: default,
                 "SylvanMail processing failed or was interrupted. Delivery is unconfirmed; do not assume it arrived. No automatic resend.",
-                timeout.Token);
+                ct: timeout.Token);
         }
         catch (Exception exception)
         {
             logger.Warning(
                 "SylvanMail failure notice failed for source {SourceId}: {ExceptionType}",
-                message.SourceMessageId,
-                exception.GetType().Name);
+                propertyValue0: message.SourceMessageId,
+                propertyValue1: exception.GetType().Name);
         }
     }
 
     private abstract record MailWork(ulong ChannelId, ulong MessageId, ulong AuthorId);
 
-    private sealed record InboundMail(SylvanMailMessage Message) : MailWork(Message.SourceChannelId, Message.SourceMessageId, Message.AuthorId);
+    private sealed record InboundMail(SylvanMailMessage Message) : MailWork(
+        ChannelId: Message.SourceChannelId,
+        MessageId: Message.SourceMessageId,
+        AuthorId: Message.AuthorId);
 
-    private sealed record DraftUpdated(ulong ChannelId, ulong MessageId, ulong AuthorId) : MailWork(ChannelId, MessageId, AuthorId);
+    private sealed record DraftUpdated(ulong ChannelId, ulong MessageId, ulong AuthorId)
+        : MailWork(ChannelId: ChannelId, MessageId: MessageId, AuthorId: AuthorId);
 
-    private sealed record DraftConfirmed(ulong ChannelId, ulong MessageId, ulong AuthorId) : MailWork(ChannelId, MessageId, AuthorId);
+    private sealed record DraftConfirmed(ulong ChannelId, ulong MessageId, ulong AuthorId)
+        : MailWork(ChannelId: ChannelId, MessageId: MessageId, AuthorId: AuthorId);
 }

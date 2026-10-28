@@ -9,16 +9,13 @@ public static class RoleColourSelection
         IReadOnlySet<ulong> eligible,
         IReadOnlySet<ulong> previouslyGranted)
     {
-        if (holdsGrant)
-        {
-            var validSelection = worn.Count == 1 && worn
-                .All(eligible.Contains);
+        if (!holdsGrant)
+            return worn.Where(previouslyGranted.Contains).ToHashSet();
 
-            return validSelection ? new HashSet<ulong>() : new HashSet<ulong>(worn);
-        }
+        var validSelection = worn.Count == 1 && worn.All(eligible.Contains);
 
-        return worn
-            .Where(previouslyGranted.Contains)
-            .ToHashSet();
+        return validSelection
+            ? new HashSet<ulong>()
+            : new HashSet<ulong>(worn);
     }
 }
