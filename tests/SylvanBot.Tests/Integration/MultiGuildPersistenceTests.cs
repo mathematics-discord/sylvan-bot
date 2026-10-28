@@ -1,8 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Common;
-using SylvanBot.Features.EmojiAnalytics;
-using SylvanBot.Features.EmojiAnalytics.Persistence;
 using SylvanBot.Features.Moderation;
 using SylvanBot.Features.RoleColours;
 using SylvanBot.Infrastructure.Data;
@@ -87,90 +85,4 @@ public sealed class MultiGuildPersistenceTests
         (publishedB.DistinctChannelThreshold, publishedB.RequiredAttachmentCount, publishedB.Window).ShouldBe((2, 5, 60));
     }
 
-    [Test]
-    public async Task EmojiState_IsPerGuild()
-    {
-        await using var db = PostgresDatabaseFixture.CreateDbContext();
-
-        db.EmojiUsageCounts.Add(
-            new EmojiUsageCount
-            {
-                GuildId = 1,
-                EmojiId = 500,
-                MessageUsageCount = 1,
-                ReactionUsageCount = 1,
-            });
-
-        db.EmojiUsageCounts.Add(
-            new EmojiUsageCount
-            {
-                GuildId = 2,
-                EmojiId = 500,
-                MessageUsageCount = 3,
-                ReactionUsageCount = 5,
-            });
-        await db.SaveChangesAsync();
-
-        var emojiUsageStore = new EmojiUsageStore(new EmojiDbContextFactory());
-
-        (await emojiUsageStore.GetUsagePageAsync(guildId: 1, [500UL], page: 1, ct: CancellationToken.None))
-            .Value.Items.Single()
-            .ReactionUsageCount.ShouldBe(1);
-
-        (await emojiUsageStore.GetUsagePageAsync(guildId: 2, [500UL], page: 1, ct: CancellationToken.None))
-            .Value.Items.Single()
-            .ReactionUsageCount.ShouldBe(5);
-
-        ErrorOr<EmojiUsagePage> pruningRead = await emojiUsageStore.GetUsagePageAsync(guildId: 1, [501UL], page: 1, ct: CancellationToken.None);
-
-        pruningRead.FirstError.Type.ShouldBe(ErrorType.NotFound);
-
-        (await db.EmojiUsageCounts
-            .AnyAsync(x => x.GuildId == 1 && x.EmojiId == 500)).ShouldBeTrue();
-
-        await emojiUsageStore.RecordBatchAsync(
-            guildId: 1,
-            [new EmojiUsageIncrement(GuildId: 1, EmojiId: 501, MessageCount: 0, ReactionCount: 1)],
-            [501UL],
-            ct: CancellationToken.None);
-
-        (await db.EmojiUsageCounts
-            .AnyAsync(x => x.GuildId == 1 && x.EmojiId == 500)).ShouldBeFalse();
-
-        var guild2Emoji = await db.EmojiUsageCounts
-            .SingleAsync(x => x.GuildId == 2 && x.EmojiId == 500);
-        guild2Emoji.MessageUsageCount.ShouldBe(3);
-        guild2Emoji.ReactionUsageCount.ShouldBe(5);
-
-        (await db.EmojiUsageCounts
-            .SingleAsync(x => x.GuildId == 1 && x.EmojiId == 501)).ReactionUsageCount.ShouldBe(1);
-    }
-
-    [Test]
-    public async Task EmojiUsage_AggregatesMessageAndReactionIncrements()
-    {
-        const ulong emojiId = 12345678901234567;
-
-        await using var db = PostgresDatabaseFixture.CreateDbContext();
-        var emojiUsageStore = new EmojiUsageStore(new EmojiDbContextFactory());
-
-        await emojiUsageStore.RecordBatchAsync(
-            guildId: 1,
-            [
-                new EmojiUsageIncrement(GuildId: 1, EmojiId: emojiId, MessageCount: 2, ReactionCount: 0),
-                new EmojiUsageIncrement(GuildId: 1, EmojiId: emojiId, MessageCount: 0, ReactionCount: 3),
-            ],
-            [emojiId],
-            ct: CancellationToken.None);
-
-        var usage = await db.EmojiUsageCounts
-            .SingleAsync(x => x.GuildId == 1 && x.EmojiId == emojiId);
-        usage.MessageUsageCount.ShouldBe(2);
-        usage.ReactionUsageCount.ShouldBe(3);
-    }
-
-    private sealed class EmojiDbContextFactory : IDbContextFactory<BotDbContext>
-    {
-        public BotDbContext CreateDbContext() => PostgresDatabaseFixture.CreateDbContext();
-    }
 }

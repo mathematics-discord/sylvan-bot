@@ -38,9 +38,6 @@ public sealed class PostgresDatabaseFixture
 
         await db.ImageSpamSettings
             .ExecuteDeleteAsync().ConfigureAwait(false);
-
-        await db.EmojiUsageCounts
-            .ExecuteDeleteAsync().ConfigureAwait(false);
     }
 
     [OneTimeSetUp]

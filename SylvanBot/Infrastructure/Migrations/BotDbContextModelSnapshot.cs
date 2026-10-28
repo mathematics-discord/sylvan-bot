@@ -313,25 +313,6 @@ namespace SylvanBot.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SylvanBot.Features.EmojiAnalytics.EmojiUsageCount", b =>
-                {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("EmojiId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("MessageUsageCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ReactionUsageCount")
-                        .HasColumnType("int");
-
-                    b.HasKey("GuildId", "EmojiId");
-
-                    b.ToTable("EmojiUsageCounts", (string)null);
-                });
-
             modelBuilder.Entity("SylvanBot.Features.Logging.LoggingConfiguration", b =>
                 {
                     b.Property<long>("GuildId")

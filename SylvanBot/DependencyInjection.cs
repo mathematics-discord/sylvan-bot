@@ -1,8 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.SylvanMail;
-using SylvanBot.Features.EmojiAnalytics;
-using SylvanBot.Features.EmojiAnalytics.Persistence;
 using SylvanBot.Features.EmojiYoink;
 using SylvanBot.Features.Logging;
 using SylvanBot.Features.MessageCache;
@@ -59,25 +57,10 @@ public static class DependencyInjection
             services.AddSingleton<ImageBurstSpamDetector>();
             services.AddSingleton<ImageSpamSettingsService>();
 
-            services
-                .AddOptions<EmojiAnalyticsOptions>()
-                .Bind(configuration.GetSection(EmojiAnalyticsOptions.SectionName))
-                .Validate(
-                    options => options.EnabledGuildIds
-                        .All(guildId => guildId != 0),
-                    "Emoji analytics guild ids must be non-zero.")
-                .ValidateOnStart();
-
             services.AddSingleton<DiscordGuildEmojiImporter>();
             services.AddModerationLogging(configuration);
             services.AddSingleton<ImageBurstSpamGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ImageBurstSpamGatewayHandler>());
-
-            services.AddSingleton<EmojiUsageStore>();
-            services.AddSingleton<EmojiAnalyticsGatewayHandler>();
-            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<EmojiAnalyticsGatewayHandler>());
-            services.AddSingleton<EmojiAnalyticsWorker>();
-            services.AddHostedService(sp => sp.GetRequiredService<EmojiAnalyticsWorker>());
 
             services.AddScoped<RoleColourOperations>();
             services.AddSingleton<RoleColourReconciler>();

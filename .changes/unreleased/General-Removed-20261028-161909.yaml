@@ -1,0 +1,4 @@
+component: General
+kind: Removed
+body: Remove /emoji usage and automatic emoji usage tracking. The database migration drops EmojiUsageCounts and permanently deletes the stored counts.
+time: 2026-10-28T16:19:09.4313484Z

@@ -17,7 +17,6 @@ and instructions.
 - [/colour](./color/) — Choose or reset your display colour, or list the
   server's colour options.
 
-- [/emoji usage](./emoji/) — Browse custom emoji usage counts.
 
 ## Moderator commands
 

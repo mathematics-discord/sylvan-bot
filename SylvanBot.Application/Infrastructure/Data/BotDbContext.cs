@@ -3,7 +3,6 @@ using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.RoleReactions;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Application.Features.WorkingHours;
-using SylvanBot.Features.EmojiAnalytics;
 using SylvanBot.Features.Logging;
 using SylvanBot.Features.Moderation;
 using SylvanBot.Features.RoleColours;
@@ -26,8 +25,6 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<WorkingHoursPreference> WorkingHours => Set<WorkingHoursPreference>();
 
     public DbSet<WorkingHoursSettings> WorkingHoursSettings => Set<WorkingHoursSettings>();
-
-    public DbSet<EmojiUsageCount> EmojiUsageCounts => Set<EmojiUsageCount>();
 
     public DbSet<ImageSpamSettings> ImageSpamSettings => Set<ImageSpamSettings>();
 

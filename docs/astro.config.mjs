@@ -23,7 +23,6 @@ export default defineConfig({
                 items: [
                     {slug: 'commands/hello'},
                     {slug: 'commands/color'},
-                    {slug: 'commands/emoji'},
                 ],
             },
             {
