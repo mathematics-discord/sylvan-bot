@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: Respect Discord reaction rate limits so pending SylvanMail replies show both 📤 to send and ❌ to cancel, and successful delivery leaves ✅ on the original forum message after clearing its reactions.
+time: 2026-10-28T18:30:00Z

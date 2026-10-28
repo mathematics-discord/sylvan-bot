@@ -8,6 +8,11 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
     public const string SendEmoji = "\U0001F4E4";
     public const string CancelEmoji = "\u274C";
 
+    // Consecutive reaction changes share Discord's rate limits. Wait within the caller's
+    // cancellation budget; this policy must not be used for sending message payloads.
+    private static RequestOptions ReactionOptions(CancellationToken ct) =>
+        new RequestOptions { CancelToken = ct, RetryMode = RetryMode.RetryRatelimit };
+
     public static SylvanMailMessage ReadMessage(IUserMessage source, ulong? guildId)
     {
         ImmutableArray<SylvanMailAttachment> attachments = source
@@ -42,12 +47,12 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         bool confirm,
         CancellationToken ct)
     {
-        var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct);
+        var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
 
         if (channel is not IThreadChannel thread)
             return default;
 
-        var fetched = await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, Options(ct));
+        var fetched = await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, ReactionOptions(ct));
 
         if (fetched is not IUserMessage source)
             return default;
@@ -74,7 +79,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
             if (!replyToBot && source.Reference?.MessageId.IsSpecified == true)
             {
-                var referenced = await channel.GetMessageAsync(id: source.Reference.MessageId.Value, mode: CacheMode.AllowDownload, Options(ct));
+                var referenced = await channel.GetMessageAsync(id: source.Reference.MessageId.Value, mode: CacheMode.AllowDownload, ReactionOptions(ct));
                 replyToBot = referenced?.Author.Id == client.CurrentUser.Id;
             }
 
@@ -102,9 +107,9 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
     {
         try
         {
-            var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct);
+            var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
 
-            if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, Options(ct)) is not IUserMessage message)
+            if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, ReactionOptions(ct)) is not IUserMessage message)
                 return;
 
             foreach (var control in new[] { SendEmoji, CancelEmoji })
@@ -116,9 +121,9 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
                     continue;
 
                 if (ready)
-                    await message.AddReactionAsync(emote: emoji, Options(ct));
+                    await message.AddReactionAsync(emote: emoji, ReactionOptions(ct));
                 else
-                    await message.RemoveReactionAsync(emote: emoji, userId: client.CurrentUser.Id, Options(ct));
+                    await message.RemoveReactionAsync(emote: emoji, userId: client.CurrentUser.Id, ReactionOptions(ct));
             }
         }
         catch (Exception exception)
@@ -129,22 +134,22 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
     public async Task ClearReactionsAsync(ulong threadId, ulong messageId, CancellationToken ct)
     {
-        var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct);
+        var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
 
-        if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, Options(ct)) is IUserMessage message)
-            await message.RemoveAllReactionsAsync(Options(ct));
+        if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, ReactionOptions(ct)) is IUserMessage message)
+            await message.RemoveAllReactionsAsync(ReactionOptions(ct));
     }
 
     public async Task MarkDeliveredAsync(SylvanMailMessage message, CancellationToken ct)
     {
         try
         {
-            var channel = await MessageChannelAsync(client: client, channelId: message.SourceChannelId, ct: ct);
+            var channel = await MessageChannelAsync(client: client, channelId: message.SourceChannelId, ct: ct, retryMode: RetryMode.RetryRatelimit);
 
-            if (await channel.GetMessageAsync(id: message.SourceMessageId, mode: CacheMode.AllowDownload, Options(ct)) is IUserMessage source)
+            if (await channel.GetMessageAsync(id: message.SourceMessageId, mode: CacheMode.AllowDownload, ReactionOptions(ct)) is IUserMessage source)
             {
-                await source.RemoveAllReactionsAsync(Options(ct));
-                await source.AddReactionAsync(new Emoji("\u2705"), Options(ct));
+                await source.RemoveAllReactionsAsync(ReactionOptions(ct));
+                await source.AddReactionAsync(new Emoji("\u2705"), ReactionOptions(ct));
             }
         }
         catch (Exception exception)

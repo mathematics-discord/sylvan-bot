@@ -21,9 +21,15 @@ internal static class SylvanMailRequests
         }
     }
 
-    public static async Task<IMessageChannel> MessageChannelAsync(DiscordSocketClient client, ulong channelId, CancellationToken ct)
+    public static async Task<IMessageChannel> MessageChannelAsync(
+        DiscordSocketClient client,
+        ulong channelId,
+        CancellationToken ct,
+        RetryMode retryMode = RetryMode.AlwaysFail)
     {
-        var channel = await client.Rest.GetChannelAsync(id: channelId, Options(ct));
+        var options = Options(ct);
+        options.RetryMode = retryMode;
+        var channel = await client.Rest.GetChannelAsync(id: channelId, options);
 
         return channel as IMessageChannel ?? throw new BotCommandException("The delivery channel is inaccessible.");
     }
