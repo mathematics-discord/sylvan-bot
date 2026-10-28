@@ -122,6 +122,27 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
         return await guild.GetBanAsync(userId, Options(cancellationToken)) is not null;
     }
 
+    public async Task<bool> IsReviewExemptAsync(
+        ulong guildId,
+        ulong moderatorId,
+        ICollection<long> roleIds,
+        CancellationToken cancellationToken)
+    {
+        if (roleIds.Count == 0)
+            return false;
+
+        var guild = await socketClient.Rest.GetGuildAsync(guildId, Options(cancellationToken));
+        var member = await guild.GetUserAsync(moderatorId, Options(cancellationToken));
+
+        if (member is null)
+            return false;
+
+        var hasExemptRole = member.RoleIds
+           .Any(roleId => roleIds.Contains(checked((long)roleId)));
+
+        return hasExemptRole || roleIds.Contains(checked((long)guildId));
+    }
+
     public async Task RevertVoiceMuteAsync(Ticket ticket, CancellationToken cancellationToken)
     {
         var guild = await socketClient.Rest.GetGuildAsync(ticket.GuildId, Options(cancellationToken));

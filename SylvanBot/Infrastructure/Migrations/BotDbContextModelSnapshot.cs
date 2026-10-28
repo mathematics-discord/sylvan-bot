@@ -449,6 +449,9 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<int?>("PublishedVersion")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("ReviewExempt")
+                        .HasColumnType("boolean");
+
                     b.Property<long?>("RoleId")
                         .HasColumnType("bigint");
 
@@ -525,6 +528,10 @@ namespace SylvanBot.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(86400);
+
+                    b.PrimitiveCollection<List<long>>("ReviewExemptRoleIds")
+                        .IsRequired()
+                        .HasColumnType("bigint[]");
 
                     b.HasKey("GuildId");
 

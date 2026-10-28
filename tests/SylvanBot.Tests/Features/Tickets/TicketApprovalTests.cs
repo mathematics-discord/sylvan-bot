@@ -104,6 +104,39 @@ public sealed class TicketApprovalTests
         ticket.ApprovedAtUtc.ShouldNotBeNull();
     }
 
+    [Test]
+    public void Approve_ExemptTicket_DoesNotRecordManualApproval()
+    {
+        // Arrange
+        var ticket = CompleteTicket();
+        ticket.ReviewExempt = true;
+        var reviewer = new TicketActor(1, 2, IsAdministrator: true, CanTimeoutMembers: false);
+
+        // Act
+        void Act() => ticket.Approve(reviewer, 0);
+
+        // Assert
+        Should.Throw<BotCommandException>(Act);
+        ticket.ApprovedAtUtc.ShouldBeNull();
+        ticket.ReviewExempt.ShouldBeTrue();
+    }
+
+    [Test]
+    public void Content_ExemptTicketEdited_PreservesExemption()
+    {
+        // Arrange
+        var ticket = CompleteTicket();
+        ticket.ReviewExempt = true;
+
+        // Act
+        ticket.Comment = "Corrected reason";
+        ticket.DurationSeconds = 60;
+
+        // Assert
+        ticket.ReviewExempt.ShouldBeTrue();
+        ticket.ApprovedAtUtc.ShouldBeNull();
+    }
+
     private static Ticket CompleteTicket() => new Ticket
     {
         GuildId = 1,

@@ -761,7 +761,7 @@ public sealed partial class TicketWorkflow(
                 exception.GetType().Name);
 
             throw new BotCommandException(
-                "Saving ticket configuration could not be confirmed. Read /ticket-admin config before changing it again.",
+                "Saving ticket configuration could not be confirmed. Read /config tickets config before changing it again.",
                 exception);
         }
     }

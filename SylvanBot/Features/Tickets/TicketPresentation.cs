@@ -37,11 +37,14 @@ internal static class TicketPresentation
 
         var label = ticket.ApprovedAtUtc is null ? "Approve" : "Approved";
 
+        if (ticket.ReviewExempt)
+            label = "Review exempt";
+
         builder.WithButton(
             label,
             $"ticket:approve:{ticket.Number}:{ticket.Version}",
             ButtonStyle.Success,
-            disabled: ticket.ApprovedAtUtc is not null);
+            disabled: ticket.ReviewExempt || ticket.ApprovedAtUtc is not null);
 
         return builder.Build();
     }

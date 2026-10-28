@@ -30,6 +30,8 @@ public interface IDiscordTicket
 
     Task<bool> IsBannedAsync(ulong guildId, ulong userId, CancellationToken cancellationToken);
 
+    Task<bool> IsReviewExemptAsync(ulong guildId, ulong moderatorId, ICollection<long> roleIds, CancellationToken cancellationToken);
+
     Task RevertVoiceMuteAsync(Ticket ticket, CancellationToken cancellationToken);
 
     Task UnbanAsync(Ticket ticket, Guid operationId, CancellationToken cancellationToken);

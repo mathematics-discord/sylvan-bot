@@ -406,6 +406,13 @@ public sealed partial class TicketWorkflow
 
             created = CreateObservedTicket(observation, number);
 
+            if (created.ModeratorUserId is not null)
+                created.ReviewExempt = await discord.IsReviewExemptAsync(
+                    guildId: created.GuildId,
+                    moderatorId: created.ModeratorUserId.Value,
+                    roleIds: configuration.ReviewExemptRoleIds,
+                    cancellationToken);
+
             if (olderThanKnownChange)
             {
                 created.Status = TicketStatus.Reverted;

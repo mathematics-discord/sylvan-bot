@@ -1,0 +1,4 @@
+component: Administration
+kind: Added
+body: Configure roles exempt from review for newly captured tickets through /config tickets review-exempt. Ticket settings are now under /config tickets config.
+time: 2026-10-28T23:09:59.892222+00:00

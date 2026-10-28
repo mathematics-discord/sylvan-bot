@@ -56,6 +56,8 @@ public sealed class Ticket
 
     public DateTimeOffset? ApprovedAtUtc { get; set; }
 
+    public bool ReviewExempt { get; set; }
+
     public bool HidePending { get; set; }
 
     public ulong? RoleId { get; init; }
@@ -131,7 +133,7 @@ public sealed class Ticket
             throw new Common.BotCommandException("This ticket changed. Refresh it before approving.");
 
         if (Action is not (TicketAction.Ban or TicketAction.Timeout or TicketAction.VoiceMute)
-            || Hidden || HidePending || PendingOperationId is not null
+            || ReviewExempt || Hidden || HidePending || PendingOperationId is not null
             || string.IsNullOrWhiteSpace(Comment) || !DurationKnown
             || (Action == TicketAction.Timeout && DurationSeconds is not > 0)
             || Completion == TicketCompletion.Pending)
