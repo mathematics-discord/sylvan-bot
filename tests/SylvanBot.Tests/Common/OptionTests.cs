@@ -22,8 +22,8 @@ public sealed class OptionTests
     public void Convert_Some_PreservesCaseAndPayload()
     {
         // Arrange
-        var          payload = new object();
-        Some<object> some    = new(payload);
+        var payload = new object();
+        Some<object> some = new Some<object>(payload);
 
         // Act
         Option<object> result = some;
@@ -37,7 +37,7 @@ public sealed class OptionTests
     public void Convert_SomeWithNullPayload_PreservesSome()
     {
         // Arrange
-        Some<string?> some = new(null);
+        Some<string?> some = new Some<string?>(Value: null);
 
         // Act
         Option<string?> result = some;

@@ -13,6 +13,7 @@ public sealed record SylvanMailMessage(
     string Content,
     ImmutableArray<SylvanMailAttachment> Attachments,
     bool UnsupportedContent,
-    string OutboundPrefix = "");
+    string OutboundPrefix = ""
+);
 
 public sealed record SylvanMailAttachment(string Url, string Filename, int Size, bool Spoiler);

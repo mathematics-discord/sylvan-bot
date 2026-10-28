@@ -78,8 +78,7 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
             return;
         }
 
-        ImmutableArray<RoleColourOption> options =
-            await operations.ListConfiguredOptionsAsync(guildId: Context.Guild.Id, ct: CancellationToken.None);
+        ImmutableArray<RoleColourOption> options = await operations.ListConfiguredOptionsAsync(guildId: Context.Guild.Id, ct: CancellationToken.None);
 
         if (options.IsEmpty)
         {
@@ -98,10 +97,10 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         if (!eligible.IsEmpty)
         {
             var menu = new SelectMenuBuilder()
-               .WithCustomId($"{SwapPrefix}:select:{ownerUserId}")
-               .WithPlaceholder("Choose a colour…")
-               .WithMinValues(1)
-               .WithMaxValues(1);
+                .WithCustomId($"{SwapPrefix}:select:{ownerUserId}")
+                .WithPlaceholder("Choose a colour…")
+                .WithMinValues(1)
+                .WithMaxValues(1);
 
             foreach (var role in eligible)
                 menu.AddOption(label: role.Name, role.Id.ToString());
@@ -128,8 +127,7 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         var builder = new StringBuilder("Configured colour options:");
 
         foreach (var option in options)
-            builder.AppendLine()
-               .Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
+            builder.AppendLine().Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
 
         return builder.ToString();
     }
@@ -138,8 +136,12 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
     {
         await DeferAsync(true);
 
-        ErrorOr<Option<ulong>> result =
-            await colours.TrySetUserColourAsync(guild: Context.Guild, userId: Context.User.Id, colourId: selected, ct: CancellationToken.None);
+        ErrorOr<Option<ulong>> result = await colours.TrySetUserColourAsync(
+            guild: Context.Guild,
+            userId: Context.User.Id,
+            colourId: selected,
+            ct: CancellationToken.None
+        );
 
         await FollowupAsync(ResultMessage(result), ephemeral: true);
 

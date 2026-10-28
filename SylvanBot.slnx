@@ -1,22 +1,22 @@
 <Solution>
     <Folder Name="/src/">
-        <Project Path="SylvanBot\SylvanBot.csproj"/>
-        <Project Path="SylvanBot.Application\SylvanBot.Application.csproj"/>
+        <Project Path="SylvanBot\SylvanBot.csproj" />
+        <Project Path="SylvanBot.Application\SylvanBot.Application.csproj" />
     </Folder>
     <Folder Name="/ops/docker/">
-        <File Path="docker-compose.yml"/>
-        <File Path="docker-compose.production.yml"/>
+        <File Path="docker-compose.yml" />
+        <File Path="docker-compose.production.yml" />
     </Folder>
-    <Folder Name="/ops/"/>
+    <Folder Name="/ops/" />
     <Folder Name="/ops/cicd/">
-        <File Path=".github/workflows/deploy-vps.yml"/>
-        <File Path="scripts/deploy-vps-stack.sh"/>
+        <File Path=".github/workflows/deploy-vps.yml" />
+        <File Path="scripts/deploy-vps-stack.sh" />
     </Folder>
     <Folder Name="/build/">
-        <File Path="Directory.Build.props"/>
-        <File Path="Directory.Packages.props"/>
+        <File Path="Directory.Build.props" />
+        <File Path="Directory.Packages.props" />
     </Folder>
     <Folder Name="/tests/">
-        <Project Path="tests/SylvanBot.Tests/SylvanBot.Tests.csproj"/>
+        <Project Path="tests/SylvanBot.Tests/SylvanBot.Tests.csproj" />
     </Folder>
 </Solution>

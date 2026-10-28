@@ -91,8 +91,7 @@ public sealed class AttachmentEvidenceDownloaderTests
     public async Task TryDownloadAsync_UnsuccessfulResponse_ReturnsNone()
     {
         // Arrange
-        using var httpClient = new HttpClient(
-            new StaticResponseHandler([], declaredLength: 0, status: HttpStatusCode.NotFound));
+        using var httpClient = new HttpClient(new StaticResponseHandler([], declaredLength: 0, status: HttpStatusCode.NotFound));
 
         // Act
         Option<byte[]> result = await AttachmentEvidenceDownloader.TryDownloadAsync(
@@ -100,7 +99,8 @@ public sealed class AttachmentEvidenceDownloaderTests
             "https://example.invalid/attachment",
             maxBytes: 4,
             logger: Logger.None,
-            ct: CancellationToken.None);
+            ct: CancellationToken.None
+        );
 
         // Assert
         result.Value.ShouldBeOfType<None>();
@@ -110,18 +110,20 @@ public sealed class AttachmentEvidenceDownloaderTests
     public async Task TryDownloadAsync_CancelledRequest_PropagatesCancellation()
     {
         // Arrange
-        using var httpClient   = new HttpClient(new StaticResponseHandler([1], declaredLength: 1));
+        using var httpClient = new HttpClient(new StaticResponseHandler([1], declaredLength: 1));
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
 
         // Act
         var exception = await Should.ThrowAsync<OperationCanceledException>(() =>
-                                                                                AttachmentEvidenceDownloader.TryDownloadAsync(
-                                                                                    httpClient: httpClient,
-                                                                                    "https://example.invalid/attachment",
-                                                                                    maxBytes: 4,
-                                                                                    logger: Logger.None,
-                                                                                    ct: cancellation.Token));
+            AttachmentEvidenceDownloader.TryDownloadAsync(
+                httpClient: httpClient,
+                "https://example.invalid/attachment",
+                maxBytes: 4,
+                logger: Logger.None,
+                ct: cancellation.Token
+            )
+        );
 
         // Assert
         exception.CancellationToken.IsCancellationRequested.ShouldBeTrue();
@@ -134,26 +136,15 @@ public sealed class AttachmentEvidenceDownloaderTests
         httpClient.BaseAddress = new Uri("https://example.invalid");
 
         return await AttachmentEvidenceDownloader
-           .TryDownloadAsync(
-                httpClient: httpClient,
-                "/attachment",
-                maxBytes: maxBytes,
-                logger: Logger.None,
-                ct: CancellationToken.None)
-           .ConfigureAwait(false);
+            .TryDownloadAsync(httpClient: httpClient, "/attachment", maxBytes: maxBytes, logger: Logger.None, ct: CancellationToken.None)
+            .ConfigureAwait(false);
     }
 
-    private sealed class StaticResponseHandler(
-        byte[] body,
-        long? declaredLength,
-        HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
+    private sealed class StaticResponseHandler(byte[] body, long? declaredLength, HttpStatusCode status = HttpStatusCode.OK) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            var response = new HttpResponseMessage(status)
-                { Content = new StaticLengthContent(body: body, declaredLength: declaredLength) };
+            var response = new HttpResponseMessage(status) { Content = new StaticLengthContent(body: body, declaredLength: declaredLength) };
 
             return Task.FromResult(response);
         }
@@ -161,7 +152,8 @@ public sealed class AttachmentEvidenceDownloaderTests
 
     private sealed class StaticLengthContent(byte[] body, long? declaredLength) : HttpContent
     {
-        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) => stream.WriteAsync(buffer: body, offset: 0, count: body.Length);
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
+            stream.WriteAsync(buffer: body, offset: 0, count: body.Length);
 
         protected override bool TryComputeLength(out long length)
         {
@@ -184,11 +176,11 @@ public sealed class AttachmentEvidenceDownloaderTests
     {
         private int _position;
 
-        public          int  BytesRead { get; private set; }
-        public override bool CanRead   => true;
-        public override bool CanSeek   => false;
-        public override bool CanWrite  => false;
-        public override long Length    => body.Length;
+        public int BytesRead { get; private set; }
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => body.Length;
 
         public override long Position
         {
@@ -196,9 +188,7 @@ public sealed class AttachmentEvidenceDownloaderTests
             set => throw new NotSupportedException();
         }
 
-        public override void Flush()
-        {
-        }
+        public override void Flush() { }
 
         public override int Read(byte[] buffer, int offset, int count)
         {
@@ -221,7 +211,8 @@ public sealed class AttachmentEvidenceDownloaderTests
             return bytesToRead;
         }
 
-        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => ValueTask.FromResult(Read(buffer.Span));
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(Read(buffer.Span));
 
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 

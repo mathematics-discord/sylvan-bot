@@ -26,8 +26,7 @@ public sealed class WorkingHoursConfigurationTests
         settings.PingRoleId.ShouldBe(10UL);
         settings.EligibleRoles.Count.ShouldBe(1);
 
-        var role = settings.EligibleRoles
-           .Single();
+        var role = settings.EligibleRoles.Single();
         role.RoleId.ShouldBe(20UL);
         role.IsExempt.ShouldBeTrue();
         settings.IsComplete.ShouldBeTrue();
@@ -76,10 +75,10 @@ public sealed class WorkingHoursConfigurationTests
     public void DesiredPingRole_ReenabledGuild_ResumesSavedScheduleAtCurrentTime()
     {
         // Arrange
-        var settings   = new WorkingHoursSettings { Enabled = false };
+        var settings = new WorkingHoursSettings { Enabled = false };
         var preference = new WorkingHoursPreference(guildId: 123, memberId: 456);
         preference.EnableSchedule(WorkingHoursTimeParser.Parse("09:00:00Z", "17:00:00Z", timezone: null).Value);
-        var now    = new DateTimeOffset(year: 2026, month: 10, day: 28, hour: 18, minute: 0, second: 0, offset: TimeSpan.Zero);
+        var now = new DateTimeOffset(year: 2026, month: 10, day: 28, hour: 18, minute: 0, second: 0, offset: TimeSpan.Zero);
         var active = preference.Window!.IsActive(now);
 
         // Act / Assert

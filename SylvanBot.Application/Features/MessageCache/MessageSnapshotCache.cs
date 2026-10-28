@@ -174,7 +174,11 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
             foreach (var snapshot in snapshots)
             {
                 await persistence.DeleteAsync(_botId, snapshot.GuildId, snapshot.MessageId, ct);
-                _deletions[(snapshot.GuildId, snapshot.MessageId)] = new Deletion { ExpiresAtUtc = snapshot.ExpiresAtUtc, State = DeletionState.Removed };
+                _deletions[(snapshot.GuildId, snapshot.MessageId)] = new Deletion
+                {
+                    ExpiresAtUtc = snapshot.ExpiresAtUtc,
+                    State = DeletionState.Removed,
+                };
             }
         }
         finally
@@ -189,13 +193,14 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
 
         try
         {
-            return _messages.Values
-                .Where(snapshot => snapshot.ExpiresAtUtc > timeProvider.GetUtcNow())
+            return _messages
+                .Values.Where(snapshot => snapshot.ExpiresAtUtc > timeProvider.GetUtcNow())
                 .GroupBy(snapshot => (snapshot.GuildId, snapshot.ChannelId))
                 .Select(group => new CachedChannelStatistics
                 {
                     GuildId = group.Key.GuildId,
-                    ChannelId = group.Key.ChannelId, Count = group.Count(),
+                    ChannelId = group.Key.ChannelId,
+                    Count = group.Count(),
                     OldestCreatedAtUtc = group.Min(snapshot => snapshot.CreatedAtUtc),
                 })
                 .ToImmutableArray();
@@ -269,17 +274,22 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
             {
                 EditedAtUtc = timestamp,
                 Content = message.Content.Value is Some<string>(var content) ? content : before.Content,
-                Attachments = message.Attachments.Value is Some<ImmutableArray<MessageAttachment>>(var attachments) ? attachments : before.Attachments,
-            });
+                Attachments = message.Attachments.Value is Some<ImmutableArray<MessageAttachment>>(var attachments)
+                    ? attachments
+                    : before.Attachments,
+            }
+        );
     }
 
     private static Option<CachedMessageSnapshot> TryCreateSnapshot(MessageEdited message)
     {
-        if (message.AuthorId.Value is not Some<ulong>(var authorId)
+        if (
+            message.AuthorId.Value is not Some<ulong>(var authorId)
             || message.Eligible.Value is not Some<bool>(true)
             || message.Content.Value is not Some<string>(var content)
             || message.Attachments.Value is not Some<ImmutableArray<MessageAttachment>>(var attachments)
-            || message.EditedAtUtc.Value is not Some<DateTimeOffset?>(var timestamp))
+            || message.EditedAtUtc.Value is not Some<DateTimeOffset?>(var timestamp)
+        )
             return new None();
 
         return new Some<CachedMessageSnapshot>(
@@ -293,7 +303,8 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
                 EditedAtUtc = timestamp,
                 Content = content,
                 Attachments = attachments,
-            });
+            }
+        );
     }
 
     // Called only while the cache gate is held: failed writes never publish an in-memory success.
@@ -310,7 +321,9 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
     }
 
     private Option<CachedMessageSnapshot> Read((ulong GuildId, ulong MessageId) key) =>
-        _messages.TryGetValue(key, out var snapshot) && snapshot.ExpiresAtUtc > timeProvider.GetUtcNow() ? new Some<CachedMessageSnapshot>(snapshot) : new None();
+        _messages.TryGetValue(key, out var snapshot) && snapshot.ExpiresAtUtc > timeProvider.GetUtcNow()
+            ? new Some<CachedMessageSnapshot>(snapshot)
+            : new None();
 
     private void EnsureReady()
     {

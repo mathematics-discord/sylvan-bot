@@ -59,18 +59,16 @@ public sealed class DiscordBotHostedService : IHostedService
         {
             var bot = await _discordClient.Rest.GetApplicationInfoAsync(new RequestOptions { CancelToken = cancellationToken });
 
-            IEnumerable<Discord.Rest.RestUserGuild> guilds = await _discordClient.Rest
-                .GetGuildSummariesAsync(options: new RequestOptions { CancelToken = cancellationToken })
+            IEnumerable<Discord.Rest.RestUserGuild> guilds = await _discordClient
+                .Rest.GetGuildSummariesAsync(options: new RequestOptions { CancelToken = cancellationToken })
                 .FlattenAsync();
 
-            var guildIds = guilds
-                .Select(guild => guild.Id)
-                .ToArray();
+            var guildIds = guilds.Select(guild => guild.Id).ToArray();
 
             await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-            var configuredGuilds = await db.LoggingConfigurations
-                .AsNoTracking()
+            var configuredGuilds = await db
+                .LoggingConfigurations.AsNoTracking()
                 .Where(configuration => configuration.Enabled && guildIds.Contains(configuration.GuildId))
                 .Select(configuration => configuration.GuildId)
                 .ToArrayAsync(cancellationToken);
@@ -126,12 +124,19 @@ public sealed class DiscordBotHostedService : IHostedService
                 "[{Category}] {Source}: {Message}",
                 propertyValue0: category,
                 propertyValue1: source,
-                propertyValue2: message.Message);
+                propertyValue2: message.Message
+            );
 
             return;
         }
 
-        _logger.Write(level: level, "[{Category}] {Source}: {Message}", propertyValue0: category, propertyValue1: source, propertyValue2: message.Message);
+        _logger.Write(
+            level: level,
+            "[{Category}] {Source}: {Message}",
+            propertyValue0: category,
+            propertyValue1: source,
+            propertyValue2: message.Message
+        );
     }
 
     private Task OnConnectedAsync()

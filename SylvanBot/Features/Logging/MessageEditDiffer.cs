@@ -7,23 +7,19 @@ namespace SylvanBot.Features.Logging;
 
 internal static class MessageEditDiffer
 {
-    private const           double                SimilarTokenThreshold = 0.5;
-    private const           string                Red                   = "\e[1;31m";
-    private const           string                Green                 = "\e[1;32m";
-    private const           string                Reset                 = "\e[0m";
-    private static readonly CustomFunctionChunker TokenChunker          = new(s => ChunkTokens(s).ToList());
+    private const double SimilarTokenThreshold = 0.5;
+    private const string Red = "\e[1;31m";
+    private const string Green = "\e[1;32m";
+    private const string Reset = "\e[0m";
+
+    private static readonly CustomFunctionChunker TokenChunker = new CustomFunctionChunker(s => ChunkTokens(s).ToList());
 
     public static (string Before, string After) BuildDiff(string before, string after)
     {
-        var diff = Differ.Instance.CreateDiffs(
-            oldText: before,
-            newText: after,
-            ignoreWhiteSpace: false,
-            ignoreCase: false,
-            chunker: TokenChunker);
+        var diff = Differ.Instance.CreateDiffs(oldText: before, newText: after, ignoreWhiteSpace: false, ignoreCase: false, chunker: TokenChunker);
 
         var beforeBuilder = new StringBuilder();
-        var afterBuilder  = new StringBuilder();
+        var afterBuilder = new StringBuilder();
         AppendDiff(diff: diff, before: beforeBuilder, after: afterBuilder, refineTokens: true);
 
         return (beforeBuilder.ToString(), afterBuilder.ToString());
@@ -60,36 +56,29 @@ internal static class MessageEditDiffer
             return null;
 
         var beforeToken = tokenDiff.PiecesOld[block.DeleteStartA];
-        var afterToken  = tokenDiff.PiecesNew[block.InsertStartB];
+        var afterToken = tokenDiff.PiecesNew[block.InsertStartB];
 
         var characterDiff = Differ.Instance.CreateDiffs(
             oldText: beforeToken,
             newText: afterToken,
             ignoreWhiteSpace: false,
             ignoreCase: false,
-            chunker: CharacterChunker.Instance);
+            chunker: CharacterChunker.Instance
+        );
 
-        var removedCharacters = characterDiff.DiffBlocks
-           .Sum(change => change.DeleteCountA);
+        var removedCharacters = characterDiff.DiffBlocks.Sum(change => change.DeleteCountA);
 
-        var addedCharacters = characterDiff.DiffBlocks
-           .Sum(change => change.InsertCountB);
+        var addedCharacters = characterDiff.DiffBlocks.Sum(change => change.InsertCountB);
 
-        var commonCharacters   = Math.Max(beforeToken.Length - removedCharacters, afterToken.Length - addedCharacters);
+        var commonCharacters = Math.Max(beforeToken.Length - removedCharacters, afterToken.Length - addedCharacters);
         var longestTokenLength = Math.Max(val1: beforeToken.Length, val2: afterToken.Length);
 
-        var tokensAreSimilar = longestTokenLength > 0
-            && (double)commonCharacters / longestTokenLength >= SimilarTokenThreshold;
+        var tokensAreSimilar = longestTokenLength > 0 && (double)commonCharacters / longestTokenLength >= SimilarTokenThreshold;
 
         return tokensAreSimilar ? characterDiff : null;
     }
 
-    private static void AppendUnchanged(
-        IReadOnlyList<string> pieces,
-        int start,
-        int end,
-        StringBuilder before,
-        StringBuilder after)
+    private static void AppendUnchanged(IReadOnlyList<string> pieces, int start, int end, StringBuilder before, StringBuilder after)
     {
         for (var index = start; index < end; index++)
         {
@@ -98,12 +87,7 @@ internal static class MessageEditDiffer
         }
     }
 
-    private static void AppendChanged(
-        StringBuilder output,
-        IReadOnlyList<string> pieces,
-        int start,
-        int count,
-        string color)
+    private static void AppendChanged(StringBuilder output, IReadOnlyList<string> pieces, int start, int count, string color)
     {
         if (count == 0)
             return;
@@ -118,8 +102,8 @@ internal static class MessageEditDiffer
 
     private static Queue<string> ChunkTokens(string text)
     {
-        Queue<string> chunks   = [];
-        var           position = 0;
+        Queue<string> chunks = [];
+        var position = 0;
 
         while (position < text.Length)
         {

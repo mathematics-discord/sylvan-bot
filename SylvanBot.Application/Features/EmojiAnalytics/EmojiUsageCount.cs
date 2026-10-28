@@ -6,22 +6,22 @@
 public sealed class EmojiUsageCount
 {
     /// <summary>
-    ///     The snowflake ID for the emoji.
+    ///     Gets the snowflake ID for the emoji.
     /// </summary>
     public required ulong EmojiId { get; init; }
 
     /// <summary>
-    ///     The Identifier of the Guild whence came the emoji.
+    ///     Gets the Identifier of the Guild whence came the emoji.
     /// </summary>
     public required ulong GuildId { get; init; }
 
     /// <summary>
-    ///     The number of times the emoji has been used in a message.
+    ///     Gets or sets the number of times the emoji has been used in a message.
     /// </summary>
     public required int MessageUsageCount { get; set; }
 
     /// <summary>
-    ///     The number of times the emoji has been used as a reaction.
+    ///     Gets or sets the number of times the emoji has been used as a reaction.
     /// </summary>
     public required int ReactionUsageCount { get; set; }
 }

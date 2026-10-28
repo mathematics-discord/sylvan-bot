@@ -5,11 +5,10 @@ namespace SylvanBot.Features.EmojiAnalytics;
 
 [Group("emoji", "Emoji analytics commands.")]
 [DefaultMemberPermissions(GuildPermission.SendMessages)]
-public sealed class EmojiModule(EmojiUsageStore store, IOptions<EmojiAnalyticsOptions> options)
-    : InteractionModuleBase<IInteractionContext>
+public sealed class EmojiModule(EmojiUsageStore store, IOptions<EmojiAnalyticsOptions> options) : InteractionModuleBase<IInteractionContext>
 {
-    private const    string                UsagePageCustomIdPrefix = "emoji-usage";
-    private readonly EmojiAnalyticsOptions _options                = options.Value;
+    private const string UsagePageCustomIdPrefix = "emoji-usage";
+    private readonly EmojiAnalyticsOptions _options = options.Value;
 
     [SlashCommand("usage", "Show top emojis by usage.")]
     public async Task UsageAsync()
@@ -33,23 +32,21 @@ public sealed class EmojiModule(EmojiUsageStore store, IOptions<EmojiAnalyticsOp
     private static string BuildUsagePageCustomId(ulong ownerUserId, int page) => $"{UsagePageCustomIdPrefix}:page:{ownerUserId}:{page}";
 
     private ComponentBuilderV2 BuildUsagePageComponents(EmojiUsagePage page, ulong ownerUserId) =>
-        new(
+        new ComponentBuilderV2(
             new ContainerBuilder()
-               .WithTextDisplay(
-                    new TextDisplayBuilder().WithContent($"## Emoji Usage Counts (Page {page.Page}/{page.TotalPages})"))
-               .WithTextDisplay(new TextDisplayBuilder().WithContent(BuildUsagePageText(page.Items))),
-            new ActionRowBuilder().WithComponents(
-            [
+                .WithTextDisplay(new TextDisplayBuilder().WithContent($"## Emoji Usage Counts (Page {page.Page}/{page.TotalPages})"))
+                .WithTextDisplay(new TextDisplayBuilder().WithContent(BuildUsagePageText(page.Items))),
+            new ActionRowBuilder().WithComponents([
                 new ButtonBuilder()
-                   .WithStyle(ButtonStyle.Secondary)
-                   .WithLabel("Previous")
-                   .WithCustomId(BuildUsagePageCustomId(ownerUserId: ownerUserId, page.Page - 1))
-                   .WithDisabled(page.Page <= 1),
+                    .WithStyle(ButtonStyle.Secondary)
+                    .WithLabel("Previous")
+                    .WithCustomId(BuildUsagePageCustomId(ownerUserId: ownerUserId, page.Page - 1))
+                    .WithDisabled(page.Page <= 1),
                 new ButtonBuilder()
-                   .WithStyle(ButtonStyle.Primary)
-                   .WithLabel("Next")
-                   .WithCustomId(BuildUsagePageCustomId(ownerUserId: ownerUserId, page.Page + 1))
-                   .WithDisabled(page.Page >= page.TotalPages),
+                    .WithStyle(ButtonStyle.Primary)
+                    .WithLabel("Next")
+                    .WithCustomId(BuildUsagePageCustomId(ownerUserId: ownerUserId, page.Page + 1))
+                    .WithDisabled(page.Page >= page.TotalPages),
             ])
         );
 
@@ -91,8 +88,7 @@ public sealed class EmojiModule(EmojiUsageStore store, IOptions<EmojiAnalyticsOp
 
         if (!_options.IsEnabled(Context.Guild.Id))
         {
-            await RespondAsync("Emoji analytics are not enabled for this guild.", ephemeral: true)
-               .ConfigureAwait(false);
+            await RespondAsync("Emoji analytics are not enabled for this guild.", ephemeral: true).ConfigureAwait(false);
 
             return;
         }
@@ -122,8 +118,7 @@ public sealed class EmojiModule(EmojiUsageStore store, IOptions<EmojiAnalyticsOp
 
         if (!_options.IsEnabled(Context.Guild.Id))
         {
-            await RespondAsync("Emoji analytics are not enabled for this guild.", ephemeral: true)
-               .ConfigureAwait(false);
+            await RespondAsync("Emoji analytics are not enabled for this guild.", ephemeral: true).ConfigureAwait(false);
 
             return;
         }

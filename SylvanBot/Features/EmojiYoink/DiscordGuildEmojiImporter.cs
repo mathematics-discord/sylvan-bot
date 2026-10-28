@@ -5,14 +5,10 @@ namespace SylvanBot.Features.EmojiYoink;
 
 public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger logger)
 {
-    private const    int     MaximumEmojiBytes = 256 * 1024;
-    private readonly ILogger _logger           = logger.ForContext<DiscordGuildEmojiImporter>();
+    private const int MaximumEmojiBytes = 256 * 1024;
+    private readonly ILogger _logger = logger.ForContext<DiscordGuildEmojiImporter>();
 
-    public async Task<ErrorOr<GuildEmote>> ImportAsync(
-        IGuild guild,
-        IUser moderator,
-        Emote source,
-        CancellationToken ct)
+    public async Task<ErrorOr<GuildEmote>> ImportAsync(IGuild guild, IUser moderator, Emote source, CancellationToken ct)
     {
         ErrorOr<string> nameResult = EmojiName.Normalize(source.Name);
 
@@ -23,7 +19,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
 
         _logger.Debug(
             "Importing emoji in guild {GuildId} for moderator {ModeratorUserId} ({ModeratorUsername}) from source {SourceEmojiId} "
-            + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}",
+                + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}",
             guild.Id,
             moderator.Id,
             moderator.Username,
@@ -43,13 +39,9 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
         }
 
         await using var imageStream = downloadResult.Value;
-        using var       image       = new Image(imageStream);
+        using var image = new Image(imageStream);
 
-        var options = new RequestOptions
-        {
-            CancelToken    = ct,
-            AuditLogReason = $"Emoji yoink by moderator {moderator.Id}; source emoji {source.Id}",
-        };
+        var options = new RequestOptions { CancelToken = ct, AuditLogReason = $"Emoji yoink by moderator {moderator.Id}; source emoji {source.Id}" };
 
         ErrorOr<GuildEmote> result;
 
@@ -73,7 +65,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
 
         _logger.Information(
             "Moderator {ModeratorUsername} ({ModeratorUserId}) added emoji {EmojiName} ({CreatedEmojiId}) to guild {GuildId} "
-            + "from source {SourceEmojiId}; animated={IsAnimated}",
+                + "from source {SourceEmojiId}; animated={IsAnimated}",
             moderator.Username,
             moderator.Id,
             created.Name,
@@ -106,7 +98,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
     {
         _logger.Warning(
             "Emoji import failed in guild {GuildId} for moderator {ModeratorUserId} ({ModeratorUsername}) from source {SourceEmojiId} "
-            + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}; error codes={ErrorCodes}",
+                + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}; error codes={ErrorCodes}",
             guild.Id,
             moderator.Id,
             moderator.Username,
@@ -120,15 +112,15 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
 
     private async Task<ErrorOr<MemoryStream>> DownloadAsync(Emote source, CancellationToken ct)
     {
-        var           animatedQuery = source.Animated ? "?animated=true" : string.Empty;
-        var           cdnUri        = new Uri($"https://cdn.discordapp.com/emojis/{source.Id}.webp{animatedQuery}");
-        MemoryStream? imageStream   = null;
+        var animatedQuery = source.Animated ? "?animated=true" : string.Empty;
+        var cdnUri = new Uri($"https://cdn.discordapp.com/emojis/{source.Id}.webp{animatedQuery}");
+        MemoryStream? imageStream = null;
 
         try
         {
             using var response = await httpClient
-               .GetAsync(requestUri: cdnUri, completionOption: HttpCompletionOption.ResponseHeadersRead, cancellationToken: ct)
-               .ConfigureAwait(false);
+                .GetAsync(requestUri: cdnUri, completionOption: HttpCompletionOption.ResponseHeadersRead, cancellationToken: ct)
+                .ConfigureAwait(false);
 
             if (response.StatusCode == HttpStatusCode.NotFound)
                 return EmojiYoinkErrors.SourceUnavailable;

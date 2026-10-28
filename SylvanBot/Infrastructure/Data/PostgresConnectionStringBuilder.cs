@@ -17,10 +17,10 @@ public static class PostgresConnectionStringBuilder
         if (!string.IsNullOrWhiteSpace(connectionString))
             return connectionString;
 
-        var host     = config["DB:Host"] ?? throw new InvalidOperationException("DB:Host not configured");
-        var port     = config["DB:Port"] ?? "5432";
+        var host = config["DB:Host"] ?? throw new InvalidOperationException("DB:Host not configured");
+        var port = config["DB:Port"] ?? "5432";
         var database = config["DB:Database"] ?? throw new InvalidOperationException("DB:Database not configured");
-        var user     = config["DB:User"] ?? throw new InvalidOperationException("DB:User not configured");
+        var user = config["DB:User"] ?? throw new InvalidOperationException("DB:User not configured");
         var password = config["DB:Password"] ?? throw new InvalidOperationException("DB:Password not configured");
 
         return $"Host={host};Port={port};Database={database};Username={user};Password={password};SSL Mode=Disable";

@@ -9,8 +9,9 @@
 
     <ItemGroup>
         <PackageReference
-                Include="Roslynator.Analyzers"
-                PrivateAssets="all"
-                IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"/>
+            Include="Roslynator.Analyzers"
+            PrivateAssets="all"
+            IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"
+        />
     </ItemGroup>
 </Project>

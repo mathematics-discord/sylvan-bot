@@ -15,14 +15,14 @@ public sealed class RoleColourSchemaCompatibilityTests
         // Arrange
         using var db = new BotDbContext(
             new DbContextOptionsBuilder<BotDbContext>()
-               .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused", postgres => postgres.MigrationsAssembly("SylvanBot")).Options
+                .UseNpgsql("Host=localhost;Database=unused;Username=unused;Password=unused", postgres => postgres.MigrationsAssembly("SylvanBot"))
+                .Options
         );
 
         var migrations = db.GetService<IMigrationsAssembly>();
 
         // Act
-        var latestMigration =
-            migrations.CreateMigration(migrationClass: migrations.Migrations.Last().Value, db.Database.ProviderName!);
+        var latestMigration = migrations.CreateMigration(migrationClass: migrations.Migrations.Last().Value, db.Database.ProviderName!);
 
         var migrationModel = db.GetService<IModelRuntimeInitializer>().Initialize(model: latestMigration.TargetModel, designTime: true);
 
@@ -30,8 +30,8 @@ public sealed class RoleColourSchemaCompatibilityTests
 
         // Assert
         db.GetService<IMigrationsModelDiffer>()
-           .GetDifferences(migrationModel.GetRelationalModel(), currentModel.GetRelationalModel())
-           .ShouldBeEmpty();
+            .GetDifferences(migrationModel.GetRelationalModel(), currentModel.GetRelationalModel())
+            .ShouldBeEmpty();
 
         db.Database.HasPendingModelChanges().ShouldBeFalse();
     }

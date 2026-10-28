@@ -3,9 +3,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace SylvanBot.Application.Features.WorkingHours.Persistence;
 
-public sealed class WorkingHoursSettingsConfiguration :
-    IEntityTypeConfiguration<WorkingHoursSettings>,
-    IEntityTypeConfiguration<WorkingHoursEligibleRole>
+public sealed class WorkingHoursSettingsConfiguration
+    : IEntityTypeConfiguration<WorkingHoursSettings>,
+        IEntityTypeConfiguration<WorkingHoursEligibleRole>
 {
     public void Configure(EntityTypeBuilder<WorkingHoursSettings> builder)
     {
@@ -17,35 +17,31 @@ public sealed class WorkingHoursSettingsConfiguration :
 
                 table.HasCheckConstraint(
                     "CK_working_hours_settings_target",
-                    "\"PingRoleId\" IS NULL OR (\"PingRoleId\" <> 0 AND \"PingRoleId\" <> \"GuildId\")");
+                    "\"PingRoleId\" IS NULL OR (\"PingRoleId\" <> 0 AND \"PingRoleId\" <> \"GuildId\")"
+                );
                 table.HasCheckConstraint("CK_working_hours_settings_enabled", "NOT \"Enabled\" OR \"PingRoleId\" IS NOT NULL");
-            });
+            }
+        );
 
         builder.HasKey(settings => settings.GuildId);
 
-        builder.Property(settings => settings.GuildId)
-           .ValueGeneratedNever();
+        builder.Property(settings => settings.GuildId).ValueGeneratedNever();
 
-        builder.Property(settings => settings.Enabled)
-           .HasDefaultValue(false);
+        builder.Property(settings => settings.Enabled).HasDefaultValue(false);
         builder.Ignore(settings => settings.IsComplete);
 
-        builder.HasMany(settings => settings.EligibleRoles)
-           .WithOne()
-           .HasForeignKey(role => role.GuildId)
-           .OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(settings => settings.EligibleRoles).WithOne().HasForeignKey(role => role.GuildId).OnDelete(DeleteBehavior.Cascade);
     }
 
     public void Configure(EntityTypeBuilder<WorkingHoursEligibleRole> builder)
     {
         builder.ToTable(
             "working_hours_eligible_roles",
-            table =>
-                table.HasCheckConstraint("CK_working_hours_eligible_roles_identity", "\"RoleId\" <> 0 AND \"RoleId\" <> \"GuildId\""));
+            table => table.HasCheckConstraint("CK_working_hours_eligible_roles_identity", "\"RoleId\" <> 0 AND \"RoleId\" <> \"GuildId\"")
+        );
 
         builder.HasKey(role => new { role.GuildId, role.RoleId });
 
-        builder.Property(role => role.RoleId)
-           .ValueGeneratedNever();
+        builder.Property(role => role.RoleId).ValueGeneratedNever();
     }
 }

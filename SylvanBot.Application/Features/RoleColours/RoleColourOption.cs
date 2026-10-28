@@ -3,9 +3,7 @@
 public sealed class RoleColourOption
 {
     // EF Core private ctor
-    private RoleColourOption()
-    {
-    }
+    private RoleColourOption() { }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public ulong DisplayRoleId { get; private set; }
@@ -21,9 +19,7 @@ public sealed class RoleColourOption
 
         if (sourceRoleId == displayRoleId)
         {
-            return Error.Validation(
-                "RoleColourOption.RolesMustDiffer",
-                "Source and display role IDs must be different.");
+            return Error.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different.");
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -42,9 +38,7 @@ public sealed class RoleColourOption
     {
         if (sourceRoleId == displayRoleId)
         {
-            return Error.Validation(
-                "RoleColourOption.RolesMustDiffer",
-                "Source and display role IDs must be different.");
+            return Error.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different.");
         }
 
         SourceRoleId = sourceRoleId;

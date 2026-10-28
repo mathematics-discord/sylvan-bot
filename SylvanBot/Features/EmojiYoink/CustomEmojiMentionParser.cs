@@ -28,9 +28,11 @@ public static partial class CustomEmojiMentionParser
 
     private static ErrorOr<Emote> ParseMention(string candidate, Error error)
     {
-        if (!Emote.TryParse(text: candidate, out var emote)
+        if (
+            !Emote.TryParse(text: candidate, out var emote)
             || emote.Id == 0
-            || !string.Equals(a: candidate, emote.ToString(), comparisonType: StringComparison.Ordinal))
+            || !string.Equals(a: candidate, emote.ToString(), comparisonType: StringComparison.Ordinal)
+        )
             return error;
 
         return emote;

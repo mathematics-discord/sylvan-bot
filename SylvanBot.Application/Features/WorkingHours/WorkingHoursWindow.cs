@@ -8,7 +8,8 @@ public sealed class WorkingHoursWindow
 {
     private static readonly ZoneLocalMappingResolver Resolver = Resolvers.CreateMappingResolver(
         ambiguousTimeResolver: Resolvers.ReturnEarlier,
-        skippedTimeResolver: Resolvers.ReturnForwardShifted);
+        skippedTimeResolver: Resolvers.ReturnForwardShifted
+    );
 
     private readonly DateTimeZone? _zone;
     private readonly (int Seconds, long FractionTicks) _start;
@@ -52,9 +53,7 @@ public sealed class WorkingHoursWindow
 
         var instant = Instant.FromDateTimeOffset(now);
 
-        var date = _zone is null
-            ? (instant + Duration.FromMinutes(OffsetMinutes!.Value)).InUtc().Date
-            : instant.InZone(_zone).Date;
+        var date = _zone is null ? (instant + Duration.FromMinutes(OffsetMinutes!.Value)).InUtc().Date : instant.InZone(_zone).Date;
 
         for (var day = -1; day <= 0; day++)
         {
@@ -71,7 +70,8 @@ public sealed class WorkingHoursWindow
 
     private static (int Seconds, long FractionTicks) ExecutionTime(string text)
     {
-        var seconds = (int.Parse(text.AsSpan(start: 0, length: 2), provider: CultureInfo.InvariantCulture) * 3600)
+        var seconds =
+            (int.Parse(text.AsSpan(start: 0, length: 2), provider: CultureInfo.InvariantCulture) * 3600)
             + (int.Parse(text.AsSpan(start: 3, length: 2), provider: CultureInfo.InvariantCulture) * 60)
             + int.Parse(text.AsSpan(start: 6, length: 2), provider: CultureInfo.InvariantCulture);
         var fraction = text.Length > 8 ? text[9..] : string.Empty;

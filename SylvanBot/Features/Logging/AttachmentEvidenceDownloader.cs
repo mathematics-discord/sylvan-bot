@@ -15,17 +15,15 @@ internal static class AttachmentEvidenceDownloader
     /// <param name="logger">The logger used to record download failures.</param>
     /// <param name="ct">A token that cancels the request and response read.</param>
     /// <returns>The downloaded bytes, or none if the response cannot be used.</returns>
-    public static async Task<Option<byte[]>> TryDownloadAsync(
-        HttpClient httpClient,
-        string url,
-        long maxBytes,
-        ILogger logger,
-        CancellationToken ct)
+    public static async Task<Option<byte[]>> TryDownloadAsync(HttpClient httpClient, string url, long maxBytes, ILogger logger, CancellationToken ct)
     {
         try
         {
-            using var response = await httpClient
-                .GetAsync(requestUri: url, completionOption: HttpCompletionOption.ResponseHeadersRead, cancellationToken: ct);
+            using var response = await httpClient.GetAsync(
+                requestUri: url,
+                completionOption: HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken: ct
+            );
 
             if (!response.IsSuccessStatusCode)
                 return new None();
@@ -86,8 +84,6 @@ internal static class AttachmentEvidenceDownloader
             bytesRemaining -= bytesRead;
         }
 
-        return buffer.Length > maxBytes
-            ? new None()
-            : new Some<byte[]>(buffer.ToArray());
+        return buffer.Length > maxBytes ? new None() : new Some<byte[]>(buffer.ToArray());
     }
 }

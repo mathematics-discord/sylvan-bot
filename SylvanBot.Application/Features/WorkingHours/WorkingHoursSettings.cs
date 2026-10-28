@@ -17,8 +17,7 @@ public sealed class WorkingHoursSettings
         if (Enabled)
             return Error.Validation(description: "Disable Working Hours before changing the ping role.");
 
-        var eligible = EligibleRoles
-           .Any(role => role.RoleId == roleId);
+        var eligible = EligibleRoles.Any(role => role.RoleId == roleId);
 
         if (roleId == 0 || roleId == GuildId || eligible)
             return Error.Validation(description: "The ping role cannot be @everyone, an eligible role or an exemption role.");
@@ -33,8 +32,7 @@ public sealed class WorkingHoursSettings
         if (roleId == 0 || roleId == GuildId || roleId == PingRoleId)
             return Error.Validation(description: "An eligible role cannot be @everyone or the ping role.");
 
-        var role = EligibleRoles
-           .SingleOrDefault(item => item.RoleId == roleId);
+        var role = EligibleRoles.SingleOrDefault(item => item.RoleId == roleId);
 
         if (add)
         {
@@ -60,8 +58,7 @@ public sealed class WorkingHoursSettings
 
     public ErrorOr<Success> ChangeExemptRole(ulong roleId, bool add)
     {
-        var role = EligibleRoles
-           .SingleOrDefault(item => item.RoleId == roleId);
+        var role = EligibleRoles.SingleOrDefault(item => item.RoleId == roleId);
 
         if (role is null)
         {

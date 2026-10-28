@@ -65,14 +65,19 @@ public sealed class MessageUpdateGatewayAdapter(ILogger logger)
                 {
                     using var document = JsonDocument.Parse(text);
                     var frame = document.RootElement;
-                    var isUpdate = frame.TryGetProperty("t", out var type) && string.Equals(type.GetString(), "MESSAGE_UPDATE", StringComparison.Ordinal);
+                    var isUpdate =
+                        frame.TryGetProperty("t", out var type) && string.Equals(type.GetString(), "MESSAGE_UPDATE", StringComparison.Ordinal);
 
                     if (isUpdate && frame.GetProperty("d").TryGetProperty("guild_id", out _))
                         _owner._current.Value = ReadUpdate(frame.GetProperty("d"));
                 }
-                catch (Exception exception) when (exception is JsonException or FormatException or InvalidOperationException or OverflowException or KeyNotFoundException)
+                catch (Exception exception)
+                    when (exception is JsonException or FormatException or InvalidOperationException or OverflowException or KeyNotFoundException)
                 {
-                    _owner._logger.Warning("Message update extraction failed: {ExceptionType}; forwarding gateway frame without cache update", exception.GetType().Name);
+                    _owner._logger.Warning(
+                        "Message update extraction failed: {ExceptionType}; forwarding gateway frame without cache update",
+                        exception.GetType().Name
+                    );
                 }
 
                 if (TextMessage is { } handler)
@@ -110,7 +115,8 @@ public sealed class MessageUpdateGatewayAdapter(ILogger logger)
                         attachment.GetProperty("url").GetString() ?? throw new JsonException("Attachment URL must be a string."),
                         attachment.TryGetProperty("proxy_url", out var proxy) ? proxy.GetString() : null,
                         attachment.TryGetProperty("content_type", out var contentType) ? contentType.GetString() : null,
-                        attachment.GetProperty("size").GetInt64()))
+                        attachment.GetProperty("size").GetInt64()
+                    ))
                     .ToImmutableArray();
 
                 if (suppliedAttachments.Any(attachment => string.IsNullOrWhiteSpace(attachment.Url) || attachment.Size < 0))
@@ -132,6 +138,9 @@ public sealed class MessageUpdateGatewayAdapter(ILogger logger)
         }
 
         private static ulong ReadId(JsonElement value) =>
-            ulong.Parse(value.GetString() ?? throw new JsonException("Message identifier missing."), System.Globalization.CultureInfo.InvariantCulture);
+            ulong.Parse(
+                value.GetString() ?? throw new JsonException("Message identifier missing."),
+                System.Globalization.CultureInfo.InvariantCulture
+            );
     }
 }

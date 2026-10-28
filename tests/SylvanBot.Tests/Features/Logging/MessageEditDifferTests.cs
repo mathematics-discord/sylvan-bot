@@ -10,7 +10,7 @@ public sealed class MessageEditDifferTests
     {
         // Arrange
         const string before = "Hayes";
-        const string after  = "hates";
+        const string after = "hates";
 
         // Act
         var diff = MessageEditDiffer.BuildDiff(before: before, after: after);
@@ -25,7 +25,7 @@ public sealed class MessageEditDifferTests
     {
         // Arrange
         const string before = "which are `significant' (disregarding the rest";
-        const string after  = "instead (and disregarding the rest";
+        const string after = "instead (and disregarding the rest";
 
         // Act
         var diff = MessageEditDiffer.BuildDiff(before: before, after: after);

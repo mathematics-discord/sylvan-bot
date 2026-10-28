@@ -49,9 +49,9 @@ public sealed class MessageChunkerTests
     public void SplitMessageIntoChunks_WithNewlineBeforeLimit_SplitsAtNewline()
     {
         // Arrange
-        var firstLine  = new string(c: 'a', count: 10);
+        var firstLine = new string(c: 'a', count: 10);
         var secondLine = new string(c: 'b', count: 10);
-        var message    = $"{firstLine}\n{secondLine}";
+        var message = $"{firstLine}\n{secondLine}";
 
         // Act
         var chunks = MessageChunker.SplitMessageIntoChunks(message: message, chunkSize: 12).Value;

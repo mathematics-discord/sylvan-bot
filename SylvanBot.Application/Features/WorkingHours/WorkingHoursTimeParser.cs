@@ -12,7 +12,9 @@ public static partial class WorkingHoursTimeParser
         (string Time, int? OffsetMinutes)? last = ParseEndpoint(end);
 
         if (first is null || last is null)
-            return Error.Validation(description: "Use HH:MM:SS[.fraction], with Z or ±HH:MM for fixed offsets. No dates, whitespace, leap seconds or -00:00.");
+            return Error.Validation(
+                description: "Use HH:MM:SS[.fraction], with Z or ±HH:MM for fixed offsets. No dates, whitespace, leap seconds or -00:00."
+            );
 
         if (first.Value.OffsetMinutes != last.Value.OffsetMinutes)
             return Error.Validation(description: "Both endpoints must have numerically equal offsets, or both must omit offsets.");
@@ -64,6 +66,10 @@ public static partial class WorkingHoursTimeParser
         return (fraction.Length == 0 ? clock : clock + "." + fraction, offsetMinutes);
     }
 
-    [GeneratedRegex(@"\A(?<hour>[0-9]{2}):(?<minute>[0-9]{2}):(?<second>[0-9]{2})(?:\.(?<fraction>[0-9]+))?(?<offset>Z|z|[+-][0-9]{2}:[0-9]{2})?\z", RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture, matchTimeoutMilliseconds: 1000)]
+    [GeneratedRegex(
+        @"\A(?<hour>[0-9]{2}):(?<minute>[0-9]{2}):(?<second>[0-9]{2})(?:\.(?<fraction>[0-9]+))?(?<offset>Z|z|[+-][0-9]{2}:[0-9]{2})?\z",
+        RegexOptions.CultureInvariant | RegexOptions.ExplicitCapture,
+        matchTimeoutMilliseconds: 1000
+    )]
     private static partial Regex ClockPattern();
 }

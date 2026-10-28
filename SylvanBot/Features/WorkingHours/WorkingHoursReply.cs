@@ -24,7 +24,7 @@ internal static class WorkingHoursReply
             {
                 await interaction.ModifyOriginalResponseAsync(properties =>
                 {
-                    properties.Content         = content;
+                    properties.Content = content;
                     properties.AllowedMentions = AllowedMentions.None;
                 });
                 first = false;

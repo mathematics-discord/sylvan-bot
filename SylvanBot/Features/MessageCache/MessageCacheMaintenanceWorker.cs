@@ -38,8 +38,6 @@ public sealed class MessageCacheMaintenanceWorker(MessageSnapshotCache cache, IL
                 }
             }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
     }
 }

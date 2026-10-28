@@ -80,14 +80,13 @@ public sealed class WorkingHoursResponseTests
     {
         // Act
         IReadOnlyList<string> messages = WorkingHoursResponses.Accepted(Window("16:00:00Z", "07:00:00Z"));
-        var                   response = string.Join(separator: '\n', values: messages);
+        var response = string.Join(separator: '\n', values: messages);
 
         // Assert
         foreach (var regulation in new[] { 4, 6, 7, 10, 11, 12 })
             response.ShouldContain($"/regulation/{regulation})");
 
-        messages.Count(message => message.StartsWith("Your availability has nevertheless", comparisonType: StringComparison.Ordinal))
-           .ShouldBe(1);
+        messages.Count(message => message.StartsWith("Your availability has nevertheless", comparisonType: StringComparison.Ordinal)).ShouldBe(1);
 
         messages.All(message => message.Length < 2000).ShouldBeTrue();
 

@@ -17,7 +17,8 @@ namespace SylvanBot.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    Number = table.Column<long>(type: "bigint", nullable: false)
+                    Number = table
+                        .Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     GuildId = table.Column<long>(type: "bigint", nullable: false),
                     ForumId = table.Column<long>(type: "bigint", nullable: false),
@@ -26,12 +27,13 @@ namespace SylvanBot.Infrastructure.Migrations
                     Retired = table.Column<bool>(type: "boolean", nullable: false),
                     CreationStarted = table.Column<bool>(type: "boolean", nullable: false),
                     NoticeStarted = table.Column<bool>(type: "boolean", nullable: false),
-                    NoticeMessageId = table.Column<long>(type: "bigint", nullable: true)
+                    NoticeMessageId = table.Column<long>(type: "bigint", nullable: true),
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_sylvan_mail_conversations", x => x.Id);
-                });
+                }
+            );
 
             migrationBuilder.CreateTable(
                 name: "sylvan_mail_settings",
@@ -40,13 +42,14 @@ namespace SylvanBot.Infrastructure.Migrations
                     GuildId = table.Column<long>(type: "bigint", nullable: false),
                     Slot = table.Column<int>(type: "integer", nullable: false),
                     ForumId = table.Column<long>(type: "bigint", nullable: false),
-                    RoleId = table.Column<long>(type: "bigint", nullable: false)
+                    RoleId = table.Column<long>(type: "bigint", nullable: false),
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_sylvan_mail_settings", x => x.GuildId);
                     table.CheckConstraint("CK_sylvan_mail_single_destination", "\"Slot\" = 1");
-                });
+                }
+            );
 
             migrationBuilder.CreateTable(
                 name: "sylvan_mail_operations",
@@ -64,7 +67,7 @@ namespace SylvanBot.Infrastructure.Migrations
                     ReceiptMessageId = table.Column<long>(type: "bigint", nullable: true),
                     AcknowledgementStarted = table.Column<bool>(type: "boolean", nullable: false),
                     AcknowledgementMessageId = table.Column<long>(type: "bigint", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                 },
                 constraints: table =>
                 {
@@ -74,8 +77,10 @@ namespace SylvanBot.Infrastructure.Migrations
                         column: x => x.ConversationId,
                         principalTable: "sylvan_mail_conversations",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
+                        onDelete: ReferentialAction.Restrict
+                    );
+                }
+            );
 
             migrationBuilder.CreateTable(
                 name: "sylvan_mail_deliveries",
@@ -83,7 +88,7 @@ namespace SylvanBot.Infrastructure.Migrations
                 {
                     SourceMessageId = table.Column<long>(type: "bigint", nullable: false),
                     Ordinal = table.Column<int>(type: "integer", nullable: false),
-                    MessageId = table.Column<long>(type: "bigint", nullable: true)
+                    MessageId = table.Column<long>(type: "bigint", nullable: true),
                 },
                 constraints: table =>
                 {
@@ -93,60 +98,50 @@ namespace SylvanBot.Infrastructure.Migrations
                         column: x => x.SourceMessageId,
                         principalTable: "sylvan_mail_operations",
                         principalColumn: "SourceMessageId",
-                        onDelete: ReferentialAction.Cascade);
-                });
+                        onDelete: ReferentialAction.Cascade
+                    );
+                }
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_sylvan_mail_conversations_GuildId_ForumId_UserId",
                 table: "sylvan_mail_conversations",
                 columns: new[] { "GuildId", "ForumId", "UserId" },
                 unique: true,
-                filter: "NOT \"Retired\"");
+                filter: "NOT \"Retired\""
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_sylvan_mail_conversations_Number",
                 table: "sylvan_mail_conversations",
                 column: "Number",
-                unique: true);
+                unique: true
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_sylvan_mail_conversations_ThreadId",
                 table: "sylvan_mail_conversations",
                 column: "ThreadId",
-                unique: true);
+                unique: true
+            );
 
-            migrationBuilder.CreateIndex(
-                name: "IX_sylvan_mail_operations_ConversationId",
-                table: "sylvan_mail_operations",
-                column: "ConversationId");
+            migrationBuilder.CreateIndex(name: "IX_sylvan_mail_operations_ConversationId", table: "sylvan_mail_operations", column: "ConversationId");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_sylvan_mail_settings_ForumId",
-                table: "sylvan_mail_settings",
-                column: "ForumId",
-                unique: true);
+            migrationBuilder.CreateIndex(name: "IX_sylvan_mail_settings_ForumId", table: "sylvan_mail_settings", column: "ForumId", unique: true);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_sylvan_mail_settings_Slot",
-                table: "sylvan_mail_settings",
-                column: "Slot",
-                unique: true);
+            migrationBuilder.CreateIndex(name: "IX_sylvan_mail_settings_Slot", table: "sylvan_mail_settings", column: "Slot", unique: true);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "sylvan_mail_deliveries");
+            migrationBuilder.DropTable(name: "sylvan_mail_deliveries");
 
-            migrationBuilder.DropTable(
-                name: "sylvan_mail_settings");
+            migrationBuilder.DropTable(name: "sylvan_mail_settings");
 
-            migrationBuilder.DropTable(
-                name: "sylvan_mail_operations");
+            migrationBuilder.DropTable(name: "sylvan_mail_operations");
 
-            migrationBuilder.DropTable(
-                name: "sylvan_mail_conversations");
+            migrationBuilder.DropTable(name: "sylvan_mail_conversations");
         }
     }
 }

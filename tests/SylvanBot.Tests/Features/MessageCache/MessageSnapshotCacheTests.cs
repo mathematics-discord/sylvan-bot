@@ -55,7 +55,8 @@ public sealed class MessageSnapshotCacheTests
                 Eligible = new None(),
                 Content = new None(),
             },
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         Option<MessageEdit> cleared = await cache.EditAsync(
             Edit(string.Empty) with
@@ -63,13 +64,20 @@ public sealed class MessageSnapshotCacheTests
                 Attachments = new Some<ImmutableArray<MessageAttachment>>([]),
                 EditedAtUtc = new Some<DateTimeOffset?>(Created.AddMinutes(5)),
             },
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         // Assert
-        partial.Value.ShouldBeOfType<Some<MessageEdit>>().Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>().Value.Content.ShouldBe("original");
+        partial
+            .Value.ShouldBeOfType<Some<MessageEdit>>()
+            .Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>()
+            .Value.Content.ShouldBe("original");
         partial.Value.ShouldBeOfType<Some<MessageEdit>>().Value.After.ShouldNotBeNull().Content.ShouldBe("original");
         partial.Value.ShouldBeOfType<Some<MessageEdit>>().Value.After.Attachments.Length.ShouldBe(1);
-        cleared.Value.ShouldBeOfType<Some<MessageEdit>>().Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>().Value.Attachments.Length.ShouldBe(1);
+        cleared
+            .Value.ShouldBeOfType<Some<MessageEdit>>()
+            .Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>()
+            .Value.Attachments.Length.ShouldBe(1);
         cleared.Value.ShouldBeOfType<Some<MessageEdit>>().Value.After.ShouldNotBeNull().Content.ShouldBeEmpty();
         cleared.Value.ShouldBeOfType<Some<MessageEdit>>().Value.After.Attachments.ShouldBeEmpty();
     }
@@ -85,13 +93,25 @@ public sealed class MessageSnapshotCacheTests
         // Act
         Option<MessageEdit> first = await cache.EditAsync(Edit("two"), CancellationToken.None);
         await cache.ReceiveAsync(Received("one"), CancellationToken.None);
-        Option<MessageEdit> second = await cache.EditAsync(Edit("three") with { EditedAtUtc = new Some<DateTimeOffset?>(Created.AddMinutes(2)) }, CancellationToken.None);
+        Option<MessageEdit> second = await cache.EditAsync(
+            Edit("three") with
+            {
+                EditedAtUtc = new Some<DateTimeOffset?>(Created.AddMinutes(2)),
+            },
+            CancellationToken.None
+        );
         await cache.EditAsync(Edit("stale") with { EditedAtUtc = new Some<DateTimeOffset?>(Created.AddMinutes(1)) }, CancellationToken.None);
         await cache.ReceiveAsync(Received("one"), CancellationToken.None);
 
         // Assert
-        first.Value.ShouldBeOfType<Some<MessageEdit>>().Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>().Value.Content.ShouldBe("one");
-        second.Value.ShouldBeOfType<Some<MessageEdit>>().Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>().Value.Content.ShouldBe("two");
+        first
+            .Value.ShouldBeOfType<Some<MessageEdit>>()
+            .Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>()
+            .Value.Content.ShouldBe("one");
+        second
+            .Value.ShouldBeOfType<Some<MessageEdit>>()
+            .Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>()
+            .Value.Content.ShouldBe("two");
         (await cache.BeginDeleteAsync(10, [Id], CancellationToken.None)).Single().Content.ShouldBe("three");
     }
 
@@ -114,17 +134,27 @@ public sealed class MessageSnapshotCacheTests
                 CreatedAtUtc = Created,
                 EditedAtUtc = new Some<DateTimeOffset?>(null),
             },
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         await cache.EditAsync(Edit("first edit") with { EditedAtUtc = new Some<DateTimeOffset?>(timestamp) }, CancellationToken.None);
         Option<MessageEdit> omitted = await cache.EditAsync(Edit("second edit"), CancellationToken.None);
-        Option<MessageEdit> staleNull = await cache.EditAsync(Edit("stale") with { EditedAtUtc = new Some<DateTimeOffset?>(null) }, CancellationToken.None);
+        Option<MessageEdit> staleNull = await cache.EditAsync(
+            Edit("stale") with
+            {
+                EditedAtUtc = new Some<DateTimeOffset?>(null),
+            },
+            CancellationToken.None
+        );
 
         // Assert
         unedited.Value.ShouldBeOfType<Some<MessageEdit>>().Value.After.ShouldNotBeNull().EditedAtUtc.ShouldBeNull();
         unedited.Value.ShouldBeOfType<Some<MessageEdit>>().Value.After.Content.ShouldBe("original");
         omitted.Value.ShouldBeOfType<Some<MessageEdit>>().Value.After.ShouldNotBeNull().EditedAtUtc.ShouldBe(timestamp);
-        omitted.Value.ShouldBeOfType<Some<MessageEdit>>().Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>().Value.Content.ShouldBe("first edit");
+        omitted
+            .Value.ShouldBeOfType<Some<MessageEdit>>()
+            .Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>()
+            .Value.Content.ShouldBe("first edit");
         staleNull.Value.ShouldBeOfType<None>();
         (await cache.BeginDeleteAsync(10, [Id], CancellationToken.None)).Single().Content.ShouldBe("second edit");
     }
@@ -242,7 +272,13 @@ public sealed class MessageSnapshotCacheTests
 
         // Act
         var initialize = restarted.InitializeAsync(1, [10], CancellationToken.None);
-        Task<Option<MessageEdit>> edit = restarted.EditAsync(Edit("after restart") with { EditedAtUtc = new Some<DateTimeOffset?>(Created.AddHours(2)) }, CancellationToken.None);
+        Task<Option<MessageEdit>> edit = restarted.EditAsync(
+            Edit("after restart") with
+            {
+                EditedAtUtc = new Some<DateTimeOffset?>(Created.AddHours(2)),
+            },
+            CancellationToken.None
+        );
         var waiting = !edit.IsCompleted && !restarted.Ready;
         persistence.LoadRelease.SetResult();
         await initialize;
@@ -250,7 +286,10 @@ public sealed class MessageSnapshotCacheTests
 
         // Assert
         waiting.ShouldBeTrue();
-        result.Value.ShouldBeOfType<Some<MessageEdit>>().Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>().Value.Content.ShouldBe("before restart");
+        result
+            .Value.ShouldBeOfType<Some<MessageEdit>>()
+            .Value.Before.Value.ShouldBeOfType<Some<CachedMessageSnapshot>>()
+            .Value.Content.ShouldBe("before restart");
         result.Value.ShouldBeOfType<Some<MessageEdit>>().Value.After.ShouldNotBeNull().Content.ShouldBe("after restart");
     }
 
@@ -278,9 +317,10 @@ public sealed class MessageSnapshotCacheTests
             {
                 GuildId = 20,
                 Attachments = new Some<ImmutableArray<MessageAttachment>>([]),
-                EditedAtUtc = new Some<DateTimeOffset?>(null)
+                EditedAtUtc = new Some<DateTimeOffset?>(null),
             },
-            CancellationToken.None);
+            CancellationToken.None
+        );
 
         // Assert
         failedReadiness.ShouldBeFalse();
@@ -299,8 +339,20 @@ public sealed class MessageSnapshotCacheTests
 
         // Act
         Option<MessageEdit> missingAttachments = await cache.EditAsync(partial, CancellationToken.None);
-        Option<MessageEdit> missingTimestamp = await cache.EditAsync(Edit("known content") with { Attachments = new Some<ImmutableArray<MessageAttachment>>([]) }, CancellationToken.None);
-        Option<MessageEdit> complete = await cache.EditAsync(partial with { Attachments = new Some<ImmutableArray<MessageAttachment>>([]) }, CancellationToken.None);
+        Option<MessageEdit> missingTimestamp = await cache.EditAsync(
+            Edit("known content") with
+            {
+                Attachments = new Some<ImmutableArray<MessageAttachment>>([]),
+            },
+            CancellationToken.None
+        );
+        Option<MessageEdit> complete = await cache.EditAsync(
+            partial with
+            {
+                Attachments = new Some<ImmutableArray<MessageAttachment>>([]),
+            },
+            CancellationToken.None
+        );
 
         // Assert
         missingAttachments.Value.ShouldBeOfType<None>();
@@ -413,29 +465,31 @@ public sealed class MessageSnapshotCacheTests
         persistence.Rows.ShouldBeEmpty();
     }
 
-    private static MessageReceived Received(string content) => new MessageReceived
-    {
-        GuildId = 10,
-        ChannelId = 20,
-        MessageId = Id,
-        AuthorId = 30,
-        CreatedAtUtc = Created,
-        Eligible = true,
-        Content = content,
-        EditedAtUtc = null,
-        Attachments = [new MessageAttachment("https://example.invalid/image", null, "image/png", 100)],
-    };
+    private static MessageReceived Received(string content) =>
+        new MessageReceived
+        {
+            GuildId = 10,
+            ChannelId = 20,
+            MessageId = Id,
+            AuthorId = 30,
+            CreatedAtUtc = Created,
+            Eligible = true,
+            Content = content,
+            EditedAtUtc = null,
+            Attachments = [new MessageAttachment("https://example.invalid/image", null, "image/png", 100)],
+        };
 
-    private static MessageEdited Edit(string content) => new MessageEdited
-    {
-        GuildId = 10,
-        ChannelId = 20,
-        MessageId = Id,
-        CreatedAtUtc = Created,
-        AuthorId = new Some<ulong>(30),
-        Eligible = new Some<bool>(true),
-        Content = new Some<string>(content),
-    };
+    private static MessageEdited Edit(string content) =>
+        new MessageEdited
+        {
+            GuildId = 10,
+            ChannelId = 20,
+            MessageId = Id,
+            CreatedAtUtc = Created,
+            AuthorId = new Some<ulong>(30),
+            Eligible = new Some<bool>(true),
+            Content = new Some<string>(content),
+        };
 
     private sealed class CacheClock(DateTimeOffset now) : TimeProvider
     {
@@ -460,7 +514,12 @@ public sealed class MessageSnapshotCacheTests
 
         public TaskCompletionSource SaveStarted { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public async Task<ImmutableArray<CachedMessageSnapshot>> LoadAsync(ulong botId, ImmutableArray<ulong> guildIds, DateTimeOffset now, CancellationToken ct)
+        public async Task<ImmutableArray<CachedMessageSnapshot>> LoadAsync(
+            ulong botId,
+            ImmutableArray<ulong> guildIds,
+            DateTimeOffset now,
+            CancellationToken ct
+        )
         {
             if (FailLoad)
                 throw new InvalidOperationException("Unavailable");
@@ -468,8 +527,7 @@ public sealed class MessageSnapshotCacheTests
             if (LoadRelease is not null)
                 await LoadRelease.Task.WaitAsync(ct);
 
-            return Rows
-                .Where(pair => pair.Key.BotId == botId && guildIds.Contains(pair.Key.GuildId) && pair.Value.ExpiresAtUtc > now)
+            return Rows.Where(pair => pair.Key.BotId == botId && guildIds.Contains(pair.Key.GuildId) && pair.Value.ExpiresAtUtc > now)
                 .Select(pair => pair.Value)
                 .ToImmutableArray();
         }
@@ -501,8 +559,7 @@ public sealed class MessageSnapshotCacheTests
 
         public Task DeleteExpiredAsync(DateTimeOffset now, CancellationToken ct)
         {
-            ImmutableArray<(ulong BotId, ulong GuildId, ulong MessageId)> expired = Rows
-                .Where(pair => pair.Value.ExpiresAtUtc <= now)
+            ImmutableArray<(ulong BotId, ulong GuildId, ulong MessageId)> expired = Rows.Where(pair => pair.Value.ExpiresAtUtc <= now)
                 .Select(pair => pair.Key)
                 .ToImmutableArray();
 

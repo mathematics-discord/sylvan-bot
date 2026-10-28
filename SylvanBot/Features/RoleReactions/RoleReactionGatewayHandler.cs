@@ -3,11 +3,9 @@ using SylvanBot.Gateway;
 
 namespace SylvanBot.Features.RoleReactions;
 
-public sealed class RoleReactionGatewayHandler(
-    DiscordSocketClient client,
-    RoleReactionCoordinator coordinator,
-    ILogger logger)
-    : BackgroundService, IDiscordGatewayHandler
+public sealed class RoleReactionGatewayHandler(DiscordSocketClient client, RoleReactionCoordinator coordinator, ILogger logger)
+    : BackgroundService,
+        IDiscordGatewayHandler
 {
     // Producer-consumer: gateway callbacks enqueue; one owned worker performs Discord writes in order.
     private readonly Channel<ReactionWork> _reactions = Channel.CreateBounded<ReactionWork>(
@@ -15,12 +13,13 @@ public sealed class RoleReactionGatewayHandler(
         {
             SingleReader = true,
             SingleWriter = false,
-            FullMode     = BoundedChannelFullMode.Wait,
-        });
+            FullMode = BoundedChannelFullMode.Wait,
+        }
+    );
 
     public Task InitializeAsync(CancellationToken ct)
     {
-        client.ReactionAdded   += AddedAsync;
+        client.ReactionAdded += AddedAsync;
         client.ReactionRemoved += RemovedAsync;
 
         return Task.CompletedTask;
@@ -28,7 +27,7 @@ public sealed class RoleReactionGatewayHandler(
 
     public void Unsubscribe()
     {
-        client.ReactionAdded   -= AddedAsync;
+        client.ReactionAdded -= AddedAsync;
         client.ReactionRemoved -= RemovedAsync;
         _reactions.Writer.TryComplete();
     }
@@ -48,7 +47,8 @@ public sealed class RoleReactionGatewayHandler(
                         userId: work.UserId,
                         emote: work.Emote,
                         added: work.Added,
-                        ct: stoppingToken);
+                        ct: stoppingToken
+                    );
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -62,7 +62,8 @@ public sealed class RoleReactionGatewayHandler(
                         work.GuildId,
                         work.MessageId,
                         work.UserId,
-                        work.Emote.ToString());
+                        work.Emote.ToString()
+                    );
                 }
             }
         }
@@ -84,8 +85,7 @@ public sealed class RoleReactionGatewayHandler(
 
     private Task Enqueue(ulong messageId, ulong channelId, SocketReaction reaction, bool added)
     {
-        var botReaction = reaction.UserId == client.CurrentUser.Id
-            || (reaction.User.IsSpecified && reaction.User.Value.IsBot);
+        var botReaction = reaction.UserId == client.CurrentUser.Id || (reaction.User.IsSpecified && reaction.User.Value.IsBot);
 
         if (botReaction || reaction.Channel is not IGuildChannel guildChannel)
             return Task.CompletedTask;
@@ -98,7 +98,8 @@ public sealed class RoleReactionGatewayHandler(
                 "Role reaction queue full or closed in guild {GuildId} on message {MessageId} for member {UserId}; toggle the reaction to retry",
                 work.GuildId,
                 messageId,
-                reaction.UserId);
+                reaction.UserId
+            );
         }
 
         return Task.CompletedTask;

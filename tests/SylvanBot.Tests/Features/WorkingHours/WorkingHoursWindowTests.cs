@@ -145,5 +145,6 @@ public sealed class WorkingHoursWindowTests
     }
 
     public static WorkingHoursWindow Window(string start, string end) => WorkingHoursTimeParser.Parse(start: start, end: end, timezone: null).Value;
+
     private static DateTimeOffset Utc(string text) => DateTimeOffset.Parse(input: text, formatProvider: CultureInfo.InvariantCulture);
 }

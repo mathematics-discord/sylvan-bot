@@ -12,11 +12,9 @@ namespace SylvanBot.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // Stored Meta data is permanently discarded; Down restores only the schema.
-            migrationBuilder.DropTable(
-                name: "MetaProposalStates");
+            migrationBuilder.DropTable(name: "MetaProposalStates");
 
-            migrationBuilder.DropTable(
-                name: "MetaSuggestionSettings");
+            migrationBuilder.DropTable(name: "MetaSuggestionSettings");
         }
 
         /// <inheritdoc />
@@ -49,12 +47,13 @@ namespace SylvanBot.Infrastructure.Migrations
                     TrackedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     VetoReason = table.Column<string>(type: "character varying(1950)", maxLength: 1950, nullable: true),
                     VetoedAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    VetoedByUserId = table.Column<long>(type: "bigint", nullable: true)
+                    VetoedByUserId = table.Column<long>(type: "bigint", nullable: true),
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_MetaProposalStates", x => x.Id);
-                });
+                }
+            );
 
             migrationBuilder.CreateTable(
                 name: "MetaSuggestionSettings",
@@ -65,43 +64,42 @@ namespace SylvanBot.Infrastructure.Migrations
                     CabinetRoleId = table.Column<long>(type: "bigint", nullable: false),
                     CommitteeRoleId = table.Column<long>(type: "bigint", nullable: false),
                     ProposalsForumChannelId = table.Column<long>(type: "bigint", nullable: false),
-                    SuggestionsForumChannelId = table.Column<long>(type: "bigint", nullable: false)
+                    SuggestionsForumChannelId = table.Column<long>(type: "bigint", nullable: false),
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_MetaSuggestionSettings", x => x.GuildId);
-                });
+                }
+            );
 
-            migrationBuilder.CreateIndex(
-                name: "IX_MetaProposalStates_GuildId",
-                table: "MetaProposalStates",
-                column: "GuildId");
+            migrationBuilder.CreateIndex(name: "IX_MetaProposalStates_GuildId", table: "MetaProposalStates", column: "GuildId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_MetaProposalStates_GuildId_PollMessageId",
                 table: "MetaProposalStates",
-                columns: new[] { "GuildId", "PollMessageId" });
+                columns: new[] { "GuildId", "PollMessageId" }
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_MetaProposalStates_GuildId_ProposalThreadChannelId",
                 table: "MetaProposalStates",
-                columns: new[] { "GuildId", "ProposalThreadChannelId" });
+                columns: new[] { "GuildId", "ProposalThreadChannelId" }
+            );
 
             migrationBuilder.CreateIndex(
                 name: "IX_MetaProposalStates_GuildId_SuggestionThreadChannelId",
                 table: "MetaProposalStates",
                 columns: new[] { "GuildId", "SuggestionThreadChannelId" },
-                unique: true);
+                unique: true
+            );
 
-            migrationBuilder.CreateIndex(
-                name: "IX_MetaProposalStates_Status",
-                table: "MetaProposalStates",
-                column: "Status");
+            migrationBuilder.CreateIndex(name: "IX_MetaProposalStates_Status", table: "MetaProposalStates", column: "Status");
 
             migrationBuilder.CreateIndex(
                 name: "IX_MetaProposalStates_Status_PollExpiresAtUtc",
                 table: "MetaProposalStates",
-                columns: new[] { "Status", "PollExpiresAtUtc" });
+                columns: new[] { "Status", "PollExpiresAtUtc" }
+            );
         }
     }
 }

@@ -10,7 +10,8 @@ public sealed class MessageCacheSamplingWorker(
     MessageSnapshotCache cache,
     ModerationLoggingGatewayHandler loggingHandler,
     MessageCacheMaintenanceWorker maintenance,
-    ILogger logger) : BackgroundService
+    ILogger logger
+) : BackgroundService
 {
     private readonly ILogger _logger = logger.ForContext<MessageCacheSamplingWorker>();
     private readonly string _processRunId = Guid.NewGuid().ToString("N");
@@ -58,16 +59,15 @@ public sealed class MessageCacheSamplingWorker(
                 }
             }
         }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
     }
 
     private static ChannelMeasurement CollectChannel(
         ulong guildId,
         ISocketMessageChannel channel,
         IReadOnlyDictionary<(ulong GuildId, ulong ChannelId), CachedChannelStatistics> statistics,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         cancellationToken.ThrowIfCancellationRequested();
         statistics.TryGetValue((guildId, channel.Id), out var measurement);
@@ -77,7 +77,8 @@ public sealed class MessageCacheSamplingWorker(
             channel.Id.ToString(CultureInfo.InvariantCulture),
             CachedMessageCount: measurement?.Count ?? 0,
             OldestMessageCreatedAtUtc: measurement?.OldestCreatedAtUtc,
-            OldestMessageExpiresAtUtc: measurement?.OldestExpiresAtUtc);
+            OldestMessageExpiresAtUtc: measurement?.OldestExpiresAtUtc
+        );
     }
 
     private Task OnReadyAsync()
@@ -91,8 +92,9 @@ public sealed class MessageCacheSamplingWorker(
     {
         ImmutableArray<CachedChannelStatistics> statistics = await cache.GetStatisticsAsync(cancellationToken);
 
-        Dictionary<(ulong GuildId, ulong ChannelId), CachedChannelStatistics> byChannel = statistics
-            .ToDictionary(statistic => (statistic.GuildId, statistic.ChannelId));
+        Dictionary<(ulong GuildId, ulong ChannelId), CachedChannelStatistics> byChannel = statistics.ToDictionary(statistic =>
+            (statistic.GuildId, statistic.ChannelId)
+        );
 
         Queue<ChannelMeasurement> measurements = [];
         long cachedGuildMembers = 0;
@@ -109,8 +111,8 @@ public sealed class MessageCacheSamplingWorker(
 
             cachedGuildMembers += guild.Users.Count;
 
-            IEnumerable<ISocketMessageChannel> channels = guild.Channels
-                .Concat(guild.ThreadChannels)
+            IEnumerable<ISocketMessageChannel> channels = guild
+                .Channels.Concat(guild.ThreadChannels)
                 .DistinctBy(channel => channel.Id)
                 .OfType<ISocketMessageChannel>();
 
@@ -121,7 +123,9 @@ public sealed class MessageCacheSamplingWorker(
                 if (client.ConnectionState != ConnectionState.Connected || !((IGuild)guild).Available)
                     return;
 
-                measurements.Enqueue(CollectChannel(guildId: guild.Id, channel: channel, statistics: byChannel, cancellationToken: cancellationToken));
+                measurements.Enqueue(
+                    CollectChannel(guildId: guild.Id, channel: channel, statistics: byChannel, cancellationToken: cancellationToken)
+                );
             }
         }
 
@@ -160,9 +164,7 @@ public sealed class MessageCacheSamplingWorker(
             .ForContext("ProcessWorkingSetBytes", value: workingSetBytes)
             .ForContext("ProcessUptime", value: uptime);
 
-        snapshotLogger
-            .ForContext("MessageCacheSample", value: true)
-            .Debug("Message-cache snapshot: {@Channels}", propertyValue: channels);
+        snapshotLogger.ForContext("MessageCacheSample", value: true).Debug("Message-cache snapshot: {@Channels}", propertyValue: channels);
 
         snapshotLogger.Debug(
             "Message-cache summary at {CollectedAtUtc}, run {ProcessRunId}: {SampledChannelCount} channels, {PopulatedChannelCount} populated, {TotalCachedMessages} cached messages, {CachedGuildMemberCount} cached guild members, whole-process working set {ProcessWorkingSetBytes} bytes, uptime {ProcessUptime}",
@@ -173,7 +175,8 @@ public sealed class MessageCacheSamplingWorker(
             totalCachedMessages,
             cachedGuildMembers,
             workingSetBytes,
-            uptime);
+            uptime
+        );
     }
 
     [UsedImplicitly]
@@ -182,5 +185,6 @@ public sealed class MessageCacheSamplingWorker(
         string ChannelId,
         int CachedMessageCount,
         DateTimeOffset? OldestMessageCreatedAtUtc,
-        DateTimeOffset? OldestMessageExpiresAtUtc);
+        DateTimeOffset? OldestMessageExpiresAtUtc
+    );
 }

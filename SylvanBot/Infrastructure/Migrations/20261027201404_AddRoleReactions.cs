@@ -21,14 +21,23 @@ namespace SylvanBot.Infrastructure.Migrations
                     EmojiText = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     RoleId = table.Column<long>(type: "bigint", nullable: false),
                 },
-                constraints: table => table.PrimaryKey("PK_RoleReactions", x => new { x.GuildId, x.MessageId, x.EmojiKey }));
+                constraints: table =>
+                    table.PrimaryKey(
+                        "PK_RoleReactions",
+                        x => new
+                        {
+                            x.GuildId,
+                            x.MessageId,
+                            x.EmojiKey,
+                        }
+                    )
+            );
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "RoleReactions");
+            migrationBuilder.DropTable(name: "RoleReactions");
         }
     }
 }

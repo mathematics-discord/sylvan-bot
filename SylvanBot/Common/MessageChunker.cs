@@ -9,7 +9,7 @@ public static class MessageChunker
         if (chunkSize <= 0)
             return Error.Validation("Chunk size must be greater than zero.");
 
-        Queue<string> chunks = new((message.Length / chunkSize) + 1);
+        Queue<string> chunks = new Queue<string>((message.Length / chunkSize) + 1);
 
         var index = 0;
 
@@ -24,7 +24,7 @@ public static class MessageChunker
                 break;
             }
 
-            var window  = message.Substring(startIndex: index, length: chunkSize);
+            var window = message.Substring(startIndex: index, length: chunkSize);
             var splitAt = window.LastIndexOf('\n');
 
             var chunkLength = splitAt > 0 ? splitAt + 1 : chunkSize;

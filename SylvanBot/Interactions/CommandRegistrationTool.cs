@@ -6,8 +6,8 @@ internal static class CommandRegistrationTool
 {
     internal static bool TryParse(string[] args, out string action, out bool global, out ulong[] guildIds)
     {
-        action   = string.Empty;
-        global   = false;
+        action = string.Empty;
+        global = false;
         guildIds = [];
 
         if (args.Length < 2 || args[0] is not ("inspect" or "clear"))
@@ -44,8 +44,7 @@ internal static class CommandRegistrationTool
     {
         if (!TryParse(args: args, out var action, out var global, out var guildIds))
         {
-            await Console.Error.WriteLineAsync(
-                "Usage: commands <inspect|clear> global | commands <inspect|clear> guild <guild-id> [guild-id ...]");
+            await Console.Error.WriteLineAsync("Usage: commands <inspect|clear> global | commands <inspect|clear> guild <guild-id> [guild-id ...]");
 
             return 2;
         }
@@ -54,8 +53,7 @@ internal static class CommandRegistrationTool
 
         if (string.IsNullOrWhiteSpace(token))
         {
-            await Console.Error.WriteLineAsync(
-                "DISCORD__TOKEN must be set in the environment for command maintenance.");
+            await Console.Error.WriteLineAsync("DISCORD__TOKEN must be set in the environment for command maintenance.");
 
             return 2;
         }
@@ -80,8 +78,7 @@ internal static class CommandRegistrationTool
 
                         if (remaining.Count != 0)
                         {
-                            throw new InvalidOperationException(
-                                "Discord returned commands after clearing global scope.");
+                            throw new InvalidOperationException("Discord returned commands after clearing global scope.");
                         }
 
                         Console.WriteLine($"Cleared global scope: {commands.Count} application commands removed.");
@@ -102,30 +99,28 @@ internal static class CommandRegistrationTool
             foreach (var guildId in guildIds)
                 try
                 {
-                    IReadOnlyCollection<RestGuildCommand> commands =
-                        await client.GetGuildApplicationCommands(guildId: guildId, withLocalizations: true);
+                    IReadOnlyCollection<RestGuildCommand> commands = await client.GetGuildApplicationCommands(
+                        guildId: guildId,
+                        withLocalizations: true
+                    );
 
                     if (string.Equals(a: action, "inspect", comparisonType: StringComparison.Ordinal))
                         PrintCommands($"guild {guildId}", commands: commands);
                     else
                     {
-                        IReadOnlyCollection<RestGuildCommand> remaining =
-                            await client.BulkOverwriteGuildCommands([], guildId: guildId);
+                        IReadOnlyCollection<RestGuildCommand> remaining = await client.BulkOverwriteGuildCommands([], guildId: guildId);
 
                         if (remaining.Count != 0)
                         {
-                            throw new InvalidOperationException(
-                                $"Discord returned commands after clearing guild {guildId} scope.");
+                            throw new InvalidOperationException($"Discord returned commands after clearing guild {guildId} scope.");
                         }
 
-                        Console.WriteLine(
-                            $"Cleared guild {guildId} scope: {commands.Count} application commands removed.");
+                        Console.WriteLine($"Cleared guild {guildId} scope: {commands.Count} application commands removed.");
                     }
                 }
                 catch (Exception ex)
                 {
-                    await Console.Error.WriteLineAsync(
-                        $"Failed to {action} application commands in guild {guildId}: {ex}");
+                    await Console.Error.WriteLineAsync($"Failed to {action} application commands in guild {guildId}: {ex}");
 
                     failed = true;
                 }
@@ -148,8 +143,7 @@ internal static class CommandRegistrationTool
         {
             Console.WriteLine($"  {command.Type} {command.Name} ({command.Id}): {command.Description}");
 
-            Console.WriteLine(
-                $"    Default member permissions: {command.DefaultMemberPermissions}; NSFW: {command.IsNsfw}");
+            Console.WriteLine($"    Default member permissions: {command.DefaultMemberPermissions}; NSFW: {command.IsNsfw}");
             PrintOptions(options: command.Options, "    ");
         }
     }
@@ -158,13 +152,11 @@ internal static class CommandRegistrationTool
     {
         foreach (var option in options)
         {
-            Console.WriteLine(
-                $"{indent}{option.Type} {option.Name} (required: {option.IsRequired}): {option.Description}");
+            Console.WriteLine($"{indent}{option.Type} {option.Name} (required: {option.IsRequired}): {option.Description}");
 
             if (option.Choices.Count > 0)
             {
-                Console.WriteLine(
-                    $"{indent}  Choices: {string.Join(", ", option.Choices.Select(choice => $"{choice.Name}={choice.Value}"))}");
+                Console.WriteLine($"{indent}  Choices: {string.Join(", ", option.Choices.Select(choice => $"{choice.Name}={choice.Value}"))}");
             }
 
             if (option.IsAutocomplete == true)
