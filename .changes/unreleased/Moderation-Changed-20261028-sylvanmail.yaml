@@ -1,4 +1,0 @@
-component: Moderation
-kind: Changed
-body: SylvanMail is out of beta. Authors can cancel pending replies with ❌ and edit them to prepare them again. Successful delivery clears all reactions and leaves a single ✅. Explicit mentions remain anonymous; replies with the reply ping enabled include the author's username.
-time: 2026-10-28T20:00:00Z

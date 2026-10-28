@@ -2,6 +2,13 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.2.0 - 2026-10-28
+## General
+### Added
+- You can now DM @Sylvan to contact the moderators as an alternative to @ModMail. SylvanMail is out of beta and will replace @ModMail as the sole way to send a private message to the moderation team.
+## Moderation
+### Changed
+- SylvanMail is out of beta. Authors can cancel pending replies with ❌ and edit them to prepare them again. Successful delivery clears all reactions and leaves a single ✅. Explicit mentions remain anonymous; replies with the reply ping enabled include the author's username.
 # v0.1.19 - 2026-10-28
 ## Moderation
 ### Added
