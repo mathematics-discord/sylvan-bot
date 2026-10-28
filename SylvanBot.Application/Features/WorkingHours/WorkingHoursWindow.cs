@@ -10,10 +10,10 @@ public sealed class WorkingHoursWindow
         ambiguousTimeResolver: Resolvers.ReturnEarlier,
         skippedTimeResolver: Resolvers.ReturnForwardShifted);
 
-    private readonly DateTimeZone?                     _zone;
+    private readonly DateTimeZone? _zone;
     private readonly (int Seconds, long FractionTicks) _start;
     private readonly (int Seconds, long FractionTicks) _end;
-    private readonly bool                              _overnight;
+    private readonly bool _overnight;
 
     internal WorkingHoursWindow(string start, string end, int? offsetMinutes, string? zoneId)
     {
@@ -28,13 +28,13 @@ public sealed class WorkingHoursWindow
         if (zoneId is not null && _zone is null)
             throw new ArgumentException("Unsupported TZDB timezone.", nameof(zoneId));
 
-        StartText     = start;
-        EndText       = end;
+        StartText = start;
+        EndText = end;
         OffsetMinutes = offsetMinutes;
-        ZoneId        = zoneId;
-        _start        = ExecutionTime(start);
-        _end          = ExecutionTime(end);
-        _overnight    = string.CompareOrdinal(strA: end, strB: start) < 0;
+        ZoneId = zoneId;
+        _start = ExecutionTime(start);
+        _end = ExecutionTime(end);
+        _overnight = string.CompareOrdinal(strA: end, strB: start) < 0;
     }
 
     public string StartText { get; }
@@ -59,8 +59,8 @@ public sealed class WorkingHoursWindow
         for (var day = -1; day <= 0; day++)
         {
             var startDate = date.PlusDays(day);
-            var start     = Resolve(date: startDate, time: _start);
-            var end       = Resolve(startDate.PlusDays(_overnight ? 1 : 0), time: _end);
+            var start = Resolve(date: startDate, time: _start);
+            var end = Resolve(startDate.PlusDays(_overnight ? 1 : 0), time: _end);
 
             if (end > start && instant >= start && instant < end)
                 return true;
@@ -74,9 +74,9 @@ public sealed class WorkingHoursWindow
         var seconds = (int.Parse(text.AsSpan(start: 0, length: 2), provider: CultureInfo.InvariantCulture) * 3600)
             + (int.Parse(text.AsSpan(start: 3, length: 2), provider: CultureInfo.InvariantCulture) * 60)
             + int.Parse(text.AsSpan(start: 6, length: 2), provider: CultureInfo.InvariantCulture);
-        var fraction  = text.Length > 8 ? text[9..] : string.Empty;
+        var fraction = text.Length > 8 ? text[9..] : string.Empty;
         var ticksText = fraction.PadRight(totalWidth: 7, paddingChar: '0');
-        var ticks     = long.Parse(ticksText.AsSpan(start: 0, length: 7), provider: CultureInfo.InvariantCulture);
+        var ticks = long.Parse(ticksText.AsSpan(start: 0, length: 7), provider: CultureInfo.InvariantCulture);
 
         // Canonical fractions have no trailing zero; any remaining digits require rounding up.
         if (fraction.Length > 7)

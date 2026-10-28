@@ -13,12 +13,12 @@ public static class WorkingHoursResponses
     {
         // Exact decimal arithmetic belongs to response policy, not scheduler execution.
         var startFraction = window.StartText.Length > 8 ? window.StartText[9..] : string.Empty;
-        var endFraction   = window.EndText.Length > 8 ? window.EndText[9..] : string.Empty;
-        var digits        = Math.Max(val1: startFraction.Length, val2: endFraction.Length);
-        var scale         = BigInteger.Pow(value: 10, exponent: digits);
-        var start         = Units(clock: window.StartText, fraction: startFraction, digits: digits, scale: scale);
-        var end           = Units(clock: window.EndText, fraction: endFraction, digits: digits, scale: scale);
-        var duration      = end - start;
+        var endFraction = window.EndText.Length > 8 ? window.EndText[9..] : string.Empty;
+        var digits = Math.Max(val1: startFraction.Length, val2: endFraction.Length);
+        var scale = BigInteger.Pow(value: 10, exponent: digits);
+        var start = Units(clock: window.StartText, fraction: startFraction, digits: digits, scale: scale);
+        var end = Units(clock: window.EndText, fraction: endFraction, digits: digits, scale: scale);
+        var duration = end - start;
 
         if (duration < 0)
             duration += 86400 * scale;
@@ -48,7 +48,7 @@ public static class WorkingHoursResponses
         for (var day = -1; day <= 1; day++)
         {
             var from = BigInteger.Max(left: start, ((day * 86400) + (22 * 3600)) * scale);
-            var to   = BigInteger.Min(start + duration, (((day + 1) * 86400) + (7 * 3600)) * scale);
+            var to = BigInteger.Min(start + duration, (((day + 1) * 86400) + (7 * 3600)) * scale);
 
             if (to > from)
                 overlap += to - from;

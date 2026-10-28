@@ -12,11 +12,11 @@ public sealed class ImageSpamSettings
         int requiredAttachmentCount,
         int burstDurationSeconds)
     {
-        GuildId                 = guildId;
-        RequiredChannelCount    = requiredChannelCount;
+        GuildId = guildId;
+        RequiredChannelCount = requiredChannelCount;
         RequiredAttachmentCount = requiredAttachmentCount;
-        BurstDurationSeconds    = burstDurationSeconds;
-        IsEnabled               = true;
+        BurstDurationSeconds = burstDurationSeconds;
+        IsEnabled = true;
     }
 
     public int BurstDurationSeconds { get; private set; }
@@ -38,9 +38,9 @@ public sealed class ImageSpamSettings
 
     public void Update(int? requiredChannelCount, int? requiredAttachmentCount, int? burstDurationSeconds)
     {
-        RequiredChannelCount    = requiredChannelCount ?? RequiredChannelCount;
+        RequiredChannelCount = requiredChannelCount ?? RequiredChannelCount;
         RequiredAttachmentCount = requiredAttachmentCount ?? RequiredAttachmentCount;
-        BurstDurationSeconds    = burstDurationSeconds ?? BurstDurationSeconds;
-        IsEnabled               = true;
+        BurstDurationSeconds = burstDurationSeconds ?? BurstDurationSeconds;
+        IsEnabled = true;
     }
 }

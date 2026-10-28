@@ -7,7 +7,7 @@ public sealed class WorkingHoursPreference
         if (guildId == 0 || memberId == 0)
             throw new ArgumentException("Guild and member identities must be non-zero.", nameof(guildId));
 
-        GuildId  = guildId;
+        GuildId = guildId;
         MemberId = memberId;
     }
 
@@ -38,7 +38,7 @@ public sealed class WorkingHoursPreference
                 return null;
 
             (string Time, int? OffsetMinutes)? start = StartTime is null ? null : WorkingHoursTimeParser.ParseEndpoint(StartTime);
-            (string Time, int? OffsetMinutes)? end   = EndTime is null ? null : WorkingHoursTimeParser.ParseEndpoint(EndTime);
+            (string Time, int? OffsetMinutes)? end = EndTime is null ? null : WorkingHoursTimeParser.ParseEndpoint(EndTime);
 
             if (start is null || end is null || start.Value.OffsetMinutes.HasValue || end.Value.OffsetMinutes.HasValue)
                 throw new InvalidOperationException("Invalid persisted availability window.");
@@ -58,11 +58,11 @@ public sealed class WorkingHoursPreference
         if (WorkingHoursResponses.Rejection(window: window, username: string.Empty) is not null)
             throw new ArgumentException("Schedules must last at least twenty minutes.", nameof(window));
 
-        StartTime     = window.StartText;
-        EndTime       = window.EndText;
+        StartTime = window.StartText;
+        EndTime = window.EndText;
         OffsetMinutes = window.OffsetMinutes;
-        ZoneId        = window.ZoneId;
-        Enabled       = true;
+        ZoneId = window.ZoneId;
+        Enabled = true;
     }
 
     public void DisableSchedule() => Enabled = false;

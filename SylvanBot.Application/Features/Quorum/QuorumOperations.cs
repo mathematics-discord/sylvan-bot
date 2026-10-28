@@ -55,10 +55,10 @@ public sealed class QuorumOperations(IDbContextFactory<BotDbContext> contexts, I
         if (channelKind is not ("text" or "forum"))
             throw new ArgumentOutOfRangeException(nameof(channelKind), actualValue: channelKind, "Unsupported quorum channel kind.");
 
-        await using var db              = await contexts.CreateDbContextAsync(ct);
-        var             id              = Guid.CreateVersion7();
-        var             storedGuildId   = checked((long)guildId);
-        var             storedChannelId = checked((long)channelId);
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        var id = Guid.CreateVersion7();
+        var storedGuildId = checked((long)guildId);
+        var storedChannelId = checked((long)channelId);
 
         // The upsert locks an existing parent row and retains its identity and voter roles.
         List<Guid> configurationIds = await db.Database
@@ -93,11 +93,11 @@ public sealed class QuorumOperations(IDbContextFactory<BotDbContext> contexts, I
         bool shouldAdd,
         CancellationToken ct)
     {
-        await using var db              = await contexts.CreateDbContextAsync(ct);
-        await using var transaction     = await db.Database.BeginTransactionAsync(ct);
-        var             storedGuildId   = checked((long)guildId);
-        var             storedChannelId = checked((long)channelId);
-        var             storedRoleId    = checked((long)roleId);
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        var storedGuildId = checked((long)guildId);
+        var storedChannelId = checked((long)channelId);
+        var storedRoleId = checked((long)roleId);
 
         // Keep this lock and the targeted write on the same context and transaction.
         List<Guid> configurationIds = await db.Database

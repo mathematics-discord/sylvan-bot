@@ -8,8 +8,8 @@ namespace SylvanBot.Application.Features.SylvanMail;
 public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts, ISylvanMailDiscord discord)
 {
     // One feature-local database lock also serializes configuration with in-flight relay work.
-    private const long LockId             = 739416284;
-    private const int  MaxAttachmentBytes = 8 * 1024 * 1024;
+    private const long LockId = 739416284;
+    private const int MaxAttachmentBytes = 8 * 1024 * 1024;
 
     public async Task ConfigureAsync(ulong guildId, ulong forumId, ulong roleId, CancellationToken ct)
     {
@@ -39,7 +39,7 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
             }
 
             saved.ForumId = forumId;
-            saved.RoleId  = roleId;
+            saved.RoleId = roleId;
             await db.SaveChangesAsync(ct);
         }
         finally
@@ -119,8 +119,8 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
 
     public async Task RefuseConfirmationAsync(ulong threadId, ulong messageId, ulong authorId, CancellationToken ct)
     {
-        await using var db           = await contexts.CreateDbContextAsync(ct);
-        var             conversation = await ActiveConversationAsync(db: db, threadId: threadId, ct: ct);
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        var conversation = await ActiveConversationAsync(db: db, threadId: threadId, ct: ct);
 
         if (conversation is null)
             return;
@@ -169,7 +169,7 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
         }
 
         var destination = settings[0];
-        var toStaff     = message.GuildId is null;
+        var toStaff = message.GuildId is null;
 
         IQueryable<SylvanMailConversation> conversationQuery = db.SylvanMailConversations
            .AsNoTracking()
@@ -197,12 +197,12 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
         {
             SourceMessageId = message.SourceMessageId,
             SourceChannelId = message.SourceChannelId,
-            AuthorId        = message.AuthorId,
-            GuildId         = destination.GuildId,
-            ConversationId  = conversation?.Id,
-            ToStaff         = toStaff,
-            State           = "Refused",
-            Detail          = "Not relayed: SylvanMail is temporarily busy. This message was refused; please send it again later.",
+            AuthorId = message.AuthorId,
+            GuildId = destination.GuildId,
+            ConversationId = conversation?.Id,
+            ToStaff = toStaff,
+            State = "Refused",
+            Detail = "Not relayed: SylvanMail is temporarily busy. This message was refused; please send it again later.",
         };
 
         db.SylvanMailOperations.Add(operation);
@@ -247,7 +247,7 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
     private static ImmutableArray<string> SplitContent(string content, int size)
     {
         var chunks = ImmutableArray.CreateBuilder<string>();
-        var index  = 0;
+        var index = 0;
 
         while (index < content.Length)
         {
@@ -299,8 +299,8 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
             return;
         }
 
-        var                     settings = destinations[0];
-        var                     toStaff  = message.GuildId is null;
+        var settings = destinations[0];
+        var toStaff = message.GuildId is null;
         SylvanMailConversation? conversation;
 
         if (toStaff)
@@ -343,14 +343,14 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
 
             if (string.Equals(a: operation.State, "Sending", comparisonType: StringComparison.Ordinal))
             {
-                operation.State  = "Uncertain";
+                operation.State = "Uncertain";
                 operation.Detail = "Interrupted delivery: some content may have arrived. No automatic resend.";
                 await db.SaveChangesAsync(ct);
             }
 
             if (string.Equals(a: operation.State, "Saved", comparisonType: StringComparison.Ordinal))
             {
-                operation.State  = "Unpublished";
+                operation.State = "Unpublished";
                 operation.Detail = "Interrupted before delivery started. No automatic resend.";
                 await db.SaveChangesAsync(ct);
             }
@@ -366,10 +366,10 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
         {
             SourceMessageId = message.SourceMessageId,
             SourceChannelId = message.SourceChannelId,
-            AuthorId        = message.AuthorId,
-            GuildId         = settings.GuildId,
-            ConversationId  = conversation?.Id,
-            ToStaff         = toStaff,
+            AuthorId = message.AuthorId,
+            GuildId = settings.GuildId,
+            ConversationId = conversation?.Id,
+            ToStaff = toStaff,
         };
 
         db.SylvanMailOperations.Add(operation);
@@ -410,9 +410,9 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
             }
 
             // An uncertain notice is not retried, but subsequent messages can still be delivered.
-            var                    label   = toStaff ? await discord.InboundPrefixAsync(guildId: settings.GuildId, message: message, ct: ct) : message.OutboundPrefix;
-            ImmutableArray<string> chunks  = SplitContent(content: message.Content, 2000 - label.Length);
-            var                    ordinal = 0;
+            var label = toStaff ? await discord.InboundPrefixAsync(guildId: settings.GuildId, message: message, ct: ct) : message.OutboundPrefix;
+            ImmutableArray<string> chunks = SplitContent(content: message.Content, 2000 - label.Length);
+            var ordinal = 0;
 
             foreach (var chunk in chunks)
             {
@@ -427,7 +427,7 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
             for (var index = 0; index < message.Attachments.Length; index++)
             {
                 var attachment = message.Attachments[index];
-                var bytes      = attachments[index];
+                var bytes = attachments[index];
 
                 await PublishAsync(
                     db: db,
@@ -437,7 +437,7 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
                     ct: ct);
             }
 
-            operation.State  = "Delivered";
+            operation.State = "Delivered";
             operation.Detail = "Delivered: Discord accepted every part.";
             await db.SaveChangesAsync(ct);
         }
@@ -455,7 +455,7 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
             var delivered = operation.Deliveries
                .Count(item => item.MessageId.HasValue);
 
-            var refused       = exception is BotCommandException;
+            var refused = exception is BotCommandException;
             var uncertainPost = toStaff && conversation is { CreationStarted: true, ThreadId: null };
 
             if ((uncertain || uncertainPost) && !refused)
@@ -468,11 +468,11 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
             operation.Detail = operation.State switch
             {
                 "Uncertain" when uncertainPost => "Saved but message unpublished: post creation is uncertain. The saved attempt will be reconciled before any new post; no automatic resend.",
-                "Uncertain"                    => $"Uncertain delivery ({delivered} confirmed parts). Further content was stopped; no automatic resend.",
-                "Partial" when refused         => $"Partial delivery ({delivered} confirmed parts). {exception.Message}",
-                "Partial"                      => $"Partial delivery ({delivered} confirmed parts); remaining content was not sent.",
-                "Refused"                      => exception.Message,
-                _                              => "Saved but unpublished: delivery could not start. No automatic resend.",
+                "Uncertain" => $"Uncertain delivery ({delivered} confirmed parts). Further content was stopped; no automatic resend.",
+                "Partial" when refused => $"Partial delivery ({delivered} confirmed parts). {exception.Message}",
+                "Partial" => $"Partial delivery ({delivered} confirmed parts); remaining content was not sent.",
+                "Refused" => exception.Message,
+                _ => "Saved but unpublished: delivery could not start. No automatic resend.",
             };
 
             // Use the original token only for effects; preserve accountability during shutdown if the DB is reachable.
@@ -570,7 +570,7 @@ public sealed class SylvanMailWorkflow(IDbContextFactory<BotDbContext> contexts,
     {
         // Outcome notices still get a bounded attempt when the delivery token has timed out.
         using var noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var       noticeToken   = noticeTimeout.Token;
+        var noticeToken = noticeTimeout.Token;
 
         if (string.Equals(a: op.State, "Delivered", comparisonType: StringComparison.Ordinal))
         {

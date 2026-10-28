@@ -9,7 +9,7 @@ public static partial class WorkingHoursTimeParser
     public static ErrorOr<WorkingHoursWindow> Parse(string start, string end, string? timezone)
     {
         (string Time, int? OffsetMinutes)? first = ParseEndpoint(start);
-        (string Time, int? OffsetMinutes)? last  = ParseEndpoint(end);
+        (string Time, int? OffsetMinutes)? last = ParseEndpoint(end);
 
         if (first is null || last is null)
             return Error.Validation(description: "Use HH:MM:SS[.fraction], with Z or ±HH:MM for fixed offsets. No dates, whitespace, leap seconds or -00:00.");
@@ -35,7 +35,7 @@ public static partial class WorkingHoursTimeParser
         if (!match.Success)
             return null;
 
-        var hour   = int.Parse(s: match.Groups["hour"].Value, provider: CultureInfo.InvariantCulture);
+        var hour = int.Parse(s: match.Groups["hour"].Value, provider: CultureInfo.InvariantCulture);
         var minute = int.Parse(s: match.Groups["minute"].Value, provider: CultureInfo.InvariantCulture);
         var second = int.Parse(s: match.Groups["second"].Value, provider: CultureInfo.InvariantCulture);
 
@@ -43,11 +43,11 @@ public static partial class WorkingHoursTimeParser
             return null;
 
         int? offsetMinutes = null;
-        var  offset        = match.Groups["offset"].Value;
+        var offset = match.Groups["offset"].Value;
 
         if (offset.Length > 1)
         {
-            var offsetHour   = int.Parse(offset.AsSpan(start: 1, length: 2), provider: CultureInfo.InvariantCulture);
+            var offsetHour = int.Parse(offset.AsSpan(start: 1, length: 2), provider: CultureInfo.InvariantCulture);
             var offsetMinute = int.Parse(offset.AsSpan(start: 4, length: 2), provider: CultureInfo.InvariantCulture);
 
             if (offsetHour > 23 || offsetMinute > 59 || string.Equals(a: offset, "-00:00", comparisonType: StringComparison.Ordinal))
@@ -59,7 +59,7 @@ public static partial class WorkingHoursTimeParser
             offsetMinutes = 0;
 
         var fraction = match.Groups["fraction"].Value.TrimEnd('0');
-        var clock    = input[..8];
+        var clock = input[..8];
 
         return (fraction.Length == 0 ? clock : clock + "." + fraction, offsetMinutes);
     }
