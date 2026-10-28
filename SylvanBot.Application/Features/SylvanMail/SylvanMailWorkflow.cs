@@ -420,7 +420,7 @@ public sealed class SylvanMailWorkflow(
 
             conversation.NoticeMessageId = await discord.SendTextAsync(
                 channelId: sourceChannelId,
-                "SylvanMail is in beta: bugs and lost messages are possible. Your DMs to Sylvan reach staff in a private forum post. Staff replies are sent by Sylvan after the author confirms them; edits and deletions after sending are not relayed.",
+                "Your DMs to Sylvan reach staff in a private forum post. Staff replies are sent by Sylvan after the author confirms them; edits and deletions after sending are not relayed.",
                 ct: ct);
             await db.SaveChangesAsync(ct);
         }

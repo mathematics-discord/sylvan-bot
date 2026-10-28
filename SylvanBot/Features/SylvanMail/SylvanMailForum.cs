@@ -105,8 +105,7 @@ public sealed class SylvanMailForum(DiscordSocketClient client) : ISylvanMailFor
         var embed = new EmbedBuilder()
            .WithTitle($"Case #{post.Number}")
            .WithDescription(
-                "Mention Sylvan for an anonymous draft, or reply to Sylvan with the reply ping enabled to sign it. Only the author can click \U0001F4E4 to send the latest draft. \u2611\uFE0F confirms delivery; errors appear here.")
-           .WithFooter("Beta · Bugs and lost messages are possible")
+                "Mention Sylvan for an anonymous draft, or reply to Sylvan with the reply ping enabled to sign it. Only the author can click \U0001F4E4 to send or \u274C to cancel the draft. Edit a cancelled draft to prepare it again. \u2705 confirms delivery; errors appear here.")
            .AddField("User ID", $"```\n{post.UserId}\n```", inline: false)
            .AddField("Username", $"```\n{username}\n```", inline: false);
 

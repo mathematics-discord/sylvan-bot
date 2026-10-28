@@ -72,6 +72,16 @@ public sealed class SylvanMailGatewayHandler(
                                 ct: timeout.Token);
 
                             break;
+                        case DraftCancelled cancellation:
+                            await drafts.HandleDraftAsync(
+                                threadId: cancellation.ChannelId,
+                                messageId: cancellation.MessageId,
+                                authorId: cancellation.AuthorId,
+                                confirm: false,
+                                ct: timeout.Token,
+                                cancel: true);
+
+                            break;
                     }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -142,12 +152,15 @@ public sealed class SylvanMailGatewayHandler(
 
     private Task ReactionAddedAsync(Cacheable<IUserMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel, SocketReaction reaction)
     {
-        if (
-            reaction.UserId == client.CurrentUser.Id
-            || !string.Equals(a: reaction.Emote.Name, b: SylvanMailDrafts.SendEmoji, comparisonType: StringComparison.Ordinal))
+        var send = string.Equals(a: reaction.Emote.Name, b: SylvanMailDrafts.SendEmoji, comparisonType: StringComparison.Ordinal);
+        var cancel = string.Equals(a: reaction.Emote.Name, b: SylvanMailDrafts.CancelEmoji, comparisonType: StringComparison.Ordinal);
+
+        if (reaction.UserId == client.CurrentUser.Id || (!send && !cancel))
             return Task.CompletedTask;
 
-        var work = new DraftConfirmed(ChannelId: channel.Id, MessageId: message.Id, AuthorId: reaction.UserId);
+        MailWork work = cancel
+            ? new DraftCancelled(ChannelId: channel.Id, MessageId: message.Id, AuthorId: reaction.UserId)
+            : new DraftConfirmed(ChannelId: channel.Id, MessageId: message.Id, AuthorId: reaction.UserId);
 
         return !_messages.Writer.TryWrite(work) ? RefuseConfirmationAsync(work) : Task.CompletedTask;
     }
@@ -158,7 +171,12 @@ public sealed class SylvanMailGatewayHandler(
 
         try
         {
-            await drafts.RefuseConfirmationAsync(threadId: work.ChannelId, messageId: work.MessageId, authorId: work.AuthorId, ct: timeout.Token);
+            await drafts.RefuseConfirmationAsync(
+                threadId: work.ChannelId,
+                messageId: work.MessageId,
+                authorId: work.AuthorId,
+                ct: timeout.Token,
+                cancel: work is DraftCancelled);
         }
         catch (Exception exception)
         {
@@ -236,5 +254,8 @@ public sealed class SylvanMailGatewayHandler(
         : MailWork(ChannelId: ChannelId, MessageId: MessageId, AuthorId: AuthorId);
 
     private sealed record DraftConfirmed(ulong ChannelId, ulong MessageId, ulong AuthorId)
+        : MailWork(ChannelId: ChannelId, MessageId: MessageId, AuthorId: AuthorId);
+
+    private sealed record DraftCancelled(ulong ChannelId, ulong MessageId, ulong AuthorId)
         : MailWork(ChannelId: ChannelId, MessageId: MessageId, AuthorId: AuthorId);
 }

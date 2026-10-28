@@ -6,6 +6,7 @@ namespace SylvanBot.Features.SylvanMail;
 public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger) : ISylvanMailDrafts
 {
     public const string SendEmoji = "\U0001F4E4";
+    public const string CancelEmoji = "\u274C";
 
     public static SylvanMailMessage ReadMessage(IUserMessage source, ulong? guildId)
     {
@@ -106,21 +107,32 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
             if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, Options(ct)) is not IUserMessage message)
                 return;
 
-            var emoji = new Emoji(SendEmoji);
-            var marked = message.Reactions.TryGetValue(key: emoji, out var reaction) && reaction.IsMe;
+            foreach (var control in new[] { SendEmoji, CancelEmoji })
+            {
+                var emoji = new Emoji(control);
+                var marked = message.Reactions.TryGetValue(key: emoji, out var reaction) && reaction.IsMe;
 
-            if (ready == marked)
-                return;
+                if (ready == marked)
+                    continue;
 
-            if (ready)
-                await message.AddReactionAsync(emote: emoji, Options(ct));
-            else
-                await message.RemoveReactionAsync(emote: emoji, userId: client.CurrentUser.Id, Options(ct));
+                if (ready)
+                    await message.AddReactionAsync(emote: emoji, Options(ct));
+                else
+                    await message.RemoveReactionAsync(emote: emoji, userId: client.CurrentUser.Id, Options(ct));
+            }
         }
         catch (Exception exception)
         {
             LogFailure(logger: logger, "draft reaction", sourceId: messageId, exception: exception);
         }
+    }
+
+    public async Task ClearReactionsAsync(ulong threadId, ulong messageId, CancellationToken ct)
+    {
+        var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct);
+
+        if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, Options(ct)) is IUserMessage message)
+            await message.RemoveAllReactionsAsync(Options(ct));
     }
 
     public async Task MarkDeliveredAsync(SylvanMailMessage message, CancellationToken ct)
@@ -130,9 +142,10 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
             var channel = await MessageChannelAsync(client: client, channelId: message.SourceChannelId, ct: ct);
 
             if (await channel.GetMessageAsync(id: message.SourceMessageId, mode: CacheMode.AllowDownload, Options(ct)) is IUserMessage source)
-                await source.AddReactionAsync(new Emoji("\u2611\uFE0F"), Options(ct));
-
-            await SetDraftReadyAsync(threadId: message.SourceChannelId, messageId: message.SourceMessageId, ready: false, ct: ct);
+            {
+                await source.RemoveAllReactionsAsync(Options(ct));
+                await source.AddReactionAsync(new Emoji("\u2705"), Options(ct));
+            }
         }
         catch (Exception exception)
         {

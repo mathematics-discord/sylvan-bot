@@ -7,4 +7,6 @@ public interface ISylvanMailDrafts
     Task SetDraftReadyAsync(ulong threadId, ulong messageId, bool ready, CancellationToken ct);
 
     Task MarkDeliveredAsync(SylvanMailMessage message, CancellationToken ct);
+
+    Task ClearReactionsAsync(ulong threadId, ulong messageId, CancellationToken ct);
 }

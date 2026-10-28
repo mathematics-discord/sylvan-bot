@@ -10,7 +10,7 @@ public sealed class SylvanMailDraftWorkflow(
     SylvanMailWorkflow relay
 )
 {
-    public async Task HandleDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct)
+    public async Task HandleDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct, bool cancel = false)
     {
         await using var db = await contexts.CreateDbContextAsync(ct);
         await SylvanMailSerialisation.EnterAsync(db: db, ct: ct);
@@ -23,23 +23,37 @@ public sealed class SylvanMailDraftWorkflow(
             if (conversation is null)
                 return;
 
-            observed = await drafts.ReadDraftAsync(threadId: threadId, messageId: messageId, authorId: authorId, confirm: confirm, ct: ct);
+            observed = await drafts.ReadDraftAsync(threadId: threadId, messageId: messageId, authorId: authorId, confirm: confirm || cancel, ct: ct);
 
             if (observed is not { HasValue: true, Value: var message })
                 return;
 
-            await ProcessDraftAsync(db: db, message: message, confirm: confirm, ct: ct);
+            if (cancel)
+            {
+                var recorded = await db.SylvanMailOperations
+                   .AnyAsync(item => item.SourceMessageId == messageId, cancellationToken: ct);
+
+                if (recorded)
+                    throw new BotCommandException("Cannot cancel: delivery has already been attempted. Check what arrived before sending another message.");
+
+                await drafts.ClearReactionsAsync(threadId: threadId, messageId: messageId, ct: ct);
+            }
+            else
+                await ProcessDraftAsync(db: db, message: message, confirm: confirm, ct: ct);
         }
         catch (Exception exception) when (observed is { HasValue: true, Value: var message })
         {
             using var noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-            if (confirm)
+            if (confirm || cancel)
             {
-                var detail =
-                    exception is BotCommandException
-                        ? exception.Message
-                        : "Delivery could not be confirmed. Some content may have arrived; do not assume it is safe to resend.";
+                var detail = "Delivery could not be confirmed. Some content may have arrived; do not assume it is safe to resend.";
+
+                if (cancel)
+                    detail = "Cancellation could not be confirmed. Remove and re-add your cancel reaction to try again; contact staff if it continues to fail.";
+
+                if (exception is BotCommandException)
+                    detail = exception.Message;
 
                 await discord.ReportAsync(
                     source: message,
@@ -49,7 +63,8 @@ public sealed class SylvanMailDraftWorkflow(
                     ct: noticeTimeout.Token);
             }
 
-            await drafts.SetDraftReadyAsync(threadId: threadId, messageId: messageId, ready: false, ct: noticeTimeout.Token);
+            if (!cancel)
+                await drafts.SetDraftReadyAsync(threadId: threadId, messageId: messageId, ready: false, ct: noticeTimeout.Token);
 
             if (exception is not BotCommandException)
                 throw;
@@ -60,7 +75,7 @@ public sealed class SylvanMailDraftWorkflow(
         }
     }
 
-    public async Task RefuseConfirmationAsync(ulong threadId, ulong messageId, ulong authorId, CancellationToken ct)
+    public async Task RefuseConfirmationAsync(ulong threadId, ulong messageId, ulong authorId, CancellationToken ct, bool cancel = false)
     {
         await using var db = await contexts.CreateDbContextAsync(ct);
         var conversation = await ActiveConversationAsync(db: db, threadId: threadId, ct: ct);
@@ -76,7 +91,17 @@ public sealed class SylvanMailDraftWorkflow(
             ct: ct);
 
         if (observed is { HasValue: true, Value: var message })
-            await relay.RefuseBusyAsync(message: message, ct: ct);
+        {
+            if (cancel)
+                await discord.ReportAsync(
+                    source: message,
+                    new Optional<ulong>(threadId),
+                    receiptId: default,
+                    "Not cancelled: SylvanMail is temporarily busy. Remove and re-add your cancel reaction to try again.",
+                    ct: ct);
+            else
+                await relay.RefuseBusyAsync(message: message, ct: ct);
+        }
     }
 
     private static Task<SylvanMailConversation?> ActiveConversationAsync(BotDbContext db, ulong threadId, CancellationToken ct) =>

@@ -9,6 +9,8 @@ SylvanMail lets people contact staff by sending Sylvan a direct message,
 even after leaving the server. Each conversation appears as a post in the
 private staff mail forum. Read the conversation and reply from that post.
 
+SylvanMail is out of beta as of v0.2.0.
+
 ## Read incoming mail
 
 Sylvan opens a case post named after the sender and notifies the configured
@@ -55,13 +57,17 @@ Sylvan in the message body.
 
 | What you see   | What it means                                                                                      |
 |----------------|----------------------------------------------------------------------------------------------------|
-| 📤             | Your draft is ready for you to confirm. It has not been sent.                                      |
-| ☑️             | Discord accepted every part of the reply.                                                          |
+| 📤 and ❌      | Your draft is ready. Click 📤 to send or ❌ to cancel.                                              |
+| ✅             | Discord accepted every part of the reply. All previous reactions have been cleared.                |
 | An error reply | Delivery failed, was partial, or could not be confirmed. Read the explanation before trying again. |
 
 Posting or editing a draft does not send it. Only the author can confirm
 it, and Sylvan sends the latest text and attachments when they do. Removing
 the mention or reply ping can make the draft ineligible to send.
+
+Only the author can cancel a pending draft. Cancelling clears its reactions
+and leaves the text in place; edit it to prepare it again. Cancellation
+cannot recall a delivery that has already started.
 
 Ordinary discussion without either reply trigger stays in the staff post.
 Other mentions in a delivered reply do not notify anyone. Editing or
@@ -74,7 +80,7 @@ rejected, correct them before preparing another reply. If Sylvan is busy,
 try again later. Editing a draft without 📤 asks Sylvan to check it again.
 
 **If delivery was partial or uncertain, check what arrived before sending
-another message.** A missing ☑️ does not prove that nothing was delivered.
+another message.** A missing ✅ does not prove that nothing was delivered.
 Clicking 📤 again does not resend an attempt Sylvan has already recorded.
 
 People sending DMs receive instructions when delivery fails. For an
