@@ -6,7 +6,7 @@ end_of_line = crlf
 indent_size = 4
 indent_style = space
 insert_final_newline = false
-max_line_length = 120
+max_line_length = 150
 tab_width = 4
 trim_trailing_whitespace = false
 ij_continuation_indent_size = 8
@@ -53,7 +53,7 @@ resharper_formatter_off_tag = @formatter:off
 resharper_formatter_on_tag = @formatter:on
 resharper_formatter_tags_enabled = true
 resharper_for_other_types = use_explicit_type
-resharper_resx_max_line_length = 2147483647
+resharper_resx_max_line_length = 150
 resharper_show_autodetect_configure_formatting_tip = false
 resharper_trailing_comma_in_multiline_lists = true
 resharper_use_indent_from_vs = false
@@ -100,10 +100,27 @@ resharper_arguments_skip_single = true
 resharper_blank_lines_after_control_transfer_statements = 1
 resharper_blank_lines_before_control_transfer_statements = 1
 resharper_blank_lines_before_multiline_statements = 1
-resharper_csharp_max_line_length = 0
+resharper_csharp_max_line_length = 150
 resharper_csharp_wrap_after_declaration_lpar = true
-resharper_csharp_wrap_lines = false
+resharper_csharp_wrap_lines = true
 resharper_csharp_wrap_parameters_style = chop_if_long
+resharper_csharp_wrap_primary_constructor_parameters_style = chop_if_long
+resharper_csharp_wrap_multiple_type_parameter_constraints_style = chop_if_long
+resharper_csharp_wrap_extends_list_style = chop_if_long
+resharper_csharp_wrap_enum_declaration = chop_if_long
+resharper_csharp_wrap_for_stmt_header_style = chop_if_long
+resharper_csharp_wrap_multiple_declaration_style = chop_if_long
+resharper_csharp_wrap_switch_expression = chop_if_long
+resharper_csharp_wrap_property_pattern = chop_if_long
+resharper_csharp_wrap_list_pattern = chop_if_long
+resharper_csharp_wrap_object_and_collection_initializer_style = chop_if_long
+resharper_csharp_wrap_array_initializer_style = chop_if_long
+resharper_csharp_wrap_chained_method_calls = chop_if_long
+resharper_csharp_wrap_chained_binary_expressions = chop_if_long
+resharper_csharp_wrap_chained_binary_patterns = chop_if_long
+resharper_csharp_wrap_ternary_expr_style = chop_if_long
+resharper_csharp_wrap_linq_expressions = chop_if_long
+resharper_csharp_wrap_verbatim_interpolated_strings = chop_if_long
 resharper_method_or_operator_body = expression_body
 resharper_parentheses_same_type_operations = true
 resharper_place_simple_embedded_statement_on_same_line = false
@@ -130,7 +147,7 @@ ij_css_use_double_quotes = true
 ij_css_value_alignment = do_not_align
 
 [*.dart]
-max_line_length = 120
+max_line_length = 150
 
 [*.less]
 indent_size = 2
@@ -820,7 +837,7 @@ ij_prototext_spaces_within_braces = true
 ij_prototext_spaces_within_brackets = false
 
 [{*.ps1,*.psd1,*.psm1}]
-max_line_length = 120
+max_line_length = 150
 ij_powershell_align_multiline_attribute_argument = false
 ij_powershell_align_multiline_binary_operation = false
 ij_powershell_align_multiline_block_parameters = false
