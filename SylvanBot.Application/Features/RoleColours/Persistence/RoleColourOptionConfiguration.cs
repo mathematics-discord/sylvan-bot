@@ -9,8 +9,7 @@ public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<Rol
     {
         builder.ToTable(
             "RoleColourOptions",
-            table => { table.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\""); }
-        );
+            table => { table.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\""); });
 
         builder.HasKey(x => x.OptionId);
 

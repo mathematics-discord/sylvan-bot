@@ -16,8 +16,7 @@ public sealed class ImageSpamSettingsConfiguration : IEntityTypeConfiguration<Im
                 table.HasCheckConstraint("CK_ImageSpamSettings_RequiredAttachmentCount_Positive", "\"RequiredAttachmentCount\" > 0");
 
                 table.HasCheckConstraint("CK_ImageSpamSettings_BurstDurationSeconds_Positive", "\"BurstDurationSeconds\" > 0");
-            }
-        );
+            });
 
         builder.HasKey(x => x.GuildId);
 

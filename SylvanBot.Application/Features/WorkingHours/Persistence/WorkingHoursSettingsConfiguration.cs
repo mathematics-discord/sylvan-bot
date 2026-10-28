@@ -17,11 +17,9 @@ public sealed class WorkingHoursSettingsConfiguration
 
                 table.HasCheckConstraint(
                     "CK_working_hours_settings_target",
-                    "\"PingRoleId\" IS NULL OR (\"PingRoleId\" <> 0 AND \"PingRoleId\" <> \"GuildId\")"
-                );
+                    "\"PingRoleId\" IS NULL OR (\"PingRoleId\" <> 0 AND \"PingRoleId\" <> \"GuildId\")");
                 table.HasCheckConstraint("CK_working_hours_settings_enabled", "NOT \"Enabled\" OR \"PingRoleId\" IS NOT NULL");
-            }
-        );
+            });
 
         builder.HasKey(settings => settings.GuildId);
 
@@ -37,8 +35,7 @@ public sealed class WorkingHoursSettingsConfiguration
     {
         builder.ToTable(
             "working_hours_eligible_roles",
-            table => table.HasCheckConstraint("CK_working_hours_eligible_roles_identity", "\"RoleId\" <> 0 AND \"RoleId\" <> \"GuildId\"")
-        );
+            table => table.HasCheckConstraint("CK_working_hours_eligible_roles_identity", "\"RoleId\" <> 0 AND \"RoleId\" <> \"GuildId\""));
 
         builder.HasKey(role => new { role.GuildId, role.RoleId });
 

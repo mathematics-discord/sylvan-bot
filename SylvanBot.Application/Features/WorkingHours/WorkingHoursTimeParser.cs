@@ -15,8 +15,7 @@ public static partial class WorkingHoursTimeParser
         {
             return new Result<WorkingHoursWindow>(
                 OperationFailureException.Validation(
-                    description: "Use HH:MM:SS[.fraction], with Z or ±HH:MM for fixed offsets. No dates, whitespace, leap seconds or -00:00."
-                ));
+                    description: "Use HH:MM:SS[.fraction], with Z or ±HH:MM for fixed offsets. No dates, whitespace, leap seconds or -00:00."));
         }
 
         if (first.Value.OffsetMinutes != last.Value.OffsetMinutes)
@@ -71,7 +70,9 @@ public static partial class WorkingHoursTimeParser
             offsetMinutes = ((offsetHour * 60) + offsetMinute) * (offset[0] == '-' ? -1 : 1);
         }
         else if (offset.Length == 1)
+        {
             offsetMinutes = 0;
+        }
 
         var fraction = match.Groups["fraction"].Value.TrimEnd('0');
         var clock = input[..8];

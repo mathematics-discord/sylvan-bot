@@ -8,8 +8,7 @@ public sealed class WorkingHoursWindow
 {
     private static readonly ZoneLocalMappingResolver Resolver = Resolvers.CreateMappingResolver(
         ambiguousTimeResolver: Resolvers.ReturnEarlier,
-        skippedTimeResolver: Resolvers.ReturnForwardShifted
-    );
+        skippedTimeResolver: Resolvers.ReturnForwardShifted);
 
     private readonly DateTimeZone? _zone;
     private readonly (int Seconds, long FractionTicks) _start;

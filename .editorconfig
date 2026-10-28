@@ -978,6 +978,15 @@ dotnet_diagnostic.ma0029.severity = none
 
 dotnet_diagnostic.SA1206.severity = none
 
+
+dotnet_diagnostic.SA1118.severity = none
+
+
+dotnet_diagnostic.SA1008.severity = none
+
+
+dotnet_diagnostic.SA1111.severity = error
+
 [*.cs]
 dotnet_diagnostic.rcs1001.severity = none
 dotnet_diagnostic.rcs1123.severity = none
