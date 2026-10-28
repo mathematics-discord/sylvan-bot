@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.1.19 - 2026-10-28
+## Moderation
+### Added
+- Request a ticket summary after the opening message and attachments in each new SylvanMail post. Lookup failures do not affect mail delivery.
 # v0.1.18 - 2026-10-28
 ## General
 ### Removed

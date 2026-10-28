@@ -1,4 +1,0 @@
-component: Moderation
-kind: Added
-body: Request a ticket summary after the opening message and attachments in each new SylvanMail post. Lookup failures do not affect mail delivery.
-time: 2026-10-28T17:58:41.0706315Z
