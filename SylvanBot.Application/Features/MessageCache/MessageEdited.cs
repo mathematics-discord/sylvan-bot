@@ -3,7 +3,7 @@ using SylvanBot.Application.Common;
 
 namespace SylvanBot.Application.Features.MessageCache;
 
-/// <summary>None leaves a field unchanged; Some supplies its current value.</summary>
+/// <summary>Undefined leaves a field unchanged; a defined optional supplies its current value.</summary>
 public sealed record MessageEdited
 {
     public required ulong GuildId { get; init; }
@@ -14,14 +14,14 @@ public sealed record MessageEdited
 
     public required DateTimeOffset CreatedAtUtc { get; init; }
 
-    public Option<ulong> AuthorId { get; init; } = new None();
+    public Optional<ulong> AuthorId { get; init; } = default;
 
-    public Option<bool> Eligible { get; init; } = new None();
+    public Optional<bool> Eligible { get; init; } = default;
 
-    /// <summary>Gets the supplied timestamp: None preserves it; Some(null) reports "not edited".</summary>
-    public Option<DateTimeOffset?> EditedAtUtc { get; init; } = new None();
+    /// <summary>Gets the supplied timestamp: undefined preserves it; explicit null reports "not edited".</summary>
+    public Optional<DateTimeOffset?> EditedAtUtc { get; init; } = default;
 
-    public Option<string> Content { get; init; } = new None();
+    public Optional<string> Content { get; init; } = default;
 
-    public Option<ImmutableArray<MessageAttachment>> Attachments { get; init; } = new None();
+    public Optional<ImmutableArray<MessageAttachment>> Attachments { get; init; } = default;
 }

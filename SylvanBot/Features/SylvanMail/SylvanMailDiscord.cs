@@ -5,6 +5,8 @@ using static SylvanBot.Features.SylvanMail.SylvanMailRequests;
 
 namespace SylvanBot.Features.SylvanMail;
 
+using DotNext;
+
 public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient http, ILogger logger) : ISylvanMailDiscord
 {
     private const int MaxAttachmentBytes = 8 * 1024 * 1024;
@@ -167,10 +169,10 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         }
     }
 
-    public async Task<Option<ulong>> ReportAsync(
+    public async Task<Optional<ulong>> ReportAsync(
         SylvanMailMessage source,
-        Option<ulong> threadId,
-        Option<ulong> receiptId,
+        Optional<ulong> threadId,
+        Optional<ulong> receiptId,
         string detail,
         CancellationToken ct)
     {
@@ -193,7 +195,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
             }
         }
 
-        if (threadId.Value is not Some<ulong>(var destinationThread))
+        if (threadId is not { HasValue: true, Value: var destinationThread })
             return receiptId;
 
         try
@@ -201,7 +203,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
             var channel = await MessageChannelAsync(client, channelId: destinationThread, ct: ct);
             var report = $"Delivery error · source `{source.SourceMessageId}`: {detail}";
 
-            if (receiptId.Value is Some<ulong>(var existingReceipt))
+            if (receiptId is { HasValue: true, Value: var existingReceipt })
             {
                 await channel.ModifyMessageAsync(
                     messageId: existingReceipt,
@@ -220,7 +222,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
 
                 var sent = await AcceptedAsync(() =>
                     channel.SendMessageAsync(text: report, options: Options(ct), allowedMentions: AllowedMentions.None, messageReference: reference));
-                receiptId = new Some<ulong>(sent.Id);
+                receiptId = new Optional<ulong>(sent.Id);
             }
         }
         catch (Exception exception)
@@ -231,7 +233,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         return receiptId;
     }
 
-    public async Task<Option<ulong>> AcknowledgeAsync(SylvanMailMessage source, bool first, CancellationToken ct)
+    public async Task<Optional<ulong>> AcknowledgeAsync(SylvanMailMessage source, bool first, CancellationToken ct)
     {
         try
         {
@@ -244,13 +246,13 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
             var sent = await AcceptedAsync(() =>
                 channel.SendMessageAsync(text: text, options: Options(ct), allowedMentions: AllowedMentions.None, messageReference: reference));
 
-            return new Some<ulong>(sent.Id);
+            return new Optional<ulong>(sent.Id);
         }
         catch (Exception exception)
         {
             LogFailure(logger, "acknowledgement", sourceId: source.SourceMessageId, exception: exception);
 
-            return new None();
+            return default;
         }
     }
 }

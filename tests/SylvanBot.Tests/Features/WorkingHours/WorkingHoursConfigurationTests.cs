@@ -10,17 +10,17 @@ public sealed class WorkingHoursConfigurationTests
     {
         // Arrange
         var settings = new WorkingHoursSettings { GuildId = 123 };
-        settings.SetPingRole(10).IsError.ShouldBeFalse();
-        settings.ChangeEligibleRole(roleId: 20, add: true).IsError.ShouldBeFalse();
-        settings.ChangeExemptRole(roleId: 20, add: true).IsError.ShouldBeFalse();
+        settings.SetPingRole(10).IsSuccessful.ShouldBeTrue();
+        settings.ChangeEligibleRole(roleId: 20, add: true).IsSuccessful.ShouldBeTrue();
+        settings.ChangeExemptRole(roleId: 20, add: true).IsSuccessful.ShouldBeTrue();
 
         // Act
-        settings.SetPingRole(20).IsError.ShouldBeTrue();
-        settings.SetPingRole(123).IsError.ShouldBeTrue();
-        settings.ChangeEligibleRole(roleId: 10, add: true).IsError.ShouldBeTrue();
-        settings.ChangeEligibleRole(roleId: 123, add: true).IsError.ShouldBeTrue();
-        settings.ChangeEligibleRole(roleId: 20, add: false).IsError.ShouldBeTrue();
-        settings.ChangeExemptRole(roleId: 30, add: true).IsError.ShouldBeTrue();
+        settings.SetPingRole(20).IsSuccessful.ShouldBeFalse();
+        settings.SetPingRole(123).IsSuccessful.ShouldBeFalse();
+        settings.ChangeEligibleRole(roleId: 10, add: true).IsSuccessful.ShouldBeFalse();
+        settings.ChangeEligibleRole(roleId: 123, add: true).IsSuccessful.ShouldBeFalse();
+        settings.ChangeEligibleRole(roleId: 20, add: false).IsSuccessful.ShouldBeFalse();
+        settings.ChangeExemptRole(roleId: 30, add: true).IsSuccessful.ShouldBeFalse();
 
         // Assert
         settings.PingRoleId.ShouldBe(10UL);
@@ -42,14 +42,14 @@ public sealed class WorkingHoursConfigurationTests
         settings.Enabled = true;
 
         // Act / Assert
-        settings.SetPingRole(11).IsError.ShouldBeTrue();
-        settings.ChangeEligibleRole(roleId: 20, add: false).IsError.ShouldBeTrue();
+        settings.SetPingRole(11).IsSuccessful.ShouldBeFalse();
+        settings.ChangeEligibleRole(roleId: 20, add: false).IsSuccessful.ShouldBeFalse();
         settings.PingRoleId.ShouldBe(10UL);
         settings.EligibleRoles.Count.ShouldBe(1);
 
         settings.Enabled = false;
-        settings.SetPingRole(11).IsError.ShouldBeFalse();
-        settings.ChangeEligibleRole(roleId: 20, add: false).IsError.ShouldBeFalse();
+        settings.SetPingRole(11).IsSuccessful.ShouldBeTrue();
+        settings.ChangeEligibleRole(roleId: 20, add: false).IsSuccessful.ShouldBeTrue();
         settings.IsComplete.ShouldBeFalse();
     }
 

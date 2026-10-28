@@ -2,6 +2,8 @@
 
 namespace SylvanBot.Features.RoleColours;
 
+using DotNext;
+
 [Group("colour", "Choose or list display colours.")]
 public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperations operations) : InteractionModuleBase<IInteractionContext>
 {
@@ -111,12 +113,12 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         return components.WithButton("Reset", $"{SwapPrefix}:reset:{ownerUserId}", style: ButtonStyle.Danger).Build();
     }
 
-    private static string ResultMessage(ErrorOr<Option<ulong>> result)
+    private static string ResultMessage(Result<Optional<ulong>> result)
     {
-        if (result.IsError)
-            return result.FirstError.Description;
+        if (!result.IsSuccessful)
+            return result.Error!.Message;
 
-        if (result.Value.Value is Some<ulong>(var colourId))
+        if (result.Value is { HasValue: true, Value: var colourId })
             return $"You are now wearing <@&{colourId}>.";
 
         return "Your display colour has been removed.";
@@ -136,7 +138,7 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
     {
         await DeferAsync(true);
 
-        ErrorOr<Option<ulong>> result = await colours.TrySetUserColourAsync(
+        Result<Optional<ulong>> result = await colours.TrySetUserColourAsync(
             guild: Context.Guild,
             userId: Context.User.Id,
             colourId: selected,

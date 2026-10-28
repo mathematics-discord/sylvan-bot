@@ -26,7 +26,7 @@
         <PackageReference Include="Discord.Net.Interactions" />
         <PackageReference Include="Discord.Net.WebSocket" />
         <PackageReference Include="DotNetEnv" />
-        <PackageReference Include="ErrorOr" />
+        <PackageReference Include="DotNext" />
         <PackageReference Include="JetBrains.Annotations" />
         <PackageReference Include="Meziantou.Analyzer">
             <PrivateAssets>all</PrivateAssets>

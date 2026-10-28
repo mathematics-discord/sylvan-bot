@@ -2,6 +2,8 @@
 
 namespace SylvanBot.Features.Configuration;
 
+using DotNext;
+
 public sealed partial class ConfigModule
 {
     [SlashCommand("image-spam", "View or update image spam detection settings.")]
@@ -21,21 +23,21 @@ public sealed partial class ConfigModule
             return;
         }
 
-        ErrorOr<Success> validationResult = Validate(
+        Result<ValueTuple> validationResult = Validate(
             numberOfChannels: numberOfChannels,
             attachmentCount: attachmentCount,
             burstDuration: burstDuration);
 
-        if (validationResult.IsError)
+        if (!validationResult.IsSuccessful)
         {
-            await RespondAsync(text: validationResult.FirstError.Description, ephemeral: true);
+            await RespondAsync(text: validationResult.Error!.Message, ephemeral: true);
 
             return;
         }
 
         await DeferAsync(ephemeral: true);
         var showCurrent = numberOfChannels is null && attachmentCount is null && burstDuration is null;
-        Option<ImageBurstSpamDetectorOptions> settingsResult;
+        Optional<ImageBurstSpamDetectorOptions> settingsResult;
 
         if (showCurrent)
             settingsResult = await settingsService.GetCurrentAsync(Context.Guild.Id, lifetime.ApplicationStopping);
@@ -47,10 +49,10 @@ public sealed partial class ConfigModule
                 attachmentCount,
                 burstDuration,
                 lifetime.ApplicationStopping);
-            settingsResult = new Some<ImageBurstSpamDetectorOptions>(saved);
+            settingsResult = new Optional<ImageBurstSpamDetectorOptions>(saved);
         }
 
-        if (settingsResult.Value is not Some<ImageBurstSpamDetectorOptions>(var settings))
+        if (settingsResult is not { HasValue: true, Value: var settings })
         {
             await ModifyOriginalResponseAsync(response => response.Content = "Image spam detection is not configured for this guild.");
 
@@ -66,14 +68,17 @@ public sealed partial class ConfigModule
         + $"{settings.RequiredAttachmentCount} attachment(s) per message, "
         + $"{settings.Window}s burst duration.";
 
-    private static ErrorOr<Success> Validate(int? numberOfChannels, int? attachmentCount, int? burstDuration)
+    private static Result<ValueTuple> Validate(int? numberOfChannels, int? attachmentCount, int? burstDuration)
     {
         if (numberOfChannels is <= 0)
-            return Error.Validation(description: "Number of channels must be greater than zero.");
+            return new Result<ValueTuple>(OperationFailureException.Validation(description: "Number of channels must be greater than zero."));
 
         if (attachmentCount is <= 0)
-            return Error.Validation(description: "Attachment count must be greater than zero.");
+            return new Result<ValueTuple>(OperationFailureException.Validation(description: "Attachment count must be greater than zero."));
 
-        return burstDuration is <= 0 ? Error.Validation(description: "Burst duration must be greater than zero seconds.") : Result.Success;
+        if (burstDuration is <= 0)
+            return new Result<ValueTuple>(OperationFailureException.Validation(description: "Burst duration must be greater than zero seconds."));
+
+        return new Result<ValueTuple>(default(ValueTuple));
     }
 }

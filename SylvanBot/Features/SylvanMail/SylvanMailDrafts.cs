@@ -3,6 +3,8 @@ using static SylvanBot.Features.SylvanMail.SylvanMailRequests;
 
 namespace SylvanBot.Features.SylvanMail;
 
+using DotNext;
+
 public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger) : ISylvanMailDrafts
 {
     public const string SendEmoji = "\U0001F4E4";
@@ -34,28 +36,28 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
             UnsupportedContent: unsupported);
     }
 
-    public async Task<Option<SylvanMailMessage>> ReadDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct)
+    public async Task<Optional<SylvanMailMessage>> ReadDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct)
     {
         var channel = await MessageChannelAsync(client, channelId: threadId, ct: ct);
 
         if (channel is not IThreadChannel thread)
-            return new None();
+            return default;
 
         var fetched = await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, Options(ct));
 
         if (fetched is not IUserMessage source)
-            return new None();
+            return default;
 
         var authorMatches = source.Author.Id == authorId && !source.Author.IsBot && !source.Author.IsWebhook;
         var supportedType = source.Type is MessageType.Default or MessageType.Reply;
 
         if (!authorMatches || !supportedType)
-            return new None();
+            return default;
 
         var hasMarker = source.Reactions.TryGetValue(new Emoji(SendEmoji), out var reaction) && reaction.IsMe;
 
         if (confirm && !hasMarker)
-            return new None();
+            return default;
 
         var content = source.Content ?? string.Empty;
         var reply = SylvanMailReply.Parse(content: content, botId: client.CurrentUser.Id, replyToBot: false, replyPingEnabled: false);
@@ -79,12 +81,12 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         {
             await SetDraftReadyAsync(threadId: threadId, messageId: messageId, ready: false, ct: ct);
 
-            return new Some<SylvanMailMessage>(ReadMessage(source: source, guildId: thread.GuildId));
+            return new Optional<SylvanMailMessage>(ReadMessage(source: source, guildId: thread.GuildId));
         }
 
         var prefix = reply.Anonymous ? "From staff: " : $"From {Format.Sanitize(source.Author.Username)}: ";
 
-        return new Some<SylvanMailMessage>(
+        return new Optional<SylvanMailMessage>(
             ReadMessage(source: source, guildId: thread.GuildId) with
             {
                 Content = reply.Content,

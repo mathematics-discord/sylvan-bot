@@ -183,8 +183,8 @@ public sealed class SylvanMailGatewayHandler(
             {
                 await discord.ReportAsync(
                     source: message,
-                    threadId: new None(),
-                    receiptId: new None(),
+                    threadId: default,
+                    receiptId: default,
                     "Not relayed: SylvanMail is temporarily busy. Please try again later.",
                     ct: timeout.Token);
             }
@@ -206,8 +206,8 @@ public sealed class SylvanMailGatewayHandler(
         {
             await discord.ReportAsync(
                 message,
-                threadId: new None(),
-                receiptId: new None(),
+                threadId: default,
+                receiptId: default,
                 "SylvanMail processing failed or was interrupted. Delivery is unconfirmed; do not assume it arrived. No automatic resend.",
                 timeout.Token);
         }

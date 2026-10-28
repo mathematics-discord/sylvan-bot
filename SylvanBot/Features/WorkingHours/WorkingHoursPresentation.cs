@@ -1,5 +1,7 @@
 ﻿namespace SylvanBot.Features.WorkingHours;
 
+using DotNext;
+
 internal static class WorkingHoursPresentation
 {
     public static string FormatRoles(IEnumerable<string> roles)
@@ -9,12 +11,11 @@ internal static class WorkingHoursPresentation
         return text.Length == 0 ? "none" : text;
     }
 
-    public static string CompletionMessage(string action, Option<int> pending) =>
-        pending.Value switch
+    public static string CompletionMessage(string action, Optional<int> pending) =>
+        pending switch
         {
-            None => $"{action} pending: configuration or member data is unavailable. Reconciliation will retry.",
-            Some<int>(0) => $"{action} completed for the currently observed members.",
-            Some<int>(var count) => $"{action} pending for {count} member(s). Reconciliation will retry.",
-            _ => throw new InvalidOperationException("Unknown reconciliation outcome."),
+            { IsUndefined: true } => $"{action} pending: configuration or member data is unavailable. Reconciliation will retry.",
+            { HasValue: true, Value: 0 } => $"{action} completed for the currently observed members.",
+            { HasValue: true, Value: var count } => $"{action} pending for {count} member(s). Reconciliation will retry.",
         };
 }

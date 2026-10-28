@@ -4,10 +4,10 @@ public static class MessageChunker
 {
     private const int DefaultMessageCharacterLimit = 2000;
 
-    public static ErrorOr<string[]> SplitMessageIntoChunks(string message, int chunkSize = DefaultMessageCharacterLimit)
+    public static Result<string[]> SplitMessageIntoChunks(string message, int chunkSize = DefaultMessageCharacterLimit)
     {
         if (chunkSize <= 0)
-            return Error.Validation("Chunk size must be greater than zero.");
+            return new Result<string[]>(OperationFailureException.Validation("Chunk size must be greater than zero."));
 
         Queue<string> chunks = new Queue<string>((message.Length / chunkSize) + 1);
 

@@ -62,7 +62,7 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
 
             var key = (message.GuildId, message.MessageId);
             var expired = message.CreatedAtUtc.AddHours(24) <= timeProvider.GetUtcNow();
-            var alreadyObserved = Read(key).Value is Some<CachedMessageSnapshot> || _deletions.ContainsKey(key);
+            var alreadyObserved = Read(key) is { HasValue: true } || _deletions.ContainsKey(key);
 
             if (!message.Eligible || expired || alreadyObserved)
                 return;
@@ -87,7 +87,7 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
         }
     }
 
-    public async Task<Option<MessageEdit>> EditAsync(MessageEdited message, CancellationToken ct)
+    public async Task<Optional<MessageEdit>> EditAsync(MessageEdited message, CancellationToken ct)
     {
         await _gate.WaitAsync(ct);
 
@@ -96,22 +96,22 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
             EnsureReady();
 
             var key = (message.GuildId, message.MessageId);
-            Option<CachedMessageSnapshot> before = Read(key);
+            Optional<CachedMessageSnapshot> before = Read(key);
             var expired = message.CreatedAtUtc.AddHours(24) <= timeProvider.GetUtcNow();
             var deleting = _deletions.ContainsKey(key);
-            var ineligible = message.Eligible.Value is Some<bool>(false);
+            var ineligible = message.Eligible is { HasValue: true, Value: false };
 
             if (expired || deleting || ineligible)
-                return new None();
+                return default;
 
-            Option<CachedMessageSnapshot> candidate = before.Value is Some<CachedMessageSnapshot>(var existing)
+            Optional<CachedMessageSnapshot> candidate = before is { HasValue: true, Value: var existing }
                 ? ApplyToExisting(message, existing)
                 : TryCreateSnapshot(message);
 
-            if (candidate.Value is not Some<CachedMessageSnapshot>(var after) || !await PersistAsync(after, ct))
-                return new None();
+            if (candidate is not { HasValue: true, Value: var after } || !await PersistAsync(after, ct))
+                return default;
 
-            return new Some<MessageEdit>(new MessageEdit { Before = before, After = after });
+            return new Optional<MessageEdit>(new MessageEdit { Before = before, After = after });
         }
         finally
         {
@@ -131,7 +131,7 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
             foreach (var messageId in messageIds)
             {
                 var key = (guildId, messageId);
-                Option<CachedMessageSnapshot> snapshot = Read(key);
+                Optional<CachedMessageSnapshot> snapshot = Read(key);
 
                 if (_deletions.TryGetValue(key, out var deletion) && deletion.State != DeletionState.AwaitingPublication)
                     continue;
@@ -142,7 +142,7 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
                 if (expiresAt > timeProvider.GetUtcNow())
                     _deletions[key] = new Deletion { ExpiresAtUtc = expiresAt, State = DeletionState.AwaitingPublication };
 
-                if (snapshot.Value is Some<CachedMessageSnapshot>(var available))
+                if (snapshot is { HasValue: true, Value: var available })
                     snapshots.Add(available);
             }
 
@@ -257,42 +257,42 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
 
     public void Dispose() => _gate.Dispose();
 
-    private static Option<CachedMessageSnapshot> ApplyToExisting(MessageEdited message, CachedMessageSnapshot before)
+    private static Optional<CachedMessageSnapshot> ApplyToExisting(MessageEdited message, CachedMessageSnapshot before)
     {
         DateTimeOffset? timestamp = before.EditedAtUtc;
 
-        if (message.EditedAtUtc.Value is Some<DateTimeOffset?>(var supplied))
+        if (message.EditedAtUtc is { IsUndefined: false, ValueOrDefault: var supplied })
         {
             if ((supplied ?? before.CreatedAtUtc) < (before.EditedAtUtc ?? before.CreatedAtUtc))
-                return new None();
+                return default;
 
             timestamp = supplied;
         }
 
-        return new Some<CachedMessageSnapshot>(
+        return new Optional<CachedMessageSnapshot>(
             before with
             {
                 EditedAtUtc = timestamp,
-                Content = message.Content.Value is Some<string>(var content) ? content : before.Content,
-                Attachments = message.Attachments.Value is Some<ImmutableArray<MessageAttachment>>(var attachments)
+                Content = message.Content is { HasValue: true, Value: var content } ? content : before.Content,
+                Attachments = message.Attachments is { HasValue: true, Value: var attachments }
                     ? attachments
                     : before.Attachments,
             }
         );
     }
 
-    private static Option<CachedMessageSnapshot> TryCreateSnapshot(MessageEdited message)
+    private static Optional<CachedMessageSnapshot> TryCreateSnapshot(MessageEdited message)
     {
         if (
-            message.AuthorId.Value is not Some<ulong>(var authorId)
-            || message.Eligible.Value is not Some<bool>(true)
-            || message.Content.Value is not Some<string>(var content)
-            || message.Attachments.Value is not Some<ImmutableArray<MessageAttachment>>(var attachments)
-            || message.EditedAtUtc.Value is not Some<DateTimeOffset?>(var timestamp)
+            message.AuthorId is not { HasValue: true, Value: var authorId }
+            || message.Eligible is not { HasValue: true, Value: true }
+            || message.Content is not { HasValue: true, Value: var content }
+            || message.Attachments is not { HasValue: true, Value: var attachments }
+            || message.EditedAtUtc is not { IsUndefined: false, ValueOrDefault: var timestamp }
         )
-            return new None();
+            return default;
 
-        return new Some<CachedMessageSnapshot>(
+        return new Optional<CachedMessageSnapshot>(
             new CachedMessageSnapshot
             {
                 GuildId = message.GuildId,
@@ -320,10 +320,10 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
         return true;
     }
 
-    private Option<CachedMessageSnapshot> Read((ulong GuildId, ulong MessageId) key) =>
+    private Optional<CachedMessageSnapshot> Read((ulong GuildId, ulong MessageId) key) =>
         _messages.TryGetValue(key, out var snapshot) && snapshot.ExpiresAtUtc > timeProvider.GetUtcNow()
-            ? new Some<CachedMessageSnapshot>(snapshot)
-            : new None();
+            ? new Optional<CachedMessageSnapshot>(snapshot)
+            : default;
 
     private void EnsureReady()
     {

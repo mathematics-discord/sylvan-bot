@@ -2,7 +2,7 @@ namespace SylvanBot.Features.EmojiYoink;
 
 public static class EmojiName
 {
-    public static ErrorOr<string> Normalize(string invokedSourceName)
+    public static Result<string> Normalize(string invokedSourceName)
     {
         var suffixStart = invokedSourceName.LastIndexOf('~');
 
@@ -16,7 +16,7 @@ public static class EmojiName
 
         return invokedSourceName.Length is >= 2 and <= 32 && invokedSourceName.All(IsValidCharacter)
             ? invokedSourceName
-            : EmojiYoinkErrors.InvalidDestinationName;
+            : new Result<string>(EmojiYoinkErrors.InvalidDestinationName);
     }
 
     private static bool IsValidCharacter(char character) => character is >= 'A' and <= 'Z' or >= 'a' and <= 'z' or >= '0' and <= '9' or '_';

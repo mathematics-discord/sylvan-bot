@@ -12,14 +12,15 @@ public sealed class RoleColourOption
     public ulong SourceRoleId { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
 
-    public static ErrorOr<RoleColourOption> Create(ulong guildId, ulong sourceRoleId, ulong displayRoleId)
+    public static Result<RoleColourOption> Create(ulong guildId, ulong sourceRoleId, ulong displayRoleId)
     {
         if (guildId == 0)
-            return Error.Validation("RoleColourOption.GuildRequired", "Guild is required.");
+            return new Result<RoleColourOption>(OperationFailureException.Validation("RoleColourOption.GuildRequired", "Guild is required."));
 
         if (sourceRoleId == displayRoleId)
         {
-            return Error.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different.");
+            return new Result<RoleColourOption>(
+                OperationFailureException.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different."));
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -34,17 +35,18 @@ public sealed class RoleColourOption
         };
     }
 
-    public ErrorOr<Success> Update(ulong sourceRoleId, ulong displayRoleId)
+    public Result<ValueTuple> Update(ulong sourceRoleId, ulong displayRoleId)
     {
         if (sourceRoleId == displayRoleId)
         {
-            return Error.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different.");
+            return new Result<ValueTuple>(
+                OperationFailureException.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different."));
         }
 
         SourceRoleId = sourceRoleId;
         DisplayRoleId = displayRoleId;
         UpdatedAtUtc = DateTimeOffset.UtcNow;
 
-        return Result.Success;
+        return new Result<ValueTuple>(default(ValueTuple));
     }
 }

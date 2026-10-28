@@ -16,7 +16,7 @@ public interface ISylvanMailDiscord
 
     Task<byte[]> DownloadAsync(SylvanMailAttachment attachment, CancellationToken ct);
 
-    Task<Option<ulong>> ReportAsync(SylvanMailMessage source, Option<ulong> threadId, Option<ulong> receiptId, string detail, CancellationToken ct);
+    Task<Optional<ulong>> ReportAsync(SylvanMailMessage source, Optional<ulong> threadId, Optional<ulong> receiptId, string detail, CancellationToken ct);
 
-    Task<Option<ulong>> AcknowledgeAsync(SylvanMailMessage source, bool first, CancellationToken ct);
+    Task<Optional<ulong>> AcknowledgeAsync(SylvanMailMessage source, bool first, CancellationToken ct);
 }

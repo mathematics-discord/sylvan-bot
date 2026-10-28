@@ -2,6 +2,8 @@
 
 namespace SylvanBot.Features.Configuration;
 
+using DotNext;
+
 public sealed partial class ConfigModule
 {
     [Group("colour", "Administrative role colour commands.")]
@@ -28,11 +30,11 @@ public sealed partial class ConfigModule
                 return;
             }
 
-            ErrorOr<Success> roleValidation = RoleColourReconciler.ValidateMapping(guild: Context.Guild, sourceId: source.Id, colourId: display.Id);
+            Result<ValueTuple> roleValidation = RoleColourReconciler.ValidateMapping(guild: Context.Guild, sourceId: source.Id, colourId: display.Id);
 
-            if (roleValidation.IsError)
+            if (!roleValidation.IsSuccessful)
             {
-                await RespondAsync(text: roleValidation.FirstError.Description, ephemeral: true);
+                await RespondAsync(text: roleValidation.Error!.Message, ephemeral: true);
 
                 return;
             }
@@ -43,16 +45,16 @@ public sealed partial class ConfigModule
                 guildId: Context.Guild.Id,
                 ct: lifetime.ApplicationStopping);
 
-            ErrorOr<(RoleColourOption Option, bool Created)> result = await operations.UpsertMappingAsync(
+            Result<(RoleColourOption Option, bool Created)> result = await operations.UpsertMappingAsync(
                 guildId: Context.Guild.Id,
                 optionId: id,
                 sourceRoleId: source.Id,
                 displayRoleId: display.Id,
                 ct: lifetime.ApplicationStopping);
 
-            if (result.IsError)
+            if (!result.IsSuccessful)
             {
-                await FollowupAsync(text: result.FirstError.Description, ephemeral: true);
+                await FollowupAsync(text: result.Error!.Message, ephemeral: true);
 
                 return;
             }
@@ -62,7 +64,7 @@ public sealed partial class ConfigModule
             var incomplete = await reconciler.ReconcileGuildAsync(
                 guild: Context.Guild,
                 ct: lifetime.ApplicationStopping,
-                previousMappings: new Some<ImmutableArray<RoleColourOption>>(previous));
+                previousMappings: new Optional<ImmutableArray<RoleColourOption>>(previous));
             var action = created ? "Registered" : "Updated";
 
             await FollowupAsync(
@@ -87,14 +89,14 @@ public sealed partial class ConfigModule
                 guildId: Context.Guild.Id,
                 ct: lifetime.ApplicationStopping);
 
-            ErrorOr<RoleColourOption> result = await operations.DeleteMappingAsync(
+            Result<RoleColourOption> result = await operations.DeleteMappingAsync(
                 guildId: Context.Guild.Id,
                 optionId: id,
                 ct: lifetime.ApplicationStopping);
 
-            if (result.IsError)
+            if (!result.IsSuccessful)
             {
-                await FollowupAsync(text: result.FirstError.Description, ephemeral: true);
+                await FollowupAsync(text: result.Error!.Message, ephemeral: true);
 
                 return;
             }
@@ -102,7 +104,7 @@ public sealed partial class ConfigModule
             var incomplete = await reconciler.ReconcileGuildAsync(
                 guild: Context.Guild,
                 ct: lifetime.ApplicationStopping,
-                previousMappings: new Some<ImmutableArray<RoleColourOption>>(previous));
+                previousMappings: new Optional<ImmutableArray<RoleColourOption>>(previous));
             await FollowupAsync($"Deleted colour mapping `{result.Value.OptionId}`.{CheckSummary(incomplete)}", ephemeral: true);
         }
 
@@ -133,7 +135,7 @@ public sealed partial class ConfigModule
             var incomplete = await reconciler.ReconcileGuildAsync(
                 guild: Context.Guild,
                 ct: lifetime.ApplicationStopping,
-                previousMappings: new None());
+                previousMappings: default);
             await FollowupAsync($"Role colour check completed.{CheckSummary(incomplete)}", ephemeral: true);
         }
 

@@ -15,10 +15,10 @@ public sealed class AttachmentEvidenceDownloaderTests
         byte[] body = [1, 2, 3, 4];
 
         // Act
-        Option<byte[]> result = await DownloadAsync(body: body, declaredLength: body.Length, maxBytes: body.Length);
+        Optional<byte[]> result = await DownloadAsync(body: body, declaredLength: body.Length, maxBytes: body.Length);
 
         // Assert
-        result.Value.ShouldBeOfType<Some<byte[]>>().Value.ShouldBe(body);
+        result.Value.ShouldBe(body);
     }
 
     [Test]
@@ -28,10 +28,10 @@ public sealed class AttachmentEvidenceDownloaderTests
         byte[] body = [1, 2, 3, 4];
 
         // Act
-        Option<byte[]> result = await DownloadAsync(body: body, declaredLength: body.Length, body.Length - 1);
+        Optional<byte[]> result = await DownloadAsync(body: body, declaredLength: body.Length, body.Length - 1);
 
         // Assert
-        result.Value.ShouldBeOfType<None>();
+        result.IsUndefined.ShouldBeTrue();
     }
 
     [Test]
@@ -41,10 +41,10 @@ public sealed class AttachmentEvidenceDownloaderTests
         byte[] body = [1, 2, 3, 4, 5];
 
         // Act
-        Option<byte[]> result = await DownloadAsync(body: body, declaredLength: null, maxBytes: 4);
+        Optional<byte[]> result = await DownloadAsync(body: body, declaredLength: null, maxBytes: 4);
 
         // Assert
-        result.Value.ShouldBeOfType<None>();
+        result.IsUndefined.ShouldBeTrue();
     }
 
     [Test]
@@ -54,10 +54,10 @@ public sealed class AttachmentEvidenceDownloaderTests
         byte[] body = [1, 2, 3, 4, 5];
 
         // Act
-        Option<byte[]> result = await DownloadAsync(body: body, declaredLength: 1, maxBytes: 4);
+        Optional<byte[]> result = await DownloadAsync(body: body, declaredLength: 1, maxBytes: 4);
 
         // Assert
-        result.Value.ShouldBeOfType<None>();
+        result.IsUndefined.ShouldBeTrue();
     }
 
     [Test]
@@ -67,10 +67,10 @@ public sealed class AttachmentEvidenceDownloaderTests
         await using var stream = new CountingStream([1, 2, 3, 4, 5, 6, 7]);
 
         // Act
-        Option<byte[]> result = await AttachmentEvidenceDownloader.ReadLimitedAsync(stream: stream, maxBytes: 3, ct: CancellationToken.None);
+        Optional<byte[]> result = await AttachmentEvidenceDownloader.ReadLimitedAsync(stream: stream, maxBytes: 3, ct: CancellationToken.None);
 
         // Assert
-        result.Value.ShouldBeOfType<None>();
+        result.IsUndefined.ShouldBeTrue();
         stream.BytesRead.ShouldBe(4);
     }
 
@@ -81,10 +81,10 @@ public sealed class AttachmentEvidenceDownloaderTests
         byte[] body = [];
 
         // Act
-        Option<byte[]> result = await DownloadAsync(body: body, declaredLength: 0, maxBytes: 0);
+        Optional<byte[]> result = await DownloadAsync(body: body, declaredLength: 0, maxBytes: 0);
 
         // Assert
-        result.Value.ShouldBeOfType<Some<byte[]>>().Value.ShouldBeEmpty();
+        result.Value.ShouldBeEmpty();
     }
 
     [Test]
@@ -94,7 +94,7 @@ public sealed class AttachmentEvidenceDownloaderTests
         using var httpClient = new HttpClient(new StaticResponseHandler([], declaredLength: 0, status: HttpStatusCode.NotFound));
 
         // Act
-        Option<byte[]> result = await AttachmentEvidenceDownloader.TryDownloadAsync(
+        Optional<byte[]> result = await AttachmentEvidenceDownloader.TryDownloadAsync(
             httpClient: httpClient,
             "https://example.invalid/attachment",
             maxBytes: 4,
@@ -103,7 +103,7 @@ public sealed class AttachmentEvidenceDownloaderTests
         );
 
         // Assert
-        result.Value.ShouldBeOfType<None>();
+        result.IsUndefined.ShouldBeTrue();
     }
 
     [Test]
@@ -129,7 +129,7 @@ public sealed class AttachmentEvidenceDownloaderTests
         exception.CancellationToken.IsCancellationRequested.ShouldBeTrue();
     }
 
-    private static async Task<Option<byte[]>> DownloadAsync(byte[] body, long? declaredLength, long maxBytes)
+    private static async Task<Optional<byte[]>> DownloadAsync(byte[] body, long? declaredLength, long maxBytes)
     {
         using var httpClient = new HttpClient(new StaticResponseHandler(body: body, declaredLength: declaredLength));
 

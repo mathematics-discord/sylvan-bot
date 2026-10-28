@@ -9,7 +9,7 @@ public sealed class SylvanMailDeliveryOutcomeTests
     public void FromFailure_UnconfirmedSendAfterAcceptedParts_RemainsUncertain()
     {
         // Arrange
-        Option<string> refusal = new None();
+        Optional<string> refusal = default;
 
         // Act
         var outcome = SylvanMailDeliveryOutcome.FromFailure(2, uncertainDelivery: true, uncertainPost: false, refusal);
@@ -23,7 +23,7 @@ public sealed class SylvanMailDeliveryOutcomeTests
     public void FromFailure_DefiniteRefusalAfterAcceptedParts_IsPartial()
     {
         // Arrange
-        Option<string> refusal = new Some<string>("Discord refused this part.");
+        Optional<string> refusal = new Optional<string>("Discord refused this part.");
 
         // Act
         var outcome = SylvanMailDeliveryOutcome.FromFailure(1, uncertainDelivery: true, uncertainPost: false, refusal);
@@ -37,7 +37,7 @@ public sealed class SylvanMailDeliveryOutcomeTests
     public void FromFailure_UnknownPostCreation_PreservesReconciliationRequirement()
     {
         // Arrange
-        Option<string> refusal = new None();
+        Optional<string> refusal = default;
 
         // Act
         var outcome = SylvanMailDeliveryOutcome.FromFailure(0, uncertainDelivery: false, uncertainPost: true, refusal);
@@ -51,7 +51,7 @@ public sealed class SylvanMailDeliveryOutcomeTests
     public void FromFailure_BeforeAnySend_IsUnpublished()
     {
         // Arrange
-        Option<string> refusal = new None();
+        Optional<string> refusal = default;
 
         // Act
         var outcome = SylvanMailDeliveryOutcome.FromFailure(0, uncertainDelivery: false, uncertainPost: false, refusal);

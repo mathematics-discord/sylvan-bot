@@ -16,10 +16,10 @@ public sealed class WorkingHoursWindowTests
     public void Parse_CompleteModes_Accepts(string start, string end, string? zone)
     {
         // Act
-        ErrorOr<WorkingHoursWindow> parsed = WorkingHoursTimeParser.Parse(start: start, end: end, timezone: zone);
+        Result<WorkingHoursWindow> parsed = WorkingHoursTimeParser.Parse(start: start, end: end, timezone: zone);
 
         // Assert
-        parsed.IsError.ShouldBeFalse();
+        parsed.IsSuccessful.ShouldBeTrue();
     }
 
     [TestCase("09:00", "17:00:00Z", arg3: null)]
@@ -48,10 +48,10 @@ public sealed class WorkingHoursWindowTests
     public void Parse_InvalidOriginalInput_Rejects(string start, string end, string? zone)
     {
         // Act
-        ErrorOr<WorkingHoursWindow> parsed = WorkingHoursTimeParser.Parse(start: start, end: end, timezone: zone);
+        Result<WorkingHoursWindow> parsed = WorkingHoursTimeParser.Parse(start: start, end: end, timezone: zone);
 
         // Assert
-        parsed.IsError.ShouldBeTrue();
+        parsed.IsSuccessful.ShouldBeFalse();
     }
 
     [Test]

@@ -232,7 +232,7 @@ public sealed class SylvanMailWorkflow(
             .Any(item => item.MessageId is null);
 
         var uncertainPost = operation.ToStaff && conversation is { CreationStarted: true, ThreadId: null };
-        Option<string> refusal = exception is BotCommandException ? new Some<string>(exception.Message) : new None();
+        Optional<string> refusal = exception is BotCommandException ? new Optional<string>(exception.Message) : default;
         var outcome = SylvanMailDeliveryOutcome.FromFailure(confirmedParts, uncertainDelivery, uncertainPost, refusal);
         operation.State = outcome.State;
         operation.Detail = outcome.Detail;
@@ -250,8 +250,8 @@ public sealed class SylvanMailWorkflow(
 
         await discord.ReportAsync(
             message,
-            new None(),
-            new None(),
+            default,
+            default,
             "SylvanMail is unavailable; your message was not relayed.",
             ct);
     }

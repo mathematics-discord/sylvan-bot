@@ -2,6 +2,8 @@
 
 namespace SylvanBot.Features.Moderation;
 
+using DotNext;
+
 public sealed class ImageBurstSpamGatewayHandler(
     DiscordSocketClient discordClient,
     ImageBurstSpamDetector detector,
@@ -38,7 +40,7 @@ public sealed class ImageBurstSpamGatewayHandler(
     {
         var guild = discordClient.GetGuild(detection.GuildId);
 
-        if (settings.Current(detection.GuildId).Value is not Some<ImageBurstSpamDetectorOptions>(var currentSettings))
+        if (settings.Current(detection.GuildId) is not { HasValue: true, Value: var currentSettings })
             return;
 
         var reason =
@@ -62,14 +64,14 @@ public sealed class ImageBurstSpamGatewayHandler(
     {
         try
         {
-            Option<ImageBurstMessage> qualifyingResult = TryCreateQualifyingMessage(message);
+            Optional<ImageBurstMessage> qualifyingResult = TryCreateQualifyingMessage(message);
 
-            if (qualifyingResult.Value is not Some<ImageBurstMessage>(var qualifyingMessage))
+            if (qualifyingResult is not { HasValue: true, Value: var qualifyingMessage })
                 return;
 
-            Option<ImageBurstDetection> detectionResult = detector.Observe(qualifyingMessage, settings.Current(qualifyingMessage.GuildId));
+            Optional<ImageBurstDetection> detectionResult = detector.Observe(qualifyingMessage, settings.Current(qualifyingMessage.GuildId));
 
-            if (detectionResult.Value is not Some<ImageBurstDetection>(var detection))
+            if (detectionResult is not { HasValue: true, Value: var detection })
                 return;
 
             await HandleDetectionAsync(detection);
@@ -93,37 +95,37 @@ public sealed class ImageBurstSpamGatewayHandler(
         discordClient.MessageReceived += HandleMessageReceivedAsync;
     }
 
-    private Option<ImageBurstMessage> TryCreateQualifyingMessage(SocketMessage message)
+    private Optional<ImageBurstMessage> TryCreateQualifyingMessage(SocketMessage message)
     {
         if (message is not SocketUserMessage userMessage)
-            return new None();
+            return default;
 
         if (userMessage.Source != MessageSource.User)
-            return new None();
+            return default;
 
         if (userMessage.Author.IsBot || userMessage.Author.IsWebhook)
-            return new None();
+            return default;
 
         if (userMessage.Channel is not SocketTextChannel channel)
-            return new None();
+            return default;
 
         if (userMessage.Author is not SocketGuildUser guildUser)
-            return new None();
+            return default;
 
-        if (settings.Current(channel.Guild.Id).Value is not Some<ImageBurstSpamDetectorOptions>(var currentSettings))
-            return new None();
+        if (settings.Current(channel.Guild.Id) is not { HasValue: true, Value: var currentSettings })
+            return default;
 
         if (userMessage.Attachments.Count < currentSettings.RequiredAttachmentCount)
-            return new None();
+            return default;
 
         if (IsExempt(guildUser))
-            return new None();
+            return default;
 
         ImageBurstAttachment[] attachments = userMessage.Attachments
             .Select(x => new ImageBurstAttachment(x.Url))
             .ToArray();
 
-        return new Some<ImageBurstMessage>(
+        return new Optional<ImageBurstMessage>(
             new ImageBurstMessage(
                 GuildId: channel.Guild.Id,
                 UserId: guildUser.Id,

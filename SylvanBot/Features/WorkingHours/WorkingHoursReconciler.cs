@@ -6,6 +6,8 @@ using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Features.WorkingHours;
 
+using DotNext;
+
 public sealed class WorkingHoursReconciler(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contexts,
@@ -56,7 +58,7 @@ public sealed class WorkingHoursReconciler(
         }
     }
 
-    public async Task<Option<int>> ReconcileSavedAsync(
+    public async Task<Optional<int>> ReconcileSavedAsync(
         BotDbContext db,
         WorkingHoursSettings settings,
         WorkingHoursGuildState state,
@@ -69,7 +71,7 @@ public sealed class WorkingHoursReconciler(
             state.PublishSettingsAndSeed(settings, guild, rules.IsReady(guild));
 
             if (!rules.IsReady(guild))
-                return new None();
+                return default;
 
             Dictionary<ulong, WorkingHoursPreference> preferences = await db.WorkingHours
                 .Where(item => item.GuildId == settings.GuildId)
@@ -85,7 +87,7 @@ public sealed class WorkingHoursReconciler(
                     propertyValue0: settings.GuildId,
                     string.Join("; ", values: problems));
 
-                return new None();
+                return default;
             }
 
             ISet<ulong> members = state.MemberIds();
@@ -108,7 +110,7 @@ public sealed class WorkingHoursReconciler(
                 preferences: preferences,
                 ct: ct);
 
-            return new Some<int>(pending);
+            return new Optional<int>(pending);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -118,7 +120,7 @@ public sealed class WorkingHoursReconciler(
         {
             logger.Error(exception: ex, "Working Hours saved; reconciliation pending in guild {GuildId}", propertyValue: settings.GuildId);
 
-            return new None();
+            return default;
         }
     }
 

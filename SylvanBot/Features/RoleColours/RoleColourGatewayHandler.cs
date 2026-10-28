@@ -2,6 +2,8 @@
 
 namespace SylvanBot.Features.RoleColours;
 
+using DotNext;
+
 public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, RoleColourReconciler colours, IHostApplicationLifetime lifetime)
     : IDiscordGatewayHandler
 {
@@ -21,7 +23,7 @@ public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, 
 
     private async Task HandleMemberUpdatedAsync(Cacheable<SocketGuildUser, ulong> before, SocketGuildUser after)
     {
-        Option<ImmutableArray<ulong>> previous = new None();
+        Optional<ImmutableArray<ulong>> previous = default;
 
         if (before.HasValue)
         {
@@ -34,10 +36,10 @@ public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, 
             if (unchanged)
                 return;
 
-            previous = new Some<ImmutableArray<ulong>>(roles);
+            previous = new Optional<ImmutableArray<ulong>>(roles);
         }
 
-        await colours.ReconcileUserRolesAsync(after.Guild, after.Id, lifetime.ApplicationStopping, previous, new None());
+        await colours.ReconcileUserRolesAsync(after.Guild, after.Id, lifetime.ApplicationStopping, previous, default);
     }
 
     private Task HandleMemberJoinedAsync(SocketGuildUser member) =>
@@ -45,6 +47,6 @@ public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, 
             guild: member.Guild,
             userId: member.Id,
             ct: lifetime.ApplicationStopping,
-            previousRoleIds: new None(),
-            previousMappings: new None());
+            previousRoleIds: default,
+            previousMappings: default);
 }

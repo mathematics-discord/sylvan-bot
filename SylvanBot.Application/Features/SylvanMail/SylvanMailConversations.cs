@@ -62,13 +62,13 @@ public sealed class SylvanMailConversations(ISylvanMailForum forum)
     {
         if (conversation.CreationStarted)
         {
-            Option<ulong> found = await forum.FindPostAsync(
+            Optional<ulong> found = await forum.FindPostAsync(
                 guildId: conversation.GuildId,
                 forumId: conversation.ForumId,
                 number: conversation.Number,
                 ct: ct);
 
-            if (found.Value is not Some<ulong>(var recoveredThread))
+            if (found is not { HasValue: true, Value: var recoveredThread })
             {
                 throw new BotCommandException(
                     "An earlier post creation has an uncertain outcome. No replacement was created; staff must reconcile the saved attempt.");

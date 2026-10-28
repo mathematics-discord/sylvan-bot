@@ -35,17 +35,17 @@ public sealed class SylvanMailReporting(ISylvanMailDiscord discord, ISylvanMailD
                     cancellationToken: noticeToken);
             op.AcknowledgementStarted = true;
             await db.SaveChangesAsync(noticeToken);
-            Option<ulong> acknowledgement = await discord.AcknowledgeAsync(source: message, first: !previouslyAcknowledged, ct: noticeToken);
-            op.AcknowledgementMessageId = acknowledgement.Value is Some<ulong>(var acknowledgementId) ? acknowledgementId : null;
+            Optional<ulong> acknowledgement = await discord.AcknowledgeAsync(source: message, first: !previouslyAcknowledged, ct: noticeToken);
+            op.AcknowledgementMessageId = acknowledgement is { HasValue: true, Value: var acknowledgementId } ? acknowledgementId : null;
             await db.SaveChangesAsync(noticeToken);
 
             return;
         }
 
-        Option<ulong> thread = threadId is { } target ? new Some<ulong>(target) : new None();
-        Option<ulong> previousReceipt = op.ReceiptMessageId is { } previous ? new Some<ulong>(previous) : new None();
-        Option<ulong> receipt = await discord.ReportAsync(message, thread, previousReceipt, op.Detail, noticeToken);
-        op.ReceiptMessageId = receipt.Value is Some<ulong>(var receiptId) ? receiptId : null;
+        Optional<ulong> thread = threadId is { } target ? new Optional<ulong>(target) : default;
+        Optional<ulong> previousReceipt = op.ReceiptMessageId is { } previous ? new Optional<ulong>(previous) : default;
+        Optional<ulong> receipt = await discord.ReportAsync(message, thread, previousReceipt, op.Detail, noticeToken);
+        op.ReceiptMessageId = receipt is { HasValue: true, Value: var receiptId } ? receiptId : null;
         await db.SaveChangesAsync(noticeToken);
     }
 }

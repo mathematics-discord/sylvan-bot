@@ -7,6 +7,8 @@ using static SylvanBot.Features.RoleReactions.RoleReactionPolicy;
 
 namespace SylvanBot.Features.RoleReactions;
 
+using DotNext;
+
 public sealed class RoleReactionConfiguration(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contextFactory,
@@ -22,14 +24,14 @@ public sealed class RoleReactionConfiguration(
         string emoji,
         CancellationToken ct)
     {
-        Option<MessageLink> parsedLink = ParseMessageLink(messageLink, guild.Id);
+        Optional<MessageLink> parsedLink = ParseMessageLink(messageLink, guild.Id);
 
-        if (parsedLink.Value is not Some<MessageLink>(var link))
+        if (parsedLink is not { HasValue: true, Value: var link })
             return "Provide a Discord message link from this server, not a message ID.";
 
-        Option<IEmote> parsedEmoji = ParseEmoji(emoji);
+        Optional<IEmote> parsedEmoji = ParseEmoji(emoji);
 
-        if (parsedEmoji.Value is not Some<IEmote>(var emote))
+        if (parsedEmoji is not { HasValue: true, Value: var emote })
             return "Provide one Unicode emoji or a custom emoji mention.";
 
         var gate = runtime.ForGuild(guild.Id);
@@ -42,9 +44,9 @@ public sealed class RoleReactionConfiguration(
             if (role is null)
                 return "The target must be an existing, ordinary role other than @everyone.";
 
-            Option<string> roleError = ValidateRole(guild, role);
+            Optional<string> roleError = ValidateRole(guild, role);
 
-            if (roleError.Value is Some<string>(var reason))
+            if (roleError is { HasValue: true, Value: var reason })
                 return reason;
 
             if (moderator.Id != guild.OwnerId && moderator.Hierarchy <= role.Position)
@@ -56,9 +58,9 @@ public sealed class RoleReactionConfiguration(
             if (channel is not IGuildChannel guildChannel)
                 return "The linked channel is unavailable or does not belong to this server.";
 
-            Option<string> channelError = ValidateChannelAccess(guild, moderator, guildChannel);
+            Optional<string> channelError = ValidateChannelAccess(guild, moderator, guildChannel);
 
-            if (channelError.Value is Some<string>(var channelReason))
+            if (channelError is { HasValue: true, Value: var channelReason })
                 return channelReason;
 
             var message = await channel.GetMessageAsync(link.MessageId, options: request);
@@ -82,14 +84,14 @@ public sealed class RoleReactionConfiguration(
 
     public async Task<string> RemoveAsync(SocketGuild guild, string messageLink, string emoji, CancellationToken ct)
     {
-        Option<MessageLink> parsedLink = ParseMessageLink(messageLink, guild.Id);
+        Optional<MessageLink> parsedLink = ParseMessageLink(messageLink, guild.Id);
 
-        if (parsedLink.Value is not Some<MessageLink>(var link))
+        if (parsedLink is not { HasValue: true, Value: var link })
             return "Provide a Discord message link from this server, not a message ID.";
 
-        Option<IEmote> parsedEmoji = ParseEmoji(emoji);
+        Optional<IEmote> parsedEmoji = ParseEmoji(emoji);
 
-        if (parsedEmoji.Value is not Some<IEmote>(var emote))
+        if (parsedEmoji is not { HasValue: true, Value: var emote })
             return "Provide one Unicode emoji or a custom emoji mention.";
 
         var gate = runtime.ForGuild(guild.Id);
@@ -130,7 +132,7 @@ public sealed class RoleReactionConfiguration(
             var request = new RequestOptions { CancelToken = ct };
             var channel = await ReadChannelAsync(mapping.GuildId, mapping.ChannelId, request);
             var message = channel is null ? null : await channel.GetMessageAsync(mapping.MessageId, options: request);
-            var configuredEmote = ParseEmoji(mapping.EmojiText).Value is Some<IEmote>(var savedEmote) ? savedEmote : emote;
+            var configuredEmote = ParseEmoji(mapping.EmojiText) is { HasValue: true, Value: var savedEmote } ? savedEmote : emote;
 
             if (message is not null)
                 await message.RemoveAllReactionsForEmoteAsync(configuredEmote, request);

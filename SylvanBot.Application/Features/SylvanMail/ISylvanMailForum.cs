@@ -6,7 +6,7 @@ public interface ISylvanMailForum
 {
     Task ValidateForumAsync(ulong guildId, ulong forumId, ulong roleId, CancellationToken ct, bool validatePing = true);
 
-    Task<Option<ulong>> FindPostAsync(ulong guildId, ulong forumId, long number, CancellationToken ct);
+    Task<Optional<ulong>> FindPostAsync(ulong guildId, ulong forumId, long number, CancellationToken ct);
 
     Task<ulong> CreatePostAsync(SylvanMailPost post, ulong roleId, string username, CancellationToken ct);
 

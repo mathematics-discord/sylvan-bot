@@ -1,5 +1,7 @@
 namespace SylvanBot.Features.Logging;
 
+using DotNext;
+
 /// <summary>
 ///     Downloads attachment evidence while enforcing a maximum response size.
 /// </summary>
@@ -15,7 +17,7 @@ internal static class AttachmentEvidenceDownloader
     /// <param name="logger">The logger used to record download failures.</param>
     /// <param name="ct">A token that cancels the request and response read.</param>
     /// <returns>The downloaded bytes, or none if the response cannot be used.</returns>
-    public static async Task<Option<byte[]>> TryDownloadAsync(HttpClient httpClient, string url, long maxBytes, ILogger logger, CancellationToken ct)
+    public static async Task<Optional<byte[]>> TryDownloadAsync(HttpClient httpClient, string url, long maxBytes, ILogger logger, CancellationToken ct)
     {
         try
         {
@@ -26,12 +28,12 @@ internal static class AttachmentEvidenceDownloader
             );
 
             if (!response.IsSuccessStatusCode)
-                return new None();
+                return default;
 
             var contentLength = response.Content.Headers.ContentLength;
 
             if (contentLength > maxBytes)
-                return new None();
+                return default;
 
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
 
@@ -45,7 +47,7 @@ internal static class AttachmentEvidenceDownloader
         {
             logger.Debug("Failed to download moderation logging attachment evidence: {ExceptionType}", ex.GetType().Name);
 
-            return new None();
+            return default;
         }
     }
 
@@ -57,7 +59,7 @@ internal static class AttachmentEvidenceDownloader
     /// <param name="ct">A token that cancels the read.</param>
     /// <returns>The bytes read, or none if the stream exceeds the limit.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxBytes"/> is negative.</exception>
-    internal static async Task<Option<byte[]>> ReadLimitedAsync(Stream stream, long maxBytes, CancellationToken ct)
+    internal static async Task<Optional<byte[]>> ReadLimitedAsync(Stream stream, long maxBytes, CancellationToken ct)
     {
         if (maxBytes < 0)
             throw new ArgumentOutOfRangeException(nameof(maxBytes), "Maximum attachment bytes must not be negative.");
@@ -77,13 +79,13 @@ internal static class AttachmentEvidenceDownloader
             var bytesRead = await stream.ReadAsync(readBuffer.AsMemory(start: 0, length: bytesToRead), cancellationToken: ct);
 
             if (bytesRead == 0)
-                return new Some<byte[]>(buffer.ToArray());
+                return new Optional<byte[]>(buffer.ToArray());
 
             await buffer.WriteAsync(readBuffer.AsMemory(start: 0, length: bytesRead), cancellationToken: ct);
 
             bytesRemaining -= bytesRead;
         }
 
-        return buffer.Length > maxBytes ? new None() : new Some<byte[]>(buffer.ToArray());
+        return buffer.Length > maxBytes ? default : new Optional<byte[]>(buffer.ToArray());
     }
 }

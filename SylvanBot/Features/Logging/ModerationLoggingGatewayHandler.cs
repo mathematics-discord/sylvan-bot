@@ -5,6 +5,8 @@ using SylvanBot.Gateway;
 
 namespace SylvanBot.Features.Logging;
 
+using DotNext;
+
 public sealed class ModerationLoggingGatewayHandler(
     DiscordSocketClient discordClient,
     LoggingScopeResolver scope,
@@ -142,9 +144,9 @@ public sealed class ModerationLoggingGatewayHandler(
             return Task.CompletedTask;
 
         // Never infer absence from Discord.NET's detached defaults (notably the empty attachment array).
-        Option<MessageEdited> observation = updatePayload.Current;
+        Optional<MessageEdited> observation = updatePayload.Current;
 
-        if (observation.Value is not Some<MessageEdited>(var payload))
+        if (observation is not { HasValue: true, Value: var payload })
             return Task.CompletedTask;
 
         var matchesEvent = payload.MessageId == after.Id && payload.ChannelId == channel.Id && payload.GuildId == guildChannel.GuildId;
@@ -161,8 +163,8 @@ public sealed class ModerationLoggingGatewayHandler(
         {
             GuildId = guildChannel.GuildId,
             ChannelId = channel.Id,
-            AuthorId = after.Author.Id == 0 ? new None() : new Some<ulong>(after.Author.Id),
-            Eligible = after.Author.Id == 0 ? new None() : new Some<bool>(IsQualifyingUserMessage(after)),
+            AuthorId = after.Author.Id == 0 ? default : new Optional<ulong>(after.Author.Id),
+            Eligible = after.Author.Id == 0 ? default : new Optional<bool>(IsQualifyingUserMessage(after)),
         };
 
         return QueueAsync(new EditedWork(edited));
@@ -239,15 +241,15 @@ public sealed class ModerationLoggingGatewayHandler(
 
     private async Task ProcessEditAsync(MessageEdited edited, IMessageChannel sourceChannel, CancellationToken ct)
     {
-        Option<MessageEdit> result = await cache.EditAsync(edited, ct);
+        Optional<MessageEdit> result = await cache.EditAsync(edited, ct);
 
-        if (result.Value is not Some<MessageEdit>(var change))
+        if (result is not { HasValue: true, Value: var change })
             return;
 
         var after = change.After;
-        var beforeContent = change.Before.Value is Some<CachedMessageSnapshot>(var before) ? before.Content : null;
+        var beforeContent = change.Before is { HasValue: true, Value: var before } ? before.Content : null;
 
-        var contentChanged = edited.Content.Value is Some<string> && !string.Equals(beforeContent, after.Content, StringComparison.Ordinal);
+        var contentChanged = edited.Content is { HasValue: true } && !string.Equals(beforeContent, after.Content, StringComparison.Ordinal);
 
         if (contentChanged)
             await publisher.PublishEditAsync(

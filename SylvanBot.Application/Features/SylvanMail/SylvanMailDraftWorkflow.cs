@@ -15,7 +15,7 @@ public sealed class SylvanMailDraftWorkflow(
     {
         await using var db = await contexts.CreateDbContextAsync(ct);
         await SylvanMailSerialisation.EnterAsync(db: db, ct: ct);
-        Option<SylvanMailMessage> observed = new None();
+        Optional<SylvanMailMessage> observed = default;
 
         try
         {
@@ -26,12 +26,12 @@ public sealed class SylvanMailDraftWorkflow(
 
             observed = await drafts.ReadDraftAsync(threadId: threadId, messageId: messageId, authorId: authorId, confirm: confirm, ct: ct);
 
-            if (observed.Value is not Some<SylvanMailMessage>(var message))
+            if (observed is not { HasValue: true, Value: var message })
                 return;
 
             await ProcessDraftAsync(db, message, confirm, ct);
         }
-        catch (Exception exception) when (observed.Value is Some<SylvanMailMessage>(var message))
+        catch (Exception exception) when (observed is { HasValue: true, Value: var message })
         {
             using var noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
@@ -44,8 +44,8 @@ public sealed class SylvanMailDraftWorkflow(
 
                 await discord.ReportAsync(
                     source: message,
-                    threadId: new Some<ulong>(threadId),
-                    receiptId: new None(),
+                    threadId: new Optional<ulong>(threadId),
+                    receiptId: default,
                     detail: detail,
                     ct: noticeTimeout.Token);
             }
@@ -69,14 +69,14 @@ public sealed class SylvanMailDraftWorkflow(
         if (conversation is null)
             return;
 
-        Option<SylvanMailMessage> observed = await drafts.ReadDraftAsync(
+        Optional<SylvanMailMessage> observed = await drafts.ReadDraftAsync(
             threadId: threadId,
             messageId: messageId,
             authorId: authorId,
             confirm: true,
             ct: ct);
 
-        if (observed.Value is Some<SylvanMailMessage>(var message))
+        if (observed is { HasValue: true, Value: var message })
             await relay.RefuseBusyAsync(message: message, ct: ct);
     }
 

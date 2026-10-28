@@ -2,6 +2,8 @@
 
 namespace SylvanBot.Features.RoleReactions;
 
+using DotNext;
+
 internal static class RoleReactionInput
 {
     public static string GetEmojiKey(IEmote emote)
@@ -14,30 +16,30 @@ internal static class RoleReactionInput
         return "unicode:" + unicode;
     }
 
-    public static Option<IEmote> ParseEmoji(string text)
+    public static Optional<IEmote> ParseEmoji(string text)
     {
         var input = text.Trim();
 
         if (input.Length is 0 or > 128)
-            return new None();
+            return default;
 
         if (Emote.TryParse(input, out var custom))
         {
             var validCustomEmoji = custom.Id != 0 && string.Equals(input, custom.ToString(), StringComparison.Ordinal);
 
-            return validCustomEmoji ? new Some<IEmote>(custom) : new None();
+            return validCustomEmoji ? new Optional<IEmote>(custom) : default;
         }
 
         if (StringInfo.ParseCombiningCharacters(input).Length != 1)
-            return new None();
+            return default;
 
-        return Emoji.TryParse(input, out var unicode) ? new Some<IEmote>(unicode) : new None();
+        return Emoji.TryParse(input, out var unicode) ? new Optional<IEmote>(unicode) : default;
     }
 
-    public static Option<MessageLink> ParseMessageLink(string text, ulong guildId)
+    public static Optional<MessageLink> ParseMessageLink(string text, ulong guildId)
     {
         if (!Uri.TryCreate(text.Trim(), UriKind.Absolute, out var uri))
-            return new None();
+            return default;
 
         var discordHost = uri.Host is "discord.com" or "canary.discord.com" or "ptb.discord.com";
 
@@ -46,27 +48,27 @@ internal static class RoleReactionInput
 
         if (!supportedAddress)
         {
-            return new None();
+            return default;
         }
 
         var parts = uri.AbsolutePath.TrimEnd('/').Split('/');
 
         if (parts.Length != 5 || !string.Equals(parts[1], "channels", StringComparison.Ordinal))
-            return new None();
+            return default;
 
         if (!ulong.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out var linkedGuildId))
-            return new None();
+            return default;
 
         if (!ulong.TryParse(parts[3], NumberStyles.None, CultureInfo.InvariantCulture, out var channelId))
-            return new None();
+            return default;
 
         if (!ulong.TryParse(parts[4], NumberStyles.None, CultureInfo.InvariantCulture, out var messageId))
-            return new None();
+            return default;
 
         if (linkedGuildId != guildId || channelId == 0 || messageId == 0)
-            return new None();
+            return default;
 
-        return new Some<MessageLink>(new MessageLink(channelId, messageId));
+        return new Optional<MessageLink>(new MessageLink(channelId, messageId));
     }
 
     public sealed record MessageLink(ulong ChannelId, ulong MessageId);

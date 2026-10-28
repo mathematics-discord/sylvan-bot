@@ -37,7 +37,7 @@ public sealed class MultiGuildPersistenceTests
 
         (await operations.ListConfiguredOptionsAsync(guildId: 2, ct: CancellationToken.None)).Single().OptionId.ShouldBe(guildB.OptionId);
 
-        (await operations.DeleteMappingAsync(guildId: 1, optionId: guildA.OptionId, ct: CancellationToken.None)).IsError.ShouldBeFalse();
+        (await operations.DeleteMappingAsync(guildId: 1, optionId: guildA.OptionId, ct: CancellationToken.None)).IsSuccessful.ShouldBeTrue();
 
         (await operations.ListConfiguredOptionsAsync(guildId: 1, ct: CancellationToken.None)).ShouldBeEmpty();
 
@@ -75,8 +75,8 @@ public sealed class MultiGuildPersistenceTests
         (persistedA.RequiredChannelCount, persistedA.RequiredAttachmentCount, persistedA.BurstDurationSeconds).ShouldBe((4, 2, 45));
 
         (persistedB.RequiredChannelCount, persistedB.RequiredAttachmentCount, persistedB.BurstDurationSeconds).ShouldBe((2, 5, 60));
-        var publishedA = service.Current(1).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
-        var publishedB = service.Current(2).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+        var publishedA = service.Current(1).Value;
+        var publishedB = service.Current(2).Value;
         publishedA.ShouldNotBeNull();
         publishedB.ShouldNotBeNull();
 

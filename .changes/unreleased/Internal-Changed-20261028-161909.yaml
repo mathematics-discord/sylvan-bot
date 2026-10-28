@@ -1,0 +1,4 @@
+component: Internal
+kind: Changed
+body: Replace ErrorOr and the custom Option type with DotNext results and optional values, preserving descriptive failures and explicit-null message edits.
+time: 2026-10-28T16:19:09.4916631Z

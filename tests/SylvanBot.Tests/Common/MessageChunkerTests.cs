@@ -23,11 +23,11 @@ public sealed class MessageChunkerTests
         // Arrange
 
         // Act
-        ErrorOr<string[]> result = MessageChunker.SplitMessageIntoChunks("message", chunkSize: 0);
+        Result<string[]> result = MessageChunker.SplitMessageIntoChunks("message", chunkSize: 0);
 
         // Assert
-        result.IsError.ShouldBeTrue();
-        result.FirstError.Type.ShouldBe(ErrorType.Validation);
+        result.IsSuccessful.ShouldBeFalse();
+        result.Error.ShouldBeOfType<OperationFailureException>().Category.ShouldBe(OperationFailureCategory.Validation);
     }
 
     [Test]

@@ -4,6 +4,8 @@ using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Features.WorkingHours;
 
+using DotNext;
+
 public sealed class WorkingHoursConfiguration(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contexts,
@@ -12,7 +14,7 @@ public sealed class WorkingHoursConfiguration(
     WorkingHoursReconciler reconciler
 )
 {
-    public async Task<ErrorOr<string>> UpdateAsync(ulong guildId, WorkingConditionsChange change, Option<ulong> roleId, CancellationToken ct)
+    public async Task<Result<string>> UpdateAsync(ulong guildId, WorkingConditionsChange change, Optional<ulong> roleId, CancellationToken ct)
     {
         var state = runtime.ForGuild(guildId);
         await state.Gate.WaitAsync(ct);
@@ -23,16 +25,16 @@ public sealed class WorkingHoursConfiguration(
             var settings = await LoadSettingsAsync(db: db, guildId: guildId, ct: ct);
             var isNew = settings is null;
             settings ??= new WorkingHoursSettings { GuildId = guildId };
-            ErrorOr<Success> validation = ApplyConfigurationChange(settings: settings, change: change, roleId: roleId);
+            Result<ValueTuple> validation = ApplyConfigurationChange(settings: settings, change: change, roleId: roleId);
 
-            if (validation.IsError)
-                return validation.Errors;
+            if (!validation.IsSuccessful)
+                return new Result<string>(validation.Error!);
 
             if (isNew)
                 db.WorkingHoursSettings.Add(settings);
 
             await db.SaveChangesAsync(ct);
-            Option<int> pending = await reconciler.ReconcileSavedAsync(db: db, settings: settings, state: state, ct: ct);
+            Optional<int> pending = await reconciler.ReconcileSavedAsync(db: db, settings: settings, state: state, ct: ct);
 
             var message = change switch
             {
@@ -58,35 +60,37 @@ public sealed class WorkingHoursConfiguration(
             .Include(settings => settings.EligibleRoles)
             .SingleOrDefaultAsync(settings => settings.GuildId == guildId, cancellationToken: ct);
 
-    private ErrorOr<Success> ApplyConfigurationChange(WorkingHoursSettings settings, WorkingConditionsChange change, Option<ulong> roleId)
+    private Result<ValueTuple> ApplyConfigurationChange(WorkingHoursSettings settings, WorkingConditionsChange change, Optional<ulong> roleId)
     {
         var guild = client.GetGuild(settings.GuildId);
 
-        if (roleId.Value is Some<ulong>(var submittedId))
+        if (roleId is { HasValue: true, Value: var submittedId })
         {
             var role = guild?.GetRole(submittedId);
 
             var available = client.ConnectionState == ConnectionState.Connected && guild is { IsConnected: true };
 
             if (!available || role is null)
-                return Error.Validation(description: "The selected role is unavailable in this guild. No settings changed.");
+                return new Result<ValueTuple>(
+                    OperationFailureException.Validation(description: "The selected role is unavailable in this guild. No settings changed."));
 
             if (change == WorkingConditionsChange.PingRole && role.IsManaged)
-                return Error.Validation(description: "An integration-managed role cannot be the ping role.");
+                return new Result<ValueTuple>(
+                    OperationFailureException.Validation(description: "An integration-managed role cannot be the ping role."));
         }
 
-        ErrorOr<Success> validation = (change, roleId.Value) switch
+        Result<ValueTuple> validation = (change, roleId) switch
         {
-            (WorkingConditionsChange.PingRole, Some<ulong>(var id)) => settings.SetPingRole(id),
-            (WorkingConditionsChange.AddEligible, Some<ulong>(var id)) => settings.ChangeEligibleRole(id, add: true),
-            (WorkingConditionsChange.RemoveEligible, Some<ulong>(var id)) => settings.ChangeEligibleRole(id, add: false),
-            (WorkingConditionsChange.AddExempt, Some<ulong>(var id)) => settings.ChangeExemptRole(id, add: true),
-            (WorkingConditionsChange.RemoveExempt, Some<ulong>(var id)) => settings.ChangeExemptRole(id, add: false),
-            (WorkingConditionsChange.Enable or WorkingConditionsChange.Disable, _) => Result.Success,
-            _ => Error.Validation(description: "Choose a role for this configuration change."),
+            (WorkingConditionsChange.PingRole, { HasValue: true, Value: var id }) => settings.SetPingRole(id),
+            (WorkingConditionsChange.AddEligible, { HasValue: true, Value: var id }) => settings.ChangeEligibleRole(id, add: true),
+            (WorkingConditionsChange.RemoveEligible, { HasValue: true, Value: var id }) => settings.ChangeEligibleRole(id, add: false),
+            (WorkingConditionsChange.AddExempt, { HasValue: true, Value: var id }) => settings.ChangeExemptRole(id, add: true),
+            (WorkingConditionsChange.RemoveExempt, { HasValue: true, Value: var id }) => settings.ChangeExemptRole(id, add: false),
+            (WorkingConditionsChange.Enable or WorkingConditionsChange.Disable, _) => new Result<ValueTuple>(default(ValueTuple)),
+            _ => new Result<ValueTuple>(OperationFailureException.Validation(description: "Choose a role for this configuration change.")),
         };
 
-        if (validation.IsError)
+        if (!validation.IsSuccessful)
             return validation;
 
         switch (change)
@@ -96,7 +100,7 @@ public sealed class WorkingHoursConfiguration(
                 ICollection<string> problems = rules.ConfigurationProblems(settings: settings, guild: guild);
 
                 if (problems.Count > 0)
-                    return Error.Validation(description: string.Join(separator: '\n', values: problems));
+                    return new Result<ValueTuple>(OperationFailureException.Validation(description: string.Join(separator: '\n', values: problems)));
 
                 settings.Enabled = true;
 
@@ -110,6 +114,6 @@ public sealed class WorkingHoursConfiguration(
                 throw new ArgumentOutOfRangeException(nameof(change), change, message: null);
         }
 
-        return Result.Success;
+        return new Result<ValueTuple>(default(ValueTuple));
     }
 }

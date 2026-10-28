@@ -8,9 +8,9 @@ public sealed record SylvanMailDeliveryOutcome
 
     public required string Detail { get; init; }
 
-    public static SylvanMailDeliveryOutcome FromFailure(int confirmedParts, bool uncertainDelivery, bool uncertainPost, Option<string> refusal)
+    public static SylvanMailDeliveryOutcome FromFailure(int confirmedParts, bool uncertainDelivery, bool uncertainPost, Optional<string> refusal)
     {
-        var refused = refusal.Value is Some<string>;
+        var refused = refusal is { HasValue: true };
         var ambiguous = (uncertainDelivery || uncertainPost) && !refused;
 
         if (ambiguous)
@@ -24,14 +24,14 @@ public sealed record SylvanMailDeliveryOutcome
 
         if (confirmedParts > 0)
         {
-            var detail = refusal.Value is Some<string>(var reason)
+            var detail = refusal is { HasValue: true, Value: var reason }
                 ? $"Partial delivery ({confirmedParts} confirmed parts). {reason}"
                 : $"Partial delivery ({confirmedParts} confirmed parts); remaining content was not sent.";
 
             return new SylvanMailDeliveryOutcome { State = "Partial", Detail = detail };
         }
 
-        return refusal.Value is Some<string>(var rejection)
+        return refusal is { HasValue: true, Value: var rejection }
             ? new SylvanMailDeliveryOutcome { State = "Refused", Detail = rejection }
             : new SylvanMailDeliveryOutcome
             {

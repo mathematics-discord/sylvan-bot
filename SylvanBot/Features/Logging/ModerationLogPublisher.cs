@@ -2,6 +2,8 @@
 
 namespace SylvanBot.Features.Logging;
 
+using DotNext;
+
 using DownloadedAttachment = ModerationLogComponents.DownloadedAttachment;
 
 public sealed class ModerationLogPublisher(
@@ -211,14 +213,14 @@ public sealed class ModerationLogPublisher(
 
             try
             {
-                Option<byte[]> downloadResult = await AttachmentEvidenceDownloader.TryDownloadAsync(
+                Optional<byte[]> downloadResult = await AttachmentEvidenceDownloader.TryDownloadAsync(
                     httpClient: httpClient,
                     url: url,
                     maxBytes: maxBytes,
                     logger: _logger,
                     ct: ct);
 
-                if (downloadResult.Value is Some<byte[]>(var bytes))
+                if (downloadResult is { HasValue: true, Value: var bytes })
                 {
                     var contentType = attachment.ContentType ?? "application/octet-stream";
                     var fileName = ModerationLogComponents.GetAttachmentFileName(attachments.Count + 1, contentType: contentType);

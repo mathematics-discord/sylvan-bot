@@ -7,6 +7,8 @@ using static SylvanBot.Features.RoleReactions.RoleReactionPolicy;
 
 namespace SylvanBot.Features.RoleReactions;
 
+using DotNext;
+
 public sealed class RoleReactionCoordinator(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contextFactory,
@@ -68,14 +70,14 @@ public sealed class RoleReactionCoordinator(
     {
         var role = guild.GetRole(mapping.RoleId);
 
-        Option<string> roleError = role switch
+        Optional<string> roleError = role switch
         {
-            null => new Some<string>("The target must be an existing, ordinary role other than @everyone."),
+            null => new Optional<string>("The target must be an existing, ordinary role other than @everyone."),
             _ when added => ValidateRole(guild, role),
             _ => ValidateManageableRole(guild, role),
         };
 
-        if (roleError.Value is Some<string>(var reason))
+        if (roleError is { HasValue: true, Value: var reason })
         {
             logger.Warning(
                 "Skipped role reaction in guild {GuildId} on message {MessageId} for member {UserId}, role {RoleId}: {Reason}",

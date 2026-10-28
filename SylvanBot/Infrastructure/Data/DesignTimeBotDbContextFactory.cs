@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace SylvanBot.Infrastructure.Data;
 
+using DotNext;
+
 /// <summary>
 ///     Creates <see cref="BotDbContext"/> instances for design-time tooling such as EF Core migrations.
 /// </summary>
@@ -25,7 +27,7 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
             ?? configurationRoot["DB:ConnectionString"]
             ?? Environment.GetEnvironmentVariable("DB__CONNECTION_STRING");
 
-        if (connectionString is null && BuildFromDiscrete(configurationRoot).Value is Some<string>(var discreteConnectionString))
+        if (connectionString is null && BuildFromDiscrete(configurationRoot) is { HasValue: true, Value: var discreteConnectionString })
             connectionString = discreteConnectionString;
 
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -40,7 +42,7 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
         return new BotDbContext(options);
     }
 
-    private static Option<string> BuildFromDiscrete(IConfiguration c)
+    private static Optional<string> BuildFromDiscrete(IConfiguration c)
     {
         var host = c["DB:Host"] ?? c["Database:Host"] ?? Environment.GetEnvironmentVariable("DB__HOST");
         var port = c["DB:Port"] ?? c["Database:Port"] ?? Environment.GetEnvironmentVariable("DB__PORT");
@@ -49,10 +51,10 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
         var pwd = c["DB:Password"] ?? c["Database:Password"] ?? Environment.GetEnvironmentVariable("DB__PASSWORD");
 
         if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(db) || string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pwd))
-            return new None();
+            return default;
 
         var resolvedPort = string.IsNullOrWhiteSpace(port) ? "5432" : port;
 
-        return new Some<string>($"Host={host};Port={resolvedPort};Database={db};Username={user};Password={pwd};SSL Mode=Prefer");
+        return new Optional<string>($"Host={host};Port={resolvedPort};Database={db};Username={user};Password={pwd};SSL Mode=Prefer");
     }
 }

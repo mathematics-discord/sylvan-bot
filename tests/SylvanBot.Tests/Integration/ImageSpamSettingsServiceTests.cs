@@ -40,7 +40,7 @@ public sealed class ImageSpamSettingsServiceTests
         (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds).ShouldBe((4, 2, 45));
         persisted.IsEnabled.ShouldBeTrue();
         (result.DistinctChannelThreshold, result.RequiredAttachmentCount, result.Window).ShouldBe((4, 2, 45));
-        var published = service.Current(1).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+        var published = service.Current(1).Value;
         published.ShouldBe(result);
     }
 
@@ -84,7 +84,7 @@ public sealed class ImageSpamSettingsServiceTests
 
         (result.DistinctChannelThreshold, result.RequiredAttachmentCount, result.Window).ShouldBe(
             (expectedChannels, expectedAttachments, expectedSeconds));
-        var published = service.Current(1).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+        var published = service.Current(1).Value;
         published.ShouldBe(result);
     }
 
@@ -102,14 +102,14 @@ public sealed class ImageSpamSettingsServiceTests
         await service.LoadEnabledSettingsAsync(CancellationToken.None);
 
         // Act
-        Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(guildId: 1, ct: CancellationToken.None);
+        Optional<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(guildId: 1, ct: CancellationToken.None);
 
         // Assert
-        var current = result.Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+        var current = result.Value;
         current.DistinctChannelThreshold.ShouldBe(6);
         current.RequiredAttachmentCount.ShouldBe(3);
         current.Window.ShouldBe(90);
-        var published = service.Current(1).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+        var published = service.Current(1).Value;
         published.ShouldBe(current);
     }
 
@@ -130,12 +130,12 @@ public sealed class ImageSpamSettingsServiceTests
         var otherGuildOptions = await service.UpsertAsync(2, null, null, 90, CancellationToken.None);
 
         // Act
-        Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(guildId: 1, ct: CancellationToken.None);
+        Optional<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(guildId: 1, ct: CancellationToken.None);
 
         // Assert
-        result.Value.ShouldBeOfType<None>();
-        service.Current(1).Value.ShouldBeOfType<None>();
-        var otherGuild = service.Current(2).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+        result.IsUndefined.ShouldBeTrue();
+        service.Current(1).IsUndefined.ShouldBeTrue();
+        var otherGuild = service.Current(2).Value;
         otherGuild.ShouldBe(otherGuildOptions);
     }
 
@@ -156,12 +156,12 @@ public sealed class ImageSpamSettingsServiceTests
         var otherGuildOptions = await service.UpsertAsync(2, null, null, 90, CancellationToken.None);
 
         // Act
-        Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(guildId: 1, ct: CancellationToken.None);
+        Optional<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(guildId: 1, ct: CancellationToken.None);
 
         // Assert
-        result.Value.ShouldBeOfType<None>();
-        service.Current(1).Value.ShouldBeOfType<None>();
-        var otherGuild = service.Current(2).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+        result.IsUndefined.ShouldBeTrue();
+        service.Current(1).IsUndefined.ShouldBeTrue();
+        var otherGuild = service.Current(2).Value;
         otherGuild.ShouldBe(otherGuildOptions);
     }
 
@@ -184,11 +184,11 @@ public sealed class ImageSpamSettingsServiceTests
         await service.LoadEnabledSettingsAsync(CancellationToken.None);
 
         // Assert
-        var first = service.Current(1).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+        var first = service.Current(1).Value;
         first.ShouldNotBeNull();
         (first.DistinctChannelThreshold, first.RequiredAttachmentCount, first.Window).ShouldBe((4, 2, 45));
-        service.Current(2).Value.ShouldBeOfType<None>();
-        var third = service.Current(3).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+        service.Current(2).IsUndefined.ShouldBeTrue();
+        var third = service.Current(3).Value;
         third.ShouldNotBeNull();
         (third.DistinctChannelThreshold, third.RequiredAttachmentCount, third.Window).ShouldBe((6, 3, 90));
     }
@@ -225,8 +225,8 @@ public sealed class ImageSpamSettingsServiceTests
 
         var persisted = await readback.ImageSpamSettings
             .SingleOrDefaultAsync(x => x.GuildId == 1);
-        Option<ImageBurstSpamDetectorOptions> published = service.Current(1);
-        (published.Value is Some<ImageBurstSpamDetectorOptions>).ShouldBe(hasExistingSettings);
+        Optional<ImageBurstSpamDetectorOptions> published = service.Current(1);
+        (published is { HasValue: true }).ShouldBe(hasExistingSettings);
 
         if (hasExistingSettings)
         {
@@ -235,7 +235,7 @@ public sealed class ImageSpamSettingsServiceTests
             (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds).ShouldBe((4, 2, 45));
 
             persisted.IsEnabled.ShouldBeTrue();
-            var current = published.Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+            var current = published.Value;
 
             (current.DistinctChannelThreshold, current.RequiredAttachmentCount, current.Window).ShouldBe((4, 2, 45));
         }

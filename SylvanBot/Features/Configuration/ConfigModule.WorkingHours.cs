@@ -3,6 +3,8 @@ using SylvanBot.Interactions;
 
 namespace SylvanBot.Features.Configuration;
 
+using DotNext;
+
 public sealed partial class ConfigModule
 {
     [Group("working-hours", "Administer Working Hours for this guild")]
@@ -20,9 +22,9 @@ public sealed partial class ConfigModule
         public async Task ShowAsync()
         {
             await DeferAsync(ephemeral: true);
-            ErrorOr<string> message = await configuration.ShowAsync(guildId: Context.Guild.Id, ct: lifetime.ApplicationStopping);
+            Result<string> message = await configuration.ShowAsync(guildId: Context.Guild.Id, ct: lifetime.ApplicationStopping);
 
-            await WorkingHoursReply.SendAsync(interaction: Context.Interaction, message.IsError ? message.FirstError.Description : message.Value);
+            await WorkingHoursReply.SendAsync(interaction: Context.Interaction, !message.IsSuccessful ? message.Error!.Message : message.Value);
         }
 
         [SlashCommand("ping-role", "Set the ping role while scheduling is disabled; the old role is left unchanged")]
@@ -53,12 +55,12 @@ public sealed partial class ConfigModule
                 return;
             }
 
-            ErrorOr<string> result = await coordinator.UpdateAsync(
+            Result<string> result = await coordinator.UpdateAsync(
                 guildId: Context.Guild.Id,
                 change: change,
-                roleId: role is null ? new None() : new Some<ulong>(role.Id),
+                roleId: role is null ? default : new Optional<ulong>(role.Id),
                 ct: lifetime.ApplicationStopping);
-            await WorkingHoursReply.SendAsync(interaction: Context.Interaction, result.IsError ? result.FirstError.Description : result.Value);
+            await WorkingHoursReply.SendAsync(interaction: Context.Interaction, !result.IsSuccessful ? result.Error!.Message : result.Value);
         }
     }
 }
