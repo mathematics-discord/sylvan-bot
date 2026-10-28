@@ -1,5 +1,6 @@
 ﻿using System.Collections.Immutable;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Application.Features.SylvanMail;
@@ -9,7 +10,8 @@ public sealed class SylvanMailWorkflow(
     ISylvanMailDiscord discord,
     ISylvanMailForum forum,
     SylvanMailReporting reporting,
-    SylvanMailConversations conversations
+    SylvanMailConversations conversations,
+    ILogger<SylvanMailWorkflow> logger
 )
 {
     public async Task RelayAsync(SylvanMailMessage message, CancellationToken ct)
@@ -138,6 +140,29 @@ public sealed class SylvanMailWorkflow(
         {
             conversation = await db.SylvanMailConversations
                .SingleOrDefaultAsync(item => item.Id == operation.ConversationId, cancellationToken: ct);
+        }
+
+        var deliveredToNewPost =
+            toStaff
+            && string.Equals(a: operation.State, "Delivered", comparisonType: StringComparison.Ordinal)
+            && conversation?.ThreadId != previousThreadId;
+
+        if (deliveredToNewPost && conversation is { ThreadId: { } newThread })
+        {
+            try
+            {
+                await discord.SendTextAsync(channelId: newThread, $".ticket show {conversation.UserId}", ct: ct);
+            }
+            catch (Exception exception)
+            {
+                // Ticket context is best effort and must not change the mail delivery outcome.
+                logger.LogWarning(
+                    exception,
+                    "SylvanMail ticket lookup failed in guild {GuildId}, thread {ThreadId}, for user {UserId}",
+                    conversation.GuildId,
+                    newThread,
+                    conversation.UserId);
+            }
         }
 
         await reporting.ReportAsync(db: db, message: message, threadId: conversation?.ThreadId, op: operation);
