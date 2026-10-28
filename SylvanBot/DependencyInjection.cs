@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.MessageCache;
-using SylvanBot.Application.Features.Quorum;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Features.EmojiAnalytics;
 using SylvanBot.Features.EmojiAnalytics.Persistence;
@@ -10,7 +9,6 @@ using SylvanBot.Features.EmojiYoink;
 using SylvanBot.Features.Logging;
 using SylvanBot.Features.MessageCache;
 using SylvanBot.Features.Moderation;
-using SylvanBot.Features.Quorum;
 using SylvanBot.Features.RoleColours;
 using SylvanBot.Features.RoleReactions;
 using SylvanBot.Features.SylvanMail;
@@ -49,8 +47,6 @@ public static class DependencyInjection
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<RoleReactionGatewayHandler>());
             services.AddHostedService(sp => sp.GetRequiredService<RoleReactionGatewayHandler>());
 
-            services.AddSingleton<IQuorumMembers, DiscordQuorumMembers>();
-            services.AddScoped<QuorumOperations>();
 
             services.AddSingleton<ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>>();
 

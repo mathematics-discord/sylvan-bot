@@ -1,6 +1,5 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.MessageCache;
-using SylvanBot.Application.Features.Quorum;
 using SylvanBot.Application.Features.RoleReactions;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Application.Features.WorkingHours;
@@ -39,10 +38,6 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<RoleColourOption> RoleColourOptions => Set<RoleColourOption>();
 
     public DbSet<RoleReaction> RoleReactions => Set<RoleReaction>();
-
-    public DbSet<QuorumConfiguration> QuorumConfigurations => Set<QuorumConfiguration>();
-
-    public DbSet<QuorumVoterRole> QuorumVoterRoles => Set<QuorumVoterRole>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
