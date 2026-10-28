@@ -2,29 +2,28 @@
 
 namespace SylvanBot.Features.WorkingHours;
 
-public sealed class WorkingHoursGatewayHandler(DiscordSocketClient client, WorkingHoursCoordinator coordinator)
-    : IDiscordGatewayHandler
+public sealed class WorkingHoursGatewayHandler(DiscordSocketClient client, WorkingHoursRuntime coordinator) : IDiscordGatewayHandler
 {
     public Task InitializeAsync(CancellationToken ct)
     {
-        client.Ready                  += ReadyAsync;
-        client.GuildAvailable         += GuildReadyAsync;
+        client.Ready += ReadyAsync;
+        client.GuildAvailable += GuildReadyAsync;
         client.GuildMembersDownloaded += GuildReadyAsync;
-        client.GuildMemberUpdated     += MemberUpdatedAsync;
-        client.UserJoined             += JoinedAsync;
-        client.UserLeft               += LeftAsync;
+        client.GuildMemberUpdated += MemberUpdatedAsync;
+        client.UserJoined += JoinedAsync;
+        client.UserLeft += LeftAsync;
 
         return Task.CompletedTask;
     }
 
     public void Unsubscribe()
     {
-        client.Ready                  -= ReadyAsync;
-        client.GuildAvailable         -= GuildReadyAsync;
+        client.Ready -= ReadyAsync;
+        client.GuildAvailable -= GuildReadyAsync;
         client.GuildMembersDownloaded -= GuildReadyAsync;
-        client.GuildMemberUpdated     -= MemberUpdatedAsync;
-        client.UserJoined             -= JoinedAsync;
-        client.UserLeft               -= LeftAsync;
+        client.GuildMemberUpdated -= MemberUpdatedAsync;
+        client.UserJoined -= JoinedAsync;
+        client.UserLeft -= LeftAsync;
     }
 
     private Task ReadyAsync()

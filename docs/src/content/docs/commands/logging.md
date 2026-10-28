@@ -1,5 +1,5 @@
 ---
-title: /logging
+title: /config logs
 description: Configure edit and deletion logs and choose which channels to exclude.
 ---
 
@@ -8,12 +8,12 @@ only to you.
 
 ## View or change log destinations
 
-Run `/logging config` without options to see the current settings.
+Run `/config logs setup` without options to see the current settings.
 
 To set destinations and enable logging:
 
 ```text
-/logging config enabled:true delete-log-channel:#deleted-messages edit-log-channel:#edited-messages
+/config logs setup enabled:true delete-log-channel:#deleted-messages edit-log-channel:#edited-messages
 ```
 
 | Option | What it changes |
@@ -29,14 +29,14 @@ enabling logging; each kind of log needs its own configured destination.
 To pause logging without discarding its destinations:
 
 ```text
-/logging config enabled:false
+/config logs setup enabled:false
 ```
 
 ## Exclude a channel
 
 ```text
-/logging exclude
-/logging exclude channel:#private-discussion
+/config logs exclude
+/config logs exclude channel:#private-discussion
 ```
 
 Leave `channel` out to exclude the current channel. You can select a channel,
@@ -46,7 +46,7 @@ also applies to messages beneath it.
 ## Remove an exclusion
 
 ```text
-/logging include channel:#private-discussion
+/config logs include channel:#private-discussion
 ```
 
 This removes the exclusion for the selected channel. Leave `channel` out
@@ -56,7 +56,7 @@ still prevent messages being logged; remove that exclusion separately.
 ## List exclusions
 
 ```text
-/logging exclusions
+/config logs exclusions
 ```
 
 Sylvan lists the excluded channels, or confirms that there are none. Log

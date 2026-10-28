@@ -1,25 +1,22 @@
-﻿using System.Collections.Concurrent;
-using SylvanBot.Gateway;
+﻿using SylvanBot.Gateway;
 
 namespace SylvanBot.Features.Moderation;
 
 public sealed class ImageBurstSpamGatewayHandler(
     DiscordSocketClient discordClient,
     ImageBurstSpamDetector detector,
-    ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild,
-    IServiceScopeFactory scopeFactory,
+    ImageSpamSettingsService settings,
+    IHostApplicationLifetime lifetime,
     IOptions<DiscordOptions> options,
     ILogger logger
 ) : IDiscordGatewayHandler
 {
-    private readonly ILogger        _logger  = logger.ForContext<ImageBurstSpamGatewayHandler>();
+    private readonly ILogger _logger = logger.ForContext<ImageBurstSpamGatewayHandler>();
     private readonly DiscordOptions _options = options.Value;
 
     public async Task InitializeAsync(CancellationToken ct)
     {
-        using var scope           = scopeFactory.CreateScope();
-        var       settingsService = scope.ServiceProvider.GetRequiredService<ImageSpamSettingsService>();
-        await settingsService.LoadEnabledSettingsAsync(ct).ConfigureAwait(false);
+        await settings.LoadEnabledSettingsAsync(ct);
 
         Subscribe();
     }
@@ -41,7 +38,7 @@ public sealed class ImageBurstSpamGatewayHandler(
     {
         var guild = discordClient.GetGuild(detection.GuildId);
 
-        if (!settingsByGuild.TryGetValue(key: detection.GuildId, out var currentSettings))
+        if (settings.Current(detection.GuildId).Value is not Some<ImageBurstSpamDetectorOptions>(var currentSettings))
             return;
 
         var reason =
@@ -49,8 +46,11 @@ public sealed class ImageBurstSpamGatewayHandler(
             + $"{detection.ChannelIds.Count} channels with {currentSettings.RequiredAttachmentCount}+ attachments "
             + $"in {currentSettings.Window} seconds.";
 
-        await guild.AddBanAsync(userId: detection.UserId, pruneDays: _options.ImageBurstSpamHistoryPruneDays, reason: reason)
-           .ConfigureAwait(false);
+        await guild.AddBanAsync(
+            userId: detection.UserId,
+            pruneDays: _options.ImageBurstSpamHistoryPruneDays,
+            reason: reason,
+            options: new RequestOptions { CancelToken = lifetime.ApplicationStopping });
 
         _logger.Warning(
             "Banned user {UserId} for image-burst spam across {ChannelCount} channels",
@@ -67,12 +67,12 @@ public sealed class ImageBurstSpamGatewayHandler(
             if (qualifyingResult.Value is not Some<ImageBurstMessage>(var qualifyingMessage))
                 return;
 
-            Option<ImageBurstDetection> detectionResult = detector.Observe(qualifyingMessage);
+            Option<ImageBurstDetection> detectionResult = detector.Observe(qualifyingMessage, settings.Current(qualifyingMessage.GuildId));
 
             if (detectionResult.Value is not Some<ImageBurstDetection>(var detection))
                 return;
 
-            await HandleDetectionAsync(detection).ConfigureAwait(false);
+            await HandleDetectionAsync(detection);
         }
         catch (Exception ex)
         {
@@ -83,8 +83,9 @@ public sealed class ImageBurstSpamGatewayHandler(
     private bool IsExempt(SocketGuildUser user)
     {
         return _options.ImageBurstSpamAllowlistedUserIds.Contains(user.Id)
-            || user.Roles.Any(role => _options.ImageBurstSpamAllowlistedRoleIds.Contains(role.Id))
-            || HasStaffPermissions(user.GuildPermissions);
+               || user.Roles
+                   .Any(role => _options.ImageBurstSpamAllowlistedRoleIds.Contains(role.Id))
+               || HasStaffPermissions(user.GuildPermissions);
     }
 
     private void Subscribe()
@@ -109,7 +110,7 @@ public sealed class ImageBurstSpamGatewayHandler(
         if (userMessage.Author is not SocketGuildUser guildUser)
             return new None();
 
-        if (!settingsByGuild.TryGetValue(key: channel.Guild.Id, out var currentSettings))
+        if (settings.Current(channel.Guild.Id).Value is not Some<ImageBurstSpamDetectorOptions>(var currentSettings))
             return new None();
 
         if (userMessage.Attachments.Count < currentSettings.RequiredAttachmentCount)
@@ -118,10 +119,16 @@ public sealed class ImageBurstSpamGatewayHandler(
         if (IsExempt(guildUser))
             return new None();
 
-        ImageBurstAttachment[] attachments =
-            userMessage.Attachments.Select(x => new ImageBurstAttachment(x.Url)).ToArray();
+        ImageBurstAttachment[] attachments = userMessage.Attachments
+            .Select(x => new ImageBurstAttachment(x.Url))
+            .ToArray();
 
         return new Some<ImageBurstMessage>(
-            new ImageBurstMessage(GuildId: channel.Guild.Id, UserId: guildUser.Id, ChannelId: channel.Id, Timestamp: userMessage.Timestamp, Attachments: attachments));
+            new ImageBurstMessage(
+                GuildId: channel.Guild.Id,
+                UserId: guildUser.Id,
+                ChannelId: channel.Id,
+                Timestamp: userMessage.Timestamp,
+                Attachments: attachments));
     }
 }

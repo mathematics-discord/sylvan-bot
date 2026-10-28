@@ -1,18 +1,23 @@
 ﻿using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Features.RoleColours;
 using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Features.RoleColours;
 
 // Live Discord roles are the equipped state. Colour writes are serialized per guild.
-public sealed class RoleColourReconciler(
-    IDbContextFactory<BotDbContext> dbContextFactory,
-    ILogger logger,
-    DiscordSocketClient discordClient)
+public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbContextFactory, ILogger logger, DiscordSocketClient discordClient)
+    : IDisposable
 {
-    private readonly ConcurrentDictionary<ulong, SemaphoreSlim> guildGates = new();
+    private readonly ConcurrentDictionary<ulong, SemaphoreSlim> _guildGates = new ConcurrentDictionary<ulong, SemaphoreSlim>();
 
-    private readonly ILogger logger = logger.ForContext<RoleColourReconciler>();
+    private readonly ILogger _logger = logger.ForContext<RoleColourReconciler>();
+
+    public void Dispose()
+    {
+        foreach (var gate in _guildGates.Values)
+            gate.Dispose();
+    }
 
     public async Task<ImmutableArray<IRole>> ListEligibleColoursAsync(IGuild guild, ulong userId, CancellationToken ct)
     {
@@ -23,13 +28,9 @@ public sealed class RoleColourReconciler(
             : [];
     }
 
-    public async Task<ErrorOr<Option<ulong>>> TrySetUserColourAsync(
-        IGuild guild,
-        ulong userId,
-        ulong? colourId,
-        CancellationToken ct)
+    public async Task<ErrorOr<Option<ulong>>> TrySetUserColourAsync(IGuild guild, ulong userId, ulong? colourId, CancellationToken ct)
     {
-        var gate = guildGates.GetOrAdd(key: guild.Id, _ => new SemaphoreSlim(initialCount: 1, maxCount: 1));
+        var gate = _guildGates.GetOrAdd(key: guild.Id, _ => new SemaphoreSlim(initialCount: 1, maxCount: 1));
         await gate.WaitAsync(ct);
 
         try
@@ -42,15 +43,13 @@ public sealed class RoleColourReconciler(
         }
         catch (Exception ex)
         {
-            logger.Error(
+            _logger.Error(
                 exception: ex,
                 "Role colour update incomplete for guild {GuildId}, member {MemberId}",
                 propertyValue0: guild.Id,
                 propertyValue1: userId);
 
-            return Error.Failure(
-                description:
-                "Discord could not complete the colour update. Your roles may have changed; please try again.");
+            return Error.Failure(description: "Discord could not complete the colour update. Your roles may have changed; please try again.");
         }
         finally
         {
@@ -62,15 +61,20 @@ public sealed class RoleColourReconciler(
         IGuild guild,
         ulong userId,
         CancellationToken ct,
-        IReadOnlyCollection<ulong>? previousRoleIds = null,
-        ImmutableArray<RoleColourOption> previousMappings = default)
+        Option<ImmutableArray<ulong>> previousRoleIds,
+        Option<ImmutableArray<RoleColourOption>> previousMappings)
     {
-        var gate = guildGates.GetOrAdd(key: guild.Id, _ => new SemaphoreSlim(initialCount: 1, maxCount: 1));
+        var gate = _guildGates.GetOrAdd(key: guild.Id, _ => new SemaphoreSlim(initialCount: 1, maxCount: 1));
         await gate.WaitAsync(ct);
 
         try
         {
-            return await ProcessRoleColourReconciliation(guild: guild, userId: userId, previousRoleIds: previousRoleIds, previousMappings: previousMappings, ct: ct);
+            return await ProcessRoleColourReconciliation(
+                guild: guild,
+                userId: userId,
+                previousRoleIds: previousRoleIds,
+                previousMappings: previousMappings,
+                ct: ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -78,15 +82,13 @@ public sealed class RoleColourReconciler(
         }
         catch (Exception ex)
         {
-            logger.Error(
+            _logger.Error(
                 exception: ex,
                 "Role colour update incomplete for guild {GuildId}, member {MemberId}",
                 propertyValue0: guild.Id,
                 propertyValue1: userId);
 
-            return Error.Failure(
-                description:
-                "Discord could not complete the colour update. Your roles may have changed; please try again.");
+            return Error.Failure(description: "Discord could not complete the colour update. Your roles may have changed; please try again.");
         }
         finally
         {
@@ -95,15 +97,12 @@ public sealed class RoleColourReconciler(
     }
 
     // Old mappings are a temporary snapshot from the admin command, never persisted.
-    public async Task<int> ReconcileGuildAsync(
-        IGuild guild,
-        CancellationToken ct,
-        ImmutableArray<RoleColourOption> previousMappings = default)
+    public async Task<int> ReconcileGuildAsync(IGuild guild, CancellationToken ct, Option<ImmutableArray<RoleColourOption>> previousMappings)
     {
         try
         {
             ImmutableArray<RoleColourOption> current = await ReadMappingsAsync(guildId: guild.Id, ct: ct);
-            ImmutableArray<RoleColourOption> old     = previousMappings.IsDefault ? [] : previousMappings;
+            ImmutableArray<RoleColourOption> old = previousMappings.Value is Some<ImmutableArray<RoleColourOption>>(var supplied) ? supplied : [];
 
             if (current.IsEmpty && old.IsEmpty)
                 return 0;
@@ -117,13 +116,15 @@ public sealed class RoleColourReconciler(
             IReadOnlyCollection<IGuildUser> members = await guild.GetUsersAsync(
                 mode: CacheMode.AllowDownload,
                 new RequestOptions { CancelToken = ct });
-
             var incomplete = 0;
 
             foreach (var member in members)
             {
-                var participates = HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: current).Any();
-                var participated = HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: old).Any();
+                var participates = HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: current)
+                    .Any();
+
+                var participated = HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: old)
+                    .Any();
 
                 if (!participates && !participated)
                     continue;
@@ -132,8 +133,10 @@ public sealed class RoleColourReconciler(
                     guild: guild,
                     userId: member.Id,
                     ct: ct,
-                    previousRoleIds: member.RoleIds,
-                    previousMappings: old);
+                    previousRoleIds: new Some<ImmutableArray<ulong>>(
+                        member.RoleIds
+                            .ToImmutableArray()),
+                    previousMappings: new Some<ImmutableArray<RoleColourOption>>(old));
 
                 if (result.IsError)
                     incomplete++;
@@ -147,7 +150,7 @@ public sealed class RoleColourReconciler(
         }
         catch (Exception ex)
         {
-            logger.Error(exception: ex, "Role colour guild check incomplete for guild {GuildId}", propertyValue: guild.Id);
+            _logger.Error(exception: ex, "Role colour guild check incomplete for guild {GuildId}", propertyValue: guild.Id);
 
             return 1;
         }
@@ -176,27 +179,26 @@ public sealed class RoleColourReconciler(
         return Result.Success;
     }
 
-    private static ImmutableArray<IRole> EligibleColours(
-        IGuild guild,
-        IReadOnlyCollection<ulong> roles,
-        ImmutableArray<RoleColourOption> mappings) =>
+    private static ImmutableArray<IRole> EligibleColours(IGuild guild, IReadOnlyCollection<ulong> roles, ImmutableArray<RoleColourOption> mappings) =>
     [
         .. HeldGrants(guildId: guild.Id, roles: roles, mappings: mappings)
-           .Where(o => !ValidateMapping(guild: guild, sourceId: o.SourceRoleId, colourId: o.DisplayRoleId).IsError)
-           .Select(o => guild.GetRole(o.DisplayRoleId))
-           .DistinctBy(role => role.Id)
-           .OrderBy(role => role.Name, comparer: StringComparer.OrdinalIgnoreCase)
-           .ThenBy(role => role.Id),
+            .Where(o => !ValidateMapping(guild: guild, sourceId: o.SourceRoleId, colourId: o.DisplayRoleId).IsError)
+            .Select(o => guild.GetRole(o.DisplayRoleId))
+            .DistinctBy(role => role.Id)
+            .OrderBy(role => role.Name, comparer: StringComparer.OrdinalIgnoreCase)
+            .ThenBy(role => role.Id),
     ];
 
-    private static bool HoldsSource(ulong guildId, IReadOnlyCollection<ulong> roles, ulong sourceId) => sourceId == guildId || roles.Contains(sourceId);
+    private static bool HoldsSource(ulong guildId, IReadOnlyCollection<ulong> roles, ulong sourceId) =>
+        sourceId == guildId || roles.Contains(sourceId);
 
     private static IEnumerable<RoleColourOption> HeldGrants(
         ulong guildId,
         IReadOnlyCollection<ulong> roles,
         ImmutableArray<RoleColourOption> mappings)
     {
-        return mappings.Where(o => HoldsSource(guildId: guildId, roles: roles, sourceId: o.SourceRoleId));
+        return mappings
+            .Where(o => HoldsSource(guildId: guildId, roles: roles, sourceId: o.SourceRoleId));
     }
 
     private static async Task RemoveColoursAsync(IGuildUser member, IEnumerable<ulong> colours, RequestOptions request)
@@ -208,25 +210,22 @@ public sealed class RoleColourReconciler(
     private static Option<ulong> SoleColour(HashSet<ulong> colours) => colours.Count == 1 ? new Some<ulong>(colours.Single()) : new None();
 
     private static Error RolesChangedError() =>
-        Error.Failure(
-            description: "Discord roles changed during the update. Please check your roles and try again.");
+        Error.Failure(description: "Discord roles changed during the update. Please check your roles and try again.");
 
-    private static HashSet<ulong> ManagedDisplayRoles(
-        IReadOnlyCollection<ulong> roles,
-        IEnumerable<RoleColourOption> mappings)
+    private static HashSet<ulong> ManagedDisplayRoles(IReadOnlyCollection<ulong> roles, IEnumerable<RoleColourOption> mappings)
     {
-        HashSet<ulong> displayRoleIds = mappings.Select(mapping => mapping.DisplayRoleId).ToHashSet();
+        HashSet<ulong> displayRoleIds = mappings
+            .Select(mapping => mapping.DisplayRoleId)
+            .ToHashSet();
 
-        return roles.Where(displayRoleIds.Contains).ToHashSet();
+        return roles
+            .Where(displayRoleIds.Contains)
+            .ToHashSet();
     }
 
-    private async Task<ErrorOr<Option<ulong>>> SetUserColourAsync(
-        IGuild guild,
-        ulong userId,
-        ulong? colourId,
-        CancellationToken ct)
+    private async Task<ErrorOr<Option<ulong>>> SetUserColourAsync(IGuild guild, ulong userId, ulong? colourId, CancellationToken ct)
     {
-        var                request      = new RequestOptions { CancelToken = ct };
+        var request = new RequestOptions { CancelToken = ct };
         Option<IGuildUser> memberResult = await ReadMemberAsync(guild: guild, userId: userId, request: request);
 
         if (memberResult.Value is not Some<IGuildUser>(var member))
@@ -238,13 +237,17 @@ public sealed class RoleColourReconciler(
         {
             ImmutableArray<IRole> eligible = EligibleColours(guild: guild, roles: member.RoleIds, mappings: mappings);
 
-            if (!eligible.Any(role => role.Id == colourId.Value))
+            if (!eligible
+                    .Any(role => role.Id == colourId.Value))
                 return Error.Validation(description: "That colour is no longer available to you.");
         }
 
-        HashSet<ulong> worn      = ManagedDisplayRoles(roles: member.RoleIds, mappings: mappings);
-        HashSet<ulong> remove    = worn.Where(id => id != colourId).ToHashSet();
-        var            addColour = colourId.HasValue && !worn.Contains(colourId.Value);
+        HashSet<ulong> worn = ManagedDisplayRoles(roles: member.RoleIds, mappings: mappings);
+
+        HashSet<ulong> remove = worn
+            .Where(id => id != colourId)
+            .ToHashSet();
+        var addColour = colourId.HasValue && !worn.Contains(colourId.Value);
 
         if (remove.Count == 0 && !addColour)
             return SoleColour(worn);
@@ -275,38 +278,37 @@ public sealed class RoleColourReconciler(
     private async Task<ErrorOr<Option<ulong>>> ProcessRoleColourReconciliation(
         IGuild guild,
         ulong userId,
-        IReadOnlyCollection<ulong>? previousRoleIds,
-        ImmutableArray<RoleColourOption> previousMappings,
+        Option<ImmutableArray<ulong>> previousRoleIds,
+        Option<ImmutableArray<RoleColourOption>> previousMappings,
         CancellationToken ct)
     {
-        var                request      = new RequestOptions { CancelToken = ct };
+        var request = new RequestOptions { CancelToken = ct };
         Option<IGuildUser> memberResult = await ReadMemberAsync(guild: guild, userId: userId, request: request);
 
         if (memberResult.Value is not Some<IGuildUser>(var member))
             return Error.NotFound(description: "The member is no longer in this guild.");
 
         ImmutableArray<RoleColourOption> mappings = await ReadMappingsAsync(guildId: guild.Id, ct: ct);
-        ImmutableArray<RoleColourOption> old      = previousMappings.IsDefault ? mappings : previousMappings;
-        HashSet<ulong>                   worn     = ManagedDisplayRoles(roles: member.RoleIds, mappings.Concat(old));
-        HashSet<ulong>                   remove;
+        ImmutableArray<RoleColourOption> old = previousMappings.Value is Some<ImmutableArray<RoleColourOption>>(var supplied) ? supplied : mappings;
 
-        if (HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: mappings).Any())
-        {
-            Option<ulong>         currentColour = SoleColour(worn);
-            ImmutableArray<IRole> eligible      = EligibleColours(guild: guild, roles: member.RoleIds, mappings: mappings);
+        HashSet<ulong> worn = ManagedDisplayRoles(
+            roles: member.RoleIds,
+            mappings
+                .Concat(old));
 
-            if (currentColour.Value is Some<ulong>(var colour) && eligible.Any(role => role.Id == colour))
-                return currentColour;
+        var holdsGrant = HeldGrants(guild.Id, member.RoleIds, mappings)
+            .Any();
 
-            remove = worn;
-        }
-        else
-        {
-            IReadOnlyCollection<ulong> before          = previousRoleIds ?? member.RoleIds;
-            HashSet<ulong>             previousColours = HeldGrants(guildId: guild.Id, roles: before, mappings: old).Select(o => o.DisplayRoleId).ToHashSet();
+        HashSet<ulong> eligible = EligibleColours(guild, member.RoleIds, mappings)
+            .Select(role => role.Id)
+            .ToHashSet();
 
-            remove = [.. worn.Intersect(previousColours)];
-        }
+        IReadOnlyCollection<ulong> before = previousRoleIds.Value is Some<ImmutableArray<ulong>>(var roles) ? roles : member.RoleIds;
+
+        HashSet<ulong> previouslyGranted = HeldGrants(guild.Id, before, old)
+            .Select(mapping => mapping.DisplayRoleId)
+            .ToHashSet();
+        IReadOnlySet<ulong> remove = RoleColourSelection.Removals(worn, holdsGrant, eligible, previouslyGranted);
 
         if (remove.Count == 0)
             return SoleColour(worn);
@@ -317,7 +319,10 @@ public sealed class RoleColourReconciler(
         if (actualResult.Value is not Some<IGuildUser>(var actual))
             return RolesChangedError();
 
-        HashSet<ulong> actualColours = ManagedDisplayRoles(roles: actual.RoleIds, mappings.Concat(old));
+        HashSet<ulong> actualColours = ManagedDisplayRoles(
+            roles: actual.RoleIds,
+            mappings
+                .Concat(old));
 
         if (actualColours.Overlaps(remove))
             return RolesChangedError();
@@ -329,14 +334,21 @@ public sealed class RoleColourReconciler(
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(ct);
 
-        return [.. await db.RoleColourOptions.AsNoTracking().Where(o => o.GuildId == guildId).ToArrayAsync(ct)];
+        RoleColourOption[] mappings = await db.RoleColourOptions
+            .AsNoTracking()
+            .Where(o => o.GuildId == guildId)
+            .ToArrayAsync(ct);
+
+        return mappings
+            .ToImmutableArray();
     }
 
     private async Task<Option<IGuildUser>> ReadMemberAsync(IGuild guild, ulong userId, RequestOptions request)
     {
-        var member = guild is SocketGuild
-            ? await discordClient.Rest.GetGuildUserAsync(guildId: guild.Id, id: userId, options: request)
-            : await guild.GetUserAsync(id: userId, mode: CacheMode.AllowDownload, options: request);
+        var member =
+            guild is SocketGuild
+                ? await discordClient.Rest.GetGuildUserAsync(guildId: guild.Id, id: userId, options: request)
+                : await guild.GetUserAsync(id: userId, mode: CacheMode.AllowDownload, options: request);
 
         return member is null ? new None() : new Some<IGuildUser>(member);
     }

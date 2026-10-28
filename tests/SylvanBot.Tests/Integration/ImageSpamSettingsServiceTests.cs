@@ -1,5 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using SylvanBot.Application.Common;
@@ -21,22 +20,27 @@ public sealed class ImageSpamSettingsServiceTests
     public async Task UpsertAsync_NewGuildWithUnspecifiedValues_PersistsAndPublishesDefaults()
     {
         // Arrange
-        await using var                                            db              = PostgresDatabaseFixture.CreateDbContext();
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
-        var                                                        service         = new ImageSpamSettingsService(dbContext: db, settingsByGuild: settingsByGuild);
+        await using var db = PostgresDatabaseFixture.CreateDbContext();
+        using var service = new ImageSpamSettingsService(PostgresDatabaseFixture.CreateContextFactory());
+        await service.LoadEnabledSettingsAsync(CancellationToken.None);
 
         // Act
-        var result = await service.UpsertAsync(guildId: 1, requiredChannelCount: null, requiredAttachmentCount: null, burstDurationSeconds: null, ct: CancellationToken.None);
-
+        var result = await service.UpsertAsync(
+            guildId: 1,
+            requiredChannelCount: null,
+            requiredAttachmentCount: null,
+            burstDurationSeconds: null,
+            ct: CancellationToken.None);
         // Assert
-        await using var readback  = PostgresDatabaseFixture.CreateDbContext();
-        var             persisted = await readback.ImageSpamSettings.SingleAsync(x => x.GuildId == 1);
+        await using var readback = PostgresDatabaseFixture.CreateDbContext();
 
-        (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds)
-           .ShouldBe((4, 2, 45));
+        var persisted = await readback.ImageSpamSettings
+            .SingleAsync(x => x.GuildId == 1);
+
+        (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds).ShouldBe((4, 2, 45));
         persisted.IsEnabled.ShouldBeTrue();
         (result.DistinctChannelThreshold, result.RequiredAttachmentCount, result.Window).ShouldBe((4, 2, 45));
-        settingsByGuild.TryGetValue(key: 1, out var published).ShouldBeTrue();
+        var published = service.Current(1).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
         published.ShouldBe(result);
     }
 
@@ -52,30 +56,35 @@ public sealed class ImageSpamSettingsServiceTests
         int expectedSeconds)
     {
         // Arrange
-        await using var db       = PostgresDatabaseFixture.CreateDbContext();
-        var             settings = ImageSpamSettings.CreateDefault(1);
+        await using var db = PostgresDatabaseFixture.CreateDbContext();
+        var settings = ImageSpamSettings.CreateDefault(1);
         settings.Update(requiredChannelCount: 5, requiredAttachmentCount: 3, burstDurationSeconds: 60);
         settings.Disable();
         db.ImageSpamSettings.Add(settings);
         await db.SaveChangesAsync();
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
-        var                                                        service         = new ImageSpamSettingsService(dbContext: db, settingsByGuild: settingsByGuild);
+        using var service = new ImageSpamSettingsService(PostgresDatabaseFixture.CreateContextFactory());
+        await service.LoadEnabledSettingsAsync(CancellationToken.None);
 
         // Act
-        var result =
-            await service.UpsertAsync(guildId: 1, requiredChannelCount: channels, requiredAttachmentCount: attachments, burstDurationSeconds: seconds, ct: CancellationToken.None);
-
+        var result = await service.UpsertAsync(
+            guildId: 1,
+            requiredChannelCount: channels,
+            requiredAttachmentCount: attachments,
+            burstDurationSeconds: seconds,
+            ct: CancellationToken.None);
         // Assert
-        await using var readback  = PostgresDatabaseFixture.CreateDbContext();
-        var             persisted = await readback.ImageSpamSettings.SingleAsync(x => x.GuildId == 1);
+        await using var readback = PostgresDatabaseFixture.CreateDbContext();
 
-        (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds)
-           .ShouldBe((expectedChannels, expectedAttachments, expectedSeconds));
+        var persisted = await readback.ImageSpamSettings
+            .SingleAsync(x => x.GuildId == 1);
+
+        (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds).ShouldBe(
+            (expectedChannels, expectedAttachments, expectedSeconds));
         persisted.IsEnabled.ShouldBeTrue();
 
-        (result.DistinctChannelThreshold, result.RequiredAttachmentCount, result.Window)
-           .ShouldBe((expectedChannels, expectedAttachments, expectedSeconds));
-        settingsByGuild.TryGetValue(key: 1, out var published).ShouldBeTrue();
+        (result.DistinctChannelThreshold, result.RequiredAttachmentCount, result.Window).ShouldBe(
+            (expectedChannels, expectedAttachments, expectedSeconds));
+        var published = service.Current(1).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
         published.ShouldBe(result);
     }
 
@@ -83,14 +92,14 @@ public sealed class ImageSpamSettingsServiceTests
     public async Task GetCurrentAsync_EnabledSettings_ReturnsAndPublishesStoredValues()
     {
         // Arrange
-        await using var db       = PostgresDatabaseFixture.CreateDbContext();
-        var             settings = ImageSpamSettings.CreateDefault(1);
+        await using var db = PostgresDatabaseFixture.CreateDbContext();
+        var settings = ImageSpamSettings.CreateDefault(1);
         settings.Update(requiredChannelCount: 6, requiredAttachmentCount: 3, burstDurationSeconds: 90);
         db.ImageSpamSettings.Add(settings);
         await db.SaveChangesAsync();
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
-        settingsByGuild[1] = new ImageBurstSpamDetectorOptions();
-        var service = new ImageSpamSettingsService(dbContext: db, settingsByGuild: settingsByGuild);
+
+        using var service = new ImageSpamSettingsService(PostgresDatabaseFixture.CreateContextFactory());
+        await service.LoadEnabledSettingsAsync(CancellationToken.None);
 
         // Act
         Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(guildId: 1, ct: CancellationToken.None);
@@ -100,7 +109,7 @@ public sealed class ImageSpamSettingsServiceTests
         current.DistinctChannelThreshold.ShouldBe(6);
         current.RequiredAttachmentCount.ShouldBe(3);
         current.Window.ShouldBe(90);
-        settingsByGuild.TryGetValue(key: 1, out var published).ShouldBeTrue();
+        var published = service.Current(1).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
         published.ShouldBe(current);
     }
 
@@ -109,20 +118,24 @@ public sealed class ImageSpamSettingsServiceTests
     {
         // Arrange
         await using var db = PostgresDatabaseFixture.CreateDbContext();
+        var settings = ImageSpamSettings.CreateDefault(1);
+        db.ImageSpamSettings.Add(settings);
+        await db.SaveChangesAsync();
 
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild   = new();
-        var                                                        otherGuildOptions = new ImageBurstSpamDetectorOptions { Window = 90 };
-        settingsByGuild[1] = new ImageBurstSpamDetectorOptions();
-        settingsByGuild[2] = otherGuildOptions;
-        var service = new ImageSpamSettingsService(dbContext: db, settingsByGuild: settingsByGuild);
+        using var service = new ImageSpamSettingsService(PostgresDatabaseFixture.CreateContextFactory());
+        await service.LoadEnabledSettingsAsync(CancellationToken.None);
+        db.ImageSpamSettings.Remove(settings);
+        await db.SaveChangesAsync();
+
+        var otherGuildOptions = await service.UpsertAsync(2, null, null, 90, CancellationToken.None);
 
         // Act
         Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(guildId: 1, ct: CancellationToken.None);
 
         // Assert
         result.Value.ShouldBeOfType<None>();
-        settingsByGuild.TryGetValue(key: 1, value: out _).ShouldBeFalse();
-        settingsByGuild.TryGetValue(key: 2, out var otherGuild).ShouldBeTrue();
+        service.Current(1).Value.ShouldBeOfType<None>();
+        var otherGuild = service.Current(2).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
         otherGuild.ShouldBe(otherGuildOptions);
     }
 
@@ -130,25 +143,25 @@ public sealed class ImageSpamSettingsServiceTests
     public async Task GetCurrentAsync_DisabledSettings_ReturnsNoneAndRemovesOnlyRequestedGuildConfiguration()
     {
         // Arrange
-        await using var db       = PostgresDatabaseFixture.CreateDbContext();
-        var             settings = ImageSpamSettings.CreateDefault(1);
-        settings.Disable();
+        await using var db = PostgresDatabaseFixture.CreateDbContext();
+        var settings = ImageSpamSettings.CreateDefault(1);
         db.ImageSpamSettings.Add(settings);
         await db.SaveChangesAsync();
 
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild   = new();
-        var                                                        otherGuildOptions = new ImageBurstSpamDetectorOptions { Window = 90 };
-        settingsByGuild[1] = new ImageBurstSpamDetectorOptions();
-        settingsByGuild[2] = otherGuildOptions;
-        var service = new ImageSpamSettingsService(dbContext: db, settingsByGuild: settingsByGuild);
+        using var service = new ImageSpamSettingsService(PostgresDatabaseFixture.CreateContextFactory());
+        await service.LoadEnabledSettingsAsync(CancellationToken.None);
+        settings.Disable();
+        await db.SaveChangesAsync();
+
+        var otherGuildOptions = await service.UpsertAsync(2, null, null, 90, CancellationToken.None);
 
         // Act
         Option<ImageBurstSpamDetectorOptions> result = await service.GetCurrentAsync(guildId: 1, ct: CancellationToken.None);
 
         // Assert
         result.Value.ShouldBeOfType<None>();
-        settingsByGuild.TryGetValue(key: 1, value: out _).ShouldBeFalse();
-        settingsByGuild.TryGetValue(key: 2, out var otherGuild).ShouldBeTrue();
+        service.Current(1).Value.ShouldBeOfType<None>();
+        var otherGuild = service.Current(2).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
         otherGuild.ShouldBe(otherGuildOptions);
     }
 
@@ -156,26 +169,26 @@ public sealed class ImageSpamSettingsServiceTests
     public async Task LoadEnabledSettingsAsync_EnabledAndDisabledGuilds_PublishesOnlyEnabledSettings()
     {
         // Arrange
-        await using var db            = PostgresDatabaseFixture.CreateDbContext();
-        var             firstGuild    = ImageSpamSettings.CreateDefault(1);
-        var             disabledGuild = ImageSpamSettings.CreateDefault(2);
+        await using var db = PostgresDatabaseFixture.CreateDbContext();
+        var firstGuild = ImageSpamSettings.CreateDefault(1);
+        var disabledGuild = ImageSpamSettings.CreateDefault(2);
         disabledGuild.Disable();
         var thirdGuild = ImageSpamSettings.CreateDefault(3);
         thirdGuild.Update(requiredChannelCount: 6, requiredAttachmentCount: 3, burstDurationSeconds: 90);
         db.ImageSpamSettings.AddRange(firstGuild, disabledGuild, thirdGuild);
         await db.SaveChangesAsync();
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
-        var                                                        service         = new ImageSpamSettingsService(dbContext: db, settingsByGuild: settingsByGuild);
+        using var service = new ImageSpamSettingsService(PostgresDatabaseFixture.CreateContextFactory());
+        await service.LoadEnabledSettingsAsync(CancellationToken.None);
 
         // Act
         await service.LoadEnabledSettingsAsync(CancellationToken.None);
 
         // Assert
-        settingsByGuild.TryGetValue(key: 1, out var first).ShouldBeTrue();
+        var first = service.Current(1).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
         first.ShouldNotBeNull();
         (first.DistinctChannelThreshold, first.RequiredAttachmentCount, first.Window).ShouldBe((4, 2, 45));
-        settingsByGuild.TryGetValue(key: 2, value: out _).ShouldBeFalse();
-        settingsByGuild.TryGetValue(key: 3, out var third).ShouldBeTrue();
+        service.Current(2).Value.ShouldBeOfType<None>();
+        var third = service.Current(3).Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
         third.ShouldNotBeNull();
         (third.DistinctChannelThreshold, third.RequiredAttachmentCount, third.Window).ShouldBe((6, 3, 90));
     }
@@ -185,43 +198,50 @@ public sealed class ImageSpamSettingsServiceTests
     public async Task UpsertAsync_SaveFails_DoesNotPublishUnpersistedSettings(bool hasExistingSettings)
     {
         // Arrange
-        await using var                                            db              = PostgresDatabaseFixture.CreateDbContext();
-        ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild = new();
+        await using var db = PostgresDatabaseFixture.CreateDbContext();
 
         if (hasExistingSettings)
         {
             db.ImageSpamSettings.Add(ImageSpamSettings.CreateDefault(1));
             await db.SaveChangesAsync();
-            settingsByGuild[1] = new ImageBurstSpamDetectorOptions();
         }
 
-        var service = new ImageSpamSettingsService(dbContext: db, settingsByGuild: settingsByGuild);
+        using var service = new ImageSpamSettingsService(PostgresDatabaseFixture.CreateContextFactory());
+        await service.LoadEnabledSettingsAsync(CancellationToken.None);
 
         // Act
         var exception = await Should.ThrowAsync<DbUpdateException>(() =>
-                                                                       service.UpsertAsync(guildId: 1, requiredChannelCount: 0, requiredAttachmentCount: null, burstDurationSeconds: null, ct: CancellationToken.None));
-
+            service.UpsertAsync(
+                guildId: 1,
+                requiredChannelCount: 0,
+                requiredAttachmentCount: null,
+                burstDurationSeconds: null,
+                ct: CancellationToken.None));
         // Assert
         var postgresException = exception.InnerException.ShouldBeOfType<PostgresException>();
         postgresException.SqlState.ShouldBe(PostgresErrorCodes.CheckViolation);
         postgresException.ConstraintName.ShouldBe("CK_ImageSpamSettings_RequiredChannelCount_Positive");
-        await using var readback  = PostgresDatabaseFixture.CreateDbContext();
-        var             persisted = await readback.ImageSpamSettings.SingleOrDefaultAsync(x => x.GuildId == 1);
-        settingsByGuild.TryGetValue(key: 1, out var published).ShouldBe(hasExistingSettings);
+        await using var readback = PostgresDatabaseFixture.CreateDbContext();
+
+        var persisted = await readback.ImageSpamSettings
+            .SingleOrDefaultAsync(x => x.GuildId == 1);
+        Option<ImageBurstSpamDetectorOptions> published = service.Current(1);
+        (published.Value is Some<ImageBurstSpamDetectorOptions>).ShouldBe(hasExistingSettings);
 
         if (hasExistingSettings)
         {
             persisted.ShouldNotBeNull();
 
-            (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds)
-               .ShouldBe((4, 2, 45));
-            persisted.IsEnabled.ShouldBeTrue();
-            published.ShouldNotBeNull();
+            (persisted.RequiredChannelCount, persisted.RequiredAttachmentCount, persisted.BurstDurationSeconds).ShouldBe((4, 2, 45));
 
-            (published.DistinctChannelThreshold, published.RequiredAttachmentCount, published.Window)
-               .ShouldBe((4, 2, 45));
+            persisted.IsEnabled.ShouldBeTrue();
+            var current = published.Value.ShouldBeOfType<Some<ImageBurstSpamDetectorOptions>>().Value;
+
+            (current.DistinctChannelThreshold, current.RequiredAttachmentCount, current.Window).ShouldBe((4, 2, 45));
         }
         else
+        {
             persisted.ShouldBeNull();
+        }
     }
 }

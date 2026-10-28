@@ -1,5 +1,5 @@
 ---
-title: /spam image-spam-config
+title: /config image-spam
 description: View or adjust detection of image bursts across several channels.
 ---
 
@@ -8,7 +8,7 @@ Run this command in a server. Replies are visible only to you.
 ## View the settings
 
 ```text
-/spam image-spam-config
+/config image-spam
 ```
 
 Sylvan shows the current settings, or says that image spam detection has
@@ -17,7 +17,7 @@ not been configured for the server.
 ## Change the settings
 
 ```text
-/spam image-spam-config number-of-channels:3 attachment-count:2 burst-duration:10
+/config image-spam number-of-channels:3 attachment-count:2 burst-duration:10
 ```
 
 | Option | Meaning |

@@ -1,5 +1,5 @@
 ---
-title: /colour-admin
+title: /config colour
 description: Configure which roles grant access to display colours.
 ---
 
@@ -17,8 +17,8 @@ Create a mapping, or change an existing mapping by supplying its ID.
 Both roles must already exist in the server.
 
 ```text
-/colour-admin upsert source:@Members display:@Purple
-/colour-admin upsert source:@Members display:@Purple id:12
+/config colour upsert source:@Members display:@Purple
+/config colour upsert source:@Members display:@Purple id:12
 ```
 
 - `source` is required. Choose the role that grants access. It must
@@ -44,7 +44,7 @@ a mapping does not automatically give them a new display role.
 Remove a mapping using its ID from `/colour list`.
 
 ```text
-/colour-admin delete id:12
+/config colour delete id:12
 ```
 
 `id` is required and must be a positive number belonging to a mapping
@@ -61,7 +61,7 @@ Check display colour roles for members who currently hold a configured
 source role. There are no options.
 
 ```text
-/colour-admin sync
+/config colour sync
 ```
 
 Sylvan keeps a member's display colour if they have exactly one configured

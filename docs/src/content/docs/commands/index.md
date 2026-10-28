@@ -38,12 +38,12 @@ and instructions.
 - [/config sylvanmail](./sylvanmail/#administrator-configuration) — Select
   the private mail forum and staff role.
 
-- [/colour-admin](./color-admin/) — Configure which roles grant access
+- [/config colour](./color-admin/) — Configure which roles grant access
   to display colours and check members' colour roles.
 
-- [/logging](./logging/) — Choose log destinations and channel exclusions.
+- [/config logs](./logging/) — Choose log destinations and channel exclusions.
 
-- [/spam image-spam-config](./spam/) — View or adjust image burst detection.
+- [/config image-spam](./spam/) — View or adjust image burst detection.
 
-- [/working-conditions](./working-conditions/) — Configure eligible roles,
+- [/config working-hours](./working-conditions/) — Configure eligible roles,
   exemptions and the ping role used by Working Hours.

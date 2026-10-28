@@ -1,9 +1,6 @@
 ﻿namespace SylvanBot.Features.WorkingHours;
 
-public sealed class WorkingHoursWorker(
-    DiscordSocketClient client,
-    WorkingHoursCoordinator coordinator,
-    ILogger logger) : BackgroundService
+public sealed class WorkingHoursWorker(DiscordSocketClient client, WorkingHoursReconciler coordinator, ILogger logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {

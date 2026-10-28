@@ -49,4 +49,4 @@ use. Listing a colour does not give you access to it or apply it.
 If there are no mappings, Sylvan tells you that no colour options are configured.
 
 Administrators can use the mapping IDs to change or remove mappings with
-[/colour-admin](../color-admin/).
+[/config colour](../color-admin/).

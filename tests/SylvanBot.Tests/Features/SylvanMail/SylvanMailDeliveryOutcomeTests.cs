@@ -1,0 +1,62 @@
+﻿using SylvanBot.Application.Common;
+using SylvanBot.Application.Features.SylvanMail;
+
+namespace SylvanBot.Tests.Features.SylvanMail;
+
+public sealed class SylvanMailDeliveryOutcomeTests
+{
+    [Test]
+    public void FromFailure_UnconfirmedSendAfterAcceptedParts_RemainsUncertain()
+    {
+        // Arrange
+        Option<string> refusal = new None();
+
+        // Act
+        var outcome = SylvanMailDeliveryOutcome.FromFailure(2, uncertainDelivery: true, uncertainPost: false, refusal);
+
+        // Assert
+        outcome.State.ShouldBe("Uncertain");
+        outcome.Detail.ShouldContain("2 confirmed parts");
+    }
+
+    [Test]
+    public void FromFailure_DefiniteRefusalAfterAcceptedParts_IsPartial()
+    {
+        // Arrange
+        Option<string> refusal = new Some<string>("Discord refused this part.");
+
+        // Act
+        var outcome = SylvanMailDeliveryOutcome.FromFailure(1, uncertainDelivery: true, uncertainPost: false, refusal);
+
+        // Assert
+        outcome.State.ShouldBe("Partial");
+        outcome.Detail.ShouldContain("Discord refused this part.");
+    }
+
+    [Test]
+    public void FromFailure_UnknownPostCreation_PreservesReconciliationRequirement()
+    {
+        // Arrange
+        Option<string> refusal = new None();
+
+        // Act
+        var outcome = SylvanMailDeliveryOutcome.FromFailure(0, uncertainDelivery: false, uncertainPost: true, refusal);
+
+        // Assert
+        outcome.State.ShouldBe("Uncertain");
+        outcome.Detail.ShouldContain("before any new post");
+    }
+
+    [Test]
+    public void FromFailure_BeforeAnySend_IsUnpublished()
+    {
+        // Arrange
+        Option<string> refusal = new None();
+
+        // Act
+        var outcome = SylvanMailDeliveryOutcome.FromFailure(0, uncertainDelivery: false, uncertainPost: false, refusal);
+
+        // Assert
+        outcome.State.ShouldBe("Unpublished");
+    }
+}

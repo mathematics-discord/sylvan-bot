@@ -1,5 +1,5 @@
 ---
-title: /working-conditions
+title: /config working-hours
 description: Configure the roles and availability rules used by Working Hours.
 ---
 
@@ -13,7 +13,7 @@ Sylvan adds or removes.
 ## Check the current configuration
 
 ```text
-/working-conditions show
+/config working-hours show
 ```
 
 Sylvan lists the enabled state, ping role, eligible roles and exemptions.
@@ -25,9 +25,9 @@ While scheduling is disabled, choose the ping role and add at least one
 eligible staff role:
 
 ```text
-/working-conditions disable
-/working-conditions ping-role role:@Moderators
-/working-conditions eligible-role action:add role:@CommunityModerators
+/config working-hours disable
+/config working-hours ping-role role:@Moderators
+/config working-hours eligible-role action:add role:@CommunityModerators
 ```
 
 - The ping role is the role Sylvan adds and removes as availability changes.
@@ -41,7 +41,7 @@ separately if you no longer want members to keep it.
 To remove an eligible role:
 
 ```text
-/working-conditions eligible-role action:remove role:@CommunityModerators
+/config working-hours eligible-role action:remove role:@CommunityModerators
 ```
 
 Remove its exemption first, if it has one. Disable scheduling before
@@ -52,8 +52,8 @@ removing the last eligible role.
 An eligible role can also be exempt:
 
 ```text
-/working-conditions exempt-role action:add role:@SeniorModerators
-/working-conditions exempt-role action:remove role:@SeniorModerators
+/config working-hours exempt-role action:add role:@SeniorModerators
+/config working-hours exempt-role action:remove role:@SeniorModerators
 ```
 
 Add the role to the eligible list before adding an exemption. For eligible
@@ -64,8 +64,8 @@ schedule still controls the ping role for someone with an exemption.
 ## Enable or suspend scheduling
 
 ```text
-/working-conditions enable
-/working-conditions disable
+/config working-hours enable
+/config working-hours disable
 ```
 
 Enabling requires a valid ping role and at least one eligible role. Disabling

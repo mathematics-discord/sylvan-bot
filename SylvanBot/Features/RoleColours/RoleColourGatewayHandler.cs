@@ -1,14 +1,14 @@
-using SylvanBot.Gateway;
+﻿using SylvanBot.Gateway;
 
 namespace SylvanBot.Features.RoleColours;
 
-public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, RoleColourReconciler colours)
+public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, RoleColourReconciler colours, IHostApplicationLifetime lifetime)
     : IDiscordGatewayHandler
 {
     public Task InitializeAsync(CancellationToken ct)
     {
         discordClient.GuildMemberUpdated += HandleMemberUpdatedAsync;
-        discordClient.UserJoined         += HandleMemberJoinedAsync;
+        discordClient.UserJoined += HandleMemberJoinedAsync;
 
         return Task.CompletedTask;
     }
@@ -16,18 +16,35 @@ public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, 
     public void Unsubscribe()
     {
         discordClient.GuildMemberUpdated -= HandleMemberUpdatedAsync;
-        discordClient.UserJoined         -= HandleMemberJoinedAsync;
+        discordClient.UserJoined -= HandleMemberJoinedAsync;
     }
 
     private async Task HandleMemberUpdatedAsync(Cacheable<SocketGuildUser, ulong> before, SocketGuildUser after)
     {
-        IReadOnlyCollection<ulong>? previous = before.HasValue ? ((IGuildUser)before.Value).RoleIds : null;
+        Option<ImmutableArray<ulong>> previous = new None();
 
-        if (previous is not null && previous.ToHashSet().SetEquals(((IGuildUser)after).RoleIds))
-            return;
+        if (before.HasValue)
+        {
+            ImmutableArray<ulong> roles = ((IGuildUser)before.Value).RoleIds
+                .ToImmutableArray();
 
-        await colours.ReconcileUserRolesAsync(guild: after.Guild, userId: after.Id, ct: CancellationToken.None, previousRoleIds: previous);
+            var unchanged = roles
+                .ToHashSet().SetEquals(((IGuildUser)after).RoleIds);
+
+            if (unchanged)
+                return;
+
+            previous = new Some<ImmutableArray<ulong>>(roles);
+        }
+
+        await colours.ReconcileUserRolesAsync(after.Guild, after.Id, lifetime.ApplicationStopping, previous, new None());
     }
 
-    private Task HandleMemberJoinedAsync(SocketGuildUser member) => colours.ReconcileUserRolesAsync(guild: member.Guild, userId: member.Id, ct: CancellationToken.None);
+    private Task HandleMemberJoinedAsync(SocketGuildUser member) =>
+        colours.ReconcileUserRolesAsync(
+            guild: member.Guild,
+            userId: member.Id,
+            ct: lifetime.ApplicationStopping,
+            previousRoleIds: new None(),
+            previousMappings: new None());
 }

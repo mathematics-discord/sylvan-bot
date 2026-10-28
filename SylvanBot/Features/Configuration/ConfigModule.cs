@@ -1,18 +1,21 @@
-using SylvanBot.Application.Features.SylvanMail;
-using SylvanBot.Interactions;
+﻿using SylvanBot.Application.Features.SylvanMail;
+using SylvanBot.Features.Moderation;
 using SylvanBot.Features.RoleReactions;
+using SylvanBot.Interactions;
 
-namespace SylvanBot.Features.SylvanMail;
+namespace SylvanBot.Features.Configuration;
 
 [Group("config", "Administrator-only bot configuration")]
 [CommandContextType(InteractionContextType.Guild)]
 [RequireContext(ContextType.Guild)]
 [DefaultMemberPermissions(GuildPermission.Administrator)]
 [RequireUserPermission(GuildPermission.Administrator)]
-public sealed class ConfigModule(
-    SylvanMailWorkflow workflow,
-    RoleReactionCoordinator roleReactions,
-    IHostApplicationLifetime lifetime) : SlashCommandBase
+public sealed partial class ConfigModule(
+    SylvanMailConfiguration workflow,
+    RoleReactionConfiguration roleReactions,
+    ImageSpamSettingsService settingsService,
+    IHostApplicationLifetime lifetime
+) : SlashCommandBase
 {
     [SlashCommand("sylvanmail", "Enable private SylvanMail in a forum and select its ping role")]
     public async Task SylvanMailAsync(
@@ -34,7 +37,8 @@ public sealed class ConfigModule(
 
         await ModifyOriginalResponseAsync(properties =>
         {
-            properties.Content         = $"SylvanMail enabled in <#{forum.Id}> for <@&{role.Id}>. Changes apply immediately; previous posts and mappings are retained.";
+            properties.Content =
+                $"SylvanMail enabled in <#{forum.Id}> for <@&{role.Id}>. Changes apply immediately; previous posts and mappings are retained.";
             properties.AllowedMentions = AllowedMentions.None;
         });
     }
@@ -58,16 +62,16 @@ public sealed class ConfigModule(
 
         await DeferAsync(ephemeral: true);
 
-        var response = action switch
+        var response = (action, roleMention) switch
         {
-            RoleReactionAction.Add => await roleReactions.AddAsync(
+            (RoleReactionAction.Add, { } targetRole) => await roleReactions.AddAsync(
                 guild: Context.Guild,
                 moderator: administrator,
                 messageLink: messageLink,
-                roleId: roleMention!.Id,
+                roleId: targetRole.Id,
                 emoji: emoji,
                 ct: lifetime.ApplicationStopping),
-            RoleReactionAction.Remove => await roleReactions.RemoveAsync(
+            (RoleReactionAction.Remove, _) => await roleReactions.RemoveAsync(
                 guild: Context.Guild,
                 messageLink: messageLink,
                 emoji: emoji,
@@ -77,7 +81,7 @@ public sealed class ConfigModule(
 
         await ModifyOriginalResponseAsync(properties =>
         {
-            properties.Content         = response;
+            properties.Content = response;
             properties.AllowedMentions = AllowedMentions.None;
         });
     }
