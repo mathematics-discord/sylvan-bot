@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.2.1 - 2026-10-28
+## Moderation
+### Fixed
+- Respect Discord reaction rate limits so pending SylvanMail replies show both 📤 to send and ❌ to cancel, and successful delivery leaves ✅ on the original forum message after clearing its reactions.
 # v0.2.0 - 2026-10-28
 ## General
 ### Added
