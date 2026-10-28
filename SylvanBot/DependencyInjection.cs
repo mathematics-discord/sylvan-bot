@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.SylvanMail;
@@ -70,20 +69,11 @@ public static class DependencyInjection
             services.AddSingleton<ImageBurstSpamGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ImageBurstSpamGatewayHandler>());
 
-            services.AddSingleton(
-                Channel.CreateUnbounded<EmojiUsageIncrement>(
-                    new UnboundedChannelOptions
-                    {
-                        SingleReader = true,
-                        SingleWriter = false,
-                        AllowSynchronousContinuations = false,
-                    }
-                )
-            );
             services.AddSingleton<EmojiUsageStore>();
             services.AddSingleton<EmojiAnalyticsGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<EmojiAnalyticsGatewayHandler>());
-            services.AddHostedService<EmojiAnalyticsWorker>();
+            services.AddSingleton<EmojiAnalyticsWorker>();
+            services.AddHostedService(sp => sp.GetRequiredService<EmojiAnalyticsWorker>());
 
             services.AddScoped<RoleColourOperations>();
             services.AddSingleton<RoleColourReconciler>();

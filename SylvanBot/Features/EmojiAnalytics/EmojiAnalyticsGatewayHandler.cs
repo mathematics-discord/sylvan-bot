@@ -1,30 +1,30 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.RegularExpressions;
-using System.Threading.Channels;
 using SylvanBot.Gateway;
 
 namespace SylvanBot.Features.EmojiAnalytics;
 
 public sealed class EmojiAnalyticsGatewayHandler(
     DiscordSocketClient discordClient,
-    Channel<EmojiUsageIncrement> buffer,
+    EmojiAnalyticsWorker worker,
     IOptions<EmojiAnalyticsOptions> options,
-    ILogger logger) : IDiscordGatewayHandler
+    ILogger logger
+) : IDiscordGatewayHandler
 {
-    private static readonly Regex EmojiRegex = new(
+    private static readonly Regex EmojiRegex = new Regex(
         @"<a?:\w{2,32}:(?<id>\d{17,21})>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant,
         TimeSpan.FromMilliseconds(100));
 
-    private readonly ILogger               _logger  = logger.ForContext<EmojiAnalyticsGatewayHandler>();
+    private readonly ILogger _logger = logger.ForContext<EmojiAnalyticsGatewayHandler>();
     private readonly EmojiAnalyticsOptions _options = options.Value;
 
     public Task InitializeAsync(CancellationToken ct)
     {
-        discordClient.MessageReceived          += HandleMessageReceivedAsync;
-        discordClient.ReactionAdded            += HandleReactionAddedAsync;
-        discordClient.ReactionRemoved          += HandleReactionRemovedAsync;
-        discordClient.ReactionsCleared         += HandleReactionsClearedAsync;
+        discordClient.MessageReceived += HandleMessageReceivedAsync;
+        discordClient.ReactionAdded += HandleReactionAddedAsync;
+        discordClient.ReactionRemoved += HandleReactionRemovedAsync;
+        discordClient.ReactionsCleared += HandleReactionsClearedAsync;
         discordClient.ReactionsRemovedForEmote += HandleReactionsRemovedForEmoteAsync;
 
         return Task.CompletedTask;
@@ -32,34 +32,41 @@ public sealed class EmojiAnalyticsGatewayHandler(
 
     public void Unsubscribe()
     {
-        discordClient.MessageReceived          -= HandleMessageReceivedAsync;
-        discordClient.ReactionAdded            -= HandleReactionAddedAsync;
-        discordClient.ReactionRemoved          -= HandleReactionRemovedAsync;
-        discordClient.ReactionsCleared         -= HandleReactionsClearedAsync;
+        discordClient.MessageReceived -= HandleMessageReceivedAsync;
+        discordClient.ReactionAdded -= HandleReactionAddedAsync;
+        discordClient.ReactionRemoved -= HandleReactionRemovedAsync;
+        discordClient.ReactionsCleared -= HandleReactionsClearedAsync;
         discordClient.ReactionsRemovedForEmote -= HandleReactionsRemovedForEmoteAsync;
     }
 
     private static EmojiUsageIncrement[] ExtractMessageIncrements(ulong guildId, string content)
     {
-        return EmojiRegex.Matches(content)
-           .Select(match =>
-                       ulong.TryParse(s: match.Groups["id"].Value, style: NumberStyles.None, provider: CultureInfo.InvariantCulture, out var id)
-                           ? (ulong?)id
-                           : null)
-           .Where(id => id.HasValue)
-           .GroupBy(id => id!.Value)
-           .Select(group => new EmojiUsageIncrement(GuildId: guildId, EmojiId: group.Key, group.Count(), ReactionCount: 0))
-           .ToArray();
+        Dictionary<ulong, int> counts = new Dictionary<ulong, int>();
+        var matches = EmojiRegex.Matches(content);
+
+        foreach (Match match in matches)
+        {
+            if (ulong.TryParse(match.Groups["id"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var id))
+                counts[id] = counts.GetValueOrDefault(id) + 1;
+        }
+
+        return counts
+            .Select(pair => new EmojiUsageIncrement(guildId, pair.Key, pair.Value, ReactionCount: 0))
+            .ToArray();
     }
 
-    private async Task HandleMessageReceivedAsync(IMessage message)
+    private Task HandleMessageReceivedAsync(IMessage message)
     {
-        if (message is not IUserMessage
-            || message.Source != MessageSource.User
-            || message.Channel is not IGuildChannel guildChannel
-            || string.IsNullOrWhiteSpace(message.Content)
-            || !_options.IsEnabled(guildChannel.GuildId))
-            return;
+        if (message is not IUserMessage || message.Source != MessageSource.User)
+            return Task.CompletedTask;
+
+        if (message.Channel is not IGuildChannel guildChannel)
+            return Task.CompletedTask;
+
+        var eligible = !string.IsNullOrWhiteSpace(message.Content) && _options.IsEnabled(guildChannel.GuildId);
+
+        if (!eligible)
+            return Task.CompletedTask;
 
         EmojiUsageIncrement[] increments;
 
@@ -71,12 +78,11 @@ public sealed class EmojiAnalyticsGatewayHandler(
         {
             _logger.Warning(exception: ex, "Emoji parsing timed out for a message in guild {GuildId}", propertyValue: guildChannel.GuildId);
 
-            return;
+            return Task.CompletedTask;
         }
 
         foreach (var increment in increments)
-            if (!buffer.Writer.TryWrite(increment))
-                await buffer.Writer.WriteAsync(increment);
+            worker.Observe(increment);
 
         if (increments.Length > 0)
         {
@@ -85,38 +91,38 @@ public sealed class EmojiAnalyticsGatewayHandler(
                 propertyValue0: increments.Length,
                 propertyValue1: guildChannel.GuildId);
         }
+
+        return Task.CompletedTask;
     }
 
-    private async Task HandleReactionAddedAsync(
-        Cacheable<IUserMessage, ulong> message,
-        Cacheable<IMessageChannel, ulong> channel,
-        SocketReaction reaction)
+    private Task HandleReactionAddedAsync(Cacheable<IUserMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel, SocketReaction reaction)
     {
         _ = message;
 
         if (reaction.Emote is not Emote customEmote)
-            return;
+            return Task.CompletedTask;
 
         if (!channel.HasValue || channel.Value is not IGuildChannel guildChannel)
         {
             LogReactionEvent("added_ignored_no_guild", emote: reaction.Emote, guildId: null);
 
-            return;
+            return Task.CompletedTask;
         }
 
         if (!_options.IsEnabled(guildChannel.GuildId))
         {
             LogReactionEvent("added_ignored_disabled", emote: reaction.Emote, guildId: guildChannel.GuildId);
 
-            return;
+            return Task.CompletedTask;
         }
 
         LogReactionEvent("added", emote: reaction.Emote, guildId: guildChannel.GuildId);
 
         var item = new EmojiUsageIncrement(GuildId: guildChannel.GuildId, EmojiId: customEmote.Id, MessageCount: 0, ReactionCount: 1);
 
-        if (!buffer.Writer.TryWrite(item))
-            await buffer.Writer.WriteAsync(item);
+        worker.Observe(item);
+
+        return Task.CompletedTask;
     }
 
     private Task HandleReactionRemovedAsync(
@@ -126,41 +132,29 @@ public sealed class EmojiAnalyticsGatewayHandler(
     {
         _ = cachedMessage;
 
-        ulong? guildId = cachedChannel is { HasValue: true, Value: IGuildChannel guildChannel }
-            ? guildChannel.GuildId
-            : null;
+        ulong? guildId = cachedChannel is { HasValue: true, Value: IGuildChannel guildChannel } ? guildChannel.GuildId : null;
 
         LogReactionEvent("removed", emote: reaction.Emote, guildId: guildId);
 
         return Task.CompletedTask;
     }
 
-    private Task HandleReactionsClearedAsync(
-        Cacheable<IUserMessage, ulong> message,
-        Cacheable<IMessageChannel, ulong> channel)
+    private Task HandleReactionsClearedAsync(Cacheable<IUserMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel)
     {
         _ = message;
 
-        ulong? guildId = channel is { HasValue: true, Value: IGuildChannel guildChannel }
-            ? guildChannel.GuildId
-            : null;
+        ulong? guildId = channel is { HasValue: true, Value: IGuildChannel guildChannel } ? guildChannel.GuildId : null;
 
-        _logger.ForContext("ReactionEventType", "cleared_all").ForContext("GuildId", value: guildId)
-           .Information("Discord reaction event recorded");
+        _logger.ForContext("ReactionEventType", "cleared_all").ForContext("GuildId", value: guildId).Information("Discord reaction event recorded");
 
         return Task.CompletedTask;
     }
 
-    private Task HandleReactionsRemovedForEmoteAsync(
-        Cacheable<IUserMessage, ulong> message,
-        Cacheable<IMessageChannel, ulong> channel,
-        IEmote emote)
+    private Task HandleReactionsRemovedForEmoteAsync(Cacheable<IUserMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel, IEmote emote)
     {
         _ = message;
 
-        ulong? guildId = channel is { HasValue: true, Value: IGuildChannel guildChannel }
-            ? guildChannel.GuildId
-            : null;
+        ulong? guildId = channel is { HasValue: true, Value: IGuildChannel guildChannel } ? guildChannel.GuildId : null;
 
         LogReactionEvent("cleared_emote", emote: emote, guildId: guildId);
 
@@ -172,11 +166,11 @@ public sealed class EmojiAnalyticsGatewayHandler(
         ulong? emojiId = emote is Emote customEmote ? customEmote.Id : null;
 
         _logger
-           .ForContext("ReactionEventType", value: reactionEventType)
-           .ForContext("GuildId", value: guildId)
-           .ForContext("EmojiName", value: emote.Name)
-           .ForContext("EmojiId", value: emojiId)
-           .ForContext("IsCustomEmoji", value: emojiId.HasValue)
-           .Debug("Discord reaction event recorded");
+            .ForContext("ReactionEventType", value: reactionEventType)
+            .ForContext("GuildId", value: guildId)
+            .ForContext("EmojiName", value: emote.Name)
+            .ForContext("EmojiId", value: emojiId)
+            .ForContext("IsCustomEmoji", value: emojiId.HasValue)
+            .Debug("Discord reaction event recorded");
     }
 }
