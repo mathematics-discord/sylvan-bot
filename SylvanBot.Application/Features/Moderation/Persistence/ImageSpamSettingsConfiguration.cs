@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace SylvanBot.Features.Moderation.Persistence;
+namespace SylvanBot.Application.Features.Moderation.Persistence;
 
 public sealed class ImageSpamSettingsConfiguration : IEntityTypeConfiguration<ImageSpamSettings>
 {

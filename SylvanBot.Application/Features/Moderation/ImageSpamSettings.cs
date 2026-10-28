@@ -1,8 +1,10 @@
-﻿namespace SylvanBot.Features.Moderation;
+﻿namespace SylvanBot.Application.Features.Moderation;
 
 public sealed class ImageSpamSettings
 {
-    private ImageSpamSettings() { }
+    private ImageSpamSettings()
+    {
+    }
 
     private ImageSpamSettings(ulong guildId, int requiredChannelCount, int requiredAttachmentCount, int burstDurationSeconds)
     {
@@ -24,7 +26,7 @@ public sealed class ImageSpamSettings
     public int RequiredChannelCount { get; private set; }
 
     public static ImageSpamSettings CreateDefault(ulong guildId) =>
-        new(guildId: guildId, requiredChannelCount: 4, requiredAttachmentCount: 2, burstDurationSeconds: 45);
+        new ImageSpamSettings(guildId: guildId, requiredChannelCount: 4, requiredAttachmentCount: 2, burstDurationSeconds: 45);
 
     public void Disable()
     {

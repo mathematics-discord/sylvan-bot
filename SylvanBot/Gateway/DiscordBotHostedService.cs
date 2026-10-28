@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Serilog.Events;
 using SylvanBot.Application.Features.MessageCache;
+using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Gateway;

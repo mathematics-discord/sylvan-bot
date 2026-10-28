@@ -1,4 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Features.Logging;
+using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Features.Logging;

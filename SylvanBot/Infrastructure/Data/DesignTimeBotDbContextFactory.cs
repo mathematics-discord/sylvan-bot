@@ -1,6 +1,7 @@
 ﻿using DotNetEnv;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Infrastructure.Data;
 

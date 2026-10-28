@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Common;
+using SylvanBot.Application.Features.Moderation;
 using SylvanBot.Features.Moderation;
 using SylvanBot.Features.RoleColours;
 using SylvanBot.Infrastructure.Data;

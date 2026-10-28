@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.SylvanMail;
+using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Features.EmojiYoink;
 using SylvanBot.Features.Logging;
 using SylvanBot.Features.MessageCache;

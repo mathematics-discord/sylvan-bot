@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using SylvanBot.Application.Features.RoleColours;
 
 namespace SylvanBot.Features.RoleColours;
 

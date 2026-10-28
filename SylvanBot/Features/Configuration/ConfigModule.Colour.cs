@@ -1,4 +1,5 @@
-﻿using SylvanBot.Features.RoleColours;
+﻿using SylvanBot.Application.Features.RoleColours;
+using SylvanBot.Features.RoleColours;
 
 namespace SylvanBot.Features.Configuration;
 

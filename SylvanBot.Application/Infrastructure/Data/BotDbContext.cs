@@ -1,13 +1,13 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Features.Logging;
 using SylvanBot.Application.Features.MessageCache;
+using SylvanBot.Application.Features.Moderation;
+using SylvanBot.Application.Features.RoleColours;
 using SylvanBot.Application.Features.RoleReactions;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Application.Features.WorkingHours;
-using SylvanBot.Features.Logging;
-using SylvanBot.Features.Moderation;
-using SylvanBot.Features.RoleColours;
 
-namespace SylvanBot.Infrastructure.Data;
+namespace SylvanBot.Application.Infrastructure.Data;
 
 /// <summary>
 ///     Entity Framework Core database context for SylvanBot persistence.

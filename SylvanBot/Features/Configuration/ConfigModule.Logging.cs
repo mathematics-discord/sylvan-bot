@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Features.Logging;
+using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Features.Logging;
 using SylvanBot.Infrastructure.Data;
 

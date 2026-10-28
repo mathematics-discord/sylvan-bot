@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Infrastructure.Data;
 

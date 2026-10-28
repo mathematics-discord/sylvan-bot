@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace SylvanBot.Features.Logging.Persistence;
+namespace SylvanBot.Application.Features.Logging.Persistence;
 
 public sealed class LoggingPersistence : IEntityTypeConfiguration<LoggingConfiguration>, IEntityTypeConfiguration<LoggingExcludedChannel>
 {

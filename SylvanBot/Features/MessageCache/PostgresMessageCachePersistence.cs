@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.MessageCache;
+using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Infrastructure.Data;
 
 namespace SylvanBot.Features.MessageCache;

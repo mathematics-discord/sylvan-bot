@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace SylvanBot.Features.RoleColours.Persistence;
+namespace SylvanBot.Application.Features.RoleColours.Persistence;
 
 public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<RoleColourOption>
 {

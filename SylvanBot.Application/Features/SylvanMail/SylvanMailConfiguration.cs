@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Common;
-using SylvanBot.Infrastructure.Data;
+using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Application.Features.SylvanMail;
 

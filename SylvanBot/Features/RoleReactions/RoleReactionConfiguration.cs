@@ -1,6 +1,7 @@
 ﻿using Discord.Net;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.RoleReactions;
+using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Infrastructure.Data;
 using static SylvanBot.Features.RoleReactions.RoleReactionInput;
 using static SylvanBot.Features.RoleReactions.RoleReactionPolicy;

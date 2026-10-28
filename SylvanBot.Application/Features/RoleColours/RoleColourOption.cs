@@ -1,15 +1,22 @@
-﻿namespace SylvanBot.Features.RoleColours;
+﻿namespace SylvanBot.Application.Features.RoleColours;
 
 public sealed class RoleColourOption
 {
     // EF Core private ctor
-    private RoleColourOption() { }
+    private RoleColourOption()
+    {
+    }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
+
     public ulong DisplayRoleId { get; private set; }
+
     public ulong GuildId { get; private set; }
+
     public long OptionId { get; private set; }
+
     public ulong SourceRoleId { get; private set; }
+
     public DateTimeOffset UpdatedAtUtc { get; private set; }
 
     public static Result<RoleColourOption> Create(ulong guildId, ulong sourceRoleId, ulong displayRoleId)

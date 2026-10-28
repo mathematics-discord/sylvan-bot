@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using SylvanBot.Application.Common;
+using SylvanBot.Application.Features.Moderation;
 using SylvanBot.Features.Moderation;
 
 namespace SylvanBot.Tests.Integration;
