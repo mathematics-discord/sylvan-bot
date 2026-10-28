@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.Quorum;
 using SylvanBot.Application.Features.RoleReactions;
 using SylvanBot.Application.Features.SylvanMail;
@@ -15,20 +16,33 @@ namespace SylvanBot.Infrastructure.Data;
 /// </summary>
 public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbContext(options)
 {
-    public DbSet<SylvanMailSettings>     SylvanMailSettings      => Set<SylvanMailSettings>();
+    public DbSet<CachedMessage> CachedMessages => Set<CachedMessage>();
+
+    public DbSet<SylvanMailSettings> SylvanMailSettings => Set<SylvanMailSettings>();
+
     public DbSet<SylvanMailConversation> SylvanMailConversations => Set<SylvanMailConversation>();
-    public DbSet<SylvanMailOperation>    SylvanMailOperations    => Set<SylvanMailOperation>();
-    public DbSet<WorkingHoursPreference> WorkingHours            => Set<WorkingHoursPreference>();
-    public DbSet<WorkingHoursSettings>   WorkingHoursSettings    => Set<WorkingHoursSettings>();
-    public DbSet<EmojiUsageCount>        EmojiUsageCounts        => Set<EmojiUsageCount>();
-    public DbSet<ImageSpamSettings>      ImageSpamSettings       => Set<ImageSpamSettings>();
-    public DbSet<LoggingConfiguration>   LoggingConfigurations   => Set<LoggingConfiguration>();
+
+    public DbSet<SylvanMailOperation> SylvanMailOperations => Set<SylvanMailOperation>();
+
+    public DbSet<WorkingHoursPreference> WorkingHours => Set<WorkingHoursPreference>();
+
+    public DbSet<WorkingHoursSettings> WorkingHoursSettings => Set<WorkingHoursSettings>();
+
+    public DbSet<EmojiUsageCount> EmojiUsageCounts => Set<EmojiUsageCount>();
+
+    public DbSet<ImageSpamSettings> ImageSpamSettings => Set<ImageSpamSettings>();
+
+    public DbSet<LoggingConfiguration> LoggingConfigurations => Set<LoggingConfiguration>();
+
     public DbSet<LoggingExcludedChannel> LoggingExcludedChannels => Set<LoggingExcludedChannel>();
-    public DbSet<RoleColourOption>       RoleColourOptions       => Set<RoleColourOption>();
-    public DbSet<RoleReaction>           RoleReactions           => Set<RoleReaction>();
+
+    public DbSet<RoleColourOption> RoleColourOptions => Set<RoleColourOption>();
+
+    public DbSet<RoleReaction> RoleReactions => Set<RoleReaction>();
 
     public DbSet<QuorumConfiguration> QuorumConfigurations => Set<QuorumConfiguration>();
-    public DbSet<QuorumVoterRole>     QuorumVoterRoles     => Set<QuorumVoterRole>();
+
+    public DbSet<QuorumVoterRole> QuorumVoterRoles => Set<QuorumVoterRole>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

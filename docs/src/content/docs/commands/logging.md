@@ -61,3 +61,7 @@ still prevent messages being logged; remove that exclusion separately.
 
 Sylvan lists the excluded channels, or confirms that there are none. Log
 destination channels and their threads are not logged back into themselves.
+
+Sylvan retains eligible message snapshots for 24 hours from the original message creation time, including across bot
+restarts. Edits do not extend that window. Deletions outside it, or messages the bot did not observe, have no cached
+content to log. This window applies to the cache; published moderation logs are not automatically removed.

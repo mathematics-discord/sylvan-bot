@@ -25,7 +25,7 @@ internal static class AttachmentEvidenceDownloader
         try
         {
             using var response = await httpClient
-               .GetAsync(requestUri: url, completionOption: HttpCompletionOption.ResponseHeadersRead, cancellationToken: ct);
+                .GetAsync(requestUri: url, completionOption: HttpCompletionOption.ResponseHeadersRead, cancellationToken: ct);
 
             if (!response.IsSuccessStatusCode)
                 return new None();
@@ -45,7 +45,7 @@ internal static class AttachmentEvidenceDownloader
         }
         catch (Exception ex)
         {
-            logger.Debug(exception: ex, "Failed to download moderation logging attachment evidence");
+            logger.Debug("Failed to download moderation logging attachment evidence: {ExceptionType}", ex.GetType().Name);
 
             return new None();
         }
@@ -67,16 +67,16 @@ internal static class AttachmentEvidenceDownloader
         const int maxReadBufferBytes = 81920;
 
         var bufferedByteLimit = maxBytes == long.MaxValue ? long.MaxValue : maxBytes + 1;
-        var bytesRemaining    = bufferedByteLimit;
-        var readBufferBytes   = (int)Math.Min(val1: maxReadBufferBytes, Math.Max(val1: 1, val2: bytesRemaining));
-        var readBuffer        = new byte[readBufferBytes];
+        var bytesRemaining = bufferedByteLimit;
+        var readBufferBytes = (int)Math.Min(val1: maxReadBufferBytes, Math.Max(val1: 1, val2: bytesRemaining));
+        var readBuffer = new byte[readBufferBytes];
 
         await using var buffer = new MemoryStream(readBufferBytes);
 
         while (bytesRemaining > 0)
         {
             var bytesToRead = (int)Math.Min(val1: readBuffer.Length, val2: bytesRemaining);
-            var bytesRead   = await stream.ReadAsync(readBuffer.AsMemory(start: 0, length: bytesToRead), cancellationToken: ct);
+            var bytesRead = await stream.ReadAsync(readBuffer.AsMemory(start: 0, length: bytesToRead), cancellationToken: ct);
 
             if (bytesRead == 0)
                 return new Some<byte[]>(buffer.ToArray());

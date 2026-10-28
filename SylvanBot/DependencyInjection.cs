@@ -1,6 +1,7 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.Quorum;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Features.EmojiAnalytics;
@@ -54,34 +55,22 @@ public static class DependencyInjection
             services.AddSingleton<ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>>();
 
             services.AddSingleton(sp =>
-                                      new ImageBurstSpamDetector(
-                                          timeProvider: TimeProvider.System,
-                                          sp.GetRequiredService<ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>>()));
+                new ImageBurstSpamDetector(
+                    timeProvider: TimeProvider.System,
+                    sp.GetRequiredService<ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>>()));
 
             services.AddScoped<ImageSpamSettingsService>();
 
             services
-               .AddOptions<EmojiAnalyticsOptions>()
-               .Bind(configuration.GetSection(EmojiAnalyticsOptions.SectionName))
-               .Validate(
+                .AddOptions<EmojiAnalyticsOptions>()
+                .Bind(configuration.GetSection(EmojiAnalyticsOptions.SectionName))
+                .Validate(
                     options => options.EnabledGuildIds.All(guildId => guildId != 0),
                     "Emoji analytics guild ids must be non-zero.")
-               .ValidateOnStart();
-
-            services
-               .AddOptions<LoggingOptions>()
-               .Bind(configuration.GetSection(LoggingOptions.SectionName))
-               .Validate(
-                    options => options.MaxAttachmentCountPerMessage >= 0,
-                    "Logging max attachment count per message must not be negative.")
-               .Validate(
-                    options => options.MaxAttachmentBytesPerAttachment >= 0,
-                    "Logging max attachment bytes per attachment must not be negative."
-                )
-               .ValidateOnStart();
+                .ValidateOnStart();
 
             services.AddSingleton<DiscordGuildEmojiImporter>();
-            services.AddSingleton<IDiscordGatewayHandler, ModerationLoggingGatewayHandler>();
+            services.AddModerationLogging(configuration);
             services.AddSingleton<ImageBurstSpamGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ImageBurstSpamGatewayHandler>());
 
@@ -89,8 +78,8 @@ public static class DependencyInjection
                 Channel.CreateUnbounded<EmojiUsageIncrement>(
                     new UnboundedChannelOptions
                     {
-                        SingleReader                  = true,
-                        SingleWriter                  = false,
+                        SingleReader = true,
+                        SingleWriter = false,
                         AllowSynchronousContinuations = false,
                     }
                 )
@@ -106,6 +95,29 @@ public static class DependencyInjection
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<RoleColourGatewayHandler>());
         }
 
+        private void AddModerationLogging(IConfiguration configuration)
+        {
+            services
+                .AddOptions<LoggingOptions>()
+                .Bind(configuration.GetSection(LoggingOptions.SectionName))
+                .Validate(
+                    options => options.MaxAttachmentCountPerMessage >= 0,
+                    "Logging max attachment count per message must not be negative.")
+                .Validate(
+                    options => options.MaxAttachmentBytesPerAttachment >= 0,
+                    "Logging max attachment bytes per attachment must not be negative."
+                )
+                .ValidateOnStart();
+
+            services.AddSingleton<IMessageCachePersistence, PostgresMessageCachePersistence>();
+            services.AddSingleton<MessageSnapshotCache>();
+            services.AddSingleton<MessageCacheMaintenanceWorker>();
+            services.AddHostedService(sp => sp.GetRequiredService<MessageCacheMaintenanceWorker>());
+            services.AddSingleton<ModerationLoggingGatewayHandler>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ModerationLoggingGatewayHandler>());
+            services.AddHostedService(sp => sp.GetRequiredService<ModerationLoggingGatewayHandler>());
+        }
+
         private void AddWorkingHours()
         {
             services.AddSingleton(TimeProvider.System);
@@ -119,19 +131,21 @@ public static class DependencyInjection
             var connectionString = PostgresConnectionStringBuilder.Build(configuration);
 
             services.AddDbContextFactory<BotDbContext>(options =>
-                                                           options.UseNpgsql(connectionString: connectionString, postgres => postgres.MigrationsAssembly("SylvanBot")));
+                options.UseNpgsql(connectionString: connectionString, postgres => postgres.MigrationsAssembly("SylvanBot")));
         }
 
         private void AddDiscord(IConfiguration configuration)
         {
             services
-               .AddOptions<DiscordOptions>()
-               .Bind(configuration.GetSection(DiscordOptions.SectionName))
-               .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "Discord token is required.")
-               .Validate(
-                    options => options.MessageCacheSize >= 1000,
-                    "Discord message cache size must be at least 1000.")
-               .ValidateOnStart();
+                .AddOptions<DiscordOptions>()
+                .Bind(configuration.GetSection(DiscordOptions.SectionName))
+                .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "Discord token is required.")
+                .Validate(
+                    options => options.MessageCacheSize is >= 0 and <= 50000,
+                    "Discord message cache size must be between 0 and 50000.")
+                .ValidateOnStart();
+
+            services.AddSingleton<MessageUpdateGatewayAdapter>();
 
             services.AddSingleton(sp =>
             {
@@ -141,20 +155,21 @@ public static class DependencyInjection
                     new DiscordSocketConfig
                     {
                         AlwaysDownloadUsers = true,
-                        MessageCacheSize    = options.MessageCacheSize,
+                        MessageCacheSize = options.MessageCacheSize,
+                        WebSocketProvider = sp.GetRequiredService<MessageUpdateGatewayAdapter>().CreateWebSocket,
                         GatewayIntents = GatewayIntents.Guilds
-                            | GatewayIntents.DirectMessages
-                            | GatewayIntents.GuildMembers
-                            | GatewayIntents.GuildMessages
-                            | GatewayIntents.GuildMessageReactions
-                            | GatewayIntents.MessageContent,
+                                         | GatewayIntents.DirectMessages
+                                         | GatewayIntents.GuildMembers
+                                         | GatewayIntents.GuildMessages
+                                         | GatewayIntents.GuildMessageReactions
+                                         | GatewayIntents.MessageContent,
                     }
                 );
             });
 
             services.AddSingleton(sp => new InteractionService(
-                                      sp.GetRequiredService<DiscordSocketClient>(),
-                                      new InteractionServiceConfig { AutoServiceScopes = true, ThrowOnError = false, EnableAutocompleteHandlers = true }));
+                sp.GetRequiredService<DiscordSocketClient>(),
+                new InteractionServiceConfig { AutoServiceScopes = true, ThrowOnError = false, EnableAutocompleteHandlers = true }));
 
             services.AddSingleton<DiscordInteractionHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<DiscordInteractionHandler>());

@@ -1,0 +1,4 @@
+kind: Added
+component: Moderation
+body: Retain eligible message snapshots for 24 hours across bot restarts so edit and deletion logs can preserve recent evidence after deployments.
+time: 2026-10-28T00:00:00Z

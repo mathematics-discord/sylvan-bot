@@ -57,6 +57,9 @@ dotnet test SylvanBot.slnx --configuration Release --results-directory ./TestRes
 Use `--filter` for focused tests. Existing PostgreSQL integration tests require Docker and create their own databases;
 the bot need not be running.
 
+See [the persistent message cache lifecycle](docs/message-cache.md) for moderation snapshot expiry, startup hydration,
+configuration, failure behaviour and telemetry.
+
 See [CHANGELOG.md](CHANGELOG.md) for release history. Changie fragments describe user-visible changes; use the
 `Internal` component for maintenance. Internal entries appear in the full changelog and are linked from Discord
 announcements rather than listed as user-facing changes.

@@ -22,6 +22,45 @@ namespace SylvanBot.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("SylvanBot.Application.Features.MessageCache.CachedMessage", b =>
+                {
+                    b.Property<long>("BotId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bot_id");
+
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("guild_id");
+
+                    b.Property<long>("MessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("message_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot");
+
+                    b.HasKey("BotId", "GuildId", "MessageId");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.HasIndex("BotId", "GuildId", "ExpiresAtUtc");
+
+                    b.ToTable("cached_messages", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_cached_messages_expiry", "expires_at_utc = created_at_utc + interval '24 hours'");
+                        });
+                });
+
             modelBuilder.Entity("SylvanBot.Application.Features.Quorum.QuorumConfiguration", b =>
                 {
                     b.Property<Guid>("Id")
@@ -75,6 +114,34 @@ namespace SylvanBot.Infrastructure.Migrations
                         .HasName("pk_quorum_voter_roles");
 
                     b.ToTable("quorum_voter_roles", "public");
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.RoleReactions.RoleReaction", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("MessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EmojiKey")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long>("ChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EmojiText")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("GuildId", "MessageId", "EmojiKey");
+
+                    b.ToTable("RoleReactions", (string)null);
                 });
 
             modelBuilder.Entity("SylvanBot.Application.Features.SylvanMail.SylvanMailConversation", b =>
@@ -427,34 +494,6 @@ namespace SylvanBot.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\"");
                         });
-                });
-
-            modelBuilder.Entity("SylvanBot.Application.Features.RoleReactions.RoleReaction", b =>
-                {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("MessageId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("EmojiKey")
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<long>("ChannelId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("EmojiText")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<long>("RoleId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("GuildId", "MessageId", "EmojiKey");
-
-                    b.ToTable("RoleReactions", (string)null);
                 });
 
             modelBuilder.Entity("SylvanBot.Application.Features.Quorum.QuorumVoterRole", b =>
