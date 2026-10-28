@@ -12,8 +12,7 @@ namespace SylvanBot.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // Existing autoban records are permanently discarded. Down restores only the table structure.
-            migrationBuilder.DropTable(
-                name: "AutobannedUsers");
+            migrationBuilder.DropTable(name: "AutobannedUsers");
         }
 
         /// <inheritdoc />
@@ -26,27 +25,19 @@ namespace SylvanBot.Infrastructure.Migrations
                     GuildId = table.Column<long>(type: "bigint", nullable: false),
                     BannedUser = table.Column<long>(type: "bigint", nullable: false),
                     Moderator = table.Column<long>(type: "bigint", nullable: false),
-                    RegisteredAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
+                    RegisteredAtUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AutobannedUsers", x => new { x.GuildId, x.BannedUser });
-                });
+                }
+            );
 
-            migrationBuilder.CreateIndex(
-                name: "IX_AutobannedUsers_BannedUser",
-                table: "AutobannedUsers",
-                column: "BannedUser");
+            migrationBuilder.CreateIndex(name: "IX_AutobannedUsers_BannedUser", table: "AutobannedUsers", column: "BannedUser");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_AutobannedUsers_GuildId",
-                table: "AutobannedUsers",
-                column: "GuildId");
+            migrationBuilder.CreateIndex(name: "IX_AutobannedUsers_GuildId", table: "AutobannedUsers", column: "GuildId");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_AutobannedUsers_Moderator",
-                table: "AutobannedUsers",
-                column: "Moderator");
+            migrationBuilder.CreateIndex(name: "IX_AutobannedUsers_Moderator", table: "AutobannedUsers", column: "Moderator");
         }
     }
 }

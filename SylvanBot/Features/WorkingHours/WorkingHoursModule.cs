@@ -1,11 +1,12 @@
-﻿namespace SylvanBot.Features.WorkingHours;
+﻿using SylvanBot.Interactions;
 
-using SylvanBot.Interactions;
+namespace SylvanBot.Features.WorkingHours;
 
 [CommandContextType(InteractionContextType.Guild)]
 [RequireContext(ContextType.Guild)]
-public sealed class WorkingHoursModule(WorkingHoursCoordinator coordinator, IHostApplicationLifetime lifetime)
-    : SlashCommandBase
+[DefaultMemberPermissions(GuildPermission.MuteMembers)]
+[RequireUserPermission(GuildPermission.MuteMembers)]
+public sealed class WorkingHoursModule(WorkingHoursSchedules coordinator, IHostApplicationLifetime lifetime) : SlashCommandBase
 {
     [SlashCommand("working-hours", "Set your recurring daily Working Hours")]
     public async Task SetWorkingHoursAsync(
@@ -17,16 +18,15 @@ public sealed class WorkingHoursModule(WorkingHoursCoordinator coordinator, IHos
     {
         await DeferAsync(ephemeral: true);
 
-        ErrorOr<string> result = await coordinator.SetScheduleAsync(
-            Context.Guild.Id,
-            Context.User.Id,
-            Context.User.Username,
-            enable,
-            start,
-            end,
-            timezone,
-            lifetime.ApplicationStopping);
-
-        await WorkingHoursReply.SendAsync(Context.Interaction, result.IsError ? result.FirstError.Description : result.Value);
+        Result<string> result = await coordinator.SetScheduleAsync(
+            guildId: Context.Guild.Id,
+            memberId: Context.User.Id,
+            username: Context.User.Username,
+            enable: enable,
+            start: start,
+            end: end,
+            timezone: timezone,
+            ct: lifetime.ApplicationStopping);
+        await WorkingHoursReply.SendAsync(interaction: Context.Interaction, !result.IsSuccessful ? result.Error!.Message : result.Value);
     }
 }

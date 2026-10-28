@@ -5,7 +5,7 @@ using System.Text;
 using Discord.Net;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Tickets;
-using SylvanBot.Infrastructure.Data;
+using SylvanBot.Application.Infrastructure.Data;
 
 public sealed partial class TicketWorker
 {

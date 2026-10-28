@@ -1,7 +1,7 @@
-﻿namespace SylvanBot.Tests.Features.WorkingHours;
+﻿using SylvanBot.Application.Features.WorkingHours;
 
-using SylvanBot.Application.Features.WorkingHours;
-using Shouldly;
+namespace SylvanBot.Tests.Features.WorkingHours;
+
 using static WorkingHoursWindowTests;
 
 [TestFixture]
@@ -13,25 +13,25 @@ public sealed class WorkingHoursResponseTests
     [TestCase("00:09:59.999999999999999999Z", "VERY FUNNY. AREN'T YOU FUNNY. HEHEHEHE.")]
     [TestCase("00:10:00Z", "Okay nah that's too low vro")]
     [TestCase("00:19:59.999999999999999999Z", "Okay nah that's too low vro")]
-    [TestCase("00:20:00Z", null)]
-    [TestCase("00:59:59.999999999999999999Z", null)]
-    [TestCase("01:00:00Z", null)]
+    [TestCase("00:20:00Z", arg2: null)]
+    [TestCase("00:59:59.999999999999999999Z", arg2: null)]
+    [TestCase("01:00:00Z", arg2: null)]
     public void Rejection_ExactDurationBands_ReturnsOnlyApplicableRejection(string end, string? expected)
     {
         // Assert
-        WorkingHoursResponses.Rejection(Window("00:00:00Z", end), "Rat").ShouldBe(expected);
+        WorkingHoursResponses.Rejection(Window("00:00:00Z", end: end), "Rat").ShouldBe(expected);
     }
 
-    [TestCase("00:20:00Z", true)]
-    [TestCase("00:59:59.999999999999Z", true)]
-    [TestCase("01:00:00Z", false)]
+    [TestCase("00:20:00Z", arg2: true)]
+    [TestCase("00:59:59.999999999999Z", arg2: true)]
+    [TestCase("01:00:00Z", arg2: false)]
     public void Accepted_SubHourOnly_ContainsReflection(string end, bool expected)
     {
         // Act
-        var response = string.Join('\n', WorkingHoursResponses.Accepted(Window("00:00:00Z", end)));
+        var response = string.Join(separator: '\n', WorkingHoursResponses.Accepted(Window("00:00:00Z", end: end)));
 
         // Assert
-        response.Contains("revolutionary potential", StringComparison.Ordinal).ShouldBe(expected);
+        response.Contains("revolutionary potential", comparisonType: StringComparison.Ordinal).ShouldBe(expected);
     }
 
     [TestCase("22:00:00Z", "07:00:00Z", true, false)]
@@ -46,11 +46,11 @@ public sealed class WorkingHoursResponseTests
     public void Accepted_NightAndBedtime_UsesCircularPrecedence(string start, string end, bool night, bool bedtime)
     {
         // Act
-        var response = string.Join('\n', WorkingHoursResponses.Accepted(Window(start, end)));
+        var response = string.Join(separator: '\n', WorkingHoursResponses.Accepted(Window(start: start, end: end)));
 
         // Assert
-        response.Contains("night shift", StringComparison.Ordinal).ShouldBe(night);
-        response.Contains("Go to fucking bed", StringComparison.Ordinal).ShouldBe(bedtime);
+        response.Contains("night shift", comparisonType: StringComparison.Ordinal).ShouldBe(night);
+        response.Contains("Go to fucking bed", comparisonType: StringComparison.Ordinal).ShouldBe(bedtime);
     }
 
     [TestCase("00:00:00Z", "06:00:00Z", "/regulation/12", false)]
@@ -69,10 +69,10 @@ public sealed class WorkingHoursResponseTests
     public void Accepted_ExactLegalThresholds_AccumulatesApplicableNotices(string start, string end, string link, bool expected)
     {
         // Act
-        var response = string.Join('\n', WorkingHoursResponses.Accepted(Window(start, end)));
+        var response = string.Join(separator: '\n', WorkingHoursResponses.Accepted(Window(start: start, end: end)));
 
         // Assert
-        response.Contains(link, StringComparison.Ordinal).ShouldBe(expected);
+        response.Contains(value: link, comparisonType: StringComparison.Ordinal).ShouldBe(expected);
     }
 
     [Test]
@@ -80,14 +80,13 @@ public sealed class WorkingHoursResponseTests
     {
         // Act
         IReadOnlyList<string> messages = WorkingHoursResponses.Accepted(Window("16:00:00Z", "07:00:00Z"));
-        var response = string.Join('\n', messages);
+        var response = string.Join(separator: '\n', values: messages);
 
         // Assert
         foreach (var regulation in new[] { 4, 6, 7, 10, 11, 12 })
             response.ShouldContain($"/regulation/{regulation})");
 
-        messages.Count(message => message.StartsWith("Your availability has nevertheless", StringComparison.Ordinal))
-            .ShouldBe(1);
+        messages.Count(message => message.StartsWith("Your availability has nevertheless", comparisonType: StringComparison.Ordinal)).ShouldBe(1);
 
         messages.All(message => message.Length < 2000).ShouldBeTrue();
 
@@ -109,6 +108,6 @@ public sealed class WorkingHoursResponseTests
         var settings = new WorkingHoursSettings { Enabled = true };
 
         // Act / Assert
-        settings.DesiredPingRole(eligible, exempt, enabled, active).ShouldBe(expected);
+        settings.DesiredPingRole(eligible: eligible, exempt: exempt, scheduleEnabled: enabled, active: active).ShouldBe(expected);
     }
 }

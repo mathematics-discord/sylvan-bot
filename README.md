@@ -36,6 +36,10 @@ dotnet run --project SylvanBot --launch-profile SylvanBot.Local
 The bot applies database migrations and registers commands on startup. Stopping it leaves PostgreSQL running.
 `docker compose down` stops the local stack and preserves its data.
 
+[SylvanMail](docs/src/content/docs/commands/sylvanmail.md) relays DMs to a private staff forum. Configure it with
+`/config sylvanmail enable:<forum-channel> role:<role>` (Administrator only). The role is a ping target; anyone with thread
+write access can draft an anonymous or signed reply and confirm it with the send reaction. Incoming DMs relay automatically.
+
 ## Development
 
 Code is grouped under `SylvanBot/Features/`, with feature persistence in `Persistence/` subfolders. Shared interactions,
@@ -50,8 +54,10 @@ dotnet build SylvanBot.slnx --configuration Release
 dotnet test SylvanBot.slnx --configuration Release --results-directory ./TestResults
 ```
 
-Use `--filter` for focused tests. Existing PostgreSQL integration tests require Docker and create their own databases;
-the bot need not be running.
+Use `--filter` for focused tests. The bot need not be running.
+
+See [the persistent message cache lifecycle](docs/message-cache.md) for moderation snapshot expiry, startup hydration,
+configuration, failure behaviour and telemetry.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history. Changie fragments describe user-visible changes; use the
 `Internal` component for maintenance. Internal entries appear in the full changelog and are linked from Discord

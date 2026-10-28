@@ -1,4 +1,4 @@
-﻿namespace SylvanBot.Features.RoleColours;
+﻿namespace SylvanBot.Application.Features.RoleColours;
 
 public sealed class RoleColourOption
 {
@@ -8,21 +8,30 @@ public sealed class RoleColourOption
     }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
+
     public ulong DisplayRoleId { get; private set; }
+
     public ulong GuildId { get; private set; }
+
     public long OptionId { get; private set; }
+
     public ulong SourceRoleId { get; private set; }
+
     public DateTimeOffset UpdatedAtUtc { get; private set; }
 
-    public static RoleColourOption Create(ulong guildId, ulong sourceRoleId, ulong displayRoleId)
+    public static Result<RoleColourOption> Create(ulong guildId, ulong sourceRoleId, ulong displayRoleId)
     {
         if (guildId == 0)
-            throw new ArgumentOutOfRangeException(nameof(guildId), guildId, "Guild is required.");
+            return new Result<RoleColourOption>(OperationFailureException.Validation("RoleColourOption.GuildRequired", "Guild is required."));
 
         if (sourceRoleId == displayRoleId)
-            throw new ArgumentException("Source and display role IDs must be different.", nameof(displayRoleId));
+        {
+            return new Result<RoleColourOption>(
+                OperationFailureException.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different."));
+        }
 
         var now = DateTimeOffset.UtcNow;
+
         return new RoleColourOption
         {
             GuildId = guildId,
@@ -33,13 +42,18 @@ public sealed class RoleColourOption
         };
     }
 
-    public void Update(ulong sourceRoleId, ulong displayRoleId)
+    public Result<ValueTuple> Update(ulong sourceRoleId, ulong displayRoleId)
     {
         if (sourceRoleId == displayRoleId)
-            throw new ArgumentException("Source and display role IDs must be different.", nameof(displayRoleId));
+        {
+            return new Result<ValueTuple>(
+                OperationFailureException.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different."));
+        }
 
         SourceRoleId = sourceRoleId;
         DisplayRoleId = displayRoleId;
         UpdatedAtUtc = DateTimeOffset.UtcNow;
+
+        return new Result<ValueTuple>(default(ValueTuple));
     }
 }

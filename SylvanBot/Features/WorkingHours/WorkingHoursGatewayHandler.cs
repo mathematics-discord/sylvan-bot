@@ -1,9 +1,8 @@
-﻿namespace SylvanBot.Features.WorkingHours;
+﻿using SylvanBot.Gateway;
 
-using SylvanBot.Gateway;
+namespace SylvanBot.Features.WorkingHours;
 
-public sealed class WorkingHoursGatewayHandler(DiscordSocketClient client, WorkingHoursCoordinator coordinator)
-    : IDiscordGatewayHandler
+public sealed class WorkingHoursGatewayHandler(DiscordSocketClient client, WorkingHoursRuntime coordinator) : IDiscordGatewayHandler
 {
     public Task InitializeAsync(CancellationToken ct)
     {
@@ -57,7 +56,7 @@ public sealed class WorkingHoursGatewayHandler(DiscordSocketClient client, Worki
 
     private Task LeftAsync(SocketGuild guild, SocketUser member)
     {
-        coordinator.MemberLeft(guild.Id, member.Id);
+        coordinator.MemberLeft(guildId: guild.Id, memberId: member.Id);
 
         return Task.CompletedTask;
     }

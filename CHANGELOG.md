@@ -2,6 +2,60 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.2.0 - 2026-10-28
+## General
+### Added
+- You can now DM @Sylvan to contact the moderators as an alternative to @ModMail. SylvanMail is out of beta and will replace @ModMail as the sole way to send a private message to the moderation team.
+## Moderation
+### Changed
+- SylvanMail is out of beta. Authors can cancel pending replies with ❌ and edit them to prepare them again. Successful delivery clears all reactions and leaves a single ✅. Explicit mentions remain anonymous; replies with the reply ping enabled include the author's username.
+# v0.1.19 - 2026-10-28
+## Moderation
+### Added
+- Request a ticket summary after the opening message and attachments in each new SylvanMail post. Lookup failures do not affect mail delivery.
+# v0.1.18 - 2026-10-28
+## General
+### Removed
+- Remove /emoji usage and automatic emoji usage tracking. The database migration drops EmojiUsageCounts and permanently deletes the stored counts.
+## Administration
+### Changed
+- Move logging, Working Hours, role-colour and image-spam settings under /config. All configuration commands now require Administrator permission. Logging setup is available at /config logs setup; personal /working-hours and /colour commands are unchanged.
+### Removed
+- Remove the Quorum commands and their saved configuration. The database migration deletes Quorum settings and voter-role mappings; back up the database before upgrading if these records are needed.
+## Internal
+### Changed
+- Replace ErrorOr and the custom Option type with DotNext results and optional values, preserving descriptive failures and explicit-null message edits.
+# v0.1.17 - 2026-10-28
+## Moderation
+### Added
+- Retain eligible message snapshots for 24 hours across bot restarts so edit and deletion logs can preserve recent evidence after deployments.
+# v0.1.16 - 2026-10-27
+## Administration
+### Added
+- Add administrator-only `/config rolereact` with `add` and `remove` actions for configuring message reaction roles. Members gain the selected role when reacting and lose it when unreacting. Removing a mapping keeps existing roles. Roles with staff or moderation permissions, including channel overrides, are rejected.
+# v0.1.15 - 2026-10-27
+## Internal
+### Fixed
+- Remove redundant permission preflights from outgoing SylvanMail replies. Trust Discord to enforce forum access while preserving mapped-case validation, author-only confirmation and duplicate-send protection. Stop reopening threads for outgoing DMs and surface unexpected draft failures in logs.
+# v0.1.14 - 2026-10-27
+## Internal
+### Changed
+- Require author confirmation for SylvanMail reply drafts, re-read edited content at confirmation, support anonymous and signed replies, and separate thread write permissions from the ping role. Replace routine thread receipts with success reactions and delivery errors, retain DM outcome notices, format inbound member mentions, and derive three-hour gap pings from DM history.
+### Fixed
+- Create a new SylvanMail case for incoming DMs when the mapped forum post is deleted, inaccessible or outside the configured forum, retaining historical mappings.
+- Include recovery instructions with every SylvanMail DM error: correct rejected content, retry a busy service later, or contact user 203864799870844928 directly by DM or another staff member. Ask staff to reconcile partial and uncertain deliveries before resending.
+# v0.1.13 - 2026-10-27
+## Internal
+### Fixed
+- Allow SylvanMail forums to grant View Channel access to additional non-administrator roles.
+# v0.1.12 - 2026-10-27
+## Internal
+### Changed
+- SylvanMail is now available as an untested beta for private Senior Moderator correspondence. Bugs, incomplete delivery and lost messages are possible; live Discord behaviour has not been verified.
+# v0.1.11 - 2026-10-26
+## General
+### Changed
+- Move colour selection to /colour set and make configured colour mappings available to everyone through /colour list, replacing /colour-admin list.
 # v0.1.10 - 2026-10-26
 ## Internal
 ### Changed

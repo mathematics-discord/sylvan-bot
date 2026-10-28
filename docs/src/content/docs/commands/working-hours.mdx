@@ -1,0 +1,99 @@
+---
+title: /working-hours
+description: Set when you receive the Moderators role on Mathematics.
+---
+
+import RoleMention from '../../../components/RoleMention.astro';
+
+Use `/working-hours` to set a daily availability window on <a href="https://discord.gg/math" target="_blank" rel="noopener noreferrer">Mathematics</a>.
+Sylvan adds <RoleMention id="268886789983436800" /> during those hours and removes it
+outside them. Your moderation powers and colours are unaffected.
+
+Working Hours is available to <RoleMention id="1328097118644338779" />,
+<RoleMention id="1522665074571870419"/>, and <RoleMention id="1522665207225127034"/>.
+Run the command inside Mathematics. Replies are visible only to you.
+
+## Set your hours
+
+Supply `enable:true`, a start time, an end time, and your timezone:
+
+```text
+/working-hours enable:true start:09:00:00 end:17:00:00 timezone:Europe/London
+```
+
+This makes you available from 9am to 5pm every day, including weekends.
+Select your timezone from the autocomplete suggestions. Named timezones
+follow daylight-saving changes automatically, so your hours stay tied
+to the local clock.
+
+The options are:
+
+- `enable`: required. Use `true` to set your hours or `false` to disable
+your schedule.
+- `start`: when your daily availability begins. Required when enabling.
+- `end`: when your daily availability ends. Required when enabling.
+- `timezone`: a named timezone such as `Europe/London`. Required unless
+both times include a fixed UTC offset.
+
+To change your hours, run the command again with the complete replacement
+schedule. You cannot change just the start time, end time, or timezone.
+
+## Use a fixed UTC offset
+
+Alternatively, put the same UTC offset on both times and leave out
+`timezone`:
+
+```text
+/working-hours enable:true start:09:00:00+01:00 end:17:00:00+01:00
+```
+
+Fixed offsets stay fixed throughout the year. This example always uses
+UTC+1, even when your local clocks change. You can also use `Z` for UTC:
+
+```text
+/working-hours enable:true start:09:00:00Z end:17:00:00Z
+```
+
+Do not combine a named timezone with fixed offsets. Both times must
+either omit offsets or include numerically equal offsets.
+
+## Time format and overnight hours
+
+Use 24-hour `HH:MM:SS` times. Seconds are required: write `09:00:00`,
+not `09:00`. Fractional seconds, such as `09:00:00.5`, are also accepted.
+Do not include dates or spaces. Hours must be 00–23, and minutes and
+seconds must be 00–59. Leap seconds and the offset `-00:00` are not accepted.
+
+Your window must last at least 20 minutes. If the end time is earlier
+than the start time, the window continues into the next day:
+
+```text
+/working-hours enable:true start:22:00:00 end:07:00:00 timezone:Europe/London
+```
+
+This makes you available from 10pm until 7am the following morning,
+repeating every day. Equal start and end times are not accepted as an
+all-day schedule.
+
+## While your schedule is enabled
+
+Sylvan controls your <RoleMention id="268886789983436800" /> role according to your hours and overrides
+manual changes to that role. This also applies to exempt senior staff
+who choose to enable a schedule.
+
+The start time is included in your availability window; the end time is
+not. Role changes may take a short time to appear. If the reply says your
+schedule was saved but role updates are pending, the schedule is saved
+and Sylvan still needs to finish applying the role change.
+
+## Disable your schedule
+
+```text
+/working-hours enable:false
+```
+
+Do not include `start`, `end`, or `timezone`. This restores permanent
+availability for ordinary staff. Staff with a configured exemption role
+retain manual control of <RoleMention id="268886789983436800" /> instead.
+
+To enable a schedule again, supply the complete schedule with `enable:true`.

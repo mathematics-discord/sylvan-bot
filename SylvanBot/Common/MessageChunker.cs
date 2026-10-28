@@ -4,12 +4,12 @@ public static class MessageChunker
 {
     private const int DefaultMessageCharacterLimit = 2000;
 
-    public static string[] SplitMessageIntoChunks(string message, int chunkSize = DefaultMessageCharacterLimit)
+    public static Result<string[]> SplitMessageIntoChunks(string message, int chunkSize = DefaultMessageCharacterLimit)
     {
         if (chunkSize <= 0)
-            throw new ArgumentOutOfRangeException(nameof(chunkSize), chunkSize, "Chunk size must be greater than zero.");
+            return new Result<string[]>(OperationFailureException.Validation("Chunk size must be greater than zero."));
 
-        Queue<string> chunks = new((message.Length / chunkSize) + 1);
+        Queue<string> chunks = new Queue<string>((message.Length / chunkSize) + 1);
 
         var index = 0;
 
@@ -20,15 +20,16 @@ public static class MessageChunker
             if (remainingLength <= chunkSize)
             {
                 chunks.Enqueue(message[index..]);
+
                 break;
             }
 
-            var window = message.Substring(index, chunkSize);
+            var window = message.Substring(startIndex: index, length: chunkSize);
             var splitAt = window.LastIndexOf('\n');
 
             var chunkLength = splitAt > 0 ? splitAt + 1 : chunkSize;
 
-            chunks.Enqueue(message.Substring(index, chunkLength));
+            chunks.Enqueue(message.Substring(startIndex: index, length: chunkLength));
             index += chunkLength;
         }
 

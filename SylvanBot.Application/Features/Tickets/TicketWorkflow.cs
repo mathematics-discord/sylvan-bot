@@ -106,7 +106,7 @@ public sealed partial class TicketWorkflow(
         }
     }
 
-    public async Task<Option<Ticket>> ShowAsync(
+    public async Task<Optional<Ticket>> ShowAsync(
         TicketActor actor,
         long number,
         bool hidden = false,
@@ -118,14 +118,14 @@ public sealed partial class TicketWorkflow(
         var ticket = await FindAsync(dbContext, actor.GuildId, number, tracking: false, cancellationToken);
 
         if (ticket is null || ticket.Hidden != hidden)
-            return new None();
+            return Optional<Ticket>.None;
 
         await CheckReadAsync(dbContext, actor, ticket, cancellationToken);
 
-        return new Some<Ticket>(ticket);
+        return ticket;
     }
 
-    public async Task<Option<Ticket>> ShowMessageAsync(
+    public async Task<Optional<Ticket>> ShowMessageAsync(
         TicketActor actor,
         TicketMessage publication,
         bool hidden = false,
@@ -149,11 +149,11 @@ public sealed partial class TicketWorkflow(
             );
 
         if (ticket is null)
-            return new None();
+            return Optional<Ticket>.None;
 
         await CheckReadAsync(dbContext, actor, ticket, cancellationToken);
 
-        return new Some<Ticket>(ticket);
+        return ticket;
     }
 
     public async Task<TicketPage> ListAsync(

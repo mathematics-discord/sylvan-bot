@@ -1,14 +1,12 @@
-﻿namespace SylvanBot.Features.Moderation;
+﻿using SylvanBot.Gateway;
 
-using System.Collections.Concurrent;
-using SylvanBot.Application.Common;
-using SylvanBot.Gateway;
+namespace SylvanBot.Features.Moderation;
 
 public sealed class ImageBurstSpamGatewayHandler(
     DiscordSocketClient discordClient,
     ImageBurstSpamDetector detector,
-    ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild,
-    IServiceScopeFactory scopeFactory,
+    ImageSpamSettingsService settings,
+    IHostApplicationLifetime lifetime,
     IOptions<DiscordOptions> options,
     ILogger logger
 ) : IDiscordGatewayHandler
@@ -16,21 +14,9 @@ public sealed class ImageBurstSpamGatewayHandler(
     private readonly ILogger _logger = logger.ForContext<ImageBurstSpamGatewayHandler>();
     private readonly DiscordOptions _options = options.Value;
 
-    private static bool HasStaffPermissions(GuildPermissions permissions)
-    {
-        return permissions.Administrator
-               || permissions.ManageGuild
-               || permissions.ManageMessages
-               || permissions.BanMembers
-               || permissions.KickMembers
-               || permissions.ModerateMembers;
-    }
-
     public async Task InitializeAsync(CancellationToken ct)
     {
-        using var scope = scopeFactory.CreateScope();
-        var settingsService = scope.ServiceProvider.GetRequiredService<ImageSpamSettingsService>();
-        await settingsService.LoadEnabledSettingsAsync(ct).ConfigureAwait(false);
+        await settings.LoadEnabledSettingsAsync(ct);
 
         Subscribe();
     }
@@ -40,11 +26,19 @@ public sealed class ImageBurstSpamGatewayHandler(
         discordClient.MessageReceived -= HandleMessageReceivedAsync;
     }
 
+    private static bool HasStaffPermissions(GuildPermissions permissions) =>
+        permissions.Administrator
+        || permissions.ManageGuild
+        || permissions.ManageMessages
+        || permissions.BanMembers
+        || permissions.KickMembers
+        || permissions.ModerateMembers;
+
     private async Task HandleDetectionAsync(ImageBurstDetection detection)
     {
         var guild = discordClient.GetGuild(detection.GuildId);
 
-        if (!settingsByGuild.TryGetValue(detection.GuildId, out var currentSettings))
+        if (settings.Current(detection.GuildId) is not { HasValue: true, Value: var currentSettings })
             return;
 
         var reason =
@@ -52,40 +46,48 @@ public sealed class ImageBurstSpamGatewayHandler(
             + $"{detection.ChannelIds.Count} channels with {currentSettings.RequiredAttachmentCount}+ attachments "
             + $"in {currentSettings.Window} seconds.";
 
-        await guild.AddBanAsync(detection.UserId, _options.ImageBurstSpamHistoryPruneDays, reason)
-            .ConfigureAwait(false);
+        await guild.AddBanAsync(
+            userId: detection.UserId,
+            pruneDays: _options.ImageBurstSpamHistoryPruneDays,
+            reason: reason,
+            new RequestOptions { CancelToken = lifetime.ApplicationStopping });
 
-        _logger.Warning("Banned user {UserId} for image-burst spam across {ChannelCount} channels", detection.UserId,
-            detection.ChannelIds.Count);
+        _logger.Warning(
+            "Banned user {UserId} for image-burst spam across {ChannelCount} channels",
+            propertyValue0: detection.UserId,
+            propertyValue1: detection.ChannelIds.Count);
     }
 
     private async Task HandleMessageReceivedAsync(SocketMessage message)
     {
         try
         {
-            Option<ImageBurstMessage> qualifyingResult = TryCreateQualifyingMessage(message);
+            DotNext.Optional<ImageBurstMessage> qualifyingResult = TryCreateQualifyingMessage(message);
 
-            if (qualifyingResult.Value is not Some<ImageBurstMessage>(var qualifyingMessage))
+            if (qualifyingResult is not { HasValue: true, Value: var qualifyingMessage })
                 return;
 
-            Option<ImageBurstDetection> detectionResult = detector.Observe(qualifyingMessage);
+            DotNext.Optional<ImageBurstDetection> detectionResult = detector.Observe(
+                message: qualifyingMessage,
+                settings.Current(qualifyingMessage.GuildId));
 
-            if (detectionResult.Value is not Some<ImageBurstDetection>(var detection))
+            if (detectionResult is not { HasValue: true, Value: var detection })
                 return;
 
-            await HandleDetectionAsync(detection).ConfigureAwait(false);
+            await HandleDetectionAsync(detection);
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "Failed processing image-burst spam detection for message {MessageId}", message.Id);
+            _logger.Error(exception: ex, "Failed processing image-burst spam detection for message {MessageId}", propertyValue: message.Id);
         }
     }
 
     private bool IsExempt(SocketGuildUser user)
     {
         return _options.ImageBurstSpamAllowlistedUserIds.Contains(user.Id)
-               || user.Roles.Any(role => _options.ImageBurstSpamAllowlistedRoleIds.Contains(role.Id))
-               || HasStaffPermissions(user.GuildPermissions);
+            || user.Roles
+               .Any(role => _options.ImageBurstSpamAllowlistedRoleIds.Contains(role.Id))
+            || HasStaffPermissions(user.GuildPermissions);
     }
 
     private void Subscribe()
@@ -93,36 +95,42 @@ public sealed class ImageBurstSpamGatewayHandler(
         discordClient.MessageReceived += HandleMessageReceivedAsync;
     }
 
-    private Option<ImageBurstMessage> TryCreateQualifyingMessage(SocketMessage message)
+    private DotNext.Optional<ImageBurstMessage> TryCreateQualifyingMessage(SocketMessage message)
     {
         if (message is not SocketUserMessage userMessage)
-            return new None();
+            return default;
 
         if (userMessage.Source != MessageSource.User)
-            return new None();
+            return default;
 
         if (userMessage.Author.IsBot || userMessage.Author.IsWebhook)
-            return new None();
+            return default;
 
         if (userMessage.Channel is not SocketTextChannel channel)
-            return new None();
+            return default;
 
         if (userMessage.Author is not SocketGuildUser guildUser)
-            return new None();
+            return default;
 
-        if (!settingsByGuild.TryGetValue(channel.Guild.Id, out var currentSettings))
-            return new None();
+        if (settings.Current(channel.Guild.Id) is not { HasValue: true, Value: var currentSettings })
+            return default;
 
         if (userMessage.Attachments.Count < currentSettings.RequiredAttachmentCount)
-            return new None();
+            return default;
 
         if (IsExempt(guildUser))
-            return new None();
+            return default;
 
-        ImageBurstAttachment[] attachments =
-            userMessage.Attachments.Select(x => new ImageBurstAttachment(x.Url)).ToArray();
+        ImageBurstAttachment[] attachments = userMessage.Attachments
+           .Select(x => new ImageBurstAttachment(x.Url))
+           .ToArray();
 
-        return new Some<ImageBurstMessage>(
-            new ImageBurstMessage(channel.Guild.Id, guildUser.Id, channel.Id, userMessage.Timestamp, attachments));
+        return new DotNext.Optional<ImageBurstMessage>(
+            new ImageBurstMessage(
+                GuildId: channel.Guild.Id,
+                UserId: guildUser.Id,
+                ChannelId: channel.Id,
+                Timestamp: userMessage.Timestamp,
+                Attachments: attachments));
     }
 }

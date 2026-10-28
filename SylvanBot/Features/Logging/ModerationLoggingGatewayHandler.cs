@@ -1,31 +1,37 @@
-namespace SylvanBot.Features.Logging;
-
-using Discord.Rest;
-using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Common;
+﻿using System.Threading.Channels;
+using SylvanBot.Application.Features.MessageCache;
+using SylvanBot.Features.MessageCache;
 using SylvanBot.Gateway;
-using SylvanBot.Infrastructure.Data;
-using DownloadedAttachment = SylvanBot.Features.Logging.ModerationLogComponents.DownloadedAttachment;
+
+namespace SylvanBot.Features.Logging;
 
 public sealed class ModerationLoggingGatewayHandler(
     DiscordSocketClient discordClient,
-    IDbContextFactory<BotDbContext> dbContextFactory,
-    HttpClient httpClient,
-    IOptions<LoggingOptions> options,
-    ILogger logger) : IDiscordGatewayHandler, IDisposable
+    LoggingScopeResolver scope,
+    ModerationLogPublisher publisher,
+    MessageSnapshotCache cache,
+    MessageUpdateGatewayAdapter updatePayload,
+    ILogger logger
+) : BackgroundService, IDiscordGatewayHandler
 {
-    private const MessageFlags CompactLogMessageFlags = MessageFlags.ComponentsV2 | MessageFlags.SuppressNotification;
-    private const int MaxUploadAttachmentCount = 10;
-    private const long MaxUploadAttachmentBytes = 8 * 1024 * 1024;
-
     private readonly ILogger _logger = logger.ForContext<ModerationLoggingGatewayHandler>();
-    private readonly LoggingOptions _options = options.Value;
-    private readonly CancellationTokenSource _shutdown = new();
-    private CancellationToken _shutdownToken;
+
+    private readonly Channel<CacheWork> _work = Channel.CreateBounded<CacheWork>(
+        new BoundedChannelOptions(128)
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.Wait,
+        });
+
+    private CancellationToken _stoppingToken;
+    private long _failures;
+
+    public long Failures => Interlocked.Read(ref _failures);
 
     public Task InitializeAsync(CancellationToken ct)
     {
-        _shutdownToken = _shutdown.Token;
+        discordClient.MessageReceived += DispatchMessageReceivedAsync;
         discordClient.MessageUpdated += DispatchMessageUpdatedAsync;
         discordClient.MessageDeleted += DispatchMessageDeletedAsync;
         discordClient.MessagesBulkDeleted += DispatchMessagesBulkDeletedAsync;
@@ -35,616 +41,282 @@ public sealed class ModerationLoggingGatewayHandler(
 
     public void Unsubscribe()
     {
+        discordClient.MessageReceived -= DispatchMessageReceivedAsync;
         discordClient.MessageUpdated -= DispatchMessageUpdatedAsync;
         discordClient.MessageDeleted -= DispatchMessageDeletedAsync;
         discordClient.MessagesBulkDeleted -= DispatchMessagesBulkDeletedAsync;
-        _shutdown.Cancel();
+        _work.Writer.TryComplete();
     }
 
-    public void Dispose()
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Unsubscribe();
-        _shutdown.Dispose();
-    }
+        _stoppingToken = stoppingToken;
 
-    private static async Task SendLogAsync(
-        IMessageChannel logChannel,
-        IReadOnlyCollection<DownloadedAttachment> attachments,
-        CancellationToken ct,
-        string? text = null,
-        MessageComponent? components = null)
-    {
-        ct.ThrowIfCancellationRequested();
-        var flags = components is null ? MessageFlags.SuppressNotification : CompactLogMessageFlags;
-        var request = new RequestOptions { CancelToken = ct };
-
-        if (attachments.Count == 0)
+        try
         {
-            await logChannel.SendMessageAsync(
-                text,
-                options: request,
-                allowedMentions: AllowedMentions.None,
-                components: components,
-                flags: flags);
+            await foreach (var work in _work.Reader.ReadAllAsync(stoppingToken))
+            {
+                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                timeout.CancelAfter(TimeSpan.FromSeconds(30));
+
+                try
+                {
+                    await ProcessAsync(work: work, ct: timeout.Token);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+                {
+                    Interlocked.Increment(ref _failures);
+
+                    _logger.Warning(
+                        "Message handling timed out for guild {GuildId}, channel {ChannelId}",
+                        propertyValue0: work.GuildId,
+                        propertyValue1: work.ChannelId);
+                }
+                catch (Exception exception)
+                {
+                    Interlocked.Increment(ref _failures);
+
+                    _logger.Warning(
+                        "Message cache handling failed for guild {GuildId}, channel {ChannelId}, message {MessageId}: {ExceptionType}",
+                        work.GuildId,
+                        work.ChannelId,
+                        work switch
+                        {
+                            ReceivedWork received => received.Message.MessageId,
+                            EditedWork edited => edited.Message.MessageId,
+                            _ => (ulong?)null,
+                        },
+                        exception.GetType().Name);
+                }
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Already persisted observations survive shutdown; pending events are transient and are not replayed.
+        }
+    }
+
+    private static bool IsQualifyingUserMessage(IMessage message) =>
+        message.Source == MessageSource.User && !message.Author.IsBot && !message.Author.IsWebhook;
+
+    private Task DispatchMessageReceivedAsync(SocketMessage message)
+    {
+        if (!IsQualifyingUserMessage(message) || message.Channel is not IGuildChannel guildChannel)
+            return Task.CompletedTask;
+
+        ImmutableArray<MessageAttachment> attachments = message
+           .Attachments
+           .Select(attachment => new MessageAttachment(
+                       Url: attachment.Url,
+                       ProxyUrl: attachment.ProxyUrl,
+                       ContentType: attachment.ContentType,
+                       Size: attachment.Size))
+           .ToImmutableArray();
+
+        var valid = attachments
+           .All(attachment => !string.IsNullOrWhiteSpace(attachment.Url) && attachment.Size >= 0);
+
+        if (!valid || message.Content is not { } content)
+        {
+            Interlocked.Increment(ref _failures);
+            _logger.Warning("Invalid received message metadata for {MessageId}; cache observation skipped", propertyValue: message.Id);
+
+            return Task.CompletedTask;
+        }
+
+        var received = new MessageReceived
+        {
+            GuildId = guildChannel.GuildId,
+            ChannelId = message.Channel.Id,
+            MessageId = message.Id,
+            AuthorId = message.Author.Id,
+            CreatedAtUtc = SnowflakeUtils.FromSnowflake(message.Id),
+            Eligible = true,
+            Content = content,
+            Attachments = attachments,
+            EditedAtUtc = message.EditedTimestamp?.ToUniversalTime(),
+        };
+
+        return QueueAsync(new ReceivedWork(received));
+    }
+
+    private Task DispatchMessageUpdatedAsync(Cacheable<IMessage, ulong> before, SocketMessage after, ISocketMessageChannel channel)
+    {
+        if (after is not SocketUserMessage || channel is not IGuildChannel guildChannel)
+            return Task.CompletedTask;
+
+        // Never infer absence from Discord.NET's detached defaults (notably the empty attachment array).
+        DotNext.Optional<MessageEdited> observation = updatePayload.Current;
+
+        if (observation is not { HasValue: true, Value: var payload })
+            return Task.CompletedTask;
+
+        var matchesEvent = payload.MessageId == after.Id && payload.ChannelId == channel.Id && payload.GuildId == guildChannel.GuildId;
+
+        if (!matchesEvent)
+        {
+            Interlocked.Increment(ref _failures);
+            _logger.Warning("Message update field presence unavailable for {MessageId}; update skipped", propertyValue: after.Id);
+
+            return Task.CompletedTask;
+        }
+
+        var edited = payload with
+        {
+            GuildId = guildChannel.GuildId,
+            ChannelId = channel.Id,
+            AuthorId = after.Author.Id == 0 ? default : new DotNext.Optional<ulong>(after.Author.Id),
+            Eligible = after.Author.Id == 0 ? default : new DotNext.Optional<bool>(IsQualifyingUserMessage(after)),
+        };
+
+        return QueueAsync(new EditedWork(edited));
+    }
+
+    private Task DispatchMessageDeletedAsync(Cacheable<IMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel) =>
+        QueueDeleteAsync(channelId: channel.Id, [message.Id], bulk: false);
+
+    private Task DispatchMessagesBulkDeletedAsync(IReadOnlyCollection<Cacheable<IMessage, ulong>> messages, Cacheable<IMessageChannel, ulong> channel)
+    {
+        ImmutableArray<ulong> ids = messages
+           .Select(message => message.Id)
+           .ToImmutableArray();
+
+        return QueueDeleteAsync(channelId: channel.Id, ids: ids, bulk: true);
+    }
+
+    private Task QueueDeleteAsync(ulong channelId, ImmutableArray<ulong> ids, bool bulk)
+    {
+        if (discordClient.GetChannel(channelId) is not IGuildChannel channel)
+            return Task.CompletedTask;
+
+        return QueueAsync(
+            new DeletionWork(GuildId: channel.GuildId, ChannelId: channelId, DeletedMessageIds: ids, DeletedAt: DateTimeOffset.UtcNow, Bulk: bulk));
+    }
+
+    private async Task QueueAsync(CacheWork work)
+    {
+        try
+        {
+            // Await admission only. Sustained overload applies bounded backpressure to gateway dispatch.
+            await _work.Writer.WriteAsync(item: work, cancellationToken: _stoppingToken);
+        }
+        catch (OperationCanceledException) when (_stoppingToken.IsCancellationRequested)
+        {
+        }
+        catch (ChannelClosedException)
+        {
+            // Shutdown has stopped admission.
+        }
+    }
+
+    private async Task ProcessAsync(CacheWork work, CancellationToken ct)
+    {
+        if (
+            discordClient.GetChannel(work.ChannelId) is not IMessageChannel sourceChannel
+            || sourceChannel is not IGuildChannel guildChannel
+            || guildChannel.GuildId != work.GuildId)
+            return;
+
+        if (work is DeletionWork deletion)
+        {
+            await ProcessDeletionAsync(work: deletion, sourceChannel: sourceChannel, ct: ct);
 
             return;
         }
 
-        List<FileAttachment> files = [];
+        var configuration = await scope.GetConfigurationAsync(guildId: work.GuildId, sourceChannel: sourceChannel, ct: ct);
 
-        try
+        if (configuration is null)
+            return;
+
+        switch (work)
         {
-            foreach (var attachment in attachments)
-            {
-                files.Add(new FileAttachment(new MemoryStream(attachment.Bytes, writable: false), attachment.FileName));
-            }
-
-            await logChannel.SendFilesAsync(
-                files,
-                text,
-                options: request,
-                allowedMentions: AllowedMentions.None,
-                components: components,
-                flags: flags);
-        }
-        finally
-        {
-            foreach (var file in files)
-                file.Dispose();
-        }
-    }
-
-    private static bool IsQualifyingUserMessage(IMessage message)
-    {
-        return message.Source == MessageSource.User && !message.Author.IsBot && !message.Author.IsWebhook;
-    }
-
-    private static async Task<ulong?> FindBanModeratorAsync(
-        SocketGuild guild,
-        ulong authorId,
-        DateTimeOffset deletedAt,
-        RequestOptions request)
-    {
-        IEnumerable<RestAuditLogEntry> entries = await guild
-            .GetAuditLogsAsync(limit: 20, options: request, actionType: ActionType.Ban)
-            .FlattenAsync();
-
-        RestAuditLogEntry[] matchingEntries = entries
-            .Where(entry => Math.Abs((entry.CreatedAt - deletedAt).TotalSeconds) <= 10)
-            .Where(entry => entry.Data is BanAuditLogData data && data.Target?.Id == authorId)
-            .ToArray();
-
-        return matchingEntries.Length == 1 ? matchingEntries[0].User?.Id : null;
-    }
-
-    private Task DispatchMessageUpdatedAsync(
-        Cacheable<IMessage, ulong> cachedMessage,
-        SocketMessage updatedMessage,
-        ISocketMessageChannel sourceChannel)
-    {
-        try
-        {
-            var isQualifyingUpdate = updatedMessage is SocketUserMessage && IsQualifyingUserMessage(updatedMessage);
-
-            if (!isQualifyingUpdate || sourceChannel is not IGuildChannel guildChannel)
-                return Task.CompletedTask;
-
-            var beforeContent = cachedMessage.HasValue ? cachedMessage.Value.Content : null;
-            var afterContent = updatedMessage.Content;
-            var authorId = updatedMessage.Author.Id;
-            var messageId = updatedMessage.Id;
-            var guildId = guildChannel.GuildId;
-            var messageJumpUrl = updatedMessage.GetJumpUrl();
-            var ct = _shutdownToken;
-
-            var contentIsUnchanged = cachedMessage.HasValue && string.Equals(beforeContent, afterContent, StringComparison.Ordinal);
-
-            if (contentIsUnchanged)
-                return Task.CompletedTask;
-
-            _ = Task.Run(
-                () => HandleMessageUpdatedAsync(
-                    guildId,
-                    sourceChannel,
-                    messageId,
-                    authorId,
-                    messageJumpUrl,
-                    beforeContent,
-                    afterContent,
-                    ct),
-                ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning(ex, "Failed to dispatch message edit {MessageId} in channel {ChannelId}", updatedMessage.Id, sourceChannel.Id);
-        }
-
-        return Task.CompletedTask;
-    }
-
-    private Task DispatchMessageDeletedAsync(
-        Cacheable<IMessage, ulong> cachedMessage,
-        Cacheable<IMessageChannel, ulong> cachedChannel)
-    {
-        try
-        {
-            if (!cachedMessage.HasValue)
-                return Task.CompletedTask;
-
-            var deletedMessage = cachedMessage.Value;
-
-            if (!IsQualifyingUserMessage(deletedMessage))
-                return Task.CompletedTask;
-
-            var sourceChannel = cachedChannel.HasValue
-                ? cachedChannel.Value
-                : discordClient.GetChannel(cachedChannel.Id) as IMessageChannel;
-
-            if (sourceChannel is not IGuildChannel guildChannel)
-            {
-                _logger.Debug(
-                    "Skipping moderation log for deleted message {MessageId}: guild channel {ChannelId} is unavailable",
-                    cachedMessage.Id,
-                    cachedChannel.Id);
-
-                return Task.CompletedTask;
-            }
-
-            var guildId = guildChannel.GuildId;
-            var ct = _shutdownToken;
-
-            _ = Task.Run(
-                () => HandleMessageDeletedAsync(
-                    guildId,
-                    sourceChannel,
-                    deletedMessage,
-                    ct),
-                ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning(
-                ex,
-                "Failed to dispatch message deletion {MessageId} in channel {ChannelId}",
-                cachedMessage.Id,
-                cachedChannel.Id);
-        }
-
-        return Task.CompletedTask;
-    }
-
-    private Task DispatchMessagesBulkDeletedAsync(
-        IReadOnlyCollection<Cacheable<IMessage, ulong>> messages,
-        Cacheable<IMessageChannel, ulong> cachedChannel)
-    {
-        try
-        {
-            var deletedAt = DateTimeOffset.UtcNow;
-
-            IMessage[] cachedMessages = messages
-                .Where(message => message.HasValue)
-                .Select(message => message.Value)
-                .ToArray();
-
-            IMessage[] deletedMessages = cachedMessages
-                .Where(IsQualifyingUserMessage)
-                .ToArray();
-
-            if (deletedMessages.Length == 0)
-                return Task.CompletedTask;
-
-            var authorIds = cachedMessages
-                .Select(message => message.Author.Id)
-                .Distinct()
-                .Take(2)
-                .ToArray();
-
-            ulong? soleAuthorId = authorIds.Length == 1 ? authorIds[0] : null;
-            var ct = _shutdownToken;
-
-            _ = Task.Run(
-                () => HandleMessagesBulkDeletedAsync(
-                    deletedMessages,
-                    cachedChannel,
-                    messages.Count,
-                    soleAuthorId,
-                    deletedAt,
-                    ct),
-                ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning(ex, "Failed to dispatch bulk message deletion in channel {ChannelId}", cachedChannel.Id);
-        }
-
-        return Task.CompletedTask;
-    }
-
-    private async Task HandleMessageUpdatedAsync(
-        ulong guildId,
-        IChannel sourceChannel,
-        ulong messageId,
-        ulong authorId,
-        string messageJumpUrl,
-        string? beforeContent,
-        string? afterContent,
-        CancellationToken ct)
-    {
-        try
-        {
-            ct.ThrowIfCancellationRequested();
-            var logChannel = await GetLogChannelAsync(guildId, sourceChannel, forEdits: true, ct);
-
-            if (logChannel is null)
-                return;
-
-            var compactLog = ModerationLogComponents.BuildEditLog(
-                messageJumpUrl,
-                sourceChannel.Id,
-                authorId,
-                beforeContent,
-                afterContent);
-
-            await SendLogAsync(logChannel, compactLog.Attachments, ct, components: compactLog.Components);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            _logger.Debug("Cancelled moderation log for edited message {MessageId} during shutdown", messageId);
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning(
-                ex,
-                "Failed to log message edit for {MessageId} in channel {ChannelId}",
-                messageId,
-                sourceChannel.Id);
-        }
-    }
-
-    private async Task HandleMessageDeletedAsync(
-        ulong guildId,
-        IMessageChannel sourceChannel,
-        IMessage deletedMessage,
-        CancellationToken ct)
-    {
-        var messageId = deletedMessage.Id;
-
-        try
-        {
-            ct.ThrowIfCancellationRequested();
-            var logChannel = await GetLogChannelAsync(guildId, sourceChannel, forEdits: false, ct);
-
-            if (logChannel is null)
-                return;
-
-            List<DownloadedAttachment> attachments = [];
-            var precedingMessageJumpUrl = await TryGetPrecedingMessageJumpUrlAsync(sourceChannel, messageId, ct);
-            int omittedAttachmentCount;
-
-            using (var downloadTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct))
-            {
-                downloadTimeout.CancelAfter(TimeSpan.FromSeconds(10));
-
-                omittedAttachmentCount = await DownloadAttachmentsAsync(
-                    deletedMessage,
-                    attachments,
-                    downloadTimeout.Token);
-            }
-
-            var compactLog = ModerationLogComponents.BuildDeleteLog(
-                sourceChannel.Id,
-                deletedMessage.Author.Id,
-                precedingMessageJumpUrl,
-                deletedMessage.Content,
-                attachments,
-                omittedAttachmentCount);
-
-            await SendLogAsync(logChannel, compactLog.Attachments, ct, components: compactLog.Components);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            _logger.Debug("Cancelled moderation log for deleted message {MessageId} during shutdown", messageId);
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning(
-                ex,
-                "Failed to log message deletion for {MessageId} in channel {ChannelId}",
-                messageId,
-                sourceChannel.Id);
-        }
-    }
-
-    private async Task HandleMessagesBulkDeletedAsync(
-        IReadOnlyCollection<IMessage> messages,
-        Cacheable<IMessageChannel, ulong> cachedChannel,
-        int originalMessageCount,
-        ulong? soleAuthorId,
-        DateTimeOffset deletedAt,
-        CancellationToken ct)
-    {
-        try
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var sourceChannel = cachedChannel.HasValue
-                ? cachedChannel.Value
-                : discordClient.GetChannel(cachedChannel.Id) as IMessageChannel;
-
-            if (sourceChannel is not IGuildChannel guildChannel)
-            {
-                _logger.Debug(
-                    "Skipping moderation log for {MessageCount} bulk deletions: guild channel {ChannelId} is unavailable",
-                    messages.Count,
-                    cachedChannel.Id);
-
-                return;
-            }
-
-            var logChannel = await GetLogChannelAsync(guildChannel.GuildId, sourceChannel, forEdits: false, ct);
-
-            if (logChannel is null)
-                return;
-
-            IEnumerable<(ulong AuthorId, ulong ChannelId, string Content)> rows = messages
-                .Select(message => (message.Author.Id, message.Channel.Id, message.Content));
-
-            var transcript = new DownloadedAttachment("bulk-delete.jsonl", "application/x-ndjson", BulkDeleteTranscript.Create(rows));
-
-            var moderatorId = await TryGetBulkDeleteModeratorAsync(
-                guildChannel.GuildId,
-                sourceChannel.Id,
-                originalMessageCount,
-                soleAuthorId,
-                deletedAt,
-                ct);
-
-            var timestamp = ModerationLogComponents.FormatTimestamp(deletedAt);
-
-            var text = moderatorId is { } actorId
-                ? $"Bulk delete in <#{sourceChannel.Id}> by <@{actorId}> at {timestamp}."
-                : $"Bulk delete in <#{sourceChannel.Id}> at {timestamp}. Moderator could not be determined.";
-
-            await SendLogAsync(logChannel, [transcript], ct, text: text);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            _logger.Debug(
-                "Cancelled moderation log for bulk deletion in channel {ChannelId} during shutdown",
-                cachedChannel.Id);
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning(ex, "Failed to log bulk message deletion in channel {ChannelId}", cachedChannel.Id);
-        }
-    }
-
-    private async Task<ulong?> TryGetBulkDeleteModeratorAsync(
-        ulong guildId,
-        ulong channelId,
-        int originalMessageCount,
-        ulong? soleAuthorId,
-        DateTimeOffset deletedAt,
-        CancellationToken ct)
-    {
-        var guild = discordClient.GetGuild(guildId);
-
-        if (guild?.CurrentUser.GuildPermissions.ViewAuditLog != true)
-            return null;
-
-        using var lookupTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        lookupTimeout.CancelAfter(TimeSpan.FromSeconds(5));
-
-        try
-        {
-            var request = new RequestOptions { CancelToken = lookupTimeout.Token };
-
-            for (var attempt = 0; attempt < 3; attempt++)
-            {
-                if (attempt > 0)
-                    await Task.Delay(TimeSpan.FromSeconds(attempt), lookupTimeout.Token);
-
-                IEnumerable<RestAuditLogEntry> bulkEntries = await guild
-                    .GetAuditLogsAsync(limit: 20, options: request, actionType: ActionType.MessageBulkDeleted)
-                    .FlattenAsync();
-
-                RestAuditLogEntry[] matchingEntries = bulkEntries
-                    .Where(entry => Math.Abs((entry.CreatedAt - deletedAt).TotalSeconds) <= 10)
-                    .Where(entry => entry.Data is MessageBulkDeleteAuditLogData data
-                                    && data.ChannelId == channelId
-                                    && data.MessageCount == originalMessageCount)
-                    .ToArray();
-
-                if (matchingEntries.Length == 1)
-                    return matchingEntries[0].User?.Id;
-
-                var canMatchBan = attempt == 2 && matchingEntries.Length == 0;
-
-                if (!canMatchBan || soleAuthorId is not { } authorId)
-                    continue;
-
-                // Give the direct deletion entry time to arrive before considering a ban.
-                return await FindBanModeratorAsync(guild, authorId, deletedAt, request);
-            }
-
-            _logger.Debug("No unique audit match for bulk deletion in guild {GuildId}, channel {ChannelId}", guildId, channelId);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (OperationCanceledException) when (lookupTimeout.IsCancellationRequested)
-        {
-            _logger.Debug("Audit lookup timed out for bulk deletion in guild {GuildId}, channel {ChannelId}", guildId, channelId);
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning(ex, "Failed to read audit log for bulk deletion in guild {GuildId}, channel {ChannelId}", guildId, channelId);
-        }
-
-        return null;
-    }
-
-    private async Task<int> DownloadAttachmentsAsync(
-        IMessage deletedMessage,
-        List<DownloadedAttachment> attachments,
-        CancellationToken ct)
-    {
-        var initialAttachmentCount = attachments.Count;
-
-        var uploadedBytes = attachments
-            .Sum(attachment => attachment.Bytes.LongLength);
-
-        var remainingBytes = MaxUploadAttachmentBytes - uploadedBytes;
-
-        IEnumerable<IAttachment> candidates = deletedMessage.Attachments
-            .Take(_options.MaxAttachmentCountPerMessage);
-
-        foreach (var attachment in candidates)
-        {
-            var uploadLimitReached = attachments.Count >= MaxUploadAttachmentCount
-                                     || remainingBytes <= 0
-                                     || ct.IsCancellationRequested;
-
-            if (uploadLimitReached)
-                break;
-
-            var maxBytes = Math.Min(_options.MaxAttachmentBytesPerAttachment, remainingBytes);
-            var url = string.IsNullOrWhiteSpace(attachment.Url) ? attachment.ProxyUrl : attachment.Url;
-            var cannotDownload = attachment.Size > maxBytes || string.IsNullOrWhiteSpace(url);
-
-            if (cannotDownload)
-                continue;
-
-            try
-            {
-                Option<byte[]> downloadResult = await AttachmentEvidenceDownloader.TryDownloadAsync(
-                    httpClient,
-                    url,
-                    maxBytes,
-                    _logger,
-                    ct);
-
-                if (downloadResult.Value is Some<byte[]>(var bytes))
-                {
-                    var contentType = attachment.ContentType ?? "application/octet-stream";
-                    var fileName = ModerationLogComponents.GetAttachmentFileName(attachments.Count + 1, contentType);
-                    attachments.Add(new DownloadedAttachment(fileName, contentType, bytes));
-                    remainingBytes -= bytes.LongLength;
-                }
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                _logger.Debug("Attachment download cancelled for deleted message {MessageId}", deletedMessage.Id);
+            case ReceivedWork received:
+                await cache.ReceiveAsync(message: received.Message, ct: ct);
 
                 break;
-            }
-        }
+            case EditedWork edited:
+                await ProcessEditAsync(edited: edited.Message, sourceChannel: sourceChannel, ct: ct);
 
-        return deletedMessage.Attachments.Count - (attachments.Count - initialAttachmentCount);
+                break;
+        }
     }
 
-    private async Task<IMessageChannel?> GetLogChannelAsync(
-        ulong guildId,
-        IChannel sourceChannel,
-        bool forEdits,
-        CancellationToken ct)
+    private async Task ProcessEditAsync(MessageEdited edited, IMessageChannel sourceChannel, CancellationToken ct)
     {
-        List<ulong> scopeIds = [sourceChannel.Id];
-        var parentChannel = sourceChannel;
+        DotNext.Optional<MessageEdit> result = await cache.EditAsync(message: edited, ct: ct);
 
-        if (sourceChannel is SocketThreadChannel threadChannel)
+        if (result is not { HasValue: true, Value: var change })
+            return;
+
+        var after = change.After;
+        var beforeContent = change.Before is { HasValue: true, Value: var before } ? before.Content : null;
+
+        var contentChanged = edited.Content is { HasValue: true }
+            && !string.Equals(a: beforeContent, b: after.Content, comparisonType: StringComparison.Ordinal);
+
+        if (contentChanged)
         {
-            parentChannel = threadChannel.ParentChannel;
-            scopeIds.Add(parentChannel.Id);
+            await publisher.PublishEditAsync(
+                guildId: edited.GuildId,
+                sourceChannel: sourceChannel,
+                authorId: after.AuthorId,
+                $"https://discord.com/channels/{edited.GuildId}/{edited.ChannelId}/{after.MessageId}",
+                beforeContent: beforeContent,
+                afterContent: after.Content,
+                expiresAtUtc: after.ExpiresAtUtc,
+                ct: ct);
         }
-
-        if (parentChannel is INestedChannel { CategoryId: { } categoryId })
-            scopeIds.Add(categoryId);
-
-        ulong? destinationChannelId;
-
-        await using (var dbContext = await dbContextFactory.CreateDbContextAsync(ct))
-        {
-            var configuration = await dbContext.LoggingConfigurations
-                .AsNoTracking()
-                .SingleOrDefaultAsync(configuration => configuration.GuildId == guildId, ct);
-
-            if (configuration?.Enabled != true)
-                return null;
-
-            destinationChannelId = forEdits
-                ? configuration.EditLogChannelId
-                : configuration.DeleteLogChannelId;
-
-            if (destinationChannelId is null)
-                return null;
-
-            var isOutputChannel = scopeIds.Contains(configuration.DeleteLogChannelId ?? 0)
-                                  || scopeIds.Contains(configuration.EditLogChannelId ?? 0);
-
-            if (isOutputChannel)
-                return null;
-
-            var isExcluded = await dbContext.LoggingExcludedChannels
-                .AsNoTracking()
-                .AnyAsync(excluded => excluded.GuildId == guildId && scopeIds.Contains(excluded.ChannelId), ct);
-
-            if (isExcluded)
-                return null;
-        }
-
-        var logChannel = discordClient.GetChannel(destinationChannelId.Value) as IMessageChannel;
-        var belongsToGuild = logChannel is IGuildChannel guildChannel && guildChannel.GuildId == guildId;
-
-        if (belongsToGuild)
-            return logChannel;
-
-        _logger.Warning(
-            "Moderation log channel {ChannelId} is unavailable in guild {GuildId} for {EventKind} in channel {SourceChannelId}",
-            destinationChannelId,
-            guildId,
-            forEdits ? "edit" : "delete",
-            sourceChannel.Id);
-
-        return null;
     }
 
-    private async Task<string?> TryGetPrecedingMessageJumpUrlAsync(
-        IMessageChannel sourceChannel,
-        ulong deletedMessageId,
-        CancellationToken ct)
+    private async Task ProcessDeletionAsync(DeletionWork work, IMessageChannel sourceChannel, CancellationToken ct)
     {
-        using var lookupTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        lookupTimeout.CancelAfter(TimeSpan.FromSeconds(2));
+        ImmutableArray<CachedMessageSnapshot> snapshots = await cache.BeginDeleteAsync(
+            guildId: work.GuildId,
+            messageIds: work.DeletedMessageIds,
+            ct: ct);
 
-        try
+        if (snapshots.IsEmpty)
+            return;
+
+        bool published;
+
+        if (work.Bulk)
         {
-            var request = new RequestOptions { CancelToken = lookupTimeout.Token };
+            var authors = snapshots
+               .Select(message => message.AuthorId)
+               .Distinct()
+               .Take(2)
+               .ToArray();
 
-            IEnumerable<IMessage> messages = await sourceChannel
-                .GetMessagesAsync(deletedMessageId, Direction.Before, limit: 1, options: request)
-                .FlattenAsync();
+            // Uncached IDs may belong to another author, including an excluded bot or webhook.
+            var soleAuthorKnown = authors.Length == 1 && snapshots.Length == work.DeletedMessageIds.Length;
 
-            var precedingMessage = messages.FirstOrDefault();
-
-            return precedingMessage?.GetJumpUrl();
+            published = await publisher.PublishBulkDeletionAsync(
+                messages: snapshots,
+                sourceChannel: sourceChannel,
+                originalMessageCount: work.DeletedMessageIds.Length,
+                soleAuthorKnown ? authors[0] : null,
+                deletedAt: work.DeletedAt,
+                ct: ct);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (OperationCanceledException) when (lookupTimeout.IsCancellationRequested)
-        {
-            _logger.Debug("Preceding message lookup timed out for deleted message {MessageId}", deletedMessageId);
+        else
+            published = await publisher.PublishDeletionAsync(guildId: work.GuildId, sourceChannel: sourceChannel, snapshots[0], ct: ct);
 
-            return null;
-        }
-        catch (Exception ex)
-        {
-            _logger.Debug(ex, "Failed to fetch preceding message for deleted message {MessageId}", deletedMessageId);
-
-            return null;
-        }
+        if (published)
+            await cache.CompleteDeleteAsync(snapshots: snapshots, ct: ct);
     }
+
+    private abstract record CacheWork(ulong GuildId, ulong ChannelId);
+
+    private sealed record ReceivedWork(MessageReceived Message) : CacheWork(GuildId: Message.GuildId, ChannelId: Message.ChannelId);
+
+    private sealed record EditedWork(MessageEdited Message) : CacheWork(GuildId: Message.GuildId, ChannelId: Message.ChannelId);
+
+    private sealed record DeletionWork(ulong GuildId, ulong ChannelId, ImmutableArray<ulong> DeletedMessageIds, DateTimeOffset DeletedAt, bool Bulk)
+        : CacheWork(GuildId: GuildId, ChannelId: ChannelId);
 }

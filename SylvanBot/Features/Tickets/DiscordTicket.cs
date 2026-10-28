@@ -129,7 +129,7 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
         }
     }
 
-    public async Task<Option<TicketMessage>> FindMessageAsync(
+    public async Task<DotNext.Optional<TicketMessage>> FindMessageAsync(
         TicketActor actor,
         Ticket ticket,
         CancellationToken cancellationToken)
@@ -142,7 +142,7 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
         var moderator = gld is null ? null : await gld.GetUserAsync(actor.UserId, options: options);
 
         if (gld is null || moderator is null)
-            return new None();
+            return DotNext.Optional<TicketMessage>.None;
 
         List<TicketMessage> publications = [];
 
@@ -165,7 +165,7 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
                 var msg = await ch.GetMessageAsync(publication.MessageId, CacheMode.AllowDownload, options);
 
                 if (msg is not null)
-                    return new Some<TicketMessage>(publication);
+                    return publication;
             }
             catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.NotFound
                                                       or System.Net.HttpStatusCode.Forbidden)
@@ -174,7 +174,7 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
             }
         }
 
-        return new None();
+        return DotNext.Optional<TicketMessage>.None;
     }
 
     public async Task<TicketMessage> PublishAsync(Ticket ticket, ulong channelId, CancellationToken cancellationToken)

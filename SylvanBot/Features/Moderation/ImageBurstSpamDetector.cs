@@ -1,51 +1,55 @@
-﻿namespace SylvanBot.Features.Moderation;
+﻿using System.Runtime.InteropServices;
 
-using System.Collections.Concurrent;
-using SylvanBot.Application.Common;
+namespace SylvanBot.Features.Moderation;
 
-public sealed class ImageBurstSpamDetector(
-    TimeProvider timeProvider,
-    ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild)
+public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
 {
-    private readonly Dictionary<ImageBurstBufferKey, Queue<ImageBurstMessage>> _buffers = new();
+    private readonly Dictionary<ImageBurstBufferKey, Queue<ImageBurstMessage>> _buffers =
+        new Dictionary<ImageBurstBufferKey, Queue<ImageBurstMessage>>();
 
-    private readonly Lock _gate = new();
+    private readonly Lock _gate = new Lock();
 
     private readonly Dictionary<ImageBurstBufferKey, DateTimeOffset> _handlingLocks = [];
 
-    public Option<ImageBurstDetection> Observe(ImageBurstMessage message)
+    public DotNext.Optional<ImageBurstDetection> Observe(ImageBurstMessage message, DotNext.Optional<ImageBurstSpamDetectorOptions> settings)
     {
-        var key = new ImageBurstBufferKey(message.GuildId, message.UserId);
+        var key = new ImageBurstBufferKey(GuildId: message.GuildId, UserId: message.UserId);
         var now = timeProvider.GetUtcNow();
 
         lock (_gate)
         {
             PruneExpiredLocks(now);
 
-            var isLocked = _handlingLocks.TryGetValue(key, out var lockedUntil) && lockedUntil > now;
-            if (isLocked)
-                return new None();
+            var isLocked = _handlingLocks.TryGetValue(key: key, out var lockedUntil) && lockedUntil > now;
 
-            if (!settingsByGuild.TryGetValue(message.GuildId, out var options))
-                return new None();
+            if (isLocked)
+                return default;
+
+            if (settings is not { HasValue: true, Value: var options })
+                return default;
 
             Queue<ImageBurstMessage> buffer = GetBuffer(key);
 
             buffer.Enqueue(message);
-            PruneOldMessages(buffer, message.Timestamp - TimeSpan.FromSeconds(options.Window));
+            PruneOldMessages(buffer: buffer, message.Timestamp - TimeSpan.FromSeconds(options.Window));
 
-            var channelIds = buffer.Select(x => x.ChannelId).Distinct().Order().ToArray();
+            var channelIds = buffer
+               .Select(x => x.ChannelId)
+               .Distinct()
+               .Order()
+               .ToArray();
 
             if (channelIds.Length < options.DistinctChannelThreshold)
-                return new None();
+                return default;
 
             _handlingLocks[key] = now + options.HandlingLockDuration;
 
-            return new Some<ImageBurstDetection>(
+            return new DotNext.Optional<ImageBurstDetection>(
                 new ImageBurstDetection(
                     GuildId: message.GuildId,
                     UserId: message.UserId,
-                    Messages: buffer.ToArray(),
+                    buffer
+                       .ToArray(),
                     ChannelIds: channelIds));
         }
     }
@@ -58,10 +62,10 @@ public sealed class ImageBurstSpamDetector(
 
     private Queue<ImageBurstMessage> GetBuffer(ImageBurstBufferKey key)
     {
-        if (_buffers.TryGetValue(key, out Queue<ImageBurstMessage>? buffer))
+        if (_buffers.TryGetValue(key: key, out Queue<ImageBurstMessage>? buffer))
             return buffer;
 
-        Queue<ImageBurstMessage> newBuffer = new();
+        Queue<ImageBurstMessage> newBuffer = new Queue<ImageBurstMessage>();
         _buffers[key] = newBuffer;
 
         return newBuffer;
@@ -69,11 +73,15 @@ public sealed class ImageBurstSpamDetector(
 
     private void PruneExpiredLocks(DateTimeOffset now)
     {
-        ImageBurstBufferKey[] expiredKeys = _handlingLocks.Where(x => x.Value <= now).Select(x => x.Key).ToArray();
+        ImageBurstBufferKey[] expiredKeys = _handlingLocks
+           .Where(x => x.Value <= now)
+           .Select(x => x.Key)
+           .ToArray();
 
         foreach (var key in expiredKeys)
             _handlingLocks.Remove(key);
     }
 
+    [StructLayout(LayoutKind.Auto)]
     private readonly record struct ImageBurstBufferKey(ulong GuildId, ulong UserId);
 }

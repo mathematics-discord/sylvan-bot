@@ -1,3 +1,5 @@
+using SylvanBot.Application.Infrastructure.Data;
+
 namespace SylvanBot.Infrastructure.Migrations;
 
 #nullable disable

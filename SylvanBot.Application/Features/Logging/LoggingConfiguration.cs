@@ -1,4 +1,4 @@
-﻿namespace SylvanBot.Features.Logging;
+﻿namespace SylvanBot.Application.Features.Logging;
 
 public sealed class LoggingConfiguration
 {

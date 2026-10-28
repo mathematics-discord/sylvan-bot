@@ -1,6 +1,10 @@
-namespace SylvanBot.Gateway;
-
+using Discord.Rest;
+using Microsoft.EntityFrameworkCore;
 using Serilog.Events;
+using SylvanBot.Application.Features.MessageCache;
+using SylvanBot.Application.Infrastructure.Data;
+
+namespace SylvanBot.Gateway;
 
 public sealed class DiscordBotHostedService : IHostedService
 {
@@ -8,12 +12,16 @@ public sealed class DiscordBotHostedService : IHostedService
     private readonly IEnumerable<IDiscordGatewayHandler> _gatewayHandlers;
     private readonly ILogger _logger;
     private readonly DiscordOptions _options;
+    private readonly MessageSnapshotCache _cache;
+    private readonly IDbContextFactory<BotDbContext> _dbContextFactory;
 
     public DiscordBotHostedService(
         DiscordSocketClient discordClient,
         InteractionService interactionService,
         IEnumerable<IDiscordGatewayHandler> gatewayHandlers,
         IOptions<DiscordOptions> options,
+        MessageSnapshotCache cache,
+        IDbContextFactory<BotDbContext> dbContextFactory,
         ILogger logger
     )
     {
@@ -21,17 +29,21 @@ public sealed class DiscordBotHostedService : IHostedService
         _gatewayHandlers = gatewayHandlers;
         _options = options.Value;
         _logger = logger.ForContext<DiscordBotHostedService>();
+        _cache = cache;
+        _dbContextFactory = dbContextFactory;
 
         _discordClient.Log += message =>
         {
-            LogDiscordMessage("Gateway", message);
+            LogDiscordMessage("Gateway", message: message);
+
             return Task.CompletedTask;
         };
 
         interactionService.Log += message =>
         {
-            if (message.Exception is not Discord.Interactions.InteractionException)
-                LogDiscordMessage("Interactions", message);
+            if (message.Exception is not InteractionException)
+                LogDiscordMessage("Interactions", message: message);
+
             return Task.CompletedTask;
         };
     }
@@ -42,10 +54,43 @@ public sealed class DiscordBotHostedService : IHostedService
         _discordClient.Disconnected += OnDisconnectedAsync;
         _discordClient.GuildMembersDownloaded += OnGuildMembersDownloadedAsync;
 
+        await _discordClient.LoginAsync(tokenType: TokenType.Bot, token: _options.Token);
+
+        try
+        {
+            var bot = await _discordClient.Rest.GetApplicationInfoAsync(new RequestOptions { CancelToken = cancellationToken });
+
+            IEnumerable<RestUserGuild> guilds = await _discordClient
+               .Rest.GetGuildSummariesAsync(options: new RequestOptions { CancelToken = cancellationToken })
+               .FlattenAsync();
+
+            var guildIds = guilds.Select(guild => guild.Id).ToArray();
+
+            await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            var configuredGuilds = await db
+               .LoggingConfigurations.AsNoTracking()
+               .Where(configuration => configuration.Enabled && guildIds.Contains(configuration.GuildId))
+               .Select(configuration => configuration.GuildId)
+               .ToArrayAsync(cancellationToken);
+
+            await _cache.InitializeAsync(botId: bot.Id, configuredGuilds.ToImmutableArray(), ct: cancellationToken);
+
+            _logger.Information(
+                "Message cache hydrated for bot {BotId} across {GuildCount} configured guilds",
+                propertyValue0: bot.Id,
+                propertyValue1: configuredGuilds.Length);
+        }
+        catch (Exception exception)
+        {
+            _logger.Error("Message cache hydration failed: {ExceptionType}; gateway startup aborted", propertyValue: exception.GetType().Name);
+
+            throw;
+        }
+
         foreach (var handler in _gatewayHandlers)
             await handler.InitializeAsync(cancellationToken);
 
-        await _discordClient.LoginAsync(TokenType.Bot, _options.Token);
         await _discordClient.StartAsync();
     }
 
@@ -78,18 +123,31 @@ public sealed class DiscordBotHostedService : IHostedService
 
         if (message.Exception is not null)
         {
-            _logger.Write(level, message.Exception, "[{Category}] {Source}: {Message}", category, source,
-                message.Message);
+            _logger.Write(
+                level: level,
+                exception: message.Exception,
+                "[{Category}] {Source}: {Message}",
+                propertyValue0: category,
+                propertyValue1: source,
+                propertyValue2: message.Message
+            );
 
             return;
         }
 
-        _logger.Write(level, "[{Category}] {Source}: {Message}", category, source, message.Message);
+        _logger.Write(
+            level: level,
+            "[{Category}] {Source}: {Message}",
+            propertyValue0: category,
+            propertyValue1: source,
+            propertyValue2: message.Message
+        );
     }
 
     private Task OnConnectedAsync()
     {
         _logger.Information("Gateway connected");
+
         return Task.CompletedTask;
     }
 
@@ -98,7 +156,7 @@ public sealed class DiscordBotHostedService : IHostedService
         if (exception is null)
             _logger.Warning("Gateway disconnected");
         else
-            _logger.Warning(exception, "Gateway disconnected with error");
+            _logger.Warning(exception: exception, "Gateway disconnected with error");
 
         return Task.CompletedTask;
     }

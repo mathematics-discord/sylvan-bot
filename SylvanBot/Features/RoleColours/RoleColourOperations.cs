@@ -1,76 +1,108 @@
-namespace SylvanBot.Features.RoleColours;
+﻿using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Features.RoleColours;
+using SylvanBot.Application.Infrastructure.Data;
 
-using Microsoft.EntityFrameworkCore;
-using SylvanBot.Infrastructure.Data;
+namespace SylvanBot.Features.RoleColours;
 
 public sealed class RoleColourOperations(BotDbContext db)
 {
     public async Task<ImmutableArray<RoleColourOption>> ListConfiguredOptionsAsync(ulong guildId, CancellationToken ct)
     {
-        return (
-            await db.RoleColourOptions.AsNoTracking().Where(option => option.GuildId == guildId)
-                .OrderBy(option => option.OptionId).ToArrayAsync(ct)
-        ).ToImmutableArray();
+        RoleColourOption[] options = await db.RoleColourOptions
+           .AsNoTracking()
+           .Where(option => option.GuildId == guildId)
+           .OrderBy(option => option.OptionId)
+           .ToArrayAsync(ct);
+
+        return options
+           .ToImmutableArray();
     }
 
-    public async Task<(RoleColourOption Option, bool Created)> UpsertMappingAsync(
+    public async Task<Result<(RoleColourOption Option, bool Created)>> UpsertMappingAsync(
         ulong guildId,
         long? optionId,
         ulong sourceRoleId,
         ulong displayRoleId,
-        CancellationToken ct
-    )
+        CancellationToken ct)
     {
         if (optionId is <= 0)
-            throw new ArgumentOutOfRangeException(nameof(optionId), optionId, "Mapping ID must be positive.");
+        {
+            return new Result<(RoleColourOption Option, bool Created)>(
+                OperationFailureException.Validation(description: "Mapping ID must be positive."));
+        }
 
         var option = optionId.HasValue
-            ? await db.RoleColourOptions.SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId.Value,
-                ct)
+            ? await db.RoleColourOptions
+               .SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId.Value, cancellationToken: ct)
             : null;
 
         if (optionId.HasValue && option is null)
-            throw new KeyNotFoundException($"Colour mapping {optionId.Value} was not found in this guild.");
+        {
+            return new Result<(RoleColourOption Option, bool Created)>(
+                OperationFailureException.NotFound(description: $"Colour mapping {optionId.Value} was not found in this guild."));
+        }
 
-        if (
-            await db.RoleColourOptions.AnyAsync(
-                o =>
-                    o.GuildId == guildId
-                    && o.SourceRoleId == sourceRoleId
-                    && o.DisplayRoleId == displayRoleId
-                    && (!optionId.HasValue || o.OptionId != optionId.Value),
-                ct
-            )
-        )
-            throw new ArgumentException("That source already grants this colour.", nameof(sourceRoleId));
+        IQueryable<RoleColourOption> matchingRoles = db.RoleColourOptions
+           .Where(mapping => mapping.GuildId == guildId)
+           .Where(mapping => mapping.SourceRoleId == sourceRoleId && mapping.DisplayRoleId == displayRoleId);
+
+        if (optionId is { } editingId)
+        {
+            matchingRoles = matchingRoles
+               .Where(mapping => mapping.OptionId != editingId);
+        }
+
+        var duplicate = await matchingRoles
+           .AnyAsync(ct);
+
+        if (duplicate)
+        {
+            return new Result<(RoleColourOption Option, bool Created)>(
+                OperationFailureException.Conflict(description: "That source already grants this colour."));
+        }
 
         var created = option is null;
+
         if (option is null)
         {
-            option = RoleColourOption.Create(guildId, sourceRoleId, displayRoleId);
+            Result<RoleColourOption> result = RoleColourOption.Create(guildId: guildId, sourceRoleId: sourceRoleId, displayRoleId: displayRoleId);
+
+            if (!result.IsSuccessful)
+                return new Result<(RoleColourOption Option, bool Created)>(result.Error!);
+
+            option = result.Value;
             db.RoleColourOptions.Add(option);
         }
         else
         {
-            option.Update(sourceRoleId, displayRoleId);
+            Result<ValueTuple> update = option.Update(sourceRoleId: sourceRoleId, displayRoleId: displayRoleId);
+
+            if (!update.IsSuccessful)
+                return new Result<(RoleColourOption Option, bool Created)>(update.Error!);
         }
 
         await db.SaveChangesAsync(ct);
+
         return (option, created);
     }
 
-    public async Task<RoleColourOption> DeleteMappingAsync(ulong guildId, long optionId, CancellationToken ct)
+    public async Task<Result<RoleColourOption>> DeleteMappingAsync(ulong guildId, long optionId, CancellationToken ct)
     {
         if (optionId <= 0)
-            throw new ArgumentOutOfRangeException(nameof(optionId), optionId, "Mapping ID must be positive.");
+            return new Result<RoleColourOption>(OperationFailureException.Validation(description: "Mapping ID must be positive."));
 
-        var option =
-            await db.RoleColourOptions.SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId, ct);
+        var option = await db.RoleColourOptions
+           .SingleOrDefaultAsync(o => o.GuildId == guildId && o.OptionId == optionId, cancellationToken: ct);
+
         if (option is null)
-            throw new KeyNotFoundException($"Colour mapping {optionId} was not found in this guild.");
+        {
+            return new Result<RoleColourOption>(
+                OperationFailureException.NotFound(description: $"Colour mapping {optionId} was not found in this guild."));
+        }
 
         db.RoleColourOptions.Remove(option);
         await db.SaveChangesAsync(ct);
+
         return option;
     }
 }

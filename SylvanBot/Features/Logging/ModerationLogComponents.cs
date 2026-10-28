@@ -1,6 +1,6 @@
-namespace SylvanBot.Features.Logging;
-
 using System.Globalization;
+
+namespace SylvanBot.Features.Logging;
 
 internal static class ModerationLogComponents
 {
@@ -20,19 +20,21 @@ internal static class ModerationLogComponents
         var after = afterContent ?? "*Unavailable*";
 
         if (beforeContent is not null && afterContent is not null)
-            (before, after) = MessageEditDiffer.BuildDiff(beforeContent, afterContent);
+            (before, after) = MessageEditDiffer.BuildDiff(before: beforeContent, after: afterContent);
 
         var blockLength = (MaxComponentTextLength - header.Length - 1) / 2;
-        var content = $"{CodeBlock(before, blockLength, ansi: true)}\n{CodeBlock(after, blockLength, ansi: true)}";
+
+        var content =
+            $"{CodeBlock(value: before, maxLength: blockLength, ansi: true)}\n{CodeBlock(value: after, maxLength: blockLength, ansi: true)}";
 
         var components = new ComponentBuilderV2(
             new ContainerBuilder()
-                .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
-                .WithSeparator(new SeparatorBuilder())
-                .WithTextDisplay(new TextDisplayBuilder().WithContent(content))
+               .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
+               .WithSeparator(new SeparatorBuilder())
+               .WithTextDisplay(new TextDisplayBuilder().WithContent(content))
         ).Build();
 
-        return new ModerationLogMessage(components, ImmutableArray<DownloadedAttachment>.Empty);
+        return new ModerationLogMessage(Components: components, Attachments: ImmutableArray<DownloadedAttachment>.Empty);
     }
 
     public static ModerationLogMessage BuildDeleteLog(
@@ -50,69 +52,31 @@ internal static class ModerationLogComponents
         if (!string.IsNullOrWhiteSpace(precedingMessageJumpUrl))
             header += $" • [Preceding message]({precedingMessageJumpUrl})";
 
-        var attachmentNotice = omittedAttachmentCount > 0
-            ? $"\n*{omittedAttachmentCount} attachment(s) omitted (download failures or limits).*"
-            : string.Empty;
+        var attachmentNotice =
+            omittedAttachmentCount > 0 ? $"\n*{omittedAttachmentCount} attachment(s) omitted (download failures or limits).*" : string.Empty;
 
         var contentLength = MaxComponentTextLength - header.Length - attachmentNotice.Length;
-        var contentBlock = CodeBlock(content, contentLength, ansi: false);
+        var contentBlock = CodeBlock(value: content, maxLength: contentLength, ansi: false);
 
         var container = new ContainerBuilder()
-            .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
-            .WithSeparator(new SeparatorBuilder())
-            .WithTextDisplay(new TextDisplayBuilder().WithContent(contentBlock + attachmentNotice));
+           .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
+           .WithSeparator(new SeparatorBuilder())
+           .WithTextDisplay(new TextDisplayBuilder().WithContent(contentBlock + attachmentNotice));
 
         if (attachments.Count > 0)
-            AddAttachmentComponents(container, attachments);
+            AddAttachmentComponents(container: container, attachments: attachments);
 
-        return new ModerationLogMessage(new ComponentBuilderV2(container).Build(), attachments);
+        return new ModerationLogMessage(new ComponentBuilderV2(container).Build(), Attachments: attachments);
     }
 
     public static string FormatTimestamp(DateTimeOffset timestamp) =>
-        timestamp.ToUniversalTime().ToString(TimestampFormat, CultureInfo.InvariantCulture);
+        timestamp.ToUniversalTime().ToString(format: TimestampFormat, formatProvider: CultureInfo.InvariantCulture);
 
-    private static void AddAttachmentComponents(
-        ContainerBuilder container,
-        IReadOnlyCollection<DownloadedAttachment> attachments)
-    {
-        container.WithSeparator(new SeparatorBuilder());
-
-        ImmutableArray<DownloadedAttachment> mediaAttachments = attachments
-            .Where(IsMediaAttachment)
-            .ToImmutableArray();
-
-        if (mediaAttachments.Length > 0)
-        {
-            var gallery = new MediaGalleryBuilder();
-
-            foreach (var attachment in mediaAttachments)
-            {
-                gallery.AddItem(
-                    new MediaGalleryItemProperties
-                    {
-                        Media = new UnfurledMediaItemProperties(attachment.Url),
-                    });
-            }
-
-            container.WithMediaGallery(gallery);
-        }
-
-        IEnumerable<DownloadedAttachment> fileAttachments = attachments
-            .Where(attachment => !IsMediaAttachment(attachment));
-
-        foreach (var attachment in fileAttachments)
-            container.WithFile(new FileComponentBuilder().WithFile(new UnfurledMediaItemProperties(attachment.Url)));
-    }
-
-    private static bool IsMediaAttachment(DownloadedAttachment attachment)
-        => attachment.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
-           || attachment.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase);
-
-    public static string GetAttachmentFileName(int index, string contentType)
-        => string.Format(
-            CultureInfo.InvariantCulture,
+    public static string GetAttachmentFileName(int index, string contentType) =>
+        string.Format(
+            provider: CultureInfo.InvariantCulture,
             "evidence-{0}{1}",
-            index,
+            arg0: index,
             contentType.ToLowerInvariant() switch
             {
                 "image/jpeg" => ".jpg",
@@ -123,13 +87,40 @@ internal static class ModerationLogComponents
                 "video/webm" => ".webm",
                 "video/quicktime" => ".mov",
                 _ => ".bin",
-            });
+            }
+        );
+
+    private static void AddAttachmentComponents(ContainerBuilder container, IReadOnlyCollection<DownloadedAttachment> attachments)
+    {
+        container.WithSeparator(new SeparatorBuilder());
+
+        ImmutableArray<DownloadedAttachment> mediaAttachments = attachments.Where(IsMediaAttachment).ToImmutableArray();
+
+        if (mediaAttachments.Length > 0)
+        {
+            var gallery = new MediaGalleryBuilder();
+
+            foreach (var attachment in mediaAttachments)
+                gallery.AddItem(new MediaGalleryItemProperties { Media = new UnfurledMediaItemProperties(attachment.Url) });
+
+            container.WithMediaGallery(gallery);
+        }
+
+        IEnumerable<DownloadedAttachment> fileAttachments = attachments.Where(attachment => !IsMediaAttachment(attachment));
+
+        foreach (var attachment in fileAttachments)
+            container.WithFile(new FileComponentBuilder().WithFile(new UnfurledMediaItemProperties(attachment.Url)));
+    }
+
+    private static bool IsMediaAttachment(DownloadedAttachment attachment) =>
+        attachment.ContentType.StartsWith("image/", comparisonType: StringComparison.OrdinalIgnoreCase)
+        || attachment.ContentType.StartsWith("video/", comparisonType: StringComparison.OrdinalIgnoreCase);
 
     private static string CodeBlock(string value, int maxLength, bool ansi)
     {
         var opening = ansi ? "```ansi\n" : "```";
         var closing = ansi ? "\n```" : "```";
-        var sanitized = value.Replace("```", "`\u200b``", StringComparison.Ordinal);
+        var sanitized = value.Replace("```", "`\u200b``", comparisonType: StringComparison.Ordinal);
         var contentLength = maxLength - opening.Length - closing.Length;
 
         if (sanitized.Length <= contentLength)
@@ -141,8 +132,8 @@ internal static class ModerationLogComponents
 
         if (ansi)
         {
-            var escapeStart = sanitized.LastIndexOf('\e', prefixLength - 1);
-            var cutsEscapeSequence = escapeStart >= 0 && sanitized.IndexOf('m', escapeStart) >= prefixLength;
+            var escapeStart = sanitized.LastIndexOf(value: '\e', prefixLength - 1);
+            var cutsEscapeSequence = escapeStart >= 0 && sanitized.IndexOf(value: 'm', startIndex: escapeStart) >= prefixLength;
 
             if (cutsEscapeSequence)
                 prefixLength = escapeStart;
@@ -153,14 +144,12 @@ internal static class ModerationLogComponents
         if (cutsSurrogatePair)
             prefixLength--;
 
-        sanitized = $"{sanitized.AsSpan(0, prefixLength)}{reset}{notice}";
+        sanitized = $"{sanitized.AsSpan(start: 0, length: prefixLength)}{reset}{notice}";
 
         return $"{opening}{sanitized}{closing}";
     }
 
-    internal sealed record ModerationLogMessage(
-        MessageComponent Components,
-        IReadOnlyCollection<DownloadedAttachment> Attachments);
+    internal sealed record ModerationLogMessage(MessageComponent Components, IReadOnlyCollection<DownloadedAttachment> Attachments);
 
     internal sealed record DownloadedAttachment(string FileName, string ContentType, byte[] Bytes)
     {

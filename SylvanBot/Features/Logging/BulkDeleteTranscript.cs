@@ -1,7 +1,7 @@
-namespace SylvanBot.Features.Logging;
-
 using System.Globalization;
 using System.Text.Json;
+
+namespace SylvanBot.Features.Logging;
 
 internal static class BulkDeleteTranscript
 {
@@ -15,7 +15,7 @@ internal static class BulkDeleteTranscript
             writer.WriteStartObject();
             writer.WriteString("author_id", message.AuthorId.ToString(CultureInfo.InvariantCulture));
             writer.WriteString("channel_id", message.ChannelId.ToString(CultureInfo.InvariantCulture));
-            writer.WriteString("content", message.Content);
+            writer.WriteString("content", value: message.Content);
             writer.WriteEndObject();
             writer.Flush();
             stream.WriteByte((byte)'\n');

@@ -1,6 +1,7 @@
-namespace SylvanBot.Infrastructure.Data;
-
 using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Infrastructure.Data;
+
+namespace SylvanBot.Infrastructure.Data;
 
 public sealed class DatabaseMigrationHostedService(IServiceScopeFactory scopeFactory, ILogger logger) : IHostedService
 {
@@ -11,19 +12,15 @@ public sealed class DatabaseMigrationHostedService(IServiceScopeFactory scopeFac
         await using var scope = scopeFactory.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<BotDbContext>();
 
-        List<string> pendingMigrations =
-            (await dbContext.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
+        List<string> pendingMigrations = (await dbContext.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
 
         if (pendingMigrations.Count == 0)
             return;
 
-        _logger.Information("Applying {PendingMigrationCount} pending database migration(s)", pendingMigrations.Count);
+        _logger.Information("Applying {PendingMigrationCount} pending database migration(s)", propertyValue: pendingMigrations.Count);
         await dbContext.Database.MigrateAsync(cancellationToken);
         _logger.Information("Database migrations applied successfully");
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

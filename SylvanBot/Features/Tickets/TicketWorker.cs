@@ -3,7 +3,7 @@ namespace SylvanBot.Features.Tickets;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Gateway;
-using SylvanBot.Infrastructure.Data;
+using SylvanBot.Application.Infrastructure.Data;
 
 public sealed partial class TicketWorker(
     DiscordSocketClient client,

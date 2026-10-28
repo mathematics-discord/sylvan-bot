@@ -1,7 +1,5 @@
 ﻿namespace SylvanBot.Application.Features.WorkingHours;
 
-using ErrorOr;
-
 public sealed class WorkingHoursSettings
 {
     public ulong GuildId { get; set; }
@@ -14,65 +12,77 @@ public sealed class WorkingHoursSettings
 
     public bool IsComplete => PingRoleId.HasValue && EligibleRoles.Count > 0;
 
-    public ErrorOr<Success> SetPingRole(ulong roleId)
+    public Result<ValueTuple> SetPingRole(ulong roleId)
     {
         if (Enabled)
-            return Error.Validation(description: "Disable Working Hours before changing the ping role.");
+            return new Result<ValueTuple>(OperationFailureException.Validation(description: "Disable Working Hours before changing the ping role."));
 
-        var eligible = EligibleRoles
-            .Any(role => role.RoleId == roleId);
+        var eligible = EligibleRoles.Any(role => role.RoleId == roleId);
 
         if (roleId == 0 || roleId == GuildId || eligible)
-            return Error.Validation(description: "The ping role cannot be @everyone, an eligible role or an exemption role.");
+        {
+            return new Result<ValueTuple>(
+                OperationFailureException.Validation(description: "The ping role cannot be @everyone, an eligible role or an exemption role."));
+        }
 
         PingRoleId = roleId;
-        return Result.Success;
+
+        return new Result<ValueTuple>(default(ValueTuple));
     }
 
-    public ErrorOr<Success> ChangeEligibleRole(ulong roleId, bool add)
+    public Result<ValueTuple> ChangeEligibleRole(ulong roleId, bool add)
     {
         if (roleId == 0 || roleId == GuildId || roleId == PingRoleId)
-            return Error.Validation(description: "An eligible role cannot be @everyone or the ping role.");
+        {
+            return new Result<ValueTuple>(
+                OperationFailureException.Validation(description: "An eligible role cannot be @everyone or the ping role."));
+        }
 
-        var role = EligibleRoles
-            .SingleOrDefault(item => item.RoleId == roleId);
+        var role = EligibleRoles.SingleOrDefault(item => item.RoleId == roleId);
 
         if (add)
         {
             if (role is null)
                 EligibleRoles.Add(new WorkingHoursEligibleRole { GuildId = GuildId, RoleId = roleId });
 
-            return Result.Success;
+            return new Result<ValueTuple>(default(ValueTuple));
         }
 
         if (role is null)
-            return Result.Success;
+            return new Result<ValueTuple>(default(ValueTuple));
 
         if (role.IsExempt)
-            return Error.Validation(description: "Remove this role's exemption before removing its eligibility.");
+        {
+            return new Result<ValueTuple>(
+                OperationFailureException.Validation(description: "Remove this role's exemption before removing its eligibility."));
+        }
 
         if (Enabled && EligibleRoles.Count == 1)
-            return Error.Validation(description: "Disable Working Hours before removing the last eligible role.");
+        {
+            return new Result<ValueTuple>(
+                OperationFailureException.Validation(description: "Disable Working Hours before removing the last eligible role."));
+        }
 
         EligibleRoles.Remove(role);
-        return Result.Success;
+
+        return new Result<ValueTuple>(default(ValueTuple));
     }
 
-    public ErrorOr<Success> ChangeExemptRole(ulong roleId, bool add)
+    public Result<ValueTuple> ChangeExemptRole(ulong roleId, bool add)
     {
-        var role = EligibleRoles
-            .SingleOrDefault(item => item.RoleId == roleId);
+        var role = EligibleRoles.SingleOrDefault(item => item.RoleId == roleId);
 
         if (role is null)
         {
             if (add)
-                return Error.Validation(description: "An exemption role must already be eligible.");
+                return new Result<ValueTuple>(OperationFailureException.Validation(description: "An exemption role must already be eligible."));
 
-            return Result.Success;
+            return new Result<ValueTuple>(default(ValueTuple));
         }
 
         role.IsExempt = add;
-        return Result.Success;
+
+        return new Result<ValueTuple>(default(ValueTuple));
     }
 
     public bool? DesiredPingRole(bool eligible, bool exempt, bool scheduleEnabled, bool active)

@@ -2,6 +2,5 @@
 
 public enum WorkingRoleAction
 {
-    [ChoiceDisplay("add")] Add,
-    [ChoiceDisplay("remove")] Remove,
+    [ChoiceDisplay("add")] Add, [ChoiceDisplay("remove")] Remove,
 }

@@ -1,52 +1,72 @@
-﻿namespace SylvanBot.Features.Moderation;
-
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Common;
-using SylvanBot.Infrastructure.Data;
+using SylvanBot.Application.Features.Moderation;
+using SylvanBot.Application.Infrastructure.Data;
 
-public sealed class ImageSpamSettingsService(
-    BotDbContext dbContext,
-    ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> settingsByGuild)
+namespace SylvanBot.Features.Moderation;
+
+public sealed class ImageSpamSettingsService(IDbContextFactory<BotDbContext> contexts) : IDisposable
 {
-    private static ImageBurstSpamDetectorOptions ToOptions(ImageSpamSettings settings) =>
-        new()
-        {
-            Window = settings.BurstDurationSeconds,
-            DistinctChannelThreshold = settings.RequiredChannelCount,
-            RequiredAttachmentCount = settings.RequiredAttachmentCount,
-        };
+    private readonly SemaphoreSlim _gate = new SemaphoreSlim(initialCount: 1, maxCount: 1);
 
-    public async Task<Option<ImageBurstSpamDetectorOptions>> GetCurrentAsync(ulong guildId, CancellationToken ct)
+    private readonly ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions> _settings =
+        new ConcurrentDictionary<ulong, ImageBurstSpamDetectorOptions>();
+
+    public void Dispose() => _gate.Dispose();
+
+    public DotNext.Optional<ImageBurstSpamDetectorOptions> Current(ulong guildId) =>
+        _settings.TryGetValue(key: guildId, out var settings) ? new DotNext.Optional<ImageBurstSpamDetectorOptions>(settings) : default;
+
+    public async Task<DotNext.Optional<ImageBurstSpamDetectorOptions>> GetCurrentAsync(ulong guildId, CancellationToken ct)
     {
-        var settings = await dbContext.ImageSpamSettings
-            .AsNoTracking()
-            .SingleOrDefaultAsync(x => x.GuildId == guildId, ct)
-            .ConfigureAwait(false);
+        await _gate.WaitAsync(ct);
 
-        if (settings is not { IsEnabled: true })
+        try
         {
-            settingsByGuild.TryRemove(guildId, out _);
+            await using var dbContext = await contexts.CreateDbContextAsync(ct);
 
-            return new None();
+            var settings = await dbContext.ImageSpamSettings
+               .AsNoTracking()
+               .SingleOrDefaultAsync(x => x.GuildId == guildId, cancellationToken: ct);
+
+            if (settings is not { IsEnabled: true })
+            {
+                _settings.TryRemove(key: guildId, value: out _);
+
+                return default;
+            }
+
+            var options = ToOptions(settings);
+            _settings[guildId] = options;
+
+            return new DotNext.Optional<ImageBurstSpamDetectorOptions>(options);
         }
-
-        var options = ToOptions(settings);
-        settingsByGuild[guildId] = options;
-
-        return new Some<ImageBurstSpamDetectorOptions>(options);
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async Task LoadEnabledSettingsAsync(CancellationToken ct)
     {
-        List<ImageSpamSettings> settings = await dbContext.ImageSpamSettings
-            .AsNoTracking()
-            .Where(x => x.IsEnabled)
-            .ToListAsync(ct)
-            .ConfigureAwait(false);
+        await _gate.WaitAsync(ct);
 
-        foreach (var setting in settings)
-            settingsByGuild[setting.GuildId] = ToOptions(setting);
+        try
+        {
+            await using var dbContext = await contexts.CreateDbContextAsync(ct);
+
+            List<ImageSpamSettings> settings = await dbContext.ImageSpamSettings
+               .AsNoTracking()
+               .Where(x => x.IsEnabled)
+               .ToListAsync(ct);
+
+            foreach (var setting in settings)
+                _settings[setting.GuildId] = ToOptions(setting);
+        }
+        finally
+        {
+            _gate.Release();
+        }
     }
 
     public async Task<ImageBurstSpamDetectorOptions> UpsertAsync(
@@ -56,22 +76,43 @@ public sealed class ImageSpamSettingsService(
         int? burstDurationSeconds,
         CancellationToken ct)
     {
-        var settings = await dbContext.ImageSpamSettings
-            .SingleOrDefaultAsync(x => x.GuildId == guildId, ct)
-            .ConfigureAwait(false);
+        await _gate.WaitAsync(ct);
 
-        if (settings is null)
+        try
         {
-            settings = ImageSpamSettings.CreateDefault(guildId);
-            dbContext.ImageSpamSettings.Add(settings);
+            await using var dbContext = await contexts.CreateDbContextAsync(ct);
+
+            var settings = await dbContext.ImageSpamSettings
+               .SingleOrDefaultAsync(x => x.GuildId == guildId, cancellationToken: ct);
+
+            if (settings is null)
+            {
+                settings = ImageSpamSettings.CreateDefault(guildId);
+                dbContext.ImageSpamSettings.Add(settings);
+            }
+
+            settings.Update(
+                requiredChannelCount: requiredChannelCount,
+                requiredAttachmentCount: requiredAttachmentCount,
+                burstDurationSeconds: burstDurationSeconds);
+            await dbContext.SaveChangesAsync(ct);
+
+            var options = ToOptions(settings);
+            _settings[guildId] = options;
+
+            return options;
         }
-
-        settings.Update(requiredChannelCount, requiredAttachmentCount, burstDurationSeconds);
-        await dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
-
-        var options = ToOptions(settings);
-        settingsByGuild[guildId] = options;
-
-        return options;
+        finally
+        {
+            _gate.Release();
+        }
     }
+
+    private static ImageBurstSpamDetectorOptions ToOptions(ImageSpamSettings settings) =>
+        new ImageBurstSpamDetectorOptions
+        {
+            Window = settings.BurstDurationSeconds,
+            DistinctChannelThreshold = settings.RequiredChannelCount,
+            RequiredAttachmentCount = settings.RequiredAttachmentCount,
+        };
 }

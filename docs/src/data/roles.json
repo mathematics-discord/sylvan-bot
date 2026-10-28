@@ -1,0 +1,18 @@
+{
+  "268886789983436800": {
+    "name": "Moderators",
+    "color": null
+  },
+  "1328097118644338779": {
+    "name": "Senior Moderators",
+    "color": "#ff8cd5"
+  },
+  "1522665074571870419": {
+    "name": "Community Moderators",
+    "color": "#ff8cd5"
+  },
+  "1522665207225127034": {
+    "name": "Trial Moderators",
+    "color": "#87e9ff"
+  }
+}

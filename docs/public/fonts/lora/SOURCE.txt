@@ -1,0 +1,11 @@
+Lora Regular (400), normal and italic.
+
+Font files are self-hosted; visitors make no requests to Google Fonts.
+Official family source: https://github.com/google/fonts/tree/main/ofl/lora
+Licence: SIL Open Font License 1.1, reproduced in OFL.txt.
+
+Static Regular files returned by the Google Fonts CSS API on 20 October 2026:
+https://fonts.gstatic.com/s/lora/v37/0QI6MX1D_JOuGQbT0gvTJPa787weuyJG.ttf
+https://fonts.gstatic.com/s/lora/v37/0QI8MX1D_JOuMw_hLdO6T2wV9KnW-MoFkqg.ttf
+
+Both font files have OS/2 weight metadata 400.

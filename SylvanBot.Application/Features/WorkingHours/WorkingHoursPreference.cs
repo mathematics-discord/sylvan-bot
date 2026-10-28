@@ -43,9 +43,9 @@ public sealed class WorkingHoursPreference
             if (start is null || end is null || start.Value.OffsetMinutes.HasValue || end.Value.OffsetMinutes.HasValue)
                 throw new InvalidOperationException("Invalid persisted availability window.");
 
-            var window = new WorkingHoursWindow(start.Value.Time, end.Value.Time, OffsetMinutes, ZoneId);
+            var window = new WorkingHoursWindow(start: start.Value.Time, end: end.Value.Time, offsetMinutes: OffsetMinutes, zoneId: ZoneId);
 
-            return WorkingHoursResponses.Rejection(window, string.Empty) is not null
+            return WorkingHoursResponses.Rejection(window: window, username: string.Empty) is not null
                 ? throw new InvalidOperationException("Invalid persisted availability window.")
                 : window;
         }
@@ -55,7 +55,7 @@ public sealed class WorkingHoursPreference
     {
         ArgumentNullException.ThrowIfNull(window);
 
-        if (WorkingHoursResponses.Rejection(window, string.Empty) is not null)
+        if (WorkingHoursResponses.Rejection(window: window, username: string.Empty) is not null)
             throw new ArgumentException("Schedules must last at least twenty minutes.", nameof(window));
 
         StartTime = window.StartText;

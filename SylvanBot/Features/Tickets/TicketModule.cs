@@ -274,7 +274,7 @@ public sealed class TicketModule(
 
         if (number is not null || message is not null)
         {
-            Option<Ticket> result = number is not null
+            DotNext.Optional<Ticket> result = number is not null
                 ? await workflow.ShowAsync(actor, number.Value, hidden, cancellationToken)
                 : await workflow.ShowMessageAsync(
                     actor,
@@ -356,9 +356,9 @@ public sealed class TicketModule(
         });
     }
 
-    private async Task ShowTicketAsync(TicketActor actor, Option<Ticket> result, CancellationToken cancellationToken)
+    private async Task ShowTicketAsync(TicketActor actor, DotNext.Optional<Ticket> result, CancellationToken cancellationToken)
     {
-        if (result.Value is not Some<Ticket>(var ticket))
+        if (!result.TryGet(out var ticket))
         {
             await ReplyAsync("No matching ticket in this view of this server.");
 
@@ -389,9 +389,9 @@ public sealed class TicketModule(
 
     private async Task<string> JumpLinkAsync(TicketActor actor, Ticket ticket, CancellationToken cancellationToken)
     {
-        Option<TicketMessage> result = await discord.FindMessageAsync(actor, ticket, cancellationToken);
+        DotNext.Optional<TicketMessage> result = await discord.FindMessageAsync(actor, ticket, cancellationToken);
 
-        if (result.Value is not Some<TicketMessage>(var publication))
+        if (!result.TryGet(out var publication))
             return string.Empty;
 
         var link = TicketPresentation.Link(ticket.GuildId, publication.ChannelId, publication.MessageId);

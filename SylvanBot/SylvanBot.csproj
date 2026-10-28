@@ -11,10 +11,12 @@
         <!-- Run the database check on each IDE build, even when compilation is up to date. -->
         <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
     </PropertyGroup>
-    <Target Name="StartLocalDatabase" BeforeTargets="Build"
-            Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(Configuration)' == 'Debug' and '$(DesignTimeBuild)' != 'true'">
-        <Exec Command="docker compose --env-file .env -f docker-compose.yml up -d --wait db"
-              WorkingDirectory="$(MSBuildProjectDirectory)/.."/>
+    <Target
+            Name="StartLocalDatabase"
+            BeforeTargets="Build"
+            Condition="'$(BuildingInsideVisualStudio)' == 'true' and '$(Configuration)' == 'Debug' and '$(DesignTimeBuild)' != 'true'"
+    >
+        <Exec Command="docker compose --env-file .env -f docker-compose.yml up -d --wait db" WorkingDirectory="$(MSBuildProjectDirectory)/.."/>
     </Target>
     <ItemGroup>
         <ProjectReference Include="..\SylvanBot.Application\SylvanBot.Application.csproj"/>
@@ -24,8 +26,12 @@
         <PackageReference Include="Discord.Net.Interactions"/>
         <PackageReference Include="Discord.Net.WebSocket"/>
         <PackageReference Include="DotNetEnv"/>
-        <PackageReference Include="ErrorOr"/>
+        <PackageReference Include="DotNext"/>
         <PackageReference Include="JetBrains.Annotations"/>
+        <PackageReference Include="Meziantou.Analyzer">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
             <PrivateAssets>all</PrivateAssets>
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
