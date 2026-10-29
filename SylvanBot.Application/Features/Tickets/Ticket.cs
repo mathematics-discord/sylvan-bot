@@ -6,6 +6,8 @@ public sealed class Ticket
 {
     public const int CommentLimit = 3000;
 
+    public IList<string> ModificationHistory { get; set; } = [];
+
     public long Id { get; init; }
 
     public ulong GuildId { get; init; }
@@ -118,6 +120,30 @@ public sealed class Ticket
 
     public bool ExpirySuspended { get; set; }
 
+    public void RecordModification(ulong moderatorId, string action, DateTimeOffset timestamp)
+    {
+        ModificationHistory.Add($"- <@{moderatorId}> {action} at <t:{timestamp.ToUnixTimeSeconds()}:f>");
+    }
+
+    public void SetComment(string comment, ulong moderatorId, bool append = false)
+    {
+        var updated = append && !string.IsNullOrEmpty(Comment) ? Comment + "\n" + comment : comment;
+
+        if (string.Equals(Comment, updated, StringComparison.Ordinal))
+            return;
+
+        Comment = updated;
+        RecordModification(moderatorId, append ? "appended comment" : "set comment", DateTimeOffset.UtcNow);
+    }
+
+    public void RecordDurationChange(ulong moderatorId)
+    {
+        var duration = DurationSeconds is null
+            ? "Permanent"
+            : TimeSpan.FromSeconds(DurationSeconds.Value).ToString(@"d\D\Thh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
+        RecordModification(moderatorId, $"set duration to {duration}", DateTimeOffset.UtcNow);
+    }
+
     public void ClearApproval()
     {
         ApprovedByUserId = null;
@@ -144,6 +170,7 @@ public sealed class Ticket
 
         ApprovedByUserId = actor.UserId;
         ApprovedAtUtc = DateTimeOffset.UtcNow;
+        RecordModification(actor.UserId, "approved", ApprovedAtUtc.Value);
         Version++;
     }
 
@@ -174,8 +201,7 @@ public sealed class Ticket
 
         var complete = !string.IsNullOrWhiteSpace(Comment)
                        && DurationKnown
-                       && (Action != TicketAction.Timeout || DurationSeconds is > 0)
-                       && (Action != TicketAction.Timeout || PendingOperationId is null);
+                       && (Action != TicketAction.Timeout || DurationSeconds is > 0);
 
         Completion = complete ? TicketCompletion.Complete : TicketCompletion.Pending;
     }

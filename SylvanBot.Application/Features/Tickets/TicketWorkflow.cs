@@ -20,7 +20,9 @@ public sealed partial class TicketWorkflow(
         bool? enabled,
         ulong? channelId,
         int? reminderIntervalSeconds = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ulong? exemptRoleAdd = null,
+        ulong? exemptRoleRemove = null)
     {
         if (actor.GuildId == 0 || actor.UserId == 0 || !actor.IsAdministrator)
             throw new BotCommandException("Administrator permission is required to configure tickets.");
@@ -37,7 +39,8 @@ public sealed partial class TicketWorkflow(
             var isNew = configuration is null;
             configuration ??= new TicketConfiguration { GuildId = actor.GuildId };
 
-            if (enabled is null && channelId is null && reminderIntervalSeconds is null)
+            if (enabled is null && channelId is null && reminderIntervalSeconds is null
+                && exemptRoleAdd is null && exemptRoleRemove is null)
                 return configuration;
 
             var destination = channelId ?? configuration.DestinationChannelId;
@@ -47,8 +50,7 @@ public sealed partial class TicketWorkflow(
                 throw new BotCommandException("The reminder interval must be at least one minute. Configuration was not changed.");
 
             if (updatedEnabled && destination is null)
-                throw new BotCommandException(
-                    "Choose a tickets channel before enabling tickets. Configuration was not changed.");
+                throw new BotCommandException("Choose a tickets channel before enabling tickets. Configuration was not changed.");
 
             if (destination is not null && (updatedEnabled || channelId is not null))
                 await discord.CheckChannelAsync(actor, destination.Value, publishing: true, cancellationToken);
@@ -61,6 +63,8 @@ public sealed partial class TicketWorkflow(
 
             if (configuration.Enabled != updatedEnabled)
                 await InvalidateGuildDeliveryAsync(dbContext, actor.GuildId, cancellationToken);
+
+            configuration.UpdateReviewExemptRoles(exemptRoleAdd, exemptRoleRemove);
 
             configuration.Enabled = updatedEnabled;
             configuration.DestinationChannelId = destination;
@@ -322,20 +326,21 @@ public sealed partial class TicketWorkflow(
             expectedVersion,
             cancellationToken);
 
-    public Task<TicketChange> AppendNoteAsync(
+    public async Task<TicketChange> AppendNoteAsync(
         TicketActor actor,
         long number,
         string comment,
         CancellationToken cancellationToken = default)
-        => CorrectNoteAsync(
-            actor,
-            number,
-            comment,
-            duration: null,
-            append: true,
-            hidden: null,
-            expectedVersion: null,
-            cancellationToken);
+    {
+        await using var dbContext = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var ticket = await FindAsync(dbContext, actor.GuildId, number, tracking: false, cancellationToken)
+            ?? throw new BotCommandException("No matching ticket in this server.");
+
+        if (ticket.Action != TicketAction.Note)
+            return await SetModerationAsync(actor, number, new TicketDetails(false, null, comment), cancellationToken, expectedVersion: ticket.Version, append: true);
+
+        return await CorrectNoteAsync(actor, number, comment, duration: null, append: true, hidden: null, expectedVersion: null, cancellationToken);
+    }
 
     public Task<TicketChange> HideNoteAsync(
         TicketActor actor,
@@ -374,7 +379,7 @@ public sealed partial class TicketWorkflow(
     {
         var canManageNotes = actor.GuildId != 0
             && actor.UserId != 0
-            && (actor.IsAdministrator || actor.CanTimeoutMembers);
+            && (actor.IsAdministrator || actor.CanViewAuditLog || actor.CanTimeoutMembers);
 
         if (!canManageNotes)
             throw new BotCommandException(
@@ -498,11 +503,8 @@ public sealed partial class TicketWorkflow(
             if (hidden is null && comment is null)
                 return new TicketChange(ticket, NoChange: true);
 
-            if (append && !string.IsNullOrEmpty(ticket.Comment))
-                comment = "\n" + comment;
-
             if (comment is not null)
-                ValidateNoteComment(comment, append ? ticket.Comment : null);
+                ValidateNoteComment(comment, append && !string.IsNullOrEmpty(ticket.Comment) ? ticket.Comment + "\n" : null);
 
             var updatedHidden = hidden ?? ticket.Hidden;
             var unhiding = ticket.Hidden && !updatedHidden;
@@ -512,7 +514,7 @@ public sealed partial class TicketWorkflow(
                 channelId = await CorrectionChannelAsync(dbContext, actor, ticket, cancellationToken);
 
             if (comment is not null)
-                ticket.Comment = append ? ticket.Comment + comment : comment;
+                ticket.SetComment(comment, actor.UserId, append);
 
             ticket.Hidden = updatedHidden;
             ticket.Version++;

@@ -19,6 +19,7 @@ public sealed class TicketApprovalTests
         ticket.ApprovedByUserId.ShouldBe(2UL);
         ticket.ApprovedAtUtc.ShouldNotBeNull();
         ticket.Version.ShouldBe(1);
+        ticket.ModificationHistory.ShouldHaveSingleItem().ShouldBe($"- <@2> approved at <t:{ticket.ApprovedAtUtc.Value.ToUnixTimeSeconds()}:f>");
         ticket.Completion.ShouldBe(TicketCompletion.Complete);
     }
 
@@ -135,6 +136,39 @@ public sealed class TicketApprovalTests
         // Assert
         ticket.ReviewExempt.ShouldBeTrue();
         ticket.ApprovedAtUtc.ShouldBeNull();
+    }
+
+    [Test]
+    public void SetComment_ReplacementAndAppend_RecordsOnlyChanges()
+    {
+        // Arrange
+        var ticket = CompleteTicket();
+
+        // Act
+        ticket.SetComment("Replacement", 2);
+        ticket.SetComment("Replacement", 2);
+        ticket.SetComment("Additional context", 3, append: true);
+
+        // Assert
+        ticket.Comment.ShouldBe("Replacement\nAdditional context");
+        ticket.ModificationHistory.Count.ShouldBe(2);
+        ticket.ModificationHistory[0].ShouldStartWith("- <@2> set comment at <t:");
+        ticket.ModificationHistory[1].ShouldStartWith("- <@3> appended comment at <t:");
+    }
+
+    [Test]
+    public void CanCorrect_SeniorModerator_CanEditEveryTicketType([Values] TicketAction action)
+    {
+        // Arrange
+        var ticket = new Ticket { GuildId = 1, ModeratorUserId = 3, Action = action, Hidden = true };
+        var reviewer = new TicketActor(1, 2, IsAdministrator: false, CanTimeoutMembers: false, CanViewAuditLog: true);
+
+        // Act
+        var allowed = ticket.CanCorrect(reviewer);
+
+        // Assert
+        allowed.ShouldBeTrue();
+        ticket.ModeratorUserId.ShouldBe(3UL);
     }
 
     private static Ticket CompleteTicket() => new Ticket

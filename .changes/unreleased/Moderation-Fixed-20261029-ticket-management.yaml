@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: Restore the moderation ticket embed layout with explicit approval status, move controls into Apps → Manage Ticket, and use an Edit button for DM completion. Correct timeout reversal and reminder scheduling. Allow senior moderators to edit any ticket and show its modification history.
+time: 2026-10-29T00:00:00+00:00

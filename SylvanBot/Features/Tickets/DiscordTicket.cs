@@ -103,7 +103,10 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
 
         try
         {
-            await member.ModifyAsync(properties => properties.TimedOutUntil = expiry, options);
+            if (expiry is null)
+                await member.RemoveTimeOutAsync(options);
+            else
+                await member.ModifyAsync(properties => properties.TimedOutUntil = expiry, options);
         }
         catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.BadRequest
                                                                     or System.Net.HttpStatusCode.Forbidden
@@ -253,7 +256,6 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
         {
             var published = await ch.SendMessageAsync(
                 embed: TicketPresentation.Describe(ticket),
-                components: TicketPresentation.Buttons(ticket),
                 allowedMentions: AllowedMentions.None,
                 options: Options(cancellationToken));
 
@@ -303,7 +305,7 @@ public sealed class DiscordTicket(DiscordSocketClient socketClient) : IDiscordTi
                 {
                     properties.Content = string.Empty;
                     properties.Embeds = new[] { TicketPresentation.Describe(ticket) };
-                    properties.Components = TicketPresentation.Buttons(ticket);
+                    properties.Components = new ComponentBuilder().Build();
                     properties.AllowedMentions = AllowedMentions.None;
                 },
                 Options(cancellationToken));

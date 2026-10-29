@@ -1,0 +1,4 @@
+component: Administration
+kind: Changed
+body: Configure tickets directly with /config tickets, including reminder intervals in minutes and roles exempt from review.
+time: 2026-10-29T00:00:00+00:00

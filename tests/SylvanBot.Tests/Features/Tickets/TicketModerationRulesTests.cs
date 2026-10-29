@@ -106,7 +106,7 @@ public sealed class TicketModerationRulesTests
         ticket.Status.ShouldBe(status);
     }
 
-    [TestCase(TicketAction.Timeout, TicketCompletion.Pending)]
+    [TestCase(TicketAction.Timeout, TicketCompletion.Complete)]
     [TestCase(TicketAction.Ban, TicketCompletion.Complete)]
     public void UpdateCompletion_PendingDiscordOperation_SeparatesExpiryFromMissingDetails(TicketAction action, TicketCompletion expected)
     {
@@ -256,7 +256,7 @@ public sealed class TicketModerationRulesTests
     }
 
     [Test]
-    public void ClearDelivery_CompletedQueue_CleansBindingOnceAndRetainsReadCursor()
+    public void ClearDelivery_CompletedQueue_CleansBindingOnceAndRetainsChannel()
     {
         // Arrange
         var moderator = new TicketModerator
@@ -268,7 +268,6 @@ public sealed class TicketModerationRulesTests
             PromptVersion = 5,
             LastAttemptedVersion = 5,
             NextDeliveryUtc = DateTimeOffset.UtcNow,
-            LastReadMessageId = 6,
             Version = 7,
         };
 
@@ -283,8 +282,41 @@ public sealed class TicketModerationRulesTests
         moderator.LastAttemptedVersion.ShouldBeNull();
         moderator.NextDeliveryUtc.ShouldBeNull();
         moderator.ChannelId.ShouldBe((ulong)3);
-        moderator.LastReadMessageId.ShouldBe((ulong)6);
         moderator.Version.ShouldBe(8);
+    }
+
+    [Test]
+    public void IsDeliveryDue_VersionChangesBeforeDeadline_DoesNotSendAnotherReminder()
+    {
+        // Arrange
+        var now = DateTimeOffset.UtcNow;
+        var moderator = new TicketModerator { ActiveTicketId = 1, NextDeliveryUtc = now.AddMinutes(5), LastAttemptedVersion = 1 };
+
+        // Act
+        moderator.PromptVersion = 2;
+        moderator.Version++;
+        var due = moderator.IsDeliveryDue(1, now.AddSeconds(30));
+
+        // Assert
+        due.ShouldBeFalse();
+        moderator.IsDeliveryDue(1, now.AddMinutes(5)).ShouldBeTrue();
+    }
+
+    [Test]
+    public void IsDeliveryDue_NewTicketOrExplicitRedelivery_SendsImmediately()
+    {
+        // Arrange
+        var now = DateTimeOffset.UtcNow;
+        var moderator = new TicketModerator { ActiveTicketId = 1, NextDeliveryUtc = now.AddDays(1) };
+
+        // Act
+        var newTicketDue = moderator.IsDeliveryDue(2, now);
+        moderator.NextDeliveryUtc = null;
+        var requestedDue = moderator.IsDeliveryDue(1, now);
+
+        // Assert
+        newTicketDue.ShouldBeTrue();
+        requestedDue.ShouldBeTrue();
     }
 
 }

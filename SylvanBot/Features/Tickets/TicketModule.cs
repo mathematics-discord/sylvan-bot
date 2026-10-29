@@ -31,15 +31,13 @@ public sealed class TicketModule(
         => ExecuteAsync((actor, cancellationToken) =>
             ShowHistoryAsync(actor, user.Id, page: 1, hidden: false, cancellationToken));
 
-    [MessageCommand("Edit Ticket")]
-    [DefaultMemberPermissions(GuildPermission.ModerateMembers)]
-    [RequireUserPermission(GuildPermission.ModerateMembers)]
+    [MessageCommand("Manage Ticket")]
+    [DefaultMemberPermissions(GuildPermission.UseApplicationCommands)]
     [CommandContextType(InteractionContextType.Guild)]
-    public Task EditTicketAsync(IMessage msg)
-        => OpenEditorAsync((actor, cancellationToken) => workflow.PrepareNoteEditAsync(
-            actor,
-            new TicketMessage(msg.Channel.Id, msg.Id),
-            cancellationToken));
+    public Task ManageTicketAsync(IMessage msg)
+        => ExecuteAsync(async (actor, cancellationToken) =>
+            await ShowTicketAsync(actor, await workflow.ShowMessageAsync(actor,
+                new TicketMessage(msg.Channel.Id, msg.Id), cancellationToken: cancellationToken), cancellationToken));
 
     [SlashCommand("note", "Save a moderator note and publish it to the staff tickets channel.")]
     public Task NoteAsync(
@@ -175,11 +173,11 @@ public sealed class TicketModule(
                     return;
                 }
 
-                if (TicketPresentation.UsesModerationEmbed(ticket))
+                if (ticket.Action != TicketAction.Note)
                 {
-                    var duration = ticket.DurationKnown ? "permanent" : string.Empty;
+                    var duration = ticket.DurationKnown && TicketPresentation.UsesModerationEmbed(ticket) ? "permanent" : string.Empty;
 
-                    if (ticket.DurationSeconds is not null)
+                    if (ticket.DurationSeconds is not null && TicketPresentation.UsesModerationEmbed(ticket))
                         duration = $"{ticket.DurationSeconds} seconds";
 
                     await RespondWithModalAsync(
@@ -208,8 +206,16 @@ public sealed class TicketModule(
     public Task ApproveButtonAsync(long number, int version)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
+            DotNext.Optional<Ticket> current = await workflow.ShowAsync(actor, number, cancellationToken: cancellationToken);
+
+            if (current.TryGet(out var ticket) && ticket.Version != version)
+            {
+                await ShowTicketAsync(actor, current, cancellationToken);
+                return;
+            }
+
             var change = await workflow.ApproveAsync(actor, number, version, cancellationToken);
-            await ReplyToChangeAsync(change);
+            await ShowTicketAsync(actor, change.Ticket, cancellationToken, change.ModerationOutcome);
             worker.Wake();
         });
 
@@ -217,8 +223,21 @@ public sealed class TicketModule(
     public Task HideModerationButtonAsync(long number, int version)
         => ExecuteAsync(async (actor, cancellationToken) =>
         {
+            DotNext.Optional<Ticket> current = await workflow.ShowAsync(actor, number, cancellationToken: cancellationToken);
+
+            if (current.TryGet(out var ticket) && ticket.Version != version)
+            {
+                await ShowTicketAsync(actor, current, cancellationToken);
+                return;
+            }
+
             var change = await workflow.HideModerationAsync(actor, number, version, cancellationToken);
-            await ReplyToChangeAsync(change, hiding: true);
+            await ModifyOriginalResponseAsync(properties =>
+            {
+                properties.Content = $"Ticket #{change.Ticket.Number} hidden.";
+                properties.Embeds = Array.Empty<Embed>();
+                properties.Components = new ComponentBuilder().Build();
+            });
             worker.Wake();
         });
 
@@ -230,8 +249,8 @@ public sealed class TicketModule(
                 throw new BotCommandException("This editor belongs to another moderator or server.");
 
             var details = TicketDetails.ParseFields(string.IsNullOrWhiteSpace(modal.Duration) ? null : modal.Duration, modal.Comment);
-            var change = await workflow.SetModerationAsync(actor, number, details, reply: null, cancellationToken, expectedVersion: version);
-            await ReplyToChangeAsync(change);
+            var change = await workflow.SetModerationAsync(actor, number, details, cancellationToken, expectedVersion: version);
+            await ShowTicketAsync(actor, change.Ticket, cancellationToken, change.ModerationOutcome);
             worker.Wake();
         });
 
@@ -405,7 +424,7 @@ public sealed class TicketModule(
         });
     }
 
-    private async Task ShowTicketAsync(TicketActor actor, DotNext.Optional<Ticket> result, CancellationToken cancellationToken)
+    private async Task ShowTicketAsync(TicketActor actor, DotNext.Optional<Ticket> result, CancellationToken cancellationToken, string? outcome = null)
     {
         if (!result.TryGet(out var ticket))
         {
@@ -418,11 +437,9 @@ public sealed class TicketModule(
 
         await ModifyOriginalResponseAsync(properties =>
         {
-            properties.Content = TicketPresentation.UsesModerationEmbed(ticket)
-                ? jumpLink + "\n" + TicketPresentation.OperationalDetails(ticket)
-                : jumpLink;
+            properties.Content = outcome is null ? jumpLink : jumpLink + "\n" + outcome;
             properties.Embed = TicketPresentation.Describe(ticket);
-            properties.Components = TicketPresentation.Buttons(ticket);
+            properties.Components = TicketPresentation.Buttons(ticket, actor);
             properties.AllowedMentions = AllowedMentions.None;
         });
 
@@ -457,11 +474,23 @@ public sealed class TicketModule(
     {
         if (defer)
         {
-            // Component hides acknowledge the source message. Modal submissions always create a private reply.
+            // Update an existing private panel; create a private response for public sources.
             if (updateMessage)
                 await DeferAsync();
+            else if (Context.Interaction is IComponentInteraction component)
+            {
+                if (component.Message.Flags?.HasFlag(MessageFlags.Ephemeral) == true)
+                    await component.DeferAsync();
+                else
+                    await component.DeferLoadingAsync(ephemeral: true);
+            }
             else if (Context.Interaction is IModalInteraction modal)
-                await modal.DeferLoadingAsync(ephemeral: true);
+            {
+                if (modal.Message?.Flags?.HasFlag(MessageFlags.Ephemeral) == true)
+                    await modal.DeferAsync();
+                else
+                    await modal.DeferLoadingAsync(ephemeral: true);
+            }
             else
                 await DeferAsync(ephemeral: true);
         }

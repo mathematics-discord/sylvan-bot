@@ -14,7 +14,9 @@ public sealed partial class ConfigModule(
     SylvanMailConfiguration workflow,
     RoleReactionConfiguration roleReactions,
     ImageSpamSettingsService settingsService,
-    IHostApplicationLifetime lifetime
+    IHostApplicationLifetime lifetime,
+    SylvanBot.Application.Features.Tickets.TicketWorkflow ticketWorkflow,
+    SylvanBot.Features.Tickets.TicketWorker ticketWorker
 ) : SlashCommandBase
 {
     [SlashCommand("sylvanmail", "Enable private SylvanMail in a forum and select its ping role")]

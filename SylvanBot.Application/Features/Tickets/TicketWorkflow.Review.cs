@@ -117,7 +117,10 @@ public sealed partial class TicketWorkflow
                 {
                     ticket.PrepareOperation(expiry: null, ticket.LastModifiedByUserId);
                     await SaveModerationAsync(dbContext, ticket, cancellationToken);
-                    await ApplyOperationAsync(dbContext, ticket, cancellationToken);
+                    var outcome = await ApplyOperationAsync(dbContext, ticket, cancellationToken);
+
+                    if (ticket.PendingOperationId is null && ticket.Status is not (TicketStatus.Expired or TicketStatus.Reverted))
+                        throw new BotCommandException(outcome);
                 }
                 else
                 {

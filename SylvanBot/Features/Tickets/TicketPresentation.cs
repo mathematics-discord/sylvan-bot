@@ -12,15 +12,19 @@ internal static class TicketPresentation
             ? $"https://discord.com/channels/{guildId}/{channelId}/{msgId}"
             : null;
 
-    internal static MessageComponent Buttons(Ticket ticket)
+    internal static MessageComponent Buttons(Ticket ticket, TicketActor? actor = null)
     {
         var builder = new ComponentBuilder();
 
-        if (ticket.Action == TicketAction.Note || UsesModerationEmbed(ticket))
+        if (ticket.Action == TicketAction.Note || UsesModerationEmbed(ticket) || actor is { CanViewAuditLog: true } or { IsAdministrator: true })
         {
-            builder.WithButton("Edit", $"ticket:edit:{ticket.Number}");
+            if (ticket.Action == TicketAction.Note || actor is null || ticket.CanCorrect(actor))
+                builder.WithButton("Edit", $"ticket:edit:{ticket.Number}");
 
-            if (!ticket.Hidden)
+            var canHide = ticket.Action == TicketAction.Note
+                || (UsesModerationEmbed(ticket) && (actor is null || actor.IsAdministrator || actor.CanViewAuditLog));
+
+            if (!ticket.Hidden && canHide)
             {
                 builder
                    .WithButton(
@@ -32,7 +36,7 @@ internal static class TicketPresentation
             }
         }
 
-        if (!UsesModerationEmbed(ticket))
+        if (!UsesModerationEmbed(ticket) || actor is { IsAdministrator: false, CanViewAuditLog: false })
             return builder.Build();
 
         var label = ticket.ApprovedAtUtc is null ? "Approve" : "Approved";
@@ -141,10 +145,13 @@ internal static class TicketPresentation
             embed.AddField("Last edited", edited);
         }
 
+        AddModificationHistory(embed, ticket);
+
         if (ticket.Action == TicketAction.Note)
             return embed.Build();
 
         AddActionFields(embed, ticket);
+
         return embed.Build();
     }
 
@@ -199,7 +206,6 @@ internal static class TicketPresentation
 
         if (ticket.RoleId is not null)
             embed.AddField("Role", ticket.RoleId.Value.ToString(CultureInfo.InvariantCulture), inline: true);
-
     }
 
     internal static bool UsesModerationEmbed(Ticket ticket) =>
@@ -210,42 +216,59 @@ internal static class TicketPresentation
         var complete = ticket.Completion is TicketCompletion.Complete or TicketCompletion.Automated
             || (ticket.Completion is null && !string.IsNullOrWhiteSpace(ticket.Comment));
 
-        var status = ticket.Hidden
-            ? "Hidden"
-            : ticket.Status switch
-            {
-                TicketStatus.Active => "In Effect",
-                TicketStatus.Expired => "Expired",
-                TicketStatus.Reverted => "Manually reverted",
-                TicketStatus.ExpirationFailed => "Expiration failed",
-                _ => "Unknown",
-            };
-
-        if (!complete)
-            status += ", Uncommented";
-
         var action = ticket.Action switch
         {
-            TicketAction.Ban => "Banned",
-            TicketAction.Timeout => "Timed out",
-            _ => "VC Muted",
+            TicketAction.Ban => "banned",
+            TicketAction.Timeout => "timed out",
+            _ => "muted",
         };
 
         var subject = ticket.SubjectUserId is null ? "Unknown" : $"<@{ticket.SubjectUserId}>";
 
         var embed = new EmbedBuilder()
-           .WithTitle($"Ticket #{ticket.Number}")
-           .WithDescription($"**{action}** {subject} ({status})\n{ticket.Comment}")
+           .WithAuthor($"Ticket #{ticket.Number}")
+           .WithTitle(
+                $"{subject} {action} by <@{ticket.ModeratorUserId}>"
+                + (ticket is { ReviewExempt: false, ApprovedAtUtc: null } ? " (UNAPPROVED)" : string.Empty))
+           .WithDescription(ticket.Comment)
+           .WithThumbnailUrl("https://media1.tenor.com/m/PHREyAefRckAAAAd/packwatch.gif")
            .WithColor(ModerationColour(ticket, complete));
 
         if (ticket.CreatedAtUtc is not null)
             embed.WithTimestamp(ticket.CreatedAtUtc.Value);
 
-        embed.AddField("User", ticket.SubjectUserId?.ToString(CultureInfo.InvariantCulture) ?? "Unknown", inline: true);
-        embed.AddField("Moderator", ticket.ModeratorUserId is null ? "Unknown" : $"<@{ticket.ModeratorUserId}>", inline: true);
+        embed.AddField("User ID", $"`{ticket.SubjectUserId}`", inline: true);
+        embed.AddField("Moderator ID", $"`{ticket.ModeratorUserId}`", inline: true);
 
         AddDurationFields(embed, ticket);
+        AddModificationHistory(embed, ticket);
+
         return embed.Build();
+    }
+
+    private static void AddModificationHistory(EmbedBuilder embed, Ticket ticket)
+    {
+        if (ticket.ModificationHistory.Count == 0)
+            return;
+
+        List<string> lines = [];
+        var length = 0;
+
+        for (var index = ticket.ModificationHistory.Count - 1; index >= 0; index--)
+        {
+            var line = ticket.ModificationHistory[index];
+
+            if (length + line.Length + 1 > 950)
+                break;
+
+            lines.Insert(0, line);
+            length += line.Length + 1;
+        }
+
+        if (lines.Count < ticket.ModificationHistory.Count)
+            lines.Insert(0, "Earlier changes omitted from this view.");
+
+        embed.AddField("Modification history", string.Join('\n', lines), inline: false);
     }
 
     private static Color ModerationColour(Ticket ticket, bool complete)
@@ -279,24 +302,17 @@ internal static class TicketPresentation
         {
             var seconds = ticket.DurationSeconds.Value;
             var days = seconds / 86400;
-            var duration = $"{seconds % 86400 / 3600}:{seconds % 3600 / 60:00}:{seconds % 60:00}";
+            var duration = $"{seconds % 86400 / 3600:00}:{seconds % 3600 / 60:00}:{seconds % 60:00}";
 
             if (days > 0)
                 duration = $"{days} day{(days == 1 ? "" : "s")}, " + duration;
 
             embed.AddField("Duration", duration, inline: true);
-
-            if (ticket.ExpiresAtUtc is not null)
-            {
-                var expiry = ticket.ExpiresAtUtc.Value.ToUnixTimeSeconds();
-                embed.AddField("Expires", $"<t:{expiry}:f>, <t:{expiry}:R>", inline: true);
-            }
         }
         else if (ticket.DurationKnown)
-            embed.AddField("Permanent", "\u200e", inline: true);
+            embed.AddField("Duration", "**Permanent**", inline: true);
         else
             embed.AddField("Duration", "Unknown", inline: true);
-
     }
 
     internal static string OperationalDetails(Ticket ticket)
@@ -331,13 +347,16 @@ internal static class TicketPresentation
         return text;
     }
 
-    internal static string CompletionText(Ticket ticket)
+    private static string CompletionText(Ticket ticket)
     {
-        if (ticket.Completion == TicketCompletion.Automated)
-            return "Automated action; no moderator reply required.";
-
-        if (ticket.Completion == TicketCompletion.Complete)
-            return "Details complete. No further reminders are scheduled.";
+        // ReSharper disable once SwitchStatementMissingSomeEnumCasesNoDefault
+        switch (ticket.Completion)
+        {
+            case TicketCompletion.Automated:
+                return "Automated action; no moderator reply required.";
+            case TicketCompletion.Complete:
+                return "Details complete. No further reminders are scheduled.";
+        }
 
         if (ticket.PendingOperationId is not null)
             return ticket.PendingOperationAttempted
@@ -352,7 +371,9 @@ internal static class TicketPresentation
         if (string.IsNullOrWhiteSpace(ticket.Comment))
             missing.Add("a comment");
 
-        return missing.Count == 0 ? "Details awaiting confirmation." : "Still needed: " + string.Join(" and ", missing) + ".";
+        return missing.Count == 0
+            ? "Details awaiting confirmation."
+            : "Still needed: " + string.Join(" and ", missing) + ".";
     }
 
     private static string PublicationChange(TicketChange change, bool hiding)

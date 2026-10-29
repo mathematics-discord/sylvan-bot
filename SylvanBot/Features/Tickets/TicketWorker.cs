@@ -12,7 +12,7 @@ public sealed partial class TicketWorker(
     IDiscordTicket discord,
     ILogger logger) : BackgroundService, IDiscordGatewayHandler
 {
-    private readonly SemaphoreSlim _wake = new(0, 1);
+    private readonly SemaphoreSlim _wake = new SemaphoreSlim(0, 1);
     private readonly ILogger _logger = logger.ForContext<TicketWorker>();
     private bool _ready;
 
@@ -20,7 +20,6 @@ public sealed partial class TicketWorker(
     {
         client.Ready += OnReadyAsync;
         client.AuditLogCreated += OnAuditAsync;
-        client.MessageReceived += OnMessageAsync;
 
         return Task.CompletedTask;
     }
@@ -29,7 +28,6 @@ public sealed partial class TicketWorker(
     {
         client.Ready -= OnReadyAsync;
         client.AuditLogCreated -= OnAuditAsync;
-        client.MessageReceived -= OnMessageAsync;
     }
 
     public void Wake()
@@ -44,7 +42,7 @@ public sealed partial class TicketWorker(
         }
     }
 
-    protected async override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
         {
@@ -79,7 +77,7 @@ public sealed partial class TicketWorker(
         }
     }
 
-    public async override Task StopAsync(CancellationToken cancellationToken)
+    public override async Task StopAsync(CancellationToken cancellationToken)
     {
         Unsubscribe();
         await base.StopAsync(cancellationToken);
@@ -106,17 +104,10 @@ public sealed partial class TicketWorker(
         return Task.CompletedTask;
     }
 
-    private Task OnMessageAsync(SocketMessage message)
-    {
-        if (message.Channel is IDMChannel && !message.Author.IsBot)
-            Wake();
-
-        return Task.CompletedTask;
-    }
-
-    private static RequestOptions Options(CancellationToken cancellationToken) => new()
-    {
-        CancelToken = cancellationToken,
-        RetryMode = RetryMode.AlwaysFail,
-    };
+    private static RequestOptions Options(CancellationToken cancellationToken)
+        => new RequestOptions
+        {
+            CancelToken = cancellationToken,
+            RetryMode = RetryMode.AlwaysFail,
+        };
 }

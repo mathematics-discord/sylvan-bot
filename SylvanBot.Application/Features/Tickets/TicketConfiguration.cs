@@ -17,4 +17,13 @@ public sealed class TicketConfiguration
     public DateTimeOffset? LastAuditScanAtUtc { get; set; }
 
     public int ReminderIntervalSeconds { get; set; } = 86400;
+
+    public void UpdateReviewExemptRoles(ulong? add, ulong? remove)
+    {
+        if (add is not null && !ReviewExemptRoleIds.Contains(checked((long)add.Value)))
+            ReviewExemptRoleIds.Add(checked((long)add.Value));
+
+        if (remove is not null)
+            ReviewExemptRoleIds.Remove(checked((long)remove.Value));
+    }
 }

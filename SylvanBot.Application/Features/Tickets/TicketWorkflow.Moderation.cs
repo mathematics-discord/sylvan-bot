@@ -31,7 +31,6 @@ public sealed partial class TicketWorkflow
             actor,
             number,
             TicketDetails.ParseFields(duration, comment),
-            reply: null,
             cancellationToken);
     }
 
@@ -39,9 +38,9 @@ public sealed partial class TicketWorkflow
         TicketActor actor,
         long number,
         TicketDetails details,
-        TicketReply? reply,
         CancellationToken cancellationToken,
-        int? expectedVersion = null)
+        int? expectedVersion = null,
+        bool append = false)
     {
         // DM permissions have no interaction context and cached membership is not authoritative.
         actor = await discord.GetActorAsync(actor.GuildId, actor.UserId, cancellationToken);
@@ -57,36 +56,41 @@ public sealed partial class TicketWorkflow
                 ?? throw new BotCommandException("No matching ticket in this server.");
 
             RequireModerationCorrection(actor, ticket);
+            await CheckReadAsync(dbContext, actor, ticket, cancellationToken);
 
             if (expectedVersion is not null && expectedVersion != ticket.Version)
                 throw new BotCommandException("This ticket changed. Reopen the editor before saving.");
 
+            if (append && details.Comment is not null && !string.IsNullOrEmpty(ticket.Comment))
+                details = details with { Comment = ticket.Comment + "\n" + details.Comment };
+
+            if (details.HasDuration && ticket.DurationKnown && details.DurationSeconds == ticket.DurationSeconds)
+                details = details with { HasDuration = false };
+
+            if (!details.HasDuration && (details.Comment is null || string.Equals(details.Comment, ticket.Comment, StringComparison.Ordinal)))
+                return new TicketChange(ticket, NoChange: true);
+
             if (ticket.HidePending)
                 throw new BotCommandException("A hide request is being reconciled. Wait before editing.");
 
-            await CheckReadAsync(dbContext, actor, ticket, cancellationToken);
-            await ValidateReplyAsync(dbContext, actor, ticket, reply, cancellationToken);
-
-            if (!details.HasDuration && details.Comment is null)
-                return new TicketChange(ticket, NoChange: true);
-
+            var previousComment = ticket.Comment;
+            var previousDuration = ticket.DurationSeconds;
+            var durationWasKnown = ticket.DurationKnown;
             var changesLiveTimeout = await PrepareDetailsAsync(ticket, actor, details, cancellationToken);
 
-            if (reply is not null)
-            {
-                var moderator = await dbContext.TicketModerators
-                   .SingleAsync(moderator => moderator.UserId == actor.UserId, cancellationToken);
-
-                moderator.LastReadMessageId = reply.MessageId;
-                moderator.Version++;
-            }
+            if (!string.Equals(previousComment, ticket.Comment, StringComparison.Ordinal))
+                ticket.RecordModification(actor.UserId, append ? "appended comment" : "set comment", DateTimeOffset.UtcNow);
 
             await SaveModerationAsync(dbContext, ticket, cancellationToken);
             var outcome = await ApplyCorrectionAsync(dbContext, ticket, changesLiveTimeout, auditCurrent, cancellationToken);
 
-            var change = await PublishObservedAsync(dbContext, ticket, cancellationToken);
+            if (ticket.DurationKnown != durationWasKnown || ticket.DurationSeconds != previousDuration)
+            {
+                ticket.RecordDurationChange(actor.UserId);
+                await SaveModerationAsync(dbContext, ticket, cancellationToken);
+            }
 
-            return change with { ModerationOutcome = outcome };
+            return (await PublishObservedAsync(dbContext, ticket, cancellationToken)) with { ModerationOutcome = outcome };
         }
         finally
         {
@@ -96,42 +100,13 @@ public sealed partial class TicketWorkflow
 
     private static void RequireModerationCorrection(TicketActor actor, Ticket ticket)
     {
-        if (ticket.Action is not (TicketAction.Timeout or TicketAction.Ban or TicketAction.VoiceMute))
+        if (ticket.Action is not (TicketAction.Timeout or TicketAction.Ban or TicketAction.VoiceMute)
+            && actor is { IsAdministrator: false, CanViewAuditLog: false })
             throw new BotCommandException("This ticket type is read-only.");
 
         if (!ticket.CanCorrect(actor))
             throw new BotCommandException(
                 "You need the matching moderation permission to correct your own ticket, or View Audit Log/Administrator to correct another moderator's ticket.");
-    }
-
-    private static async Task ValidateReplyAsync(
-        BotDbContext dbContext,
-        TicketActor actor,
-        Ticket ticket,
-        TicketReply? reply,
-        CancellationToken cancellationToken)
-    {
-        if (reply is null)
-            return;
-
-        var moderator = await dbContext.TicketModerators
-           .SingleOrDefaultAsync(moderator => moderator.UserId == actor.UserId, cancellationToken);
-
-        var current = moderator is not null
-            && moderator.ActiveTicketId == ticket.Id
-            && moderator.ChannelId == reply.ChannelId
-            && moderator.PromptMessageId is not null
-            && reply.MessageId > moderator.PromptMessageId
-            && (reply.PromptMessageId is null || moderator.PromptMessageId == reply.PromptMessageId)
-            && moderator.PromptVersion == ticket.Version
-            && reply.TicketVersion == ticket.Version
-            && (moderator.LastReadMessageId is null || reply.MessageId > moderator.LastReadMessageId)
-            && ticket.ModeratorUserId == actor.UserId
-            && ticket.Completion == TicketCompletion.Pending;
-
-        if (!current)
-            throw new BotCommandException(
-                "That prompt is no longer current. Reply to the latest prompt; this answer was not applied to another ticket.");
     }
 
     private async Task SaveModerationAsync(BotDbContext dbContext, Ticket ticket, CancellationToken cancellationToken)
@@ -183,9 +158,7 @@ public sealed partial class TicketWorkflow
             ticket.RejectOperation();
             await SaveModerationAsync(dbContext, ticket, cancellationToken);
 
-            return ticket.Action == TicketAction.Timeout
-                ? "Discord rejected the timeout change. The existing timeout and its duration were retained; any supplied comment was saved."
-                : "The details were saved, but Discord rejected the scheduled unban. Expiry will retry after reconciliation.";
+            return exception.Message;
         }
         catch (Exception exception)
         {
@@ -206,9 +179,7 @@ public sealed partial class TicketWorkflow
         ticket.UpdateCompletion();
         await SaveModerationAsync(dbContext, ticket, cancellationToken);
 
-        return ticket.Status == TicketStatus.Expired
-            ? "Discord confirmed that the action expired; audit reconciliation is pending."
-            : "Discord confirmed the live timeout update; audit reconciliation is pending.";
+        return "Ticket updated.";
     }
 
     private async Task<TicketChange> PublishObservedAsync(
@@ -294,7 +265,10 @@ public sealed partial class TicketWorkflow
             throw new BotCommandException(
                 "Provide a nonblank comment within the ticket comment limit. Nothing was changed.");
 
-        DateTimeOffset? expiry = details.Expiry(ticket.CreatedAtUtc!.Value);
+        if (details.HasDuration && ticket.Action is not (TicketAction.Timeout or TicketAction.Ban or TicketAction.VoiceMute))
+            throw new BotCommandException("This ticket type does not support changing duration.");
+
+        DateTimeOffset? expiry = details.Expiry(ticket.CreatedAtUtc ?? DateTimeOffset.UtcNow);
 
         await ReconcileEndedTimeoutAsync(ticket, cancellationToken);
 
@@ -307,7 +281,7 @@ public sealed partial class TicketWorkflow
             throw new BotCommandException("Discord timeouts cannot be permanent. Nothing was changed.");
 
         if (changesLiveTimeout)
-            expiry = details.TimeoutExpiry(ticket.CreatedAtUtc.Value, DateTimeOffset.UtcNow);
+            expiry = details.TimeoutExpiry(ticket.CreatedAtUtc ?? throw new BotCommandException("The original action time is unknown."), DateTimeOffset.UtcNow);
 
         if (details is { HasDuration: true, DurationSeconds: <= 0 })
             throw new BotCommandException("The duration must be positive. Nothing was changed.");

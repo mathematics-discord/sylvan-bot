@@ -164,9 +164,13 @@ public sealed partial class TicketWorkflow
                 }
                 catch (BotCommandException)
                 {
-                    ticket.HidePending = ticket.PendingOperationId is not null;
-                    ticket.Version++;
-                    await SaveModerationAsync(dbContext, ticket, cancellationToken);
+                    if (ticket.PendingOperationId is null && ticket.HidePending)
+                    {
+                        ticket.HidePending = false;
+                        ticket.Version++;
+                        await SaveModerationAsync(dbContext, ticket, cancellationToken);
+                    }
+
                     throw;
                 }
 
