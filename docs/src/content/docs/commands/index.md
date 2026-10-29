@@ -28,6 +28,8 @@ and instructions.
 - [/yoink and Yoink emoji](./yoink/) — Copy a custom emoji into the server
   using a slash command or a message's Apps menu.
 
+- [/persistence](./persistence/) — Remember selected safe roles across departures and rejoins.
+
 ## Administrator commands
 
 - [/config rolereact](./role-react/) — Add or remove message reactions
