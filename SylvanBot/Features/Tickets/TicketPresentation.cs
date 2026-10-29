@@ -224,14 +224,19 @@ internal static class TicketPresentation
         };
 
         var subject = ticket.SubjectUserId is null ? "Unknown" : $"<@{ticket.SubjectUserId}>";
+        var moderator = ticket.ModeratorUserId is null ? "Unknown" : $"<@{ticket.ModeratorUserId}>";
+        var description = $"{subject} {action} by {moderator}";
+
+        if (!string.IsNullOrEmpty(ticket.Comment))
+            description += $"\n\n{ticket.Comment}";
 
         var embed = new EmbedBuilder()
            .WithAuthor($"Ticket #{ticket.Number}")
            .WithTitle(
-                $"{subject} {action} by <@{ticket.ModeratorUserId}>"
+                ActionName(ticket.Action)
                 + (ticket is { ReviewExempt: false, ApprovedAtUtc: null } ? " (UNAPPROVED)" : string.Empty))
-           .WithDescription(ticket.Comment)
-           .WithThumbnailUrl("https://media1.tenor.com/m/PHREyAefRckAAAAd/packwatch.gif")
+           .WithDescription(description)
+           .WithThumbnailUrl("https://media.tenor.com/PHREyAefRckAAAAM/packwatch.gif")
            .WithColor(ModerationColour(ticket, complete));
 
         if (ticket.CreatedAtUtc is not null)
