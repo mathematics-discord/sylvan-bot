@@ -8,7 +8,7 @@ using SylvanBot.Application.Features.Tickets;
 [Group("ticket", "Moderator tickets.")]
 [DefaultMemberPermissions(GuildPermission.UseApplicationCommands)]
 [RequireContext(ContextType.Guild)]
-public sealed class TicketModule(
+public sealed partial class TicketModule(
     TicketWorkflow workflow,
     TicketWorker worker,
     IDiscordTicket discord,
@@ -154,7 +154,7 @@ public sealed class TicketModule(
     [ComponentInteraction("ticket:edit:*", true)]
     public Task EditButtonAsync(long id) => EditAsync(id);
 
-    private Task OpenEditorAsync(Func<TicketActor, CancellationToken, Task<Ticket>> prepareEdit)
+    private Task OpenEditorAsync(Func<TicketActor, CancellationToken, Task<Ticket>> prepareEdit, bool review = false)
         => ExecuteAsync(
             async (actor, cancellationToken) =>
             {
@@ -181,7 +181,7 @@ public sealed class TicketModule(
                         duration = $"{ticket.DurationSeconds} seconds";
 
                     await RespondWithModalAsync(
-                        $"ticket-moderation-edit:{actor.GuildId}:{actor.UserId}:{ticket.Number}:{ticket.Version}",
+                        $"{(review ? "ticket-review-edit" : "ticket-moderation-edit")}:{actor.GuildId}:{actor.UserId}:{ticket.Number}:{ticket.Version}",
                         new TicketModerationEditModal
                         {
                             Title = $"Edit Ticket #{ticket.Number}",

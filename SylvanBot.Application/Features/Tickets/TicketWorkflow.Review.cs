@@ -21,7 +21,7 @@ public sealed partial class TicketWorkflow
             ticket.Approve(actor, version);
             await SaveModerationAsync(dbContext, ticket, cancellationToken);
 
-            return await PublishObservedAsync(dbContext, ticket, cancellationToken);
+            return new TicketChange(ticket);
         }
         finally
         {

@@ -6,6 +6,22 @@ using SylvanBot.Application.Features.Tickets;
 public sealed class TicketApprovalTests
 {
     [Test]
+    public void Approve_AlreadyApproved_DoesNotDuplicateHistory()
+    {
+        // Arrange
+        var ticket = CompleteTicket();
+        var reviewer = new TicketActor(1, 2, IsAdministrator: true, CanTimeoutMembers: false);
+        ticket.Approve(reviewer, ticket.Version);
+
+        // Act
+        ticket.Approve(reviewer, ticket.Version);
+
+        // Assert
+        ticket.ModificationHistory.Count.ShouldBe(1);
+        ticket.Version.ShouldBe(1);
+    }
+
+    [Test]
     public void Approve_Reviewer_RecordsApproval()
     {
         // Arrange
