@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.2.2 - 2026-10-29
+## Administration
+### Added
+- Add senior moderator commands to persist safe roles across member departures and rejoins.
 # v0.2.1 - 2026-10-28
 ## Moderation
 ### Fixed

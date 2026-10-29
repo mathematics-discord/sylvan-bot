@@ -1,3 +1,0 @@
-component: Administration
-kind: Added
-body: Add senior moderator commands to persist safe roles across member departures and rejoins.
