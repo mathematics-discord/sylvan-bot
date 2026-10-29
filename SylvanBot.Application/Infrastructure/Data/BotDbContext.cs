@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Logging;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.Moderation;
@@ -35,6 +35,9 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<RoleColourOption> RoleColourOptions => Set<RoleColourOption>();
 
     public DbSet<RoleReaction> RoleReactions => Set<RoleReaction>();
+
+    public DbSet<SylvanBot.Application.Features.RolePersistence.PersistentRole> PersistentRoles => Set<SylvanBot.Application.Features.RolePersistence.PersistentRole>();
+    public DbSet<SylvanBot.Application.Features.RolePersistence.PendingRole> PendingRoles => Set<SylvanBot.Application.Features.RolePersistence.PendingRole>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

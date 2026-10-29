@@ -31,7 +31,7 @@ export default defineConfig({
             },
             {
                 label: 'Senior moderator commands',
-                items: [{slug: 'commands/yoink'}],
+                items: [{slug: 'commands/yoink'}, {slug: 'commands/persistence'}],
             },
             {
                 label: 'Administrator commands',

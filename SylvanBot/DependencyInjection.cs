@@ -48,6 +48,10 @@ public static class DependencyInjection
 
             services.AddWorkingHours();
 
+            services.AddSingleton<SylvanBot.Features.RolePersistence.RolePersistenceWorker>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<SylvanBot.Features.RolePersistence.RolePersistenceWorker>());
+            services.AddHostedService(sp => sp.GetRequiredService<SylvanBot.Features.RolePersistence.RolePersistenceWorker>());
+
             services.AddSingleton<RoleReactionRuntime>();
             services.AddSingleton<RoleReactionConfiguration>();
             services.AddSingleton<RoleReactionCoordinator>();

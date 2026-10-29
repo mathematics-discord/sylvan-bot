@@ -5,7 +5,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SylvanBot.Application.Infrastructure.Data;
-using SylvanBot.Infrastructure.Data;
 
 #nullable disable
 
@@ -22,6 +21,52 @@ namespace SylvanBot.Infrastructure.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("SylvanBot.Application.Features.Logging.LoggingConfiguration", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("guild_id");
+
+                    b.Property<long?>("DeleteLogChannelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("delete_log_channel_id");
+
+                    b.Property<long?>("EditLogChannelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("edit_log_channel_id");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enabled");
+
+                    b.Property<TimeSpan>("LegacyEvidenceRetentionPeriod")
+                        .HasColumnType("interval")
+                        .HasColumnName("evidence_retention_period");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("logging_configurations", (string)null);
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.Logging.LoggingExcludedChannel", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("guild_id");
+
+                    b.Property<long>("ChannelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("channel_id");
+
+                    b.Property<DateTimeOffset>("ExcludedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("excluded_at_utc");
+
+                    b.HasKey("GuildId", "ChannelId");
+
+                    b.ToTable("logging_excluded_channels", (string)null);
+                });
 
             modelBuilder.Entity("SylvanBot.Application.Features.MessageCache.CachedMessage", b =>
                 {
@@ -60,6 +105,100 @@ namespace SylvanBot.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("ck_cached_messages_expiry", "expires_at_utc = created_at_utc + interval '24 hours'");
                         });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.Moderation.ImageSpamSettings", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("BurstDurationSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("RequiredAttachmentCount")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("RequiredChannelCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("ImageSpamSettings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ImageSpamSettings_BurstDurationSeconds_Positive", "\"BurstDurationSeconds\" > 0");
+
+                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredAttachmentCount_Positive", "\"RequiredAttachmentCount\" > 0");
+
+                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredChannelCount_Positive", "\"RequiredChannelCount\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.RoleColours.RoleColourOption", b =>
+                {
+                    b.Property<long>("OptionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("OptionId"));
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("DisplayRoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("SourceRoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("OptionId");
+
+                    b.HasIndex("GuildId", "SourceRoleId", "DisplayRoleId")
+                        .IsUnique();
+
+                    b.ToTable("RoleColourOptions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\"");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.RolePersistence.PendingRole", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("GuildId", "UserId", "RoleId");
+
+                    b.HasIndex("GuildId", "RoleId");
+
+                    b.ToTable("PendingRoles");
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.RolePersistence.PersistentRole", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("GuildId", "RoleId");
+
+                    b.ToTable("PersistentRoles");
                 });
 
             modelBuilder.Entity("SylvanBot.Application.Features.RoleReactions.RoleReaction", b =>
@@ -314,113 +453,13 @@ namespace SylvanBot.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SylvanBot.Features.Logging.LoggingConfiguration", b =>
+            modelBuilder.Entity("SylvanBot.Application.Features.RolePersistence.PendingRole", b =>
                 {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("guild_id");
-
-                    b.Property<long?>("DeleteLogChannelId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("delete_log_channel_id");
-
-                    b.Property<long?>("EditLogChannelId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("edit_log_channel_id");
-
-                    b.Property<bool>("Enabled")
-                        .HasColumnType("boolean")
-                        .HasColumnName("enabled");
-
-                    b.Property<TimeSpan>("LegacyEvidenceRetentionPeriod")
-                        .HasColumnType("interval")
-                        .HasColumnName("evidence_retention_period");
-
-                    b.HasKey("GuildId");
-
-                    b.ToTable("logging_configurations", (string)null);
-                });
-
-            modelBuilder.Entity("SylvanBot.Features.Logging.LoggingExcludedChannel", b =>
-                {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("guild_id");
-
-                    b.Property<long>("ChannelId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("channel_id");
-
-                    b.Property<DateTimeOffset>("ExcludedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("excluded_at_utc");
-
-                    b.HasKey("GuildId", "ChannelId");
-
-                    b.ToTable("logging_excluded_channels", (string)null);
-                });
-
-            modelBuilder.Entity("SylvanBot.Features.Moderation.ImageSpamSettings", b =>
-                {
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("BurstDurationSeconds")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("RequiredAttachmentCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("RequiredChannelCount")
-                        .HasColumnType("integer");
-
-                    b.HasKey("GuildId");
-
-                    b.ToTable("ImageSpamSettings", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ImageSpamSettings_BurstDurationSeconds_Positive", "\"BurstDurationSeconds\" > 0");
-
-                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredAttachmentCount_Positive", "\"RequiredAttachmentCount\" > 0");
-
-                            t.HasCheckConstraint("CK_ImageSpamSettings_RequiredChannelCount_Positive", "\"RequiredChannelCount\" > 0");
-                        });
-                });
-
-            modelBuilder.Entity("SylvanBot.Features.RoleColours.RoleColourOption", b =>
-                {
-                    b.Property<long>("OptionId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("OptionId"));
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("DisplayRoleId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("GuildId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("SourceRoleId")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTimeOffset>("UpdatedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("OptionId");
-
-                    b.HasIndex("GuildId", "SourceRoleId", "DisplayRoleId")
-                        .IsUnique();
-
-                    b.ToTable("RoleColourOptions", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_RoleColourOptions_DifferentRoles", "\"SourceRoleId\" <> \"DisplayRoleId\"");
-                        });
+                    b.HasOne("SylvanBot.Application.Features.RolePersistence.PersistentRole", null)
+                        .WithMany()
+                        .HasForeignKey("GuildId", "RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SylvanBot.Application.Features.SylvanMail.SylvanMailDelivery", b =>
