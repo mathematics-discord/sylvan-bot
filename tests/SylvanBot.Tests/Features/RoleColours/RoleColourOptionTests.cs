@@ -12,7 +12,7 @@ public sealed class RoleColourOptionTests
         var updatedAt = option.UpdatedAtUtc;
 
         // Act
-        var result = option.Update(30, 30);
+        Result<ValueTuple> result = option.Update(30, 30);
 
         // Assert
         result.IsSuccessful.ShouldBeFalse();
