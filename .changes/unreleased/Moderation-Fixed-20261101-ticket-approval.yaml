@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: Preserve ticket approval when comments or durations are edited, so an approved ticket does not require another review.
+time: 2026-11-01T00:00:00+00:00

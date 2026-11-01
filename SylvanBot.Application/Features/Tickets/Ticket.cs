@@ -1,7 +1,6 @@
 namespace SylvanBot.Application.Features.Tickets;
 
 using static System.StringComparison;
-using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations.Schema;
 
 public sealed class Ticket
@@ -124,7 +123,6 @@ public sealed class Ticket
             return;
 
         Comment = comment;
-        InvalidateApproval();
         Record(append ? TicketHistoryAction.AppendedComment : TicketHistoryAction.SetComment, moderatorId);
     }
 
@@ -138,7 +136,6 @@ public sealed class Ticket
         DurationSeconds = seconds;
         ExpiresAtUtc = expiry;
         ExpirySuspended = false;
-        InvalidateApproval();
         Record(TicketHistoryAction.SetDuration, moderatorId);
         ModificationHistory[^1].SetDuration(seconds ?? long.MaxValue);
     }
@@ -206,12 +203,15 @@ public sealed class Ticket
             throw new BotCommandException("This ticket cannot accept that pending change.");
 
         Pending = operation;
-        InvalidateApproval();
         Version++;
     }
 
     public void Initialise(string comment, long? seconds, DateTimeOffset? expiry = null)
     {
+        ArgumentOutOfRangeException.ThrowIfZero(GuildId);
+        ArgumentOutOfRangeException.ThrowIfZero(SubjectUserId);
+        ArgumentOutOfRangeException.ThrowIfZero(ModeratorUserId);
+
         if (comment.Length > CommentLimit)
             throw new BotCommandException("The comment is too long.");
 
@@ -232,31 +232,4 @@ public sealed class Ticket
         if (string.IsNullOrWhiteSpace(comment) || comment.Length > CommentLimit)
             throw new BotCommandException($"Comments must contain 1 to {CommentLimit} characters.");
     }
-
-    private void InvalidateApproval()
-    {
-        ApprovedByUserId = null;
-        ApprovedAtUtc = null;
-    }
 }
-
-public union TicketOperationCommand(TicketOperationCommand.ChangeTimeout, TicketOperationCommand.ExpireBan)
-{
-    public sealed record ChangeTimeout(DateTimeOffset ExpiryUtc);
-
-    public sealed record ExpireBan;
-}
-
-public sealed record TicketActor(
-    ulong GuildId,
-    ulong UserId,
-    bool IsAdministrator,
-    bool CanTimeoutMembers,
-    bool CanBanMembers = false,
-    bool CanKickMembers = false,
-    bool CanMuteMembers = false,
-    bool CanDeafenMembers = false,
-    bool CanManageRoles = false,
-    bool CanViewAuditLog = false);
-
-public sealed record TicketPage(ImmutableArray<Ticket> Items, int Page, bool HasMore);
