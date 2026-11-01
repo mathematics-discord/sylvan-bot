@@ -199,6 +199,7 @@ public sealed class Ticket
             return null;
 
         ModificationHistory.Add(entry);
+
         return entry;
     }
 

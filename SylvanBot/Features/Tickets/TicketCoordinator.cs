@@ -256,7 +256,7 @@ public sealed class TicketCoordinator(
                 {
                     ready++;
 
-                    if (next is null && ticket.Number > cursorAfter)
+                    if (next is null && ticket.Number > cursor)
                         next = ticket;
                 }
                 else
