@@ -4,7 +4,7 @@ using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 
 [RequireContext(ContextType.DM)]
-public sealed class TicketDmModule(TicketWorkflow workflow, IDiscordTicket discord, TicketWorker worker,
+public sealed class TicketDmModule(TicketCoordinator coordinator, TicketBoundary boundary, TicketWorker worker,
     IHostApplicationLifetime lifetime) : InteractionModuleBase<IInteractionContext>
 {
     internal static MessageComponent Buttons(Ticket ticket) => new ComponentBuilder()
@@ -20,13 +20,13 @@ public sealed class TicketDmModule(TicketWorkflow workflow, IDiscordTicket disco
 
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
         deadline.CancelAfter(TimeSpan.FromSeconds(2));
-        var actor = await discord.GetActorAsync(guildId, ownerId, deadline.Token);
-        DotNext.Optional<Ticket> result = await workflow.ShowAsync(actor, number, cancellationToken: deadline.Token);
+        var actor = await boundary.GetActorAsync(guildId, ownerId, deadline.Token);
+        var ticket = await coordinator.ShowAsync(actor, number, false, deadline.Token);
 
-        if (!result.TryGet(out var ticket) || ticket.ModeratorUserId != ownerId || !ticket.CanCorrect(actor))
+        if (ticket is null || ticket.ModeratorUserId != ownerId || !ticket.CanCorrect(actor))
             throw new BotCommandException("This ticket is no longer available to edit.");
 
-        var duration = ticket.DurationKnown ? "permanent" : string.Empty;
+        var duration = "permanent";
 
         if (ticket.DurationSeconds is not null)
             duration = $"{ticket.DurationSeconds} seconds";
@@ -36,7 +36,7 @@ public sealed class TicketDmModule(TicketWorkflow workflow, IDiscordTicket disco
             new TicketModerationEditModal
             {
                 Title = $"Edit Ticket #{number}",
-                Comment = ticket.Comment ?? string.Empty,
+                Comment = ticket.Comment,
                 Duration = duration,
             });
     }
@@ -50,22 +50,23 @@ public sealed class TicketDmModule(TicketWorkflow workflow, IDiscordTicket disco
 
         await interaction.DeferLoadingAsync(ephemeral: true);
         var cancellationToken = lifetime.ApplicationStopping;
-        var actor = await discord.GetActorAsync(guildId, ownerId, cancellationToken);
-        DotNext.Optional<Ticket> result = await workflow.ShowAsync(actor, number, cancellationToken: cancellationToken);
+        var actor = await boundary.GetActorAsync(guildId, ownerId, cancellationToken);
+        var ticket = await coordinator.ShowAsync(actor, number, false, cancellationToken);
 
-        if (!result.TryGet(out var ticket) || ticket.ModeratorUserId != ownerId)
+        if (ticket is null || ticket.ModeratorUserId != ownerId)
             throw new BotCommandException("This ticket is no longer available to edit.");
 
         var details = TicketDetails.ParseFields(string.IsNullOrWhiteSpace(modal.Duration) ? null : modal.Duration, modal.Comment);
-        var change = await workflow.SetModerationAsync(actor, number, details, cancellationToken, expectedVersion: version);
+        var result = await coordinator.EditAsync(actor, number, version, details, null, cancellationToken);
+        ticket = await coordinator.ShowAsync(actor, number, false, cancellationToken) ?? throw new BotCommandException("The ticket is no longer visible.");
         await interaction.Message.ModifyAsync(properties =>
         {
             properties.Content = "Ticket details saved.";
-            properties.Embed = TicketPresentation.Describe(change.Ticket);
-            properties.Components = Buttons(change.Ticket);
+            properties.Embed = TicketPresentation.Describe(ticket);
+            properties.Components = Buttons(ticket);
             properties.AllowedMentions = AllowedMentions.None;
         });
-        await ModifyOriginalResponseAsync(properties => properties.Content = change.ModerationOutcome ?? "Ticket details saved.");
+        await ModifyOriginalResponseAsync(properties => properties.Content = result.Outcome);
         worker.Wake();
     }
 }

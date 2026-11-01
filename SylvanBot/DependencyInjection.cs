@@ -36,8 +36,12 @@ public static class DependencyInjection
 
         private void AddFeatures(IConfiguration configuration)
         {
-            services.AddSingleton<IDiscordTicket, DiscordTicket>();
-            services.AddSingleton<TicketWorkflow>();
+            services.AddSingleton<TicketBoundary>();
+            services.AddSingleton<NoteTicketStrategy>();
+            services.AddSingleton<BanTicketStrategy>();
+            services.AddSingleton<TimeoutTicketStrategy>();
+            services.AddSingleton<TicketPublisher>();
+            services.AddSingleton<TicketCoordinator>();
             services.AddSingleton<TicketWorker>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<TicketWorker>());
             services.AddHostedService(sp => sp.GetRequiredService<TicketWorker>());

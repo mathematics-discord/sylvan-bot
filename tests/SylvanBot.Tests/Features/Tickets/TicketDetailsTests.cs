@@ -6,6 +6,23 @@ using SylvanBot.Application.Features.Tickets;
 public sealed class TicketDetailsTests
 {
     [Test]
+    public void PermanentDuration_Expiry_DoesNotOverflow()
+    {
+        // Arrange
+        var details = TicketDetails.ParseFields("permanent", "reason");
+        var actionTime = DateTimeOffset.UtcNow;
+
+        // Act
+        var expiry = details.Expiry(actionTime);
+
+        // Assert
+        details.DurationSeconds.ShouldBe(long.MaxValue);
+        expiry.ShouldBe(DateTimeOffset.MaxValue);
+        Should.Throw<BotCommandException>(() => details.TimeoutExpiry(actionTime, actionTime));
+
+    }
+
+    [Test]
     public void ParseReply_MultipleDurationItems_SeparatesComment()
     {
         // Arrange
@@ -17,7 +34,7 @@ public sealed class TicketDetailsTests
         // Assert
         details.HasDuration.ShouldBeTrue();
         details.DurationSeconds.ShouldBe(115200);
-        details.Comment.ShouldBe("breaking rules");
+        details.Comment.Apply(string.Empty).ShouldBe("breaking rules");
     }
 
     [TestCase("p, repeated spam")]
@@ -31,8 +48,8 @@ public sealed class TicketDetailsTests
 
         // Assert
         details.HasDuration.ShouldBeTrue();
-        details.DurationSeconds.ShouldBeNull();
-        details.Comment.ShouldBe("repeated spam");
+        details.DurationSeconds.ShouldBe(long.MaxValue);
+        details.Comment.Apply(string.Empty).ShouldBe("repeated spam");
     }
 
     [Test]
@@ -46,7 +63,7 @@ public sealed class TicketDetailsTests
 
         // Assert
         details.HasDuration.ShouldBeFalse();
-        details.Comment.ShouldBe(reply);
+        details.Comment.Apply(string.Empty).ShouldBe(reply);
     }
 
     [TestCase("0 hours, reason")]
@@ -76,7 +93,7 @@ public sealed class TicketDetailsTests
 
         // Assert
         details.DurationSeconds.ShouldBe(7200);
-        details.Comment.ShouldBeNull();
+        (details.Comment is TicketCommentEdit.Keep).ShouldBeTrue();
     }
 
     [TestCase("1 m, reason", 60L)]
@@ -91,7 +108,7 @@ public sealed class TicketDetailsTests
 
         // Assert
         details.DurationSeconds.ShouldBe(seconds);
-        details.Comment.ShouldBe("reason");
+        details.Comment.Apply(string.Empty).ShouldBe("reason");
     }
 
     [Test]
@@ -122,7 +139,7 @@ public sealed class TicketDetailsTests
         var details = TicketDetails.ParseReply("2 days");
 
         // Act
-        DateTimeOffset? expiry = details.Expiry(actionTime);
+        var expiry = details.Expiry(actionTime);
 
         // Assert
         expiry.ShouldBe(actionTime.AddDays(2));

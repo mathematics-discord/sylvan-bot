@@ -26,7 +26,7 @@ public sealed partial class ConfigModule
             throw new BotCommandException("Choose different roles to add and remove.");
 
         var actor = new TicketActor(Context.Guild.Id, moderator.Id, true, moderator.GuildPermissions.ModerateMembers);
-        var configuration = await ticketWorkflow.ConfigureAsync(actor, enabled, channel?.Id,
+        var configuration = await ticketCoordinator.ConfigureAsync(actor, enabled, channel?.Id,
             reminderMinutes * 60, lifetime.ApplicationStopping, add?.Id, remove?.Id);
         ticketWorker.Wake();
         var destination = configuration.DestinationChannelId is null ? "unset" : $"<#{configuration.DestinationChannelId}>";

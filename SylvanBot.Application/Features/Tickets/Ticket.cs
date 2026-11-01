@@ -1,14 +1,14 @@
-﻿using System.ComponentModel.DataAnnotations;
-
 namespace SylvanBot.Application.Features.Tickets;
+
+using static System.StringComparison;
+using System.Collections.Immutable;
+using System.ComponentModel.DataAnnotations.Schema;
 
 public sealed class Ticket
 {
     public const int CommentLimit = 3000;
 
-    public IList<string> ModificationHistory { get; set; } = [];
-
-    public long Id { get; init; }
+    public long Id { get; private set; }
 
     public ulong GuildId { get; init; }
 
@@ -16,262 +16,247 @@ public sealed class Ticket
 
     public TicketAction Action { get; init; }
 
-    public ulong? SubjectUserId { get; init; }
+    public ulong SubjectUserId { get; init; }
 
-    public ulong? ModeratorUserId { get; init; }
+    public ulong ModeratorUserId { get; init; }
 
-    [StringLength(CommentLimit)]
-    public string? Comment
-    {
-        get;
-        set
-        {
-            if (value?.Length > CommentLimit)
-                throw new ArgumentOutOfRangeException(
-                    nameof(value),
-                    $"Ticket comments cannot exceed {CommentLimit:N0} characters.");
+    public DateTimeOffset CreatedAtUtc { get; init; }
 
-            if (!string.Equals(field, value, StringComparison.Ordinal))
-                ClearApproval();
+    public string Comment { get; private set; } = string.Empty;
 
-            field = value;
-        }
-    }
+    public long? DurationSeconds { get; private set; }
 
-    public DateTimeOffset? CreatedAtUtc { get; init; }
+    public DateTimeOffset? ExpiresAtUtc { get; private set; }
 
-    public TicketStatus? Status { get; set; }
+    public TicketStatus Status { get; private set; }
 
-    public long? DurationSeconds
-    {
-        get;
-        set
-        {
-            if (field != value)
-                ClearApproval();
+    public bool Hidden { get; private set; }
 
-            field = value;
-        }
-    }
+    public bool ReviewExempt { get; init; }
 
-    public ulong? ApprovedByUserId { get; set; }
+    public bool ReminderExempt { get; init; }
 
-    public DateTimeOffset? ApprovedAtUtc { get; set; }
+    public ulong? ApprovedByUserId { get; private set; }
 
-    public bool ReviewExempt { get; set; }
-
-    public bool HidePending { get; set; }
-
-    public ulong? RoleId { get; init; }
-
-    public bool Hidden { get; set; }
-
-    public ulong? ChannelId { get; set; }
-
-    public ulong? MessageId { get; set; }
-
-    public ulong? PreviousChannelId { get; set; }
-
-    public ulong? PreviousMessageId { get; set; }
-
-    public bool PublicationPending { get; set; }
-
-    public ulong? LastModifiedByUserId { get; set; }
-
-    public DateTimeOffset? LastModifiedAtUtc { get; set; }
-
-    public int Version { get; set; }
+    public DateTimeOffset? ApprovedAtUtc { get; private set; }
 
     public ulong? SourceAuditId { get; init; }
 
     public ulong? LastAuditId { get; set; }
 
-    public string? AuditReason { get; init; }
+    public string AuditReason { get; init; } = string.Empty;
 
-    public bool DurationKnown
-    {
-        get;
-        set
-        {
-            if (field != value)
-                ClearApproval();
+    public ulong? RoleId { get; init; }
 
-            field = value;
-        }
-    }
-
-    public DateTimeOffset? ExpiresAtUtc { get; set; }
-
-    public TicketCompletion? Completion { get; set; }
-
-    public long? SupersededByNumber { get; set; }
-
-    public int? PublishedVersion { get; set; }
-
-    public Guid? PendingOperationId { get; set; }
-
-    public DateTimeOffset? PendingExpiryUtc { get; set; }
-
-    public ulong? PendingEditorUserId { get; set; }
-
-    public DateTimeOffset? PendingRequestedAtUtc { get; set; }
-
-    public bool PendingOperationAttempted { get; set; }
+    public long? SupersededByNumber { get; private set; }
 
     public bool ExpirySuspended { get; set; }
 
-    public void RecordModification(ulong moderatorId, string action, DateTimeOffset timestamp)
+    public int Version { get; private set; }
+
+    public TicketOperation? Pending { get; set; }
+
+    public bool SendUncertain { get; set; }
+
+    public IList<TicketPublication> Publications { get; } = [];
+
+    public IList<TicketHistoryEntry> ModificationHistory { get; } = [];
+
+    [NotMapped]
+    public bool Complete => !string.IsNullOrWhiteSpace(Comment)
+                            && (Action != TicketAction.Timeout
+                                || (DurationSeconds is > 0 && ExpiresAtUtc is not null));
+
+    public bool CanCorrect(TicketActor actor) => actor.GuildId == GuildId
+                                                 && actor.UserId != 0
+                                                 && (actor.IsAdministrator
+                                                     || actor.CanViewAuditLog
+                                                     || (Action == TicketAction.Note && actor.CanTimeoutMembers)
+                                                     || (actor.UserId == ModeratorUserId
+                                                         && Action switch
+                                                         {
+                                                             TicketAction.Timeout => actor.CanTimeoutMembers,
+                                                             TicketAction.Ban => actor.CanBanMembers,
+                                                             TicketAction.VoiceMute => actor.CanMuteMembers,
+                                                             _ => false,
+                                                         }));
+
+    public void RequireEdit(TicketActor actor, int version)
     {
-        ModificationHistory.Add($"- <@{moderatorId}> {action} at <t:{timestamp.ToUnixTimeSeconds()}:f>");
+        if (!CanCorrect(actor))
+            throw new BotCommandException("You do not have permission to edit this ticket.");
+
+        if (Version != version)
+            throw new BotCommandException("This ticket changed. Reopen it before saving.");
+
+        if (Pending is not null)
+            throw new BotCommandException("Resolve the pending Discord operation before editing details.");
+    }
+
+    public string ValidateEdit(TicketDetails details, DateTimeOffset now)
+    {
+        if (details.Duration is null || details.Comment is null)
+            throw new BotCommandException("Duration and comment edit choices are required.");
+
+        var comment = details.Comment.Apply(Comment);
+
+        if (details.Comment is not TicketCommentEdit.Keep)
+            ValidateComment(comment);
+
+        if (!details.HasDuration)
+            return comment;
+
+        if (Action is not (TicketAction.Ban or TicketAction.Timeout or TicketAction.VoiceMute))
+            throw new BotCommandException("This ticket type does not accept a duration.");
+
+        _ = Action == TicketAction.Timeout
+            ? details.TimeoutExpiry(CreatedAtUtc, now)
+            : details.Expiry(CreatedAtUtc);
+
+        return comment;
     }
 
     public void SetComment(string comment, ulong moderatorId, bool append = false)
     {
-        var updated = append && !string.IsNullOrEmpty(Comment) ? Comment + "\n" + comment : comment;
+        ValidateComment(comment);
 
-        if (string.Equals(Comment, updated, StringComparison.Ordinal))
+        if (string.Equals(Comment, comment, Ordinal))
             return;
 
-        Comment = updated;
-        RecordModification(moderatorId, append ? "appended comment" : "set comment", DateTimeOffset.UtcNow);
+        Comment = comment;
+        InvalidateApproval();
+        Record(append ? TicketHistoryAction.AppendedComment : TicketHistoryAction.SetComment, moderatorId);
     }
 
-    public void RecordDurationChange(ulong moderatorId)
+    public void SetDuration(long? seconds, ulong? moderatorId, DateTimeOffset? observedExpiry = null)
     {
-        var duration = DurationSeconds is null
-            ? "Permanent"
-            : TimeSpan.FromSeconds(DurationSeconds.Value).ToString(@"d\D\Thh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture);
-        RecordModification(moderatorId, $"set duration to {duration}", DateTimeOffset.UtcNow);
+        DateTimeOffset? expiry = observedExpiry ?? (seconds is { } finite ? CreatedAtUtc.AddSeconds(finite) : null);
+
+        if (DurationSeconds == seconds && ExpiresAtUtc == expiry && !ExpirySuspended)
+            return;
+
+        DurationSeconds = seconds;
+        ExpiresAtUtc = expiry;
+        ExpirySuspended = false;
+        InvalidateApproval();
+        Record(TicketHistoryAction.SetDuration, moderatorId);
+        ModificationHistory[^1].SetDuration(seconds ?? long.MaxValue);
     }
 
-    public void ClearApproval()
+    public void SetHidden(TicketActor actor, int version, bool hidden)
     {
-        ApprovedByUserId = null;
-        ApprovedAtUtc = null;
+        var senior = actor.IsAdministrator || actor.CanViewAuditLog;
+
+        if (!CanCorrect(actor) || (Action != TicketAction.Note && !senior) || (Hidden && !senior))
+            throw new BotCommandException("You cannot change this ticket's visibility.");
+
+        if (version != Version)
+            throw new BotCommandException("This ticket changed. Refresh it before changing visibility.");
+
+        if (Hidden == hidden)
+            return;
+
+        Hidden = hidden;
+        Record(hidden ? TicketHistoryAction.Hidden : TicketHistoryAction.Unhidden, actor.UserId);
     }
 
-    public void Approve(TicketActor actor, int expectedVersion)
+    public void Approve(TicketActor actor, int version)
     {
-        if (actor.GuildId != GuildId || actor.UserId == 0 || (actor is { IsAdministrator: false, CanViewAuditLog: false }))
-            throw new Common.BotCommandException("Approval requires Administrator or View Audit Log.");
+        if (actor.GuildId != GuildId || actor.UserId == 0 || (!actor.IsAdministrator && !actor.CanViewAuditLog))
+            throw new BotCommandException("Approval requires Administrator or View Audit Log.");
 
-        if (Version != expectedVersion)
-            throw new Common.BotCommandException("This ticket changed. Refresh it before approving.");
+        if (version != Version || Hidden || !Complete || Pending is not null)
+            throw new BotCommandException("Complete the details, resolve pending changes and refresh before approving.");
 
-        if (Action is not (TicketAction.Ban or TicketAction.Timeout or TicketAction.VoiceMute)
-            || ReviewExempt || Hidden || HidePending || PendingOperationId is not null
-            || string.IsNullOrWhiteSpace(Comment) || !DurationKnown
-            || (Action == TicketAction.Timeout && DurationSeconds is not > 0)
-            || Completion == TicketCompletion.Pending)
-            throw new Common.BotCommandException("Complete the ticket details and resolve pending changes before approving.");
-
-        if (ApprovedAtUtc is not null)
+        if (ApprovedByUserId is not null || ReviewExempt)
             return;
 
         ApprovedByUserId = actor.UserId;
         ApprovedAtUtc = DateTimeOffset.UtcNow;
-        RecordModification(actor.UserId, "approved", ApprovedAtUtc.Value);
+        Record(TicketHistoryAction.Approved, actor.UserId);
+    }
+
+    public void End(TicketStatus status, ulong? moderatorId = null, long? successor = null)
+    {
+        if (Status == status)
+            return;
+
+        Status = status;
+        SupersededByNumber = successor;
+
+        Record(
+            status switch
+            {
+                TicketStatus.Expired => TicketHistoryAction.Expired,
+                TicketStatus.Superseded => TicketHistoryAction.Superseded,
+                _ => TicketHistoryAction.Reverted,
+            },
+            moderatorId);
+    }
+
+    public void Record(TicketHistoryAction action, ulong? moderatorId = null, DateTimeOffset? timestamp = null)
+    {
+        ModificationHistory.Add(new TicketHistoryEntry(ModificationHistory.Count + 1, action, moderatorId, timestamp ?? DateTimeOffset.UtcNow));
         Version++;
     }
 
-    public bool CanCorrect(TicketActor actor)
+    public void BeginTimeoutChange(TicketOperation operation)
     {
-        if (actor.GuildId != GuildId || actor.UserId == 0)
-            return false;
+        if (Action != TicketAction.Timeout || Pending is not null || operation.Command is not TicketOperationCommand.ChangeTimeout)
+            throw new BotCommandException("This ticket cannot accept that pending change.");
 
-        if (Hidden && actor is { IsAdministrator: false, CanViewAuditLog: false })
-            return false;
+        Pending = operation;
+        InvalidateApproval();
+        Version++;
+    }
 
-        if (actor.IsAdministrator || actor.CanViewAuditLog)
-            return true;
+    public void Initialise(string comment, long? seconds, DateTimeOffset? expiry = null)
+    {
+        if (comment.Length > CommentLimit)
+            throw new BotCommandException("The comment is too long.");
 
-        return ModeratorUserId == actor.UserId && Action switch
+        Comment = comment;
+        DurationSeconds = seconds;
+        ExpiresAtUtc = expiry ?? (seconds is { } finite ? CreatedAtUtc.AddSeconds(finite) : null);
+
+        Status = Action switch
         {
-            TicketAction.Timeout => actor.CanTimeoutMembers,
-            TicketAction.VoiceMute => actor.CanMuteMembers,
-            TicketAction.Ban => actor.CanBanMembers,
-            _ => false,
+            TicketAction.Note => TicketStatus.NotApplicable,
+            TicketAction.Kick => TicketStatus.Applied,
+            _ => TicketStatus.Active,
         };
     }
 
-    public void UpdateCompletion()
+    public static void ValidateComment(string comment)
     {
-        if (Completion is null or TicketCompletion.Automated)
-            return;
-
-        var complete = !string.IsNullOrWhiteSpace(Comment)
-                       && DurationKnown
-                       && (Action != TicketAction.Timeout || DurationSeconds is > 0);
-
-        Completion = complete ? TicketCompletion.Complete : TicketCompletion.Pending;
+        if (string.IsNullOrWhiteSpace(comment) || comment.Length > CommentLimit)
+            throw new BotCommandException($"Comments must contain 1 to {CommentLimit} characters.");
     }
 
-    public void PrepareOperation(DateTimeOffset? expiry, ulong? editorUserId)
+    private void InvalidateApproval()
     {
-        PendingOperationId = Guid.NewGuid();
-        PendingExpiryUtc = expiry;
-        PendingEditorUserId = editorUserId;
-        PendingRequestedAtUtc = DateTimeOffset.UtcNow;
-        PendingOperationAttempted = false;
-        Version++;
-        UpdateCompletion();
-    }
-
-    public void RejectOperation()
-    {
-        ClearOperation();
-
-        if (Action == TicketAction.Ban)
-            Status = TicketStatus.ExpirationFailed;
-
-        Version++;
-        UpdateCompletion();
-    }
-
-    public void SetObservedExpiry(DateTimeOffset expiry)
-    {
-        ExpiresAtUtc = expiry;
-        DurationSeconds = Math.Max(1, (long)Math.Ceiling((expiry - CreatedAtUtc!.Value).TotalSeconds));
-        DurationKnown = true;
-    }
-
-    public void ClearOperation()
-    {
-        PendingOperationId = null;
-        PendingExpiryUtc = null;
-        PendingEditorUserId = null;
-        PendingRequestedAtUtc = null;
-        PendingOperationAttempted = false;
-    }
-
-    public void CancelOlderOperation(TicketObservation observation)
-    {
-        if (LastAuditId is null || observation.AuditId > LastAuditId)
-            ClearOperation();
-    }
-
-    public void ConfirmOperation(DateTimeOffset? expiry)
-    {
-        var editor = PendingEditorUserId;
-        DateTimeOffset? requested = PendingRequestedAtUtc;
-
-        if (Action == TicketAction.Timeout && PendingExpiryUtc is not null)
-            SetObservedExpiry(PendingExpiryUtc.Value);
-
-        if (Action == TicketAction.Timeout && expiry is not null)
-            SetObservedExpiry(expiry.Value);
-        else
-            Status = TicketStatus.Expired;
-
-        ClearOperation();
-
-        if (LastModifiedAtUtc is null || LastModifiedAtUtc <= requested)
-        {
-            LastModifiedByUserId = editor;
-            LastModifiedAtUtc = requested;
-        }
-
-        Version++;
-        UpdateCompletion();
+        ApprovedByUserId = null;
+        ApprovedAtUtc = null;
     }
 }
+
+public union TicketOperationCommand(TicketOperationCommand.ChangeTimeout, TicketOperationCommand.ExpireBan)
+{
+    public sealed record ChangeTimeout(DateTimeOffset ExpiryUtc);
+
+    public sealed record ExpireBan;
+}
+
+public sealed record TicketActor(
+    ulong GuildId,
+    ulong UserId,
+    bool IsAdministrator,
+    bool CanTimeoutMembers,
+    bool CanBanMembers = false,
+    bool CanKickMembers = false,
+    bool CanMuteMembers = false,
+    bool CanDeafenMembers = false,
+    bool CanManageRoles = false,
+    bool CanViewAuditLog = false);
+
+public sealed record TicketPage(ImmutableArray<Ticket> Items, int Page, bool HasMore);

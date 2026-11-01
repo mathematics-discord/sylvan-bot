@@ -1,4 +1,6 @@
 ﻿# Build outputs
+artifacts/
+*.log
 **/bin/
 **/obj/
 **/logs/*.jsonl

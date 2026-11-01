@@ -15,7 +15,7 @@ public sealed partial class ConfigModule(
     RoleReactionConfiguration roleReactions,
     ImageSpamSettingsService settingsService,
     IHostApplicationLifetime lifetime,
-    SylvanBot.Application.Features.Tickets.TicketWorkflow ticketWorkflow,
+    SylvanBot.Features.Tickets.TicketCoordinator ticketCoordinator,
     SylvanBot.Features.Tickets.TicketWorker ticketWorker
 ) : SlashCommandBase
 {

@@ -16,25 +16,24 @@ public sealed record TicketDetails
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
         TimeSpan.FromMilliseconds(100));
 
-    public TicketDetails(bool hasDuration, long? durationSeconds, string? comment)
+    public TicketDetails(TicketDurationEdit duration, TicketCommentEdit comment)
     {
-        HasDuration = hasDuration;
-        DurationSeconds = durationSeconds;
+        if (duration is null || comment is null)
+            throw new BotCommandException("Duration and comment edit choices are required.");
+
+        Duration = duration;
         Comment = comment;
     }
 
-    public bool HasDuration { get; init; }
-
-    public long? DurationSeconds { get; init; }
-
-    public string? Comment { get; init; }
-
-    public void Deconstruct(out bool hasDuration, out long? durationSeconds, out string? comment)
+    public TicketDurationEdit Duration { get; init; }
+    public TicketCommentEdit Comment { get; init; }
+    public bool HasDuration => Duration is TicketDurationEdit.Set or TicketDurationEdit.Permanent;
+    public long DurationSeconds => Duration switch
     {
-        hasDuration = HasDuration;
-        durationSeconds = DurationSeconds;
-        comment = Comment;
-    }
+        TicketDurationEdit.Set duration when duration.Seconds > 0 => duration.Seconds,
+        TicketDurationEdit.Permanent => long.MaxValue,
+        _ => throw new BotCommandException("A positive duration is required."),
+    };
 
     static public TicketDetails ParseReply(string text)
     {
@@ -44,7 +43,7 @@ public sealed record TicketDetails
         var permanent = Permanent.Match(text);
 
         if (permanent.Success)
-            return new TicketDetails(true, null, ReadComment(text[permanent.Length..]));
+            return new TicketDetails(new TicketDurationEdit.Permanent(), ReadComment(text[permanent.Length..]));
 
         var offset = 0;
         long seconds = 0;
@@ -93,33 +92,33 @@ public sealed record TicketDetails
 
         var comment = ReadComment(remainder);
 
-        if (offset == 0 && comment is null)
+        if (offset == 0 && comment is TicketCommentEdit.Keep)
             throw new BotCommandException("Supply a duration or a nonblank comment. Nothing was changed.");
 
-        return new TicketDetails(offset > 0, offset > 0 ? seconds : null, comment);
+        return new TicketDetails(offset > 0 ? new TicketDurationEdit.Set(seconds) : new TicketDurationEdit.Keep(), comment);
     }
 
     public static TicketDetails ParseFields(string? duration, string? comment)
     {
         if (duration is null)
-            return new TicketDetails(false, null, comment is null ? null : RequireComment(comment));
+            return new TicketDetails(new TicketDurationEdit.Keep(), comment is null ? new TicketCommentEdit.Keep() : new TicketCommentEdit.Replace(RequireComment(comment)));
 
         var details = ParseReply(duration);
 
-        if (!details.HasDuration || details.Comment is not null)
+        if (!details.HasDuration || details.Comment is not TicketCommentEdit.Keep)
             throw new BotCommandException("The duration field must contain only a duration or 'permanent'. Nothing was changed.");
 
-        return details with { Comment = comment is null ? null : RequireComment(comment) };
+        return details with { Comment = comment is null ? new TicketCommentEdit.Keep() : new TicketCommentEdit.Replace(RequireComment(comment)) };
     }
 
-    public DateTimeOffset? Expiry(DateTimeOffset actionTime)
+    public DateTimeOffset Expiry(DateTimeOffset actionTime)
     {
-        if (!HasDuration || DurationSeconds is null)
-            return null;
+        if (!HasDuration || DurationSeconds == long.MaxValue)
+            return DateTimeOffset.MaxValue;
 
         try
         {
-            return actionTime.AddSeconds(DurationSeconds.Value);
+            return actionTime.AddSeconds(DurationSeconds);
         }
         catch (ArgumentOutOfRangeException exception)
         {
@@ -129,8 +128,10 @@ public sealed record TicketDetails
 
     public DateTimeOffset TimeoutExpiry(DateTimeOffset actionTime, DateTimeOffset now)
     {
-        var expiry = Expiry(actionTime)
-                     ?? throw new BotCommandException("Discord timeouts cannot be permanent. Nothing was changed.");
+        var expiry = Expiry(actionTime);
+
+        if (expiry == DateTimeOffset.MaxValue)
+            throw new BotCommandException("Discord timeouts cannot be permanent. Nothing was changed.");
 
         if (expiry > now.AddDays(28))
             throw new BotCommandException("Discord timeouts cannot end more than 28 days from now. Nothing was changed.");
@@ -138,7 +139,9 @@ public sealed record TicketDetails
         return expiry;
     }
 
-    private static string? ReadComment(string text) => string.IsNullOrWhiteSpace(text) ? null : RequireComment(text);
+    private static TicketCommentEdit ReadComment(string text) => string.IsNullOrWhiteSpace(text)
+        ? new TicketCommentEdit.Keep()
+        : new TicketCommentEdit.Replace(RequireComment(text));
 
     private static string RequireComment(string text)
     {

@@ -2,8 +2,10 @@
 
 public enum TicketStatus
 {
-    Active,
-    Expired,
-    ExpirationFailed,
-    Reverted,
+    NotApplicable = -1,
+    Active = 0,
+    Expired = 1,
+    Reverted = 3,
+    Applied = 4,
+    Superseded = 5,
 }
