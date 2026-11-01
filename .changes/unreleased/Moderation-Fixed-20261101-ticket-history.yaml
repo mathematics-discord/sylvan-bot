@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: Show only moderator changes in ticket modification history, excluding automatic expiry and audit reconciliation.
+time: 2026-11-01T00:00:00+00:00

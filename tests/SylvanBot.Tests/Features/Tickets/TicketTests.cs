@@ -164,6 +164,60 @@ public sealed class TicketTests
         Should.Throw<BotCommandException>(() => new TicketDetails(default, new TicketCommentEdit.Keep()));
     }
 
+    [TestCase(TicketStatus.Expired)]
+    [TestCase(TicketStatus.Reverted)]
+    [TestCase(TicketStatus.Superseded)]
+    public void End_LifecycleChange_UpdatesStateWithoutModificationHistory(TicketStatus status)
+    {
+        // Arrange
+        var ticket = Create(TicketAction.Timeout);
+        var version = ticket.Version;
+
+        // Act
+        ticket.End(status, moderatorId: 4, successor: 2);
+
+        // Assert
+        ticket.Status.ShouldBe(status);
+        ticket.SupersededByNumber.ShouldBe(2);
+        ticket.Version.ShouldBe(version + 1);
+        ticket.ModificationHistory.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void Record_AuditObserved_AdvancesVersionWithoutModificationHistory()
+    {
+        // Arrange
+        var ticket = Create(TicketAction.Timeout);
+        var version = ticket.Version;
+
+        // Act
+        ticket.Record(TicketHistoryAction.AuditObserved, moderatorId: 4);
+
+        // Assert
+        ticket.Version.ShouldBe(version + 1);
+        ticket.ModificationHistory.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void SetDuration_SystemChange_PreservesModeratorHistory()
+    {
+        // Arrange
+        var ticket = Create(TicketAction.Timeout);
+        ticket.SetDuration(600, 4);
+        var version = ticket.Version;
+        var history = ticket.ModificationHistory.ShouldHaveSingleItem();
+        var originalDescription = history.Format();
+
+        // Act
+        ticket.SetDuration(300, moderatorId: null);
+
+        // Assert
+        ticket.DurationSeconds.ShouldBe(300);
+        ticket.Version.ShouldBe(version + 1);
+        ticket.ModificationHistory.ShouldHaveSingleItem().ShouldBeSameAs(history);
+        history.Format().ShouldBe(originalDescription);
+    }
+
     internal static Ticket Create(TicketAction action, bool reviewExempt = false)
     {
         var ticket = new Ticket

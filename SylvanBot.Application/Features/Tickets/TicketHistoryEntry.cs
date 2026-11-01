@@ -32,6 +32,13 @@ public sealed class TicketHistoryEntry
     public TicketHistoryAction Action { get; private set; }
 
     [NotMapped]
+    public bool IsModeratorChange => Action == TicketHistoryAction.Historical
+        || (_moderatorId is > 0 && Action is TicketHistoryAction.Approved
+            or TicketHistoryAction.SetComment or TicketHistoryAction.AppendedComment
+            or TicketHistoryAction.SetDuration or TicketHistoryAction.HideRequested
+            or TicketHistoryAction.Hidden or TicketHistoryAction.Unhidden);
+
+    [NotMapped]
     public DateTimeOffset Timestamp => _timestamp
         ?? throw new InvalidOperationException("Historical text has no structured timestamp.");
 

@@ -187,11 +187,13 @@ internal static class TicketPresentation
 
     private static void AddHistory(EmbedBuilder embed, Ticket ticket)
     {
-        if (ticket.ModificationHistory.Count == 0)
-            return;
+        TicketHistoryEntry[] history = ticket.ModificationHistory
+            .Where(entry => entry.IsModeratorChange)
+            .OrderByDescending(entry => entry.Sequence)
+            .ToArray();
 
-        IOrderedEnumerable<TicketHistoryEntry> history = ticket.ModificationHistory
-            .OrderByDescending(entry => entry.Sequence);
+        if (history.Length == 0)
+            return;
 
         List<string> lines = [];
         var length = 0;
@@ -207,7 +209,7 @@ internal static class TicketPresentation
             length += line.Length + 1;
         }
 
-        if (lines.Count < ticket.ModificationHistory.Count)
+        if (lines.Count < history.Length)
             lines.Insert(0, "Earlier changes omitted from this view.");
 
         embed.AddField("Modification history", string.Join('\n', lines), inline: false);

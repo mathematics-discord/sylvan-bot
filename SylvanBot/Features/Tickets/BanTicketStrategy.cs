@@ -222,7 +222,7 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
             {
                 latest.SetDuration(
                     Math.Max(1, (long)Math.Ceiling((timeout.ExpiresAtUtc - latest.CreatedAtUtc).TotalSeconds)),
-                    observation.ModeratorUserId,
+                    observation.ModeratorIsBot ? null : observation.ModeratorUserId,
                     timeout.ExpiresAtUtc);
             }
 

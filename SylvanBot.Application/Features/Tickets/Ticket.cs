@@ -136,8 +136,7 @@ public sealed class Ticket
         DurationSeconds = seconds;
         ExpiresAtUtc = expiry;
         ExpirySuspended = false;
-        Record(TicketHistoryAction.SetDuration, moderatorId);
-        ModificationHistory[^1].SetDuration(seconds ?? long.MaxValue);
+        Record(TicketHistoryAction.SetDuration, moderatorId)?.SetDuration(seconds ?? long.MaxValue);
     }
 
     public void SetHidden(TicketActor actor, int version, bool hidden)
@@ -191,10 +190,16 @@ public sealed class Ticket
             moderatorId);
     }
 
-    public void Record(TicketHistoryAction action, ulong? moderatorId = null, DateTimeOffset? timestamp = null)
+    public TicketHistoryEntry? Record(TicketHistoryAction action, ulong? moderatorId = null, DateTimeOffset? timestamp = null)
     {
-        ModificationHistory.Add(new TicketHistoryEntry(ModificationHistory.Count + 1, action, moderatorId, timestamp ?? DateTimeOffset.UtcNow));
         Version++;
+        var entry = new TicketHistoryEntry(ModificationHistory.Count + 1, action, moderatorId, timestamp ?? DateTimeOffset.UtcNow);
+
+        if (!entry.IsModeratorChange)
+            return null;
+
+        ModificationHistory.Add(entry);
+        return entry;
     }
 
     public void BeginTimeoutChange(TicketOperation operation)
