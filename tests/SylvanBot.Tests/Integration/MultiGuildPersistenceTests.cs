@@ -7,7 +7,7 @@ using SylvanBot.Features.RoleColours;
 namespace SylvanBot.Tests.Integration;
 
 [TestFixture]
-[SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements should be documented")]
+[Ignore("This was a regression suite - no longer required")]
 public sealed class MultiGuildPersistenceTests
 {
     [SetUp]

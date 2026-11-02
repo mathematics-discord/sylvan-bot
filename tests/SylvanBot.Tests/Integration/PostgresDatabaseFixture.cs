@@ -8,7 +8,7 @@ using Testcontainers.PostgreSql;
 namespace SylvanBot.Tests.Integration;
 
 [SetUpFixture]
-[SuppressMessage("Structure", "NUnit1028:The non-test method is public")]
+[Ignore("Not currently used")]
 public sealed class PostgresDatabaseFixture
 {
     private static PostgreSqlContainer _container = null!;

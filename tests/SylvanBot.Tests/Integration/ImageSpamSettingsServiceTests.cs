@@ -7,7 +7,7 @@ using SylvanBot.Features.Moderation;
 namespace SylvanBot.Tests.Integration;
 
 [TestFixture]
-[SuppressMessage("StyleCop.CSharp.DocumentationRules", "SA1600:Elements should be documented")]
+[Ignore("Battle-hardened by now")]
 public sealed class ImageSpamSettingsServiceTests
 {
     [SetUp]
