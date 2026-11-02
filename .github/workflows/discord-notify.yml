@@ -1,0 +1,97 @@
+name: Notify Discord of master changes
+
+on:
+  push:
+    branches: [master]
+  pull_request_target:
+    branches: [master]
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  notify:
+    if: >-
+      (github.event_name == 'push' && github.event.deleted == false) ||
+      (github.event_name == 'pull_request_target' && github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Only event metadata is read. Never check out or run pull-request code.
+      - name: Send commits or merged pull request to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_COMMITS_WEBHOOK_URL }}
+        shell: python
+        run: |
+          import json
+          import os
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as stream:
+              event = json.load(stream)
+
+          kind = os.environ["GITHUB_EVENT_NAME"]
+          repo = event["repository"]["full_name"]
+          if kind == "push":
+              if event.get("ref") != "refs/heads/master" or event.get("deleted"):
+                  raise SystemExit(0)
+              commits = event.get("commits", [])
+              if not commits:
+                  raise SystemExit(0)
+              title = f"{repo}: {len(commits)} commit(s) pushed to master"
+              url = event["compare"]
+              lines = []
+              for commit in commits[:15]:
+                  subject = commit["message"].splitlines()[0][:160]
+                  author = commit.get("author", {}).get("name", "unknown")[:80]
+                  lines.append(f'[`{commit["id"][:7]}`]({commit["url"]}) {subject} — {author}')
+              if len(commits) > 15:
+                  lines.append(f"…and {len(commits) - 15} more commits. See comparison.")
+              description = "\n".join(lines)
+              color = 0x57F287
+          elif kind == "pull_request_target":
+              pr = event["pull_request"]
+              if event.get("action") != "closed" or not pr.get("merged") or pr["base"]["ref"] != "master":
+                  raise SystemExit(0)
+              title = f'{repo}: PR #{pr["number"]} merged into master'
+              url = pr["html_url"]
+              merger = (pr.get("merged_by") or {}).get("login", "unknown")
+              description = f'{pr["title"][:500]}\nMerged by {merger}.'
+              color = 0x9B59B6
+          else:
+              raise SystemExit(0)
+
+          webhook = os.environ.get("DISCORD_WEBHOOK_URL", "")
+          parsed = urllib.parse.urlsplit(webhook)
+          if parsed.scheme != "https" or parsed.hostname != "discord.com" or not parsed.path.startswith("/api/webhooks/"):
+              raise SystemExit("DISCORD_COMMITS_WEBHOOK_URL must be a Discord webhook URL.")
+          payload = {
+              "allowed_mentions": {"parse": []},
+              "embeds": [{
+                  "title": title[:256],
+                  "url": url,
+                  "description": description[:4096],
+                  "color": color,
+              }],
+          }
+          query = urllib.parse.parse_qsl(parsed.query)
+          query = [(key, value) for key, value in query if key != "wait"] + [("wait", "true")]
+          endpoint = urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(query)))
+          request = urllib.request.Request(
+              endpoint,
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json", "User-Agent": "Sylvan-GitHub-Notifications"},
+              method="POST",
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  message = json.load(response)
+          except urllib.error.HTTPError as error:
+              raise SystemExit(f"Discord rejected the notification (HTTP {error.code}).") from None
+          except urllib.error.URLError:
+              raise SystemExit("Could not reach Discord.") from None
+          if str(message.get("channel_id")) != "845916489504391198":
+              raise SystemExit("Webhook delivered to an unexpected Discord channel.")
+          print("Discord confirmed delivery to the configured channel.")
