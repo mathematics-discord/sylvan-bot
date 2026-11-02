@@ -4,6 +4,7 @@
     </PropertyGroup>
     <ItemGroup>
         <PackageVersion Include="coverlet.collector" Version="10.1.0"/>
+        <PackageVersion Include="CsCheck" Version="5.0.0"/>
         <PackageVersion Include="DiffPlex" Version="1.9.0"/>
         <PackageVersion Include="Discord.Net" Version="3.19.1"/>
         <PackageVersion Include="Discord.Net.Commands" Version="3.19.1"/>

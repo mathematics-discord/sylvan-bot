@@ -1,0 +1,4 @@
+component: Internal
+kind: Changed
+body: Use CsCheck properties for Working Hours interval membership and equivalent fractional times, replacing repetitive fixed-offset examples.
+time: 2026-11-02T22:34:11.8307950Z
