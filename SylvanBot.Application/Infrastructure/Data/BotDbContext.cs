@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Features.Automod;
 using SylvanBot.Application.Features.Logging;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.Moderation;
@@ -15,6 +16,12 @@ namespace SylvanBot.Application.Infrastructure.Data;
 /// </summary>
 public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbContext(options)
 {
+    public DbSet<AutomodSettings> AutomodSettings => Set<AutomodSettings>();
+
+    public DbSet<AutomodRule> AutomodRules => Set<AutomodRule>();
+
+    public DbSet<AutomodExemptRole> AutomodExemptRoles => Set<AutomodExemptRole>();
+
     public DbSet<CachedMessage> CachedMessages => Set<CachedMessage>();
 
     public DbSet<SylvanMailSettings> SylvanMailSettings => Set<SylvanMailSettings>();

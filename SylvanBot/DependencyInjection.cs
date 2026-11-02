@@ -1,8 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.MessageCache;
+using SylvanBot.Application.Features.Automod;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Features.EmojiYoink;
+using SylvanBot.Features.Automod;
 using SylvanBot.Features.Logging;
 using SylvanBot.Features.MessageCache;
 using SylvanBot.Features.Moderation;
@@ -35,6 +37,11 @@ public static class DependencyInjection
 
         private void AddFeatures(IConfiguration configuration)
         {
+            services.AddSingleton<AutomodManagement>();
+            services.AddSingleton<AutomodRuntime>();
+            services.AddHostedService(sp => sp.GetRequiredService<AutomodRuntime>());
+            services.AddSingleton<AutomodGatewayHandler>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<AutomodGatewayHandler>());
             services.AddSingleton<ISylvanMailDiscord, SylvanMailDiscord>();
             services.AddSingleton<ISylvanMailDrafts, SylvanMailDrafts>();
             services.AddSingleton<ISylvanMailForum, SylvanMailForum>();
