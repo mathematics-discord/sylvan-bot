@@ -16,6 +16,7 @@ This file defines review policy and is self-contained. Apply the rules below whe
 
 ### Protect the bot's actual contracts
 
+- Internal contracts MUST preserve explicit optionality, using `Optional<T>` where absence has semantic meaning. Nullability MUST NOT carry semantic meaning unless a common C# idiom calls for it (such as a `TryGet` pattern) or an API boundary requires it. Convert boundary-required nullable values to explicit optionality when entering internal contracts; do not replace explicit optionality with nullable types merely to reduce conversions.
 - Check authorisation, guild isolation, role hierarchy, and component ownership where the change affects them. Account for existing framework preconditions and shared checks before requesting duplicate validation.
 - Preserve command and component contracts, option semantics, and honest user responses unless the task intentionally changes them. Check interaction acknowledgement, Discord payload limits, and unintended mentions where relevant.
 - Check changed database work for data loss, incorrect queries, lost updates, and context lifetime or concurrency errors. Preserve deployed migration history and existing data unless removal is explicitly intended. Removing an EF model does not itself authorise dropping stored data.
