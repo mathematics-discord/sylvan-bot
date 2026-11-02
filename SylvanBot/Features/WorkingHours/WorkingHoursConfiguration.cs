@@ -112,6 +112,12 @@ public sealed class WorkingHoursConfiguration(
                 settings.Enabled = false;
 
                 break;
+            case WorkingConditionsChange.PingRole:
+            case WorkingConditionsChange.AddEligible:
+            case WorkingConditionsChange.RemoveEligible:
+            case WorkingConditionsChange.AddExempt:
+            case WorkingConditionsChange.RemoveExempt:
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(change), actualValue: change, message: null);
         }

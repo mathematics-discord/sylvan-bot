@@ -1,0 +1,4 @@
+component: Administration
+kind: Fixed
+body: Allow valid Working Hours ping, eligible and exempt role changes to save successfully.
+time: 2026-11-02T23:21:50.009155+00:00
