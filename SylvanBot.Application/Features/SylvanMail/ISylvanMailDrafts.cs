@@ -2,7 +2,7 @@
 
 public interface ISylvanMailDrafts
 {
-    Task<Optional<SylvanMailMessage>> ReadDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct);
+    Task<Optional<SylvanMailMessage>> ReadDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool requireReadyMarker, CancellationToken ct);
 
     Task SetDraftReadyAsync(ulong threadId, ulong messageId, bool ready, CancellationToken ct);
 

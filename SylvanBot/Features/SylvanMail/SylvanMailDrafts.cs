@@ -44,7 +44,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         ulong threadId,
         ulong messageId,
         ulong authorId,
-        bool confirm,
+        bool requireReadyMarker,
         CancellationToken ct)
     {
         var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
@@ -65,7 +65,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
         var hasMarker = source.Reactions.TryGetValue(new Emoji(SendEmoji), out var reaction) && reaction.IsMe;
 
-        if (confirm && !hasMarker)
+        if (requireReadyMarker && !hasMarker)
             return default;
 
         var content = source.Content ?? string.Empty;

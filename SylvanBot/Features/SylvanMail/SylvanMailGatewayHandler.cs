@@ -59,7 +59,7 @@ public sealed class SylvanMailGatewayHandler(
                                 threadId: draft.ChannelId,
                                 messageId: draft.MessageId,
                                 authorId: draft.AuthorId,
-                                confirm: false,
+                                action: SylvanMailDraftAction.Update,
                                 ct: timeout.Token);
 
                             break;
@@ -68,7 +68,7 @@ public sealed class SylvanMailGatewayHandler(
                                 threadId: confirmation.ChannelId,
                                 messageId: confirmation.MessageId,
                                 authorId: confirmation.AuthorId,
-                                confirm: true,
+                                action: SylvanMailDraftAction.Confirm,
                                 ct: timeout.Token);
 
                             break;
@@ -77,9 +77,8 @@ public sealed class SylvanMailGatewayHandler(
                                 threadId: cancellation.ChannelId,
                                 messageId: cancellation.MessageId,
                                 authorId: cancellation.AuthorId,
-                                confirm: false,
-                                ct: timeout.Token,
-                                cancel: true);
+                                action: SylvanMailDraftAction.Cancel,
+                                ct: timeout.Token);
 
                             break;
                     }
@@ -175,8 +174,8 @@ public sealed class SylvanMailGatewayHandler(
                 threadId: work.ChannelId,
                 messageId: work.MessageId,
                 authorId: work.AuthorId,
-                ct: timeout.Token,
-                cancel: work is DraftCancelled);
+                action: work is DraftCancelled ? SylvanMailDraftAction.Cancel : SylvanMailDraftAction.Confirm,
+                ct: timeout.Token);
         }
         catch (Exception exception)
         {

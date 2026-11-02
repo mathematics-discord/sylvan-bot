@@ -10,8 +10,11 @@ public sealed class SylvanMailDraftWorkflow(
     SylvanMailWorkflow relay
 )
 {
-    public async Task HandleDraftAsync(ulong threadId, ulong messageId, ulong authorId, bool confirm, CancellationToken ct, bool cancel = false)
+    public async Task HandleDraftAsync(ulong threadId, ulong messageId, ulong authorId, SylvanMailDraftAction action, CancellationToken ct)
     {
+        if (action is not (SylvanMailDraftAction.Update or SylvanMailDraftAction.Confirm or SylvanMailDraftAction.Cancel))
+            throw new ArgumentOutOfRangeException(nameof(action));
+
         await using var db = await contexts.CreateDbContextAsync(ct);
         await SylvanMailSerialisation.EnterAsync(db: db, ct: ct);
         Optional<SylvanMailMessage> observed = default;
@@ -23,12 +26,17 @@ public sealed class SylvanMailDraftWorkflow(
             if (conversation is null)
                 return;
 
-            observed = await drafts.ReadDraftAsync(threadId: threadId, messageId: messageId, authorId: authorId, confirm: confirm || cancel, ct: ct);
+            observed = await drafts.ReadDraftAsync(
+                threadId: threadId,
+                messageId: messageId,
+                authorId: authorId,
+                requireReadyMarker: action != SylvanMailDraftAction.Update,
+                ct: ct);
 
             if (observed is not { HasValue: true, Value: var message })
                 return;
 
-            if (cancel)
+            if (action == SylvanMailDraftAction.Cancel)
             {
                 var recorded = await db.SylvanMailOperations
                    .AnyAsync(item => item.SourceMessageId == messageId, cancellationToken: ct);
@@ -39,17 +47,17 @@ public sealed class SylvanMailDraftWorkflow(
                 await drafts.ClearReactionsAsync(threadId: threadId, messageId: messageId, ct: ct);
             }
             else
-                await ProcessDraftAsync(db: db, message: message, confirm: confirm, ct: ct);
+                await ProcessDraftAsync(db: db, message: message, action: action, ct: ct);
         }
         catch (Exception exception) when (observed is { HasValue: true, Value: var message })
         {
             using var noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-            if (confirm || cancel)
+            if (action != SylvanMailDraftAction.Update)
             {
                 var detail = "Delivery could not be confirmed. Some content may have arrived; do not assume it is safe to resend.";
 
-                if (cancel)
+                if (action == SylvanMailDraftAction.Cancel)
                     detail = "Cancellation could not be confirmed. Remove and re-add your cancel reaction to try again; contact staff if it continues to fail.";
 
                 if (exception is BotCommandException)
@@ -63,7 +71,7 @@ public sealed class SylvanMailDraftWorkflow(
                     ct: noticeTimeout.Token);
             }
 
-            if (!cancel)
+            if (action != SylvanMailDraftAction.Cancel)
                 await drafts.SetDraftReadyAsync(threadId: threadId, messageId: messageId, ready: false, ct: noticeTimeout.Token);
 
             if (exception is not BotCommandException)
@@ -75,8 +83,11 @@ public sealed class SylvanMailDraftWorkflow(
         }
     }
 
-    public async Task RefuseConfirmationAsync(ulong threadId, ulong messageId, ulong authorId, CancellationToken ct, bool cancel = false)
+    public async Task RefuseConfirmationAsync(ulong threadId, ulong messageId, ulong authorId, SylvanMailDraftAction action, CancellationToken ct)
     {
+        if (action is not (SylvanMailDraftAction.Confirm or SylvanMailDraftAction.Cancel))
+            throw new ArgumentOutOfRangeException(nameof(action));
+
         await using var db = await contexts.CreateDbContextAsync(ct);
         var conversation = await ActiveConversationAsync(db: db, threadId: threadId, ct: ct);
 
@@ -87,12 +98,12 @@ public sealed class SylvanMailDraftWorkflow(
             threadId: threadId,
             messageId: messageId,
             authorId: authorId,
-            confirm: true,
+            requireReadyMarker: true,
             ct: ct);
 
         if (observed is { HasValue: true, Value: var message })
         {
-            if (cancel)
+            if (action == SylvanMailDraftAction.Cancel)
                 await discord.ReportAsync(
                     source: message,
                     new Optional<ulong>(threadId),
@@ -112,14 +123,14 @@ public sealed class SylvanMailDraftWorkflow(
                      .Any(settings => settings.GuildId == item.GuildId && settings.ForumId == item.ForumId))
            .SingleOrDefaultAsync(ct);
 
-    private async Task ProcessDraftAsync(BotDbContext db, SylvanMailMessage message, bool confirm, CancellationToken ct)
+    private async Task ProcessDraftAsync(BotDbContext db, SylvanMailMessage message, SylvanMailDraftAction action, CancellationToken ct)
     {
         var recorded = await db.SylvanMailOperations
            .AnyAsync(item => item.SourceMessageId == message.SourceMessageId, cancellationToken: ct);
 
         if (recorded)
         {
-            if (confirm)
+            if (action == SylvanMailDraftAction.Confirm)
                 await relay.RelayLockedAsync(db: db, message: message, ct: ct);
 
             await drafts.SetDraftReadyAsync(threadId: message.SourceChannelId, messageId: message.SourceMessageId, ready: false, ct: ct);
@@ -132,7 +143,7 @@ public sealed class SylvanMailDraftWorkflow(
 
         SylvanMailContent.Validate(message);
 
-        if (confirm)
+        if (action == SylvanMailDraftAction.Confirm)
         {
             await relay.RelayLockedAsync(db: db, message: message, ct: ct);
             await drafts.SetDraftReadyAsync(threadId: message.SourceChannelId, messageId: message.SourceMessageId, ready: false, ct: ct);
