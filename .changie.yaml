@@ -3,6 +3,9 @@ unreleasedDir: unreleased
 headerPath: header.tpl.md
 changelogPath: CHANGELOG.md
 
+# VersionNoPrefix retains prerelease suffixes in filenames and headings.
+# Example: changie batch 0.4.0-rc.1 (also supports -alpha.N and -beta.N).
+# Optional +build.metadata is preserved too, e.g. 0.4.0-rc.1+build.42.
 versionExt: md
 versionFileFormat: 'v{{.VersionNoPrefix}}.md'
 versionFormat: '# v{{.VersionNoPrefix}} - {{.Time.Format "2006-01-02"}}'

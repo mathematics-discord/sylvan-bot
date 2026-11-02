@@ -1,6 +1,9 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 SPEC = importlib.util.spec_from_file_location(
@@ -16,6 +19,28 @@ def texts(messages):
 
 
 class ReleaseAnnouncementTests(unittest.TestCase):
+    def test_release_channel_colours_every_announcement_container(self):
+        for suffix, colour in [("-alpha.1", 0x9B59B6), ("-beta.2", 0xF0B232),
+                               ("-rc.10", 0x5865F2), ("", 0x57F287),
+                               ("-alpha.1+build-ABC.001", 0x9B59B6),
+                               ("-beta.2+build-ABC.001", 0xF0B232),
+                               ("-rc.10+build-ABC.001", 0x5865F2),
+                               ("+build-ABC.001", 0x57F287)]:
+            for entry_count in [1, 60]:
+                with self.subTest(suffix=suffix, entry_count=entry_count):
+                    version = f"1.2.3{suffix}"
+                    notes = (f"# v{version}\n## General\n### Changed\n"
+                             + "".join(f"- Change {number}: " + "x" * 200 + "\n"
+                                       for number in range(entry_count)))
+                    messages = announce.build_messages(version, notes, NOTES_URL)
+
+                    if entry_count == 1:
+                        self.assertEqual(len(messages), 1)
+                    else:
+                        self.assertGreater(len(messages), 1)
+                    for message in messages:
+                        self.assertEqual(message["components"][0]["accent_color"], colour)
+
     def test_mixed_release_keeps_public_entries_and_links_to_internal_details(self):
         notes = """# v1.2.3
 ## General

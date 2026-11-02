@@ -12,9 +12,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
+from release_version import version_key
 
-SEMVER = r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
-VERSION = re.compile(rf"{SEMVER}\Z")
+
 USER_AGENT = "DiscordBot (https://github.com/ratgirl-laboratories/sylvan-bot, 1.0)"
 COMPONENT_NAMES = ("General", "Administration", "Moderation", "Internal")
 KIND_NAMES = ("Security", "Added", "Changed", "Fixed", "Deprecated", "Removed")
@@ -43,9 +43,7 @@ def release_from_commits(before, after):
         new = json.loads(git("show", f"{after}:version.json"))["version"]
     except (subprocess.CalledProcessError, KeyError, json.JSONDecodeError):
         return None, "Version metadata is unavailable in the release range."
-    if not VERSION.fullmatch(old) or not VERSION.fullmatch(new):
-        raise ValueError("version.json contains a non-release version.")
-    if tuple(map(int, new.split("."))) <= tuple(map(int, old.split("."))):
+    if version_key(new) <= version_key(old):
         return None, "version.json did not advance."
 
     note_path = f".changes/v{new}.md"
@@ -182,12 +180,14 @@ def section_chunks(section, limit):
 
 
 def container_message(version, chunks, part=None, total=None):
+    channel = version.partition("+")[0].partition("-")[2].partition(".")[0]
+    colour = {"alpha": 0x9B59B6, "beta": 0xF0B232, "rc": 0x5865F2, "": 0x57F287}[channel]
     title = f"# v{version}" if part is None else f"# v{version} (part {part}/{total})"
     children = [{"type": 10, "content": title}]
     for chunk in chunks:
         children.append({"type": 14, "divider": False, "spacing": 1})
         children.append({"type": 10, "content": chunk})
-    return {"flags": 32768, "components": [{"type": 17, "components": children}],
+    return {"flags": 32768, "components": [{"type": 17, "accent_color": colour, "components": children}],
             "allowed_mentions": {"parse": []}}
 
 

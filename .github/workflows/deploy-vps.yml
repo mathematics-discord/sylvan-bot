@@ -21,7 +21,7 @@ on:
           - major
           - custom
       version:
-        description: Exact major.minor.patch version when release type is custom
+        description: Custom version, e.g. 0.4.0-alpha.1, 0.4.0-beta.1, 0.4.0-rc.1 or 0.4.0 (optional +metadata)
         required: false
         type: string
       image_tag:
@@ -44,6 +44,7 @@ jobs:
       contents: write
     outputs:
       version: ${{ steps.publish.outputs.version }}
+      image_tag: ${{ steps.publish.outputs.image_tag }}
       source_sha: ${{ steps.publish.outputs.source_sha }}
       before_sha: ${{ steps.publish.outputs.before_sha }}
     steps:
@@ -93,6 +94,8 @@ jobs:
             echo "before_sha=$before_sha"
             echo "source_sha=$(git rev-parse HEAD)"
             echo "version=$version"
+            # Docker tags cannot contain +; _ cannot occur in a SemVer version.
+            echo "image_tag=v${version/+/_}"
           } >> "$GITHUB_OUTPUT"
 
   scan-release:
@@ -171,7 +174,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}:sha-${{ needs.release.outputs.source_sha }}
-            ghcr.io/${{ github.repository }}:v${{ needs.release.outputs.version }}
+            ghcr.io/${{ github.repository }}:${{ needs.release.outputs.image_tag }}
             ghcr.io/${{ github.repository }}:master
 
   deploy-production:
