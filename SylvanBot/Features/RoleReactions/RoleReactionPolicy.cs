@@ -1,3 +1,5 @@
+using SylvanBot.Features.RolePersistence;
+
 namespace SylvanBot.Features.RoleReactions;
 
 internal static class RoleReactionPolicy
@@ -20,7 +22,7 @@ internal static class RoleReactionPolicy
         if (manageableError is { HasValue: true })
             return manageableError;
 
-        if ((role.Permissions.RawValue & (ulong)SylvanBot.Features.RolePersistence.PersistentRolePolicy.StaffPermissions) != 0)
+        if ((role.Permissions.RawValue & (ulong)PersistentRolePolicy.StaffPermissions) != 0)
             return new DotNext.Optional<string>("Roles with staff or moderation permissions cannot be assigned by reaction.");
 
         // Threads inherit their parent's overwrites; Discord.NET does not support reading their own.
@@ -30,7 +32,7 @@ internal static class RoleReactionPolicy
            .Select(channel => channel.GetPermissionOverwrite(role));
 
         var grantsStaffPermissions = overwrites
-           .Any(overwrite => overwrite.HasValue && (overwrite.Value.AllowValue & (ulong)SylvanBot.Features.RolePersistence.PersistentRolePolicy.StaffPermissions) != 0);
+           .Any(overwrite => overwrite.HasValue && (overwrite.Value.AllowValue & (ulong)PersistentRolePolicy.StaffPermissions) != 0);
 
         return grantsStaffPermissions
             ? new DotNext.Optional<string>("The role has staff or moderation permissions in a channel override and cannot be assigned by reaction.")

@@ -7,6 +7,7 @@ using SylvanBot.Features.Logging;
 using SylvanBot.Features.MessageCache;
 using SylvanBot.Features.Moderation;
 using SylvanBot.Features.RoleColours;
+using SylvanBot.Features.RolePersistence;
 using SylvanBot.Features.RoleReactions;
 using SylvanBot.Features.SylvanMail;
 using SylvanBot.Features.WorkingHours;
@@ -48,9 +49,9 @@ public static class DependencyInjection
 
             services.AddWorkingHours();
 
-            services.AddSingleton<SylvanBot.Features.RolePersistence.RolePersistenceWorker>();
-            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<SylvanBot.Features.RolePersistence.RolePersistenceWorker>());
-            services.AddHostedService(sp => sp.GetRequiredService<SylvanBot.Features.RolePersistence.RolePersistenceWorker>());
+            services.AddSingleton<RolePersistenceWorker>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<RolePersistenceWorker>());
+            services.AddHostedService(sp => sp.GetRequiredService<RolePersistenceWorker>());
 
             services.AddSingleton<RoleReactionRuntime>();
             services.AddSingleton<RoleReactionConfiguration>();

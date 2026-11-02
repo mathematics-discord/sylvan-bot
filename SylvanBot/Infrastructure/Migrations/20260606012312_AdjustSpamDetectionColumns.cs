@@ -1,9 +1,8 @@
+using Microsoft.EntityFrameworkCore.Migrations;
+
 namespace SylvanBot.Infrastructure.Migrations
 {
 #nullable disable
-
-    using Microsoft.EntityFrameworkCore.Migrations;
-
     /// <inheritdoc />
     public partial class AdjustSpamDetectionColumns : Migration
     {

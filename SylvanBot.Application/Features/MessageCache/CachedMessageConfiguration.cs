@@ -9,8 +9,7 @@ public sealed class CachedMessageConfiguration : IEntityTypeConfiguration<Cached
     {
         builder.ToTable(
             "cached_messages",
-            table => table.HasCheckConstraint("ck_cached_messages_expiry", "expires_at_utc = created_at_utc + interval '24 hours'")
-        );
+            table => table.HasCheckConstraint("ck_cached_messages_expiry", "expires_at_utc = created_at_utc + interval '24 hours'"));
 
         builder.HasKey(message => new
         {

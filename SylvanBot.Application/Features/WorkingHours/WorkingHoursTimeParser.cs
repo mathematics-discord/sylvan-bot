@@ -15,8 +15,7 @@ public static partial class WorkingHoursTimeParser
         {
             return new Result<WorkingHoursWindow>(
                 OperationFailureException.Validation(
-                    description: "Use HH:MM:SS[.fraction], with Z or ±HH:MM for fixed offsets. No dates, whitespace, leap seconds or -00:00."
-                ));
+                    description: "Use HH:MM:SS[.fraction], with Z or ±HH:MM for fixed offsets. No dates, whitespace, leap seconds or -00:00."));
         }
 
         if (first.Value.OffsetMinutes != last.Value.OffsetMinutes)

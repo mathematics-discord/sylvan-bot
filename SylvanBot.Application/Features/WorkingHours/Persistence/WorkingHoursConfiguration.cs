@@ -19,8 +19,7 @@ public sealed class WorkingHoursConfiguration : IEntityTypeConfiguration<Working
                     + "((\"OffsetMinutes\" IS NOT NULL AND \"OffsetMinutes\" BETWEEN -1439 AND 1439 AND \"ZoneId\" IS NULL) OR "
                     + "(\"OffsetMinutes\" IS NULL AND \"ZoneId\" IS NOT NULL AND length(\"ZoneId\") > 0)))";
                 table.HasCheckConstraint("CK_working_hours_window", sql: windowConstraint);
-            }
-        );
+            });
 
         builder.HasKey(p => new { p.GuildId, p.MemberId });
 

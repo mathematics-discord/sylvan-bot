@@ -13,7 +13,9 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
 
     private enum DeletionState
     {
-        AwaitingPublication, AwaitingRemoval, Removed,
+        AwaitingPublication,
+        AwaitingRemoval,
+        Removed,
     }
 
     public bool Ready => Volatile.Read(ref _ready);
@@ -275,8 +277,7 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
                 Attachments = message.Attachments is { HasValue: true, Value: var attachments }
                     ? attachments
                     : before.Attachments,
-            }
-        );
+            });
     }
 
     private static Optional<CachedMessageSnapshot> TryCreateSnapshot(MessageEdited message)
@@ -301,8 +302,7 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
                 EditedAtUtc = timestamp,
                 Content = content,
                 Attachments = attachments,
-            }
-        );
+            });
     }
 
     // Called only while the cache gate is held: failed writes never publish an in-memory success.

@@ -1,8 +1,8 @@
 #nullable disable
 
-namespace SylvanBot.Infrastructure.Migrations;
-
 using Microsoft.EntityFrameworkCore.Migrations;
+
+namespace SylvanBot.Infrastructure.Migrations;
 
 /// <inheritdoc />
 public partial class MapQuorumPersistence : Migration

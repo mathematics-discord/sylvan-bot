@@ -3,6 +3,7 @@ using SylvanBot.Application.Features.Logging;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.Moderation;
 using SylvanBot.Application.Features.RoleColours;
+using SylvanBot.Application.Features.RolePersistence;
 using SylvanBot.Application.Features.RoleReactions;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Application.Features.WorkingHours;
@@ -36,8 +37,9 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
 
     public DbSet<RoleReaction> RoleReactions => Set<RoleReaction>();
 
-    public DbSet<SylvanBot.Application.Features.RolePersistence.PersistentRole> PersistentRoles => Set<SylvanBot.Application.Features.RolePersistence.PersistentRole>();
-    public DbSet<SylvanBot.Application.Features.RolePersistence.PendingRole> PendingRoles => Set<SylvanBot.Application.Features.RolePersistence.PendingRole>();
+    public DbSet<PersistentRole> PersistentRoles => Set<PersistentRole>();
+
+    public DbSet<PendingRole> PendingRoles => Set<PendingRole>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

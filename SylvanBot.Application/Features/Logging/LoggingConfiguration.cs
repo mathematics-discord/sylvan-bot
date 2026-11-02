@@ -3,8 +3,11 @@
 public sealed class LoggingConfiguration
 {
     public ulong GuildId { get; set; }
+
     public bool Enabled { get; set; }
+
     public ulong? DeleteLogChannelId { get; set; }
+
     public ulong? EditLogChannelId { get; set; }
 
     // Inert compatibility value for evidence_retention_period until schema retirement.

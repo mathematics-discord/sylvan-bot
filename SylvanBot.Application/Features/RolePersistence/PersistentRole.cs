@@ -6,13 +6,16 @@ namespace SylvanBot.Application.Features.RolePersistence;
 public sealed class PersistentRole
 {
     public ulong GuildId { get; set; }
+
     public ulong RoleId { get; set; }
 }
 
 public sealed class PendingRole
 {
     public ulong GuildId { get; set; }
+
     public ulong UserId { get; set; }
+
     public ulong RoleId { get; set; }
 }
 

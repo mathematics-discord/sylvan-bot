@@ -1,8 +1,9 @@
+using Microsoft.EntityFrameworkCore.Migrations;
+
 namespace SylvanBot.Infrastructure.Migrations;
 
 #nullable disable
 
-using Microsoft.EntityFrameworkCore.Migrations;
 
 public partial class MultiGuildContract : Migration
 {

@@ -1,12 +1,11 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Infrastructure.Migrations;
 
 #nullable disable
 
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
-using SylvanBot.Infrastructure.Data;
 
 [DbContext(typeof(BotDbContext))]
 [Migration("20260625213000_AddQuorumConfigurationTables")]

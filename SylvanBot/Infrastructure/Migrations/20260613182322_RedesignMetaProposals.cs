@@ -1,10 +1,9 @@
+using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+
 namespace SylvanBot.Infrastructure.Migrations
 {
 #nullable disable
-
-    using Microsoft.EntityFrameworkCore.Migrations;
-    using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-
     /// <inheritdoc />
     public partial class RedesignMetaProposals : Migration
     {

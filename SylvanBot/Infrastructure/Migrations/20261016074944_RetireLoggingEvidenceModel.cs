@@ -1,9 +1,9 @@
 ﻿#nullable disable
 
+using Microsoft.EntityFrameworkCore.Migrations;
+
 namespace SylvanBot.Infrastructure.Migrations
 {
-    using Microsoft.EntityFrameworkCore.Migrations;
-
     /// <inheritdoc />
     public partial class RetireLoggingEvidenceModel : Migration
     {

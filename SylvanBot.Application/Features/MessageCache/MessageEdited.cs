@@ -13,14 +13,15 @@ public sealed record MessageEdited
 
     public required DateTimeOffset CreatedAtUtc { get; init; }
 
-    public Optional<ulong> AuthorId { get; init; } = default;
+    public Optional<ulong> AuthorId { get; init; }
 
-    public Optional<bool> Eligible { get; init; } = default;
+    public Optional<bool> Eligible { get; init; }
 
     /// <summary>Gets the supplied timestamp: undefined preserves it; explicit null reports "not edited".</summary>
-    public Optional<DateTimeOffset?> EditedAtUtc { get; init; } = default;
+    /// TODO: WHAT THE FUCK
+    public Optional<DateTimeOffset?> EditedAtUtc { get; init; }
 
-    public Optional<string> Content { get; init; } = default;
+    public Optional<string> Content { get; init; }
 
-    public Optional<ImmutableArray<MessageAttachment>> Attachments { get; init; } = default;
+    public Optional<ImmutableArray<MessageAttachment>> Attachments { get; init; }
 }
