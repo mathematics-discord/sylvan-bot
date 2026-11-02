@@ -1,4 +1,0 @@
-component: Moderation
-kind: Added
-body: Add configurable word and regex automod rules, message deletion and timeouts, with role exemptions. Viewing and managing rules requires View Audit Log; administrators manage role exemptions and can enable or disable each action separately without losing rules.
-time: 2026-11-02T23:21:50.009155+00:00

@@ -2,6 +2,17 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.4.0-alpha.1 - 2026-11-02
+## Administration
+### Fixed
+- Allow valid Working Hours ping, eligible and exempt role changes to save successfully.
+## Moderation
+### Added
+- Add configurable word and regex automod rules, message deletion and timeouts, with role exemptions. Viewing and managing rules requires View Audit Log; administrators manage role exemptions and can enable or disable each action separately without losing rules.
+## Internal
+### Changed
+- Use CsCheck properties for Working Hours interval membership and equivalent fractional times, replacing repetitive fixed-offset examples.
+- Support numbered alpha, beta and release-candidate versions with optional build metadata in the deployment workflow, and colour release announcements by release channel.
 # v0.3.0 - 2026-10-29
 ## Administration
 ### Added
