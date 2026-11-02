@@ -1,4 +1,4 @@
-﻿using SylvanBot.Application.Features.WorkingHours;
+using SylvanBot.Application.Features.WorkingHours;
 
 namespace SylvanBot.Tests.Features.WorkingHours;
 
@@ -108,6 +108,6 @@ public sealed class WorkingHoursResponseTests
         var settings = new WorkingHoursSettings { Enabled = true };
 
         // Act / Assert
-        settings.DesiredPingRole(eligible: eligible, exempt: exempt, scheduleEnabled: enabled, active: active).ShouldBe(expected);
+        settings.DesiredPingRole(eligible: eligible, exempt: exempt, scheduleEnabled: enabled, active: active).ShouldBe(expected.HasValue ? new Optional<bool>(expected.Value) : default);
     }
 }

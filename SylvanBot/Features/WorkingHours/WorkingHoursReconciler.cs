@@ -247,7 +247,7 @@ public sealed class WorkingHoursReconciler(
         var exempt = settings.EligibleRoles
            .Where(role => role.IsExempt)
            .Any(role => member.RoleIds.Contains(role.RoleId));
-        var desired = settings.DesiredPingRole(eligible: eligible, exempt: exempt, preference?.Enabled == true, active: active);
+        DotNext.Optional<bool> desired = settings.DesiredPingRole(eligible: eligible, exempt: exempt, preference?.Enabled == true, active: active);
 
         if (settings.PingRoleId is not { } target)
             return false;

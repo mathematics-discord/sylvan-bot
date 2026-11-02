@@ -85,17 +85,17 @@ public sealed class WorkingHoursSettings
         return new Result<ValueTuple>(default(ValueTuple));
     }
 
-    public bool? DesiredPingRole(bool eligible, bool exempt, bool scheduleEnabled, bool active)
+    public Optional<bool> DesiredPingRole(bool eligible, bool exempt, bool scheduleEnabled, bool active)
     {
         if (!eligible)
-            return false;
+            return new Optional<bool>(false);
 
         if (!Enabled)
-            return exempt ? null : true;
+            return exempt ? default : new Optional<bool>(true);
 
         if (scheduleEnabled)
-            return active;
+            return new Optional<bool>(active);
 
-        return exempt ? null : true;
+        return exempt ? default : new Optional<bool>(true);
     }
 }
