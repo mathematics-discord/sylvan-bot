@@ -49,6 +49,7 @@ resharper_braces_for_ifelse = required_for_multiline
 resharper_cpp_insert_final_newline = false
 resharper_csharp_wrap_after_invocation_lpar = true
 resharper_csharp_wrap_arguments_style = chop_if_long
+resharper_csharp_wrap_before_binary_opsign = true
 resharper_formatter_off_tag = @formatter:off
 resharper_formatter_on_tag = @formatter:on
 resharper_formatter_tags_enabled = true
@@ -976,7 +977,7 @@ dotnet_diagnostic.sa1206.severity = none
 dotnet_diagnostic.sa1313.severity = none
 
 
-dotnet_diagnostic.SA1008.severity = none
+dotnet_diagnostic.sa1008.severity = none
 
 [*.cs]
 dotnet_diagnostic.rcs1123.severity = none

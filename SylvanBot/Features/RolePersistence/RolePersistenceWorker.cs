@@ -9,10 +9,10 @@ using SylvanBot.Gateway;
 namespace SylvanBot.Features.RolePersistence;
 
 public sealed class RolePersistenceWorker(DiscordSocketClient client, IDbContextFactory<BotDbContext> contexts, ILogger logger)
-    : BackgroundService,
-        IDiscordGatewayHandler
+    : BackgroundService, IDiscordGatewayHandler
 {
     private readonly ConcurrentDictionary<ulong, SemaphoreSlim> _gates = new ConcurrentDictionary<ulong, SemaphoreSlim>();
+
     private readonly Channel<(ulong Guild, ulong User, ulong[]? Roles)> _work = Channel.CreateUnbounded<(ulong, ulong, ulong[]?)>(
         new UnboundedChannelOptions { SingleReader = true }
     );
@@ -23,6 +23,7 @@ public sealed class RolePersistenceWorker(DiscordSocketClient client, IDbContext
     {
         client.UserLeft += LeftAsync;
         client.UserJoined += JoinedAsync;
+
         return Task.CompletedTask;
     }
 
@@ -39,12 +40,14 @@ public sealed class RolePersistenceWorker(DiscordSocketClient client, IDbContext
             _work.Writer.TryWrite((guild.Id, user.Id, member.Roles.Select(x => x.Id).ToArray()));
         else
             logger.Warning("Cannot save departing roles: guild {GuildId}, user {UserId} was not cached", guild.Id, user.Id);
+
         return Task.CompletedTask;
     }
 
     private Task JoinedAsync(SocketGuildUser user)
     {
         _work.Writer.TryWrite((user.Guild.Id, user.Id, null));
+
         return Task.CompletedTask;
     }
 
@@ -54,6 +57,7 @@ public sealed class RolePersistenceWorker(DiscordSocketClient client, IDbContext
         {
             var gate = Gate(work.Guild);
             await gate.WaitAsync(stoppingToken);
+
             try
             {
                 await ProcessAsync(work.Guild, work.User, work.Roles, stoppingToken);
@@ -76,44 +80,64 @@ public sealed class RolePersistenceWorker(DiscordSocketClient client, IDbContext
     private async Task ProcessAsync(ulong guildId, ulong userId, ulong[]? departedRoles, CancellationToken ct)
     {
         var guild = client.GetGuild(guildId);
+
         if (guild is null)
             return;
+
         await using var db = await contexts.CreateDbContextAsync(ct);
-        List<PendingRole> pending = await db.PendingRoles.Where(x => x.GuildId == guildId && x.UserId == userId).ToListAsync(ct);
-        var configured = await db.PersistentRoles.Where(x => x.GuildId == guildId).Select(x => x.RoleId).ToArrayAsync(ct);
+
+        List<PendingRole> pending = await db.PendingRoles
+            .Where(x => x.GuildId == guildId && x.UserId == userId)
+            .ToListAsync(ct);
+
+        var configured = await db.PersistentRoles
+            .Where(x => x.GuildId == guildId)
+            .Select(x => x.RoleId)
+            .ToArrayAsync(ct);
+
         if (departedRoles is not null)
         {
             HashSet<ulong> selected = departedRoles
                 .Intersect(configured)
                 .Where(id => guild.GetRole(id) is { } role && PersistentRolePolicy.IsSafe(guild, role))
                 .ToHashSet();
+
             db.PendingRoles.RemoveRange(pending.Where(x => !selected.Contains(x.RoleId)));
+
             foreach (var id in selected.Except(pending.Select(x => x.RoleId)))
-                db.PendingRoles.Add(
-                    new PendingRole
-                    {
-                        GuildId = guildId,
-                        UserId = userId,
-                        RoleId = id,
-                    }
-                );
+                db.PendingRoles.Add(new PendingRole { GuildId = guildId, UserId = userId, RoleId = id, });
+
             await db.SaveChangesAsync(ct);
+
             return;
         }
+
         var request = new RequestOptions { CancelToken = ct, AuditLogReason = "Role persistence" };
         var member = await client.Rest.GetGuildUserAsync(guildId, userId, request);
+
         if (member is null)
             return;
+
         var sources = await db.RoleColourOptions.Where(x => x.GuildId == guildId).Select(x => x.SourceRoleId).ToArrayAsync(ct);
+
         foreach (var saved in pending.OrderByDescending(x => sources.Contains(x.RoleId)))
         {
             var role = guild.GetRole(saved.RoleId);
-            if (!configured.Contains(saved.RoleId) || role is null || !PersistentRolePolicy.IsSafe(guild, role))
+
+            var shouldRemove =
+                !configured.Contains(saved.RoleId)
+                || role is null
+                || !PersistentRolePolicy.IsSafe(guild, role)
+                || member.RoleIds.Contains(saved.RoleId);
+
+            if (shouldRemove)
+            {
                 db.PendingRoles.Remove(saved);
-            else if (member.RoleIds.Contains(saved.RoleId))
-                db.PendingRoles.Remove(saved);
-            else if (!guild.CurrentUser.GuildPermissions.ManageRoles || guild.CurrentUser.Hierarchy <= role.Position)
+            }
+            else if (!guild.CurrentUser.GuildPermissions.ManageRoles || guild.CurrentUser.Hierarchy <= role!.Position)
+            {
                 logger.Warning("Role persistence blocked by hierarchy or permissions: guild {GuildId}, role {RoleId}", guildId, saved.RoleId);
+            }
             else
             {
                 try
@@ -126,6 +150,7 @@ public sealed class RolePersistenceWorker(DiscordSocketClient client, IDbContext
                     logger.Warning(ex, "Could not restore role {RoleId} for {UserId}", saved.RoleId, userId);
                 }
             }
+
             await db.SaveChangesAsync(ct);
         }
     }
