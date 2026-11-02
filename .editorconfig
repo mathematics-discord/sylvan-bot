@@ -14,7 +14,7 @@ ij_formatter_off_tag = @formatter:off
 ij_formatter_on_tag = @formatter:on
 ij_formatter_tags_enabled = true
 ij_smart_tabs = false
-ij_visual_guides =
+ij_visual_guides = 
 ij_wrap_on_typing = false
 
 # Microsoft .NET properties
@@ -30,7 +30,7 @@ dotnet_naming_rule.unity_serialized_field_rule.style = lower_camel_case_style
 dotnet_naming_rule.unity_serialized_field_rule.symbols = unity_serialized_field_symbols
 dotnet_naming_style.lower_camel_case_style.capitalization = camel_case
 dotnet_naming_symbols.unity_serialized_field_symbols.applicable_accessibilities = *
-dotnet_naming_symbols.unity_serialized_field_symbols.applicable_kinds =
+dotnet_naming_symbols.unity_serialized_field_symbols.applicable_kinds = 
 dotnet_naming_symbols.unity_serialized_field_symbols.resharper_applicable_kinds = unity_serialised_field
 dotnet_naming_symbols.unity_serialized_field_symbols.resharper_required_modifiers = instance
 dotnet_style_parentheses_in_arithmetic_binary_operators = always_for_clarity:none
@@ -43,7 +43,7 @@ dotnet_style_require_accessibility_modifiers = for_non_interface_members:suggest
 
 # ReSharper properties
 resharper_apply_auto_detected_rules = false
-resharper_arguments_named = named
+resharper_arguments_named = positional
 resharper_autodetect_indent_settings = false
 resharper_braces_for_ifelse = required_for_multiline
 resharper_cpp_insert_final_newline = false
@@ -57,6 +57,7 @@ resharper_resx_max_line_length = 150
 resharper_show_autodetect_configure_formatting_tip = false
 resharper_trailing_comma_in_multiline_lists = true
 resharper_use_indent_from_vs = false
+resharper_wrap_verbatim_interpolated_strings = wrap_if_long
 resharper_xmldoc_attribute_style = on_single_line
 resharper_xmldoc_space_before_self_closing = false
 
@@ -120,7 +121,7 @@ resharper_csharp_wrap_chained_binary_expressions = chop_if_long
 resharper_csharp_wrap_chained_binary_patterns = chop_if_long
 resharper_csharp_wrap_ternary_expr_style = chop_if_long
 resharper_csharp_wrap_linq_expressions = chop_if_long
-resharper_csharp_wrap_verbatim_interpolated_strings = chop_if_long
+resharper_csharp_wrap_verbatim_interpolated_strings = wrap_if_long
 resharper_method_or_operator_body = expression_body
 resharper_parentheses_same_type_operations = true
 resharper_place_simple_embedded_statement_on_same_line = false
@@ -367,7 +368,7 @@ ij_typescript_prefer_explicit_types_function_expression_returns = false
 ij_typescript_prefer_explicit_types_function_returns = false
 ij_typescript_prefer_explicit_types_vars_fields = false
 ij_typescript_prefer_parameters_wrap = false
-ij_typescript_property_prefix =
+ij_typescript_property_prefix = 
 ij_typescript_reformat_c_style_comments = false
 ij_typescript_space_after_colon = true
 ij_typescript_space_after_comma = true
@@ -552,7 +553,7 @@ ij_javascript_prefer_explicit_types_function_expression_returns = false
 ij_javascript_prefer_explicit_types_function_returns = false
 ij_javascript_prefer_explicit_types_vars_fields = false
 ij_javascript_prefer_parameters_wrap = false
-ij_javascript_property_prefix =
+ij_javascript_property_prefix = 
 ij_javascript_reformat_c_style_comments = false
 ij_javascript_space_after_colon = true
 ij_javascript_space_after_comma = true
@@ -969,7 +970,13 @@ tab_width = 4
 dotnet_diagnostic.ma0029.severity = none
 
 
-dotnet_diagnostic.SA1206.severity = none
+dotnet_diagnostic.sa1206.severity = none
+
+
+dotnet_diagnostic.sa1313.severity = none
+
+
+dotnet_diagnostic.SA1008.severity = none
 
 [*.cs]
 dotnet_diagnostic.rcs1123.severity = none
