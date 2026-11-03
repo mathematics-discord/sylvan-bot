@@ -67,6 +67,7 @@ public sealed class AutomodDurationTests
         // Act / Assert
         AutomodDuration.ResolveSeconds(AutomodAction.Ban, new Optional<string>("365d")).Value.ShouldBe(31536000);
     }
+
     [TestCase(1L)]
     [TestCase(2419200L)]
     public void MuteExpiry_ValidDuration_UsesRequestedSeconds(long seconds)

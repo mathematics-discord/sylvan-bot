@@ -66,6 +66,7 @@ public sealed class AutomodConfigurationTests
         error.Message.ShouldContain("rule 7");
         error.Message.ShouldContain("guild 3");
     }
+
     [TestCase(AutomodAction.Delete)]
     [TestCase(AutomodAction.Note)]
     [TestCase(AutomodAction.Mute)]

@@ -12,7 +12,7 @@ public sealed class AutomodRuleListTests
     public void CreatePage_ShortRules_ShowsAtMostTwentyEntries(int count, int expectedPages)
     {
         // Arrange
-        var rules = Enumerable.Range(1, count)
+        AutomodRule[] rules = Enumerable.Range(1, count)
             .Select(id => new AutomodRule { Id = id, Pattern = "spaghetti", Action = AutomodAction.Delete })
             .ToArray();
 
@@ -31,8 +31,10 @@ public sealed class AutomodRuleListTests
     public void CreatePage_UnorderedRules_SortsIdsAndFormatsSpoileredPatterns()
     {
         // Arrange
-        AutomodRule[] rules = [
-            new AutomodRule { Id = 19, Pattern = "spag+h?etti", MatchType = AutomodMatchType.Regex, Action = AutomodAction.Mute, DurationSeconds = 1800 },
+        AutomodRule[] rules =
+        [
+            new AutomodRule
+                { Id = 19, Pattern = "spag+h?etti", MatchType = AutomodMatchType.Regex, Action = AutomodAction.Mute, DurationSeconds = 1800 },
             new AutomodRule { Id = 12, Pattern = "spaghetti", Action = AutomodAction.Delete },
         ];
 
@@ -40,7 +42,8 @@ public sealed class AutomodRuleListTests
         var page = AutomodRuleList.CreatePage(rules, 0);
 
         // Assert
-        page.Text.ShouldBe("### Automod rules\nPage 1 of 1\n\n- #12 ? Word ? Delete ? ||`spaghetti`||\n- #19 ? Regex ? Mute, 30 minutes ? ||`spag+h?etti`||");
+        page.Text.ShouldBe(
+            "### Automod rules\nPage 1 of 1\n\n- #12 ? Word ? Delete ? ||`spaghetti`||\n- #19 ? Regex ? Mute, 30 minutes ? ||`spag+h?etti`||");
     }
 
     [Test]
@@ -62,7 +65,7 @@ public sealed class AutomodRuleListTests
     public void CreatePage_LongEntries_ReducesEntryCountBeforeTextLimit()
     {
         // Arrange
-        var rules = Enumerable.Range(1, 3)
+        AutomodRule[] rules = Enumerable.Range(1, 3)
             .Select(id => new AutomodRule { Id = id, Pattern = new string('x', 2000) })
             .ToArray();
 
@@ -97,6 +100,7 @@ public sealed class AutomodRuleListTests
 
             // Assert
             page.Text.Length.ShouldBeLessThan(4000);
+
             if (index > 0)
                 page.Text.ShouldContain("(continued)");
         }
@@ -147,7 +151,7 @@ public sealed class AutomodRuleListTests
     public void CreatePage_StalePageAfterRemoval_ClampsToLastAvailablePage()
     {
         // Arrange
-        var rules = Enumerable.Range(1, 21)
+        List<AutomodRule> rules = Enumerable.Range(1, 21)
             .Select(id => new AutomodRule { Id = id, Pattern = "hello" })
             .ToList();
         rules.RemoveAt(20);

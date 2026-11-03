@@ -105,7 +105,7 @@ public sealed class AutomodModule(AutomodManagement management, IHostApplication
             && component.Message.Author.Id == Context.Client.CurrentUser.Id
             && direction is "prev" or "next";
 
-        var listText = component.Message.Components
+        IEnumerable<TextDisplayComponent> listText = component.Message.Components
             .OfType<ContainerComponent>()
             .SelectMany(container => container.Components)
             .OfType<TextDisplayComponent>();

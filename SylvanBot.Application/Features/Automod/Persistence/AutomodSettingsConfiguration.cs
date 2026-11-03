@@ -10,7 +10,6 @@ public sealed class AutomodSettingsConfiguration : IEntityTypeConfiguration<Auto
         builder.ToTable("automod_settings");
         builder.HasKey(settings => new { settings.GuildId, settings.Action });
 
-        builder.Property(settings => settings.GuildId)
-            .ValueGeneratedNever();
+        builder.Property(settings => settings.GuildId).ValueGeneratedNever();
     }
 }

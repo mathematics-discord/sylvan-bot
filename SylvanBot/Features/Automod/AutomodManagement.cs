@@ -34,6 +34,7 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
         }
 
         var refreshed = await runtime.RefreshAsync(guildId, ct);
+
         return (rules, refreshed);
     }
 
@@ -50,6 +51,7 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
 
         // Refresh even when already absent so a repeated removal can recover a stale snapshot.
         var refreshed = await runtime.RefreshAsync(guildId, ct);
+
         return (removed > 0, refreshed);
     }
 
@@ -69,6 +71,7 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
     public async Task<ImmutableArray<AutomodAction>> ListDisabledActionsAsync(ulong guildId, CancellationToken ct)
     {
         await using var db = await contexts.CreateDbContextAsync(ct);
+
         AutomodAction[] actions = await db.AutomodSettings
             .AsNoTracking()
             .Where(settings => settings.GuildId == guildId && !settings.Enabled)
@@ -96,9 +99,9 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
 
                 await db.Database.ExecuteSqlInterpolatedAsync(
                     $"""
-                    INSERT INTO automod_settings ("GuildId", "Action", "Enabled") VALUES ({storedGuildId}, {storedAction}, {enabled})
-                    ON CONFLICT ("GuildId", "Action") DO UPDATE SET "Enabled" = EXCLUDED."Enabled"
-                    """,
+                     INSERT INTO automod_settings ("GuildId", "Action", "Enabled") VALUES ({storedGuildId}, {storedAction}, {enabled})
+                     ON CONFLICT ("GuildId", "Action") DO UPDATE SET "Enabled" = EXCLUDED."Enabled"
+                     """,
                     ct);
             }
 

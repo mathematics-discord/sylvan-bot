@@ -8,13 +8,9 @@ public sealed class AutomodExemptRoleConfiguration : IEntityTypeConfiguration<Au
     public void Configure(EntityTypeBuilder<AutomodExemptRole> builder)
     {
         builder.ToTable("automod_exempt_roles");
-
         builder.HasKey(role => new { role.GuildId, role.RoleId });
 
-        builder.Property(role => role.GuildId)
-            .ValueGeneratedNever();
-
-        builder.Property(role => role.RoleId)
-            .ValueGeneratedNever();
+        builder.Property(role => role.GuildId).ValueGeneratedNever();
+        builder.Property(role => role.RoleId).ValueGeneratedNever();
     }
 }
