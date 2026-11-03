@@ -2,19 +2,24 @@
 using SylvanBot.Application.Features.Automod;
 using SylvanBot.Features.MessageCache;
 using SylvanBot.Gateway;
+using static SylvanBot.Application.Features.Automod.AutomodAction;
 
 namespace SylvanBot.Features.Automod;
 
 public sealed class AutomodGatewayHandler(
     DiscordSocketClient client,
     AutomodRuntime runtime,
+    AutomodBanEnforcement bans,
     MessageUpdateGatewayAdapter updatePayload,
     IHostApplicationLifetime lifetime,
-    TimeProvider timeProvider,
-    ILogger logger) : IDiscordGatewayHandler
+    ILogger logger) : IDiscordGatewayHandler, IDisposable
 {
     private readonly ILogger _logger = logger.ForContext<AutomodGatewayHandler>();
+    private readonly SemaphoreSlim _muteGate = new SemaphoreSlim(1, 1);
+
     private bool _subscribed;
+
+    public void Dispose() => _muteGate.Dispose();
 
     public Task InitializeAsync(CancellationToken ct)
     {
@@ -81,10 +86,10 @@ public sealed class AutomodGatewayHandler(
 
         try
         {
-            var member = client.GetGuild(guildId)?.GetUser(message.Author.Id) ??
-                         (IGuildUser?)await client.Rest.GetGuildUserAsync(guildId, message.Author.Id, new RequestOptions { CancelToken = ct });
+            var member = client.GetGuild(guildId)?.GetUser(message.Author.Id)
+                         ?? (IGuildUser?)await client.Rest.GetGuildUserAsync(guildId, message.Author.Id, new RequestOptions { CancelToken = ct });
 
-            if (member is not null && member.RoleIds is not null)
+            if (member?.RoleIds != null)
                 return new DotNext.Optional<bool>(configuration.ExemptRoleIds.Overlaps(member.RoleIds));
 
             _logger.Warning(
@@ -152,7 +157,7 @@ public sealed class AutomodGatewayHandler(
             if (result.Rule is not { HasValue: true, Value: var rule })
                 return;
 
-            if (rule.Action != AutomodAction.Delete && rule.Action != AutomodAction.Mute)
+            if (rule.Action is not (Delete or Mute or Ban))
             {
                 _logger.Warning(
                     "Automod action {Action} is unsupported for guild {GuildId}, message {MessageId}, rule {RuleId}; no action taken",
@@ -166,8 +171,21 @@ public sealed class AutomodGatewayHandler(
 
             await DeleteAsync(message, guildId, rule.Id, ct);
 
-            if (rule.Action == AutomodAction.Mute)
-                await MuteAsync(message, guildId, rule, ct);
+            switch (rule.Action)
+            {
+                case Ban:
+                    await bans.BanAsync(guildId, message.Author.Id, message.Id, rule, ct);
+
+                    break;
+                case Mute:
+                    await MuteAsync(message, guildId, rule, ct);
+
+                    break;
+                case Delete:
+                case Note:
+                default:
+                    break;
+            }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -210,23 +228,34 @@ public sealed class AutomodGatewayHandler(
         }
         catch (Exception ex)
         {
-            _logger.Warning("Automod deletion failed for guild {GuildId}, message {MessageId}, rule {RuleId}: {ExceptionType}", guildId, message.Id, ruleId, ex.GetType().Name);
+            _logger.Warning(
+                "Automod deletion failed for guild {GuildId}, message {MessageId}, rule {RuleId}: {ExceptionType}",
+                guildId,
+                message.Id,
+                ruleId,
+                ex.GetType().Name);
         }
     }
 
     private async Task MuteAsync(SocketMessage message, ulong guildId, AutomodRule rule, CancellationToken ct)
     {
+        await _muteGate.WaitAsync(ct);
+
         try
         {
             DotNext.Optional<long> duration = rule.DurationSeconds is { } seconds ? new DotNext.Optional<long>(seconds) : default;
-            var requestedExpiry = AutomodDuration.MuteExpiry(duration, timeProvider.GetUtcNow());
-            var request = new RequestOptions { CancelToken = ct, AuditLogReason = $"Automod mute rule {rule.Id}" };
-            var member = client.GetGuild(guildId)?.GetUser(message.Author.Id)
-                ?? (IGuildUser?)await client.Rest.GetGuildUserAsync(guildId, message.Author.Id, request);
+            var requestedExpiry = AutomodDuration.MuteExpiry(duration, DateTimeOffset.UtcNow);
+            var request = new RequestOptions { CancelToken = ct, RetryMode = RetryMode.AlwaysFail, AuditLogReason = $"Automod mute rule {rule.Id}" };
+            var member = await client.Rest.GetGuildUserAsync(guildId, message.Author.Id, request);
 
             if (member is null)
             {
-                _logger.Warning("Automod timeout refused for guild {GuildId}, message {MessageId}, rule {RuleId}: member unavailable", guildId, message.Id, rule.Id);
+                _logger.Warning(
+                    "Automod timeout refused for guild {GuildId}, message {MessageId}, rule {RuleId}: member unavailable",
+                    guildId,
+                    message.Id,
+                    rule.Id);
+
                 return;
             }
 
@@ -236,16 +265,33 @@ public sealed class AutomodGatewayHandler(
 
             if (AutomodDuration.CoversExpiry(existingExpiry, requestedExpiry))
             {
-                _logger.Information("Automod timeout unchanged for guild {GuildId}, message {MessageId}, rule {RuleId}: existing expiry covers requested expiry", guildId, message.Id, rule.Id);
+                _logger.Information(
+                    "Automod timeout unchanged for guild {GuildId}, message {MessageId}, rule {RuleId}: existing expiry covers requested expiry",
+                    guildId,
+                    message.Id,
+                    rule.Id);
+
                 return;
             }
 
             await member.ModifyAsync(properties => properties.TimedOutUntil = requestedExpiry, request);
-            _logger.Information("Automod timed out user {UserId} in guild {GuildId} until {Expiry} for rule {RuleId}, message {MessageId}", message.Author.Id, guildId, requestedExpiry, rule.Id, message.Id);
+
+            _logger.Information(
+                "Automod timed out user {UserId} in guild {GuildId} until {Expiry} for rule {RuleId}, message {MessageId}",
+                message.Author.Id,
+                guildId,
+                requestedExpiry,
+                rule.Id,
+                message.Id);
         }
         catch (ArgumentOutOfRangeException)
         {
-            _logger.Warning("Automod timeout refused for guild {GuildId}, message {MessageId}, rule {RuleId}: invalid stored duration {DurationSeconds}", guildId, message.Id, rule.Id, rule.DurationSeconds);
+            _logger.Warning(
+                "Automod timeout refused for guild {GuildId}, message {MessageId}, rule {RuleId}: invalid stored duration {DurationSeconds}",
+                guildId,
+                message.Id,
+                rule.Id,
+                rule.DurationSeconds);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -253,11 +299,26 @@ public sealed class AutomodGatewayHandler(
         }
         catch (HttpException ex)
         {
-            _logger.Warning("Automod timeout failed for guild {GuildId}, message {MessageId}, rule {RuleId}: HTTP {HttpCode}, Discord {DiscordCode}", guildId, message.Id, rule.Id, ex.HttpCode, ex.DiscordCode);
+            _logger.Warning(
+                "Automod timeout failed for guild {GuildId}, message {MessageId}, rule {RuleId}: HTTP {HttpCode}, Discord {DiscordCode}",
+                guildId,
+                message.Id,
+                rule.Id,
+                ex.HttpCode,
+                ex.DiscordCode);
         }
         catch (Exception ex)
         {
-            _logger.Warning("Automod timeout failed for guild {GuildId}, message {MessageId}, rule {RuleId}: {ExceptionType}", guildId, message.Id, rule.Id, ex.GetType().Name);
+            _logger.Warning(
+                "Automod timeout failed for guild {GuildId}, message {MessageId}, rule {RuleId}: {ExceptionType}",
+                guildId,
+                message.Id,
+                rule.Id,
+                ex.GetType().Name);
+        }
+        finally
+        {
+            _muteGate.Release();
         }
     }
 }

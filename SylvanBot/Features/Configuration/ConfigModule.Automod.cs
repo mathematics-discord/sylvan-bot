@@ -29,10 +29,10 @@ public sealed partial class ConfigModule
             var target = selectedAction.HasValue ? selectedAction.Value.ToString() : "all actions";
             var state = enabled ? "enabled" : "disabled";
             var response = $"Automod {target} {state}. Saved rules and exemptions are retained.";
-            var includesStoredOnly = !selectedAction.HasValue || selectedAction.Value is AutomodAction.Note or AutomodAction.Ban;
+            var includesStoredOnly = !selectedAction.HasValue || selectedAction.Value == AutomodAction.Note;
 
             if (enabled && includesStoredOnly)
-                response += " Note and Ban actions are stored but are not executed yet.";
+                response += " Note actions are stored but are not executed yet.";
 
             await AutomodReply.SendAsync(Context.Interaction, AutomodReply.WithRefreshStatus(response, refreshed), ephemeral: false);
         }
@@ -68,7 +68,7 @@ public sealed partial class ConfigModule
                 .Select(id => Context.Guild.GetRole(id) is { } role ? $"{role.Name} ({id})" : $"Deleted role ({id})");
 
             var exemptions = ids.IsEmpty ? "No automod exempt roles in this guild." : "Exempt roles:\n" + string.Join("\n", rows);
-            var response = string.Join("\n", statuses) + "\nNote and Ban actions are stored but are not executed yet.\n\n" + exemptions;
+            var response = string.Join("\n", statuses) + "\nNote actions are stored but are not executed yet.\n\n" + exemptions;
 
             await AutomodReply.SendAsync(Context.Interaction, response, ephemeral: false);
         }

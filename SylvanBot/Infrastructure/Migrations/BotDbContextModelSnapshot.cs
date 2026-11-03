@@ -22,6 +22,58 @@ namespace SylvanBot.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("SylvanBot.Application.Features.Automod.AutomodBan", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AuditId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("MessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("NextCheckAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("RuleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GuildId", "UserId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" IN ('Pending', 'Active', 'Removing')");
+
+                    b.HasIndex("Status", "NextCheckAt");
+
+                    b.ToTable("automod_bans", (string)null);
+                });
+
             modelBuilder.Entity("SylvanBot.Application.Features.Automod.AutomodExemptRole", b =>
                 {
                     b.Property<long>("GuildId")

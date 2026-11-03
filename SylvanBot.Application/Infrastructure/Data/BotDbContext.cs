@@ -16,6 +16,8 @@ namespace SylvanBot.Application.Infrastructure.Data;
 /// </summary>
 public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbContext(options)
 {
+    public DbSet<AutomodBan> AutomodBans => Set<AutomodBan>();
+
     public DbSet<AutomodSettings> AutomodSettings => Set<AutomodSettings>();
 
     public DbSet<AutomodRule> AutomodRules => Set<AutomodRule>();

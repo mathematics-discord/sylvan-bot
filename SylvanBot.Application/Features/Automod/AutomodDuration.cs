@@ -13,6 +13,16 @@ public static partial class AutomodDuration
         matchTimeoutMilliseconds: 100)]
     private static partial Regex DurationPattern { get; }
 
+    public static Optional<DateTimeOffset> BanExpiry(Optional<long> seconds, DateTimeOffset now)
+    {
+        if (!seconds.HasValue)
+            return default;
+
+        return seconds.Value <= 0
+            ? throw new ArgumentOutOfRangeException(nameof(seconds))
+            : new Optional<DateTimeOffset>(now.AddSeconds(seconds.Value));
+    }
+
     public static DateTimeOffset MuteExpiry(Optional<long> seconds, DateTimeOffset now)
     {
         if (!seconds.HasValue || seconds.Value <= 0 || seconds.Value > MaximumMuteSeconds)

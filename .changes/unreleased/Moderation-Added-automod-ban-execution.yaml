@@ -1,0 +1,5 @@
+component: Moderation
+kind: Added
+body: >-
+  Senior Moderators: automod Ban rules now ban users whose messages match a rule. Set a duration for a temporary ban or leave it blank for a permanent ban.
+time: 2026-11-03T01:00:00+00:00
