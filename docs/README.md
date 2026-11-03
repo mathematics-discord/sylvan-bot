@@ -26,9 +26,11 @@ and code keeps its monospace font.
 ## Deployment
 
 The production release workflow calls `.github/workflows/deploy-docs.yml`
-after publishing the scanned release commit to `master`. The docs workflow
-checks, builds and publishes that exact commit, independently of the bot's
+after detecting a committed release batch on `master` and scanning its exact
+commit. The docs workflow checks, builds and publishes that exact commit,
+independently of the bot's
 image build and deployment. Ordinary pushes do not deploy the docs.
+See [Preparing a release](releases.md) for the local batching procedure.
 
 The release version is passed as `DOCS_RELEASE` at build time and displayed
 beside the site title. Local builds omit it unless that variable is set.

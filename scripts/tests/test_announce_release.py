@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -19,6 +20,29 @@ def texts(messages):
 
 
 class ReleaseAnnouncementTests(unittest.TestCase):
+    def test_successful_master_push_announces_selected_batch(self):
+        env = {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/master",
+               "DEPLOY_RESULT": "success", "RELEASE_BEFORE": "a" * 40,
+               "RELEASE_AFTER": "b" * 40, "DISCORD_RELEASE_WEBHOOK_URL": "https://example.invalid"}
+        notes = "# v1.2.3\n## General\n### Changed\n- Visible change.\n"
+        with patch.dict(announce.os.environ, env, clear=True), \
+                patch.object(announce, "release_from_commits", return_value=(("1.2.3", notes), "")) as release, \
+                patch.object(announce, "post") as post:
+            announce.main()
+        release.assert_called_once_with("a" * 40, "b" * 40)
+        post.assert_called_once()
+
+    def test_manual_nonmaster_and_failed_deployments_do_not_announce(self):
+        for event, ref, result in [("workflow_dispatch", "refs/heads/master", "success"),
+                                   ("push", "refs/heads/feature/test", "success"),
+                                   ("push", "refs/heads/master", "failure")]:
+            with self.subTest(event=event, ref=ref, result=result), \
+                    patch.dict(announce.os.environ, {"GITHUB_EVENT_NAME": event,
+                               "GITHUB_REF": ref, "DEPLOY_RESULT": result}, clear=True), \
+                    patch.object(announce, "post") as post:
+                announce.main()
+                post.assert_not_called()
+
     def test_release_channel_colours_every_announcement_container(self):
         for suffix, colour in [("-alpha.1", 0x9B59B6), ("-beta.2", 0xF0B232),
                                ("-rc.10", 0x5865F2), ("", 0x57F287),

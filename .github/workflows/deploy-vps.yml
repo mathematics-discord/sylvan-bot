@@ -1,33 +1,8 @@
 name: Deploy Sylvan Bot to VPS
 
 on:
-  workflow_dispatch:
-    inputs:
-      target:
-        description: Deployment target
-        required: true
-        type: choice
-        options:
-          - production
-          - production-image
-      release_type:
-        description: Production version bump (choose custom to enter a version)
-        required: true
-        default: patch
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
-          - custom
-      version:
-        description: Custom version, e.g. 0.4.0-alpha.1, 0.4.0-beta.1, 0.4.0-rc.1 or 0.4.0 (optional +metadata)
-        required: false
-        type: string
-      image_tag:
-        description: Existing image tag or full image ref for production-image
-        required: false
-        type: string
+  push:
+    branches: [master]
 
 permissions:
   contents: read
@@ -35,103 +10,46 @@ permissions:
 concurrency:
   group: deploy-sylvan-bot
   cancel-in-progress: false
+  queue: max
 
 jobs:
   release:
-    if: inputs.target == 'production'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     outputs:
-      version: ${{ steps.publish.outputs.version }}
-      image_tag: ${{ steps.publish.outputs.image_tag }}
-      source_sha: ${{ steps.publish.outputs.source_sha }}
-      before_sha: ${{ steps.publish.outputs.before_sha }}
+      has_release: ${{ steps.detect.outputs.has_release }}
+      version: ${{ steps.detect.outputs.version }}
+      image_tag: ${{ steps.detect.outputs.image_tag }}
+      source_sha: ${{ steps.detect.outputs.source_sha }}
+      before_sha: ${{ steps.detect.outputs.before_sha }}
     steps:
-      - name: Require master
-        env:
-          GITHUB_REF_VALUE: ${{ github.ref }}
-        run: |
-          if [[ "$GITHUB_REF_VALUE" != 'refs/heads/master' ]]; then
-            echo 'Production releases must be dispatched from master.' >&2
-            exit 1
-          fi
-
-      - name: Check out master
+      - name: Check out pushed commit and history
         uses: actions/checkout@v4
         with:
-          ref: master
+          ref: ${{ github.event.after }}
           fetch-depth: 0
 
-      - name: Install Changie 1.26.0
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --fail --location --silent --show-error \
-            https://github.com/miniscruff/changie/releases/download/v1.26.0/changie_1.26.0_linux_amd64.tar.gz \
-            -o "$RUNNER_TEMP/changie.tar.gz"
-          tar -xzf "$RUNNER_TEMP/changie.tar.gz" -C "$RUNNER_TEMP" changie
-          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-
-      - name: Batch and stage release
-        id: publish
-        shell: bash
+      - name: Detect committed release batch
+        id: detect
         env:
-          RELEASE_TYPE: ${{ inputs.release_type }}
-          REQUESTED_VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          before_sha="$(git rev-parse HEAD)"
-          bash scripts/prepare-release.sh "$RELEASE_TYPE" "$REQUESTED_VERSION"
-          version="$(python3 -c 'import json; print(json.load(open("version.json", encoding="utf-8"))["version"])')"
-          git add .changes CHANGELOG.md version.json
-          git diff --cached --check
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m "Release v${version}"
-          git push origin "HEAD:refs/heads/release/${version}"
-          {
-            echo "before_sha=$before_sha"
-            echo "source_sha=$(git rev-parse HEAD)"
-            echo "version=$version"
-            # Docker tags cannot contain +; _ cannot occur in a SemVer version.
-            echo "image_tag=v${version/+/_}"
-          } >> "$GITHUB_OUTPUT"
+          RELEASE_BEFORE: ${{ github.event.before }}
+          RELEASE_AFTER: ${{ github.event.after }}
+        run: python3 scripts/detect-release.py
 
   scan-release:
     needs: release
+    if: needs.release.outputs.has_release == 'true'
     permissions:
       contents: read
       security-events: write
     uses: ./.github/workflows/codeql.yml
     with:
       source_sha: ${{ needs.release.outputs.source_sha }}
-      source_ref: refs/heads/release/${{ needs.release.outputs.version }}
-
-  publish-release:
-    needs:
-      - release
-      - scan-release
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Check out scanned release commit
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.release.outputs.source_sha }}
-          fetch-depth: 0
-          # The deploy-key bypass applies only to the Codex completion rule.
-          # Existing CodeQL rules still require the exact staged SHA to be scanned.
-          ssh-key: ${{ secrets.CODEX_GATE_RELEASE_SSH_KEY }}
-
-      - name: Publish scanned release
-        run: git push origin HEAD:master
+      source_ref: refs/heads/master
 
   deploy-docs:
     needs:
       - release
-      - publish-release
+      - scan-release
     uses: ./.github/workflows/deploy-docs.yml
     with:
       source_sha: ${{ needs.release.outputs.source_sha }}
@@ -143,7 +61,7 @@ jobs:
   build-and-push:
     needs:
       - release
-      - publish-release
+      - scan-release
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -225,46 +143,3 @@ jobs:
           RELEASE_AFTER: ${{ needs.release.outputs.source_sha }}
           DISCORD_RELEASE_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}
         run: python3 scripts/announce-release.py
-
-  deploy-production-image:
-    if: inputs.target == 'production-image'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Resolve existing image
-        id: image
-        shell: bash
-        env:
-          INPUT_IMAGE_TAG: ${{ inputs.image_tag }}
-          GITHUB_REPOSITORY_VALUE: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          if [[ -z "$INPUT_IMAGE_TAG" ]]; then
-            echo 'An image tag or full image ref is required for production-image.' >&2
-            exit 1
-          fi
-          image_repo="ghcr.io/${GITHUB_REPOSITORY_VALUE,,}"
-          if [[ "$INPUT_IMAGE_TAG" == */* ]]; then
-            image_ref="$INPUT_IMAGE_TAG"
-          else
-            image_ref="${image_repo}:$INPUT_IMAGE_TAG"
-          fi
-          echo "image_ref=$image_ref" >> "$GITHUB_OUTPUT"
-
-      - name: Deploy existing image
-        shell: bash
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_PORT: ${{ secrets.VPS_PORT }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
-          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
-        run: |
-          bash scripts/deploy-vps-stack.sh \
-            --project sylvan-bot-production \
-            --remote-dir /opt/sylvan-bot/production \
-            --image-ref "$IMAGE_REF"
