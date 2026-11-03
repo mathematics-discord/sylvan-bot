@@ -78,22 +78,31 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
         return actions.ToImmutableArray();
     }
 
-    public async Task<bool> SetEnabledAsync(ulong guildId, AutomodAction action, bool enabled, CancellationToken ct)
+    public async Task<bool> SetEnabledAsync(ulong guildId, DotNext.Optional<AutomodAction> action, bool enabled, CancellationToken ct)
     {
-        if (!Enum.IsDefined(action))
+        if (action.HasValue && !Enum.IsDefined(action.Value))
             throw new ArgumentOutOfRangeException(nameof(action));
+
+        AutomodAction[] actions = action.HasValue ? [action.Value] : Enum.GetValues<AutomodAction>();
 
         await using (var db = await contexts.CreateDbContextAsync(ct))
         {
+            await using var transaction = await db.Database.BeginTransactionAsync(ct);
             var storedGuildId = unchecked((long)guildId);
-            var storedAction = (int)action;
 
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT INTO automod_settings ("GuildId", "Action", "Enabled") VALUES ({storedGuildId}, {storedAction}, {enabled})
-                ON CONFLICT ("GuildId", "Action") DO UPDATE SET "Enabled" = EXCLUDED."Enabled"
-                """,
-                ct);
+            foreach (var target in actions)
+            {
+                var storedAction = (int)target;
+
+                await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    INSERT INTO automod_settings ("GuildId", "Action", "Enabled") VALUES ({storedGuildId}, {storedAction}, {enabled})
+                    ON CONFLICT ("GuildId", "Action") DO UPDATE SET "Enabled" = EXCLUDED."Enabled"
+                    """,
+                    ct);
+            }
+
+            await transaction.CommitAsync(ct);
         }
 
         return await runtime.RefreshAsync(guildId, ct);

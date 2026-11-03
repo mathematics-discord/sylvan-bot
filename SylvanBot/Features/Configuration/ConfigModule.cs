@@ -1,6 +1,5 @@
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Features.Moderation;
-using SylvanBot.Features.Automod;
 using SylvanBot.Features.RoleReactions;
 using SylvanBot.Interactions;
 
@@ -15,7 +14,6 @@ public sealed partial class ConfigModule(
     SylvanMailConfiguration workflow,
     RoleReactionConfiguration roleReactions,
     ImageSpamSettingsService settingsService,
-    AutomodManagement automod,
     IHostApplicationLifetime lifetime
 ) : SlashCommandBase
 {

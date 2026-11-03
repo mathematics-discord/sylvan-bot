@@ -80,27 +80,67 @@ public sealed class AutomodModule(AutomodManagement management, IHostApplication
     public async Task ListAsync()
     {
         RequireAuditLogAccess();
-        await DeferAsync(ephemeral: true);
+        await DeferAsync(ephemeral: false);
         ImmutableArray<AutomodRule> rules = await management.ListAsync(Context.Guild.Id, lifetime.ApplicationStopping);
+        var components = BuildListComponents(rules, page: 0);
 
-        IEnumerable<string> rows = rules
-            .Select(rule =>
-            {
-                var duration = rule.Action switch
-                {
-                    AutomodAction.Delete or AutomodAction.Note => "no duration",
-                    AutomodAction.Ban when rule.DurationSeconds is null => "permanent",
-                    _ => $"{rule.DurationSeconds} seconds",
-                };
+        await ModifyOriginalResponseAsync(properties =>
+        {
+            properties.Content = string.Empty;
+            properties.Flags = MessageFlags.ComponentsV2;
+            properties.Components = components;
+            properties.AllowedMentions = AllowedMentions.None;
+        });
+    }
 
-                var pattern = rule.Pattern
-                    .Replace("\r", "\\r", StringComparison.Ordinal)
-                    .Replace("\n", "\\n", StringComparison.Ordinal);
+    [ComponentInteraction("automod-list:*:*:*", ignoreGroupNames: true)]
+    public async Task ChangePageAsync(ulong guildId, int page, string direction)
+    {
+        RequireAuditLogAccess();
 
-                return string.Create(CultureInfo.InvariantCulture, $"{rule.Id} | {rule.MatchType} | {pattern} | {rule.Action} | {duration}");
-            });
+        if (Context.Interaction is not SocketMessageComponent component)
+            throw new BotCommandException("This control is not an automod list.");
 
-        await AutomodReply.SendAsync(Context.Interaction, rules.IsEmpty ? "No automod rules in this guild." : string.Join("\n", rows));
+        var validSource = guildId == Context.Guild.Id
+            && component.Message.Author.Id == Context.Client.CurrentUser.Id
+            && direction is "prev" or "next";
+
+        var listText = component.Message.Components
+            .OfType<ContainerComponent>()
+            .SelectMany(container => container.Components)
+            .OfType<TextDisplayComponent>();
+
+        var isRuleList = listText
+            .Any(text => text.Content.StartsWith(AutomodRuleList.Heading, StringComparison.Ordinal));
+
+        if (!validSource || !isRuleList)
+            throw new BotCommandException("This control is not an automod list for this guild. Use /automod list to open one.");
+
+        await component.DeferAsync();
+        ImmutableArray<AutomodRule> rules = await management.ListAsync(Context.Guild.Id, lifetime.ApplicationStopping);
+        var components = BuildListComponents(rules, page);
+
+        await component.ModifyOriginalResponseAsync(properties =>
+        {
+            properties.Components = components;
+            properties.AllowedMentions = AllowedMentions.None;
+        });
+    }
+
+    private MessageComponent BuildListComponents(ImmutableArray<AutomodRule> rules, int page)
+    {
+        var result = AutomodRuleList.CreatePage(rules, page);
+        var previousId = string.Create(CultureInfo.InvariantCulture, $"automod-list:{Context.Guild.Id}:{Math.Max(0, result.Index - 1)}:prev");
+        var nextId = string.Create(CultureInfo.InvariantCulture, $"automod-list:{Context.Guild.Id}:{Math.Min(result.Count - 1, result.Index + 1)}:next");
+        var controls = new ActionRowBuilder()
+            .WithButton("Prev", previousId, ButtonStyle.Secondary, disabled: result.Index == 0)
+            .WithButton("Next", nextId, ButtonStyle.Secondary, disabled: result.Index == result.Count - 1);
+
+        var container = new ContainerBuilder()
+            .WithTextDisplay(new TextDisplayBuilder().WithContent(result.Text))
+            .WithActionRow(controls);
+
+        return new ComponentBuilderV2(container).Build();
     }
 
     private void RequireAuditLogAccess()
