@@ -993,6 +993,9 @@ dotnet_diagnostic.SA1313.severity = none
 
 dotnet_diagnostic.MA0076.severity = none
 
+
+dotnet_diagnostic.MA0015.severity = none
+
 [*.cs]
 dotnet_diagnostic.rcs1001.severity = none
 dotnet_diagnostic.rcs1123.severity = none

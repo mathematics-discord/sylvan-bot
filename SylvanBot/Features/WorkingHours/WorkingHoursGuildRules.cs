@@ -46,8 +46,7 @@ public sealed class WorkingHoursGuildRules(DiscordSocketClient client)
             target is not null
             && target.Id != guild.Id
             && !target.IsManaged
-            && bot is not null
-            && bot.GuildPermissions.ManageRoles
+            && bot?.GuildPermissions.ManageRoles == true
             && bot.Hierarchy > target.Position;
 
         if (!manageable)

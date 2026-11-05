@@ -137,7 +137,7 @@ public sealed class TicketBoundary(DiscordSocketClient socketClient, HttpClient 
         var guild = await socketClient.Rest.GetGuildAsync(guildId, Options(cancellationToken));
         var member = await guild.GetUserAsync(userId, Options(cancellationToken));
 
-        if (member is null || member.IsBot)
+        if (member?.IsBot != false)
             throw new BotCommandException("The responsible moderator is not an available human member of this server.");
 
         var permissions = member.GuildPermissions;
