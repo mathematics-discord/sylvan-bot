@@ -20,6 +20,7 @@ public sealed class TicketWorker(
     {
         client.Ready += OnReadyAsync;
         client.AuditLogCreated += OnAuditAsync;
+        client.UserVoiceStateUpdated += OnVoiceAsync;
 
         return Task.CompletedTask;
     }
@@ -28,6 +29,7 @@ public sealed class TicketWorker(
     {
         client.Ready -= OnReadyAsync;
         client.AuditLogCreated -= OnAuditAsync;
+        client.UserVoiceStateUpdated -= OnVoiceAsync;
     }
 
     public void Wake()
@@ -89,6 +91,12 @@ public sealed class TicketWorker(
         base.Dispose();
     }
 
+    private Task OnVoiceAsync(SocketUser user, SocketVoiceState before, SocketVoiceState after)
+    {
+        Wake();
+        return Task.CompletedTask;
+    }
+
     private Task OnReadyAsync()
     {
         _ready = true;
@@ -137,7 +145,7 @@ public sealed class TicketWorker(
                     var from = config.LastAuditScanAtUtc ?? config.CaptureFromUtc!.Value;
 
                     if (from < started.AddDays(-45))
-                        await coordinator.SuspendBansAsync(config.GuildId, token);
+                        await coordinator.SuspendRestrictionsAsync(config.GuildId, token);
 
                     var scan = await boundary.ReadAuditAsync(config.GuildId, from.AddMinutes(-10), token);
                     await coordinator.AcceptScanAsync(config, scan, started, token);

@@ -40,6 +40,10 @@ public static class DependencyInjection
             services.AddSingleton<NoteTicketStrategy>();
             services.AddSingleton<BanTicketStrategy>();
             services.AddSingleton<TimeoutTicketStrategy>();
+            services.AddSingleton<KickTicketStrategy>();
+            services.AddSingleton<VoiceMuteTicketStrategy>();
+            services.AddSingleton<VoiceDeafenTicketStrategy>();
+            services.AddSingleton<RoleTicketStrategy>();
             services.AddSingleton<TicketPublisher>();
             services.AddSingleton<TicketCoordinator>();
             services.AddSingleton<TicketWorker>();
@@ -155,6 +159,7 @@ public static class DependencyInjection
                             GatewayIntents.Guilds
                             | GatewayIntents.DirectMessages
                             | GatewayIntents.GuildMembers
+                            | GatewayIntents.GuildVoiceStates
                             | GatewayIntents.GuildBans
                             | GatewayIntents.GuildMessages
                             | GatewayIntents.GuildMessageReactions

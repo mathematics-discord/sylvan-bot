@@ -58,9 +58,7 @@ public sealed class TicketBoundary(DiscordSocketClient socketClient, HttpClient 
                     }
 
                     lastAuditId = lastAuditId.TryGet(out var previous) ? Math.Max(previous, auditId) : auditId;
-                    DotNext.Optional<TicketObservation> result = TicketAuditReader.Read(guildId, entry, botIds, socketClient.CurrentUser.Id);
-                    if (result.TryGet(out var observation))
-                        observations.Add(observation);
+                    observations.AddRange(TicketAuditReader.Read(guildId, entry, botIds, socketClient.CurrentUser.Id));
                 }
                 catch (Exception exception) when (exception is InvalidDataException or FormatException or JsonException)
                 {

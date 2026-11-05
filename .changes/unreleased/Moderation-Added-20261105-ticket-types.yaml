@@ -1,0 +1,3 @@
+component: Moderation
+kind: Added
+body: Capture kicks, voice mutes, voice deafens and tracked role grants as tickets. Responsible moderators can complete their tickets, and timed voice and role restrictions expire automatically, including after disconnection or departure.

@@ -11,6 +11,10 @@ public sealed class TicketCoordinator(
     NoteTicketStrategy notes,
     BanTicketStrategy bans,
     TimeoutTicketStrategy timeouts,
+    KickTicketStrategy kicks,
+    VoiceMuteTicketStrategy voiceMutes,
+    VoiceDeafenTicketStrategy voiceDeafens,
+    RoleTicketStrategy roles,
     TicketBoundary boundary,
     TicketPublisher publisher,
     ILogger logger) : IDisposable
@@ -89,16 +93,8 @@ public sealed class TicketCoordinator(
 
                 var comment = ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
 
-                if (details.HasDuration && ticket.Action is not (TicketAction.Ban or TicketAction.Timeout))
-                    throw new BotCommandException("Operational duration edits for this ticket type are not available yet.");
-
-                outcome = ticket.Action switch
-                {
-                    TicketAction.Timeout when details.HasDuration =>
-                        (await timeouts.HandleAsync(db, new EditDetails(ticket, actor, details), token)).Outcome,
-                    TicketAction.Ban when details.HasDuration => (await bans.HandleAsync(db, new EditDetails(ticket, actor, details), token)).Outcome,
-                    _ => outcome,
-                };
+                if (details.HasDuration)
+                    outcome = (await Strategy(ticket.Action).HandleAsync(db, new EditDetails(ticket, actor, details), token)).Outcome;
 
                 if (details.Comment is not TicketCommentEdit.Keep)
                     ticket.SetComment(comment, actor.UserId, details.Comment is TicketCommentEdit.Append);
@@ -219,9 +215,7 @@ public sealed class TicketCoordinator(
                              && !ticket.Hidden
                              && !ticket.ReviewExempt
                              && ticket.ApprovedByUserId == null
-                             && (ticket.Action == TicketAction.Ban
-                                 || ticket.Action == TicketAction.Timeout
-                                 || ticket.Action == TicketAction.VoiceMute));
+                             && ticket.Action != TicketAction.Note);
 
         long cursor = 0;
         var ready = 0;
@@ -256,7 +250,7 @@ public sealed class TicketCoordinator(
                 {
                     ready++;
 
-                    if (next is null && ticket.Number > cursor)
+                    if (next is null && ticket.Number > after)
                         next = ticket;
                 }
                 else
@@ -279,7 +273,9 @@ public sealed class TicketCoordinator(
         int? reminderIntervalSeconds,
         CancellationToken cancellationToken,
         ulong? exemptRoleAdd = null,
-        ulong? exemptRoleRemove = null)
+        ulong? exemptRoleRemove = null,
+        ulong? trackedRoleAdd = null,
+        ulong? trackedRoleRemove = null)
     {
         if (actor.GuildId == 0 || actor.UserId == 0 || !actor.IsAdministrator)
             throw new BotCommandException("Administrator permission is required to configure tickets.");
@@ -335,6 +331,13 @@ public sealed class TicketCoordinator(
             config.DestinationChannelId = destination;
             config.ReminderIntervalSeconds = reminderIntervalSeconds ?? config.ReminderIntervalSeconds;
             config.UpdateReviewExemptRoles(exemptRoleAdd, exemptRoleRemove);
+
+            if (trackedRoleAdd is { } added && !config.TrackedRoleIds.Contains(checked((long)added)))
+                config.TrackedRoleIds.Add(checked((long)added));
+
+            if (trackedRoleRemove is { } removed)
+                config.TrackedRoleIds.Remove(checked((long)removed));
+
             await SaveAsync(db, cancellationToken);
 
             return config;
@@ -363,22 +366,36 @@ public sealed class TicketCoordinator(
                 if (value.OperationId.TryGet(out var correlation))
                     correlations[correlation] = Math.Max(correlations.GetValueOrDefault(correlation), value.AuditId);
 
-            foreach (var observation in scan.Observations)
+            IEnumerable<IGrouping<ulong, TicketObservation>> groups = scan.Observations.GroupBy(observation => observation.AuditId);
+
+            foreach (IGrouping<ulong, TicketObservation> group in groups)
             {
-                var member = config.ReviewExemptRoleIds.Count == 0
-                    ? null
-                    : await client.Rest.GetGuildUserAsync(config.GuildId, observation.ModeratorUserId, TicketBoundary.Options(token));
+                List<long> affected = [];
 
-                var exempt = member is not null
-                             && (config.ReviewExemptRoleIds.Contains(checked((long)config.GuildId))
-                                 || member.RoleIds.Any(id => config.ReviewExemptRoleIds.Contains(checked((long)id))));
+                await using (var transaction = await db.Database.BeginTransactionAsync(token))
+                {
+                    foreach (var observation in group)
+                    {
+                        var member = config.ReviewExemptRoleIds.Count == 0
+                            ? null
+                            : await client.Rest.GetGuildUserAsync(config.GuildId, observation.ModeratorUserId, TicketBoundary.Options(token));
 
-                await using var transaction = await db.Database.BeginTransactionAsync(token);
-                var result = await Strategy(observation.Action).HandleAsync(db, new ObserveModeration(observation, exempt, correlations), token);
-                config.LastAuditId = Math.Max(config.LastAuditId ?? 0, observation.AuditId);
-                await db.SaveChangesAsync(token);
-                await transaction.CommitAsync(token);
-                await PublishAsync(config.GuildId, result, token);
+                        var exempt = member is not null
+                                     && (config.ReviewExemptRoleIds.Contains(checked((long)config.GuildId))
+                                         || member.RoleIds.Any(id => config.ReviewExemptRoleIds.Contains(checked((long)id))));
+
+                        var result = await Strategy(observation.Action)
+                            .HandleAsync(db, new ObserveModeration(observation, exempt, correlations), token);
+
+                        affected.AddRange(result.TicketIds);
+                    }
+
+                    config.LastAuditId = Math.Max(config.LastAuditId ?? 0, group.Key);
+                    await db.SaveChangesAsync(token);
+                    await transaction.CommitAsync(token);
+                }
+
+                await PublishAsync(config.GuildId, new TicketResult(affected.ToImmutableArray(), string.Empty), token);
                 db.ChangeTracker.Clear();
                 db.Attach(config);
             }
@@ -406,7 +423,7 @@ public sealed class TicketCoordinator(
             var ticket = await db.Tickets
                 .SingleAsync(value => value.GuildId == guildId && value.Id == id, token);
 
-            if (ticket.Action is TicketAction.Ban or TicketAction.Timeout)
+            if (ticket.Action is not (TicketAction.Note or TicketAction.Kick))
                 await Strategy(ticket.Action).HandleAsync(db, new ReconcileTicket(ticket, auditCurrent), token);
 
             await db.SaveChangesAsync(token);
@@ -418,7 +435,7 @@ public sealed class TicketCoordinator(
         }
     }
 
-    internal async Task SuspendBansAsync(ulong guildId, CancellationToken token)
+    internal async Task SuspendRestrictionsAsync(ulong guildId, CancellationToken token)
     {
         await _gate.WaitAsync(token);
 
@@ -427,7 +444,12 @@ public sealed class TicketCoordinator(
             await using var db = await contexts.CreateDbContextAsync(token);
 
             await db.Tickets
-                .Where(ticket => ticket.GuildId == guildId && ticket.Action == TicketAction.Ban && ticket.Status == TicketStatus.Active)
+                .Where(ticket => ticket.GuildId == guildId
+                                 && (ticket.Action == TicketAction.Ban
+                                     || ticket.Action == TicketAction.VoiceMute
+                                     || ticket.Action == TicketAction.VoiceDeafen
+                                     || ticket.Action == TicketAction.Role)
+                                 && ticket.Status == TicketStatus.Active)
                 .ExecuteUpdateAsync(update => update.SetProperty(ticket => ticket.ExpirySuspended, true), token);
         }
         finally
@@ -474,6 +496,10 @@ public sealed class TicketCoordinator(
         TicketAction.Note => notes,
         TicketAction.Ban => bans,
         TicketAction.Timeout => timeouts,
+        TicketAction.Kick => kicks,
+        TicketAction.VoiceMute => voiceMutes,
+        TicketAction.VoiceDeafen => voiceDeafens,
+        TicketAction.Role => roles,
         _ => throw new BotCommandException("This ticket action has no operational strategy yet."),
     };
 

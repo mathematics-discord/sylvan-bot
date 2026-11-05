@@ -116,13 +116,14 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
         return new TicketResult(ticket.Version == version ? [] : [ticket.Id], "Ban expiry reconciled.");
     }
 
-    // The two ingestion strategies share audit identity, attribution and supersession rules.
+    // Strategies share audit identity, attribution and supersession rules.
     internal static async Task<TicketResult> RecordObservedAsync(BotDbContext db, ObserveModeration request, CancellationToken token)
     {
         var observation = request.Observation;
 
         var alreadyRecorded = await db.Tickets
-            .AnyAsync(ticket => ticket.GuildId == observation.GuildId && ticket.SourceAuditId == observation.AuditId, token);
+            .AnyAsync(ticket => ticket.GuildId == observation.GuildId && ticket.SourceAuditId == observation.AuditId
+                                && ticket.Action == observation.Action && ticket.RoleId == observation.RoleId, token);
 
         if (alreadyRecorded)
             return new TicketResult([], string.Empty);
@@ -131,6 +132,7 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
             .Where(ticket => ticket.GuildId == observation.GuildId
                              && ticket.SubjectUserId == observation.SubjectUserId
                              && ticket.Action == observation.Action
+                             && ticket.RoleId == observation.RoleId
                              && ticket.SourceAuditId != null)
             .OrderByDescending(ticket => ticket.SourceAuditId)
             .FirstOrDefaultAsync(token);
@@ -141,13 +143,14 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
                     ticket => ticket.GuildId == observation.GuildId
                               && ticket.SubjectUserId == observation.SubjectUserId
                               && ticket.Action == observation.Action
+                             && ticket.RoleId == observation.RoleId
                               && ticket.Pending != null
                               && ticket.Pending.Id == observation.OperationId.Value,
                     token)
             : null;
 
         List<Ticket> affected = [];
-        var older = latest is not null && latest.LastAuditId >= observation.AuditId;
+        var older = observation.Action != TicketAction.Kick && latest is not null && latest.LastAuditId >= observation.AuditId;
 
         if (operation is not null && operation.LastAuditId < observation.AuditId)
         {
@@ -169,9 +172,27 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
         var config = await db.TicketConfigurations
             .SingleAsync(value => value.GuildId == observation.GuildId, token);
 
+        if (observation.RestoredTicketNumber is { } restoredNumber)
+        {
+            var restored = await db.Tickets
+                .SingleOrDefaultAsync(ticket => ticket.GuildId == observation.GuildId
+                    && ticket.Number == restoredNumber && ticket.Action == TicketAction.Role
+                    && ticket.SubjectUserId == observation.SubjectUserId && ticket.RoleId == observation.RoleId, token);
+
+            if (restored is not null && restored.LastAuditId < observation.AuditId)
+            {
+                restored.LastAuditId = observation.AuditId;
+                await db.SaveChangesAsync(token);
+            }
+
+            return new TicketResult([], string.Empty);
+        }
+
+        var tracked = observation.Action != TicketAction.Role
+                      || (observation.RoleId is { } role && config.TrackedRoleIds.Contains(checked((long)role)));
         Ticket? created = null;
 
-        if (observation is { CreatesTicket: true, OperationId.HasValue: false } && config.CaptureFromUtc <= observation.CreatedAtUtc)
+        if (observation is { CreatesTicket: true, OperationId.HasValue: false } && tracked && config.CaptureFromUtc <= observation.CreatedAtUtc)
         {
             var number = await db.Database
                 .SqlQuery<long>($"SELECT nextval('ticket_numbers') AS \"Value\"")
@@ -184,9 +205,12 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
             if (expiry is { } end)
                 duration = Math.Max(1, (long)Math.Ceiling((end - observation.CreatedAtUtc).TotalSeconds));
 
+            if (observation.Action == TicketAction.Kick)
+                duration = null;
+
             created = new Ticket
             {
-                GuildId = observation.GuildId, Number = number, Action = observation.Action,
+                GuildId = observation.GuildId, Number = number, Action = observation.Action, RoleId = observation.RoleId,
                 SubjectUserId = observation.SubjectUserId, ModeratorUserId = observation.ModeratorUserId,
                 CreatedAtUtc = observation.CreatedAtUtc, SourceAuditId = observation.AuditId, LastAuditId = observation.AuditId,
                 AuditReason = observation.Reason, ReviewExempt = request.ReviewExempt, ReminderExempt = observation.ModeratorIsBot,
@@ -201,7 +225,7 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
             affected.Add(created);
         }
 
-        var updateLatest = latest is not null
+        var updateLatest = observation.Action != TicketAction.Kick && latest is not null
                            && !older
                            && latest != operation
                            && (!observation.OperationId.HasValue || operation is not null);
@@ -211,6 +235,11 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
             if (created is not null)
             {
                 latest!.End(TicketStatus.Superseded, observation.ModeratorUserId, created.Number);
+            }
+            else if (!tracked && observation.CreatesTicket)
+            {
+                // An untracked new grant belongs to the moderator, not the old restriction.
+                latest!.End(TicketStatus.Reverted);
             }
             else if (observation.Removed)
             {
