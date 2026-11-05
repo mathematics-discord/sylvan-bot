@@ -126,6 +126,31 @@ public sealed class TicketModerationRulesTests
         requestedDue.ShouldBeTrue();
     }
 
+    [TestCase(TicketAction.Kick)]
+    [TestCase(TicketAction.VoiceMute)]
+    [TestCase(TicketAction.VoiceDeafen)]
+    [TestCase(TicketAction.Role)]
+    public void CanCorrect_NewAction_RequiresOwnerAndMatchingPermission(TicketAction action)
+    {
+        // Arrange
+        var ticket = CreateTicket(action);
+        var owner = new TicketActor(1, 2, false, false,
+            CanKickMembers: action == TicketAction.Kick,
+            CanMuteMembers: action == TicketAction.VoiceMute,
+            CanDeafenMembers: action == TicketAction.VoiceDeafen,
+            CanManageRoles: action == TicketAction.Role);
+
+        // Act
+        var allowed = ticket.CanCorrect(owner);
+        var other = ticket.CanCorrect(owner with { UserId = 9 });
+        var unprivileged = ticket.CanCorrect(new TicketActor(1, 2, false, false));
+
+        // Assert
+        allowed.ShouldBeTrue();
+        other.ShouldBeFalse();
+        unprivileged.ShouldBeFalse();
+    }
+
     private static Ticket CreateTicket(TicketAction action)
     {
         var ticket = new Ticket { GuildId = 1, Number = 1, SubjectUserId = 3, ModeratorUserId = 2,

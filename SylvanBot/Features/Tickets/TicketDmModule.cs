@@ -26,6 +26,14 @@ public sealed class TicketDmModule(TicketCoordinator coordinator, TicketBoundary
         if (ticket is null || ticket.ModeratorUserId != ownerId || !ticket.CanCorrect(actor))
             throw new BotCommandException("This ticket is no longer available to edit.");
 
+        if (ticket.Action == TicketAction.Kick)
+        {
+            await RespondWithModalAsync(
+                $"ticket-dm-kick-save:{guildId}:{ownerId}:{number}:{ticket.Version}",
+                new TicketCommentModal { Title = $"Edit Ticket #{number}", Comment = ticket.Comment });
+            return;
+        }
+
         var duration = "permanent";
 
         if (ticket.DurationSeconds is not null)
@@ -40,6 +48,10 @@ public sealed class TicketDmModule(TicketCoordinator coordinator, TicketBoundary
                 Duration = duration,
             });
     }
+
+    [ModalInteraction("ticket-dm-kick-save:*:*:*:*", true)]
+    public Task SaveKickAsync(ulong guildId, ulong ownerId, long number, int version, TicketCommentModal modal)
+        => SaveAsync(guildId, ownerId, number, version, new TicketModerationEditModal { Comment = modal.Comment });
 
     [ModalInteraction("ticket-dm-save:*:*:*:*", true)]
     public async Task SaveAsync(ulong guildId, ulong ownerId, long number, int version, TicketModerationEditModal modal)

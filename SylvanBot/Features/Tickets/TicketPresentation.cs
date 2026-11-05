@@ -11,7 +11,7 @@ internal static class TicketPresentation
 
     internal static string Link(ulong guildId, ulong channelId, ulong messageId) => $"https://discord.com/channels/{guildId}/{channelId}/{messageId}";
 
-    internal static bool UsesModerationEmbed(Ticket ticket) => ticket.Action is TicketAction.Ban or TicketAction.Timeout or TicketAction.VoiceMute;
+    internal static bool UsesModerationEmbed(Ticket ticket) => ticket.Action != TicketAction.Note;
 
     internal static string ActionName(TicketAction action) => action switch
     {
@@ -104,7 +104,10 @@ internal static class TicketPresentation
             {
                 TicketAction.Ban => "banned",
                 TicketAction.Timeout => "timed out",
-                _ => "muted",
+                TicketAction.VoiceMute => "muted",
+                TicketAction.VoiceDeafen => "deafened",
+                TicketAction.Kick => "kicked",
+                _ => $"given <@&{ticket.RoleId}>",
             };
 
             description = $"<@{ticket.SubjectUserId}> {verb} by <@{ticket.ModeratorUserId}>";
@@ -134,7 +137,8 @@ internal static class TicketPresentation
         {
             embed.AddField("Moderator ID", $"`{ticket.ModeratorUserId}`", inline: true);
 
-            embed.AddField(
+            if (ticket.Action != TicketAction.Kick)
+                embed.AddField(
                 "Duration",
                 ticket.DurationSeconds is { } seconds ? TimeSpan.FromSeconds(seconds).ToString() : "**Permanent**",
                 inline: true);
@@ -143,6 +147,14 @@ internal static class TicketPresentation
                 embed.AddField("Expires", TimestampTag.FormatFromDateTimeOffset(expiry, TimestampTagStyles.Relative), inline: true);
         }
         else embed.AddField("Created", $"<t:{ticket.CreatedAtUtc.ToUnixTimeSeconds()}:f>", inline: true);
+
+        if (ticket.Action == TicketAction.Role)
+            embed.AddField("Role", $"<@&{ticket.RoleId}> (`{ticket.RoleId}`)", inline: true);
+
+        if (ticket.Pending is not null)
+            embed.AddField("Pending", "Expiry or a Discord change is awaiting confirmation.");
+        if (ticket.ExpirySuspended)
+            embed.AddField("Expiry paused", "Confirm the duration after audit recovery.");
 
         AddHistory(embed, ticket);
 
@@ -221,6 +233,9 @@ internal static class TicketPresentation
         {
             TicketAction.Ban => (Pending: 0xFF6666, Complete: 0xFF0000, Ended: 0x990000),
             TicketAction.Timeout => (Pending: 0xBBFF55, Complete: 0x99FF00, Ended: 0x559900),
+            TicketAction.Kick => (Pending: 0xFFBB55, Complete: 0xFF9900, Ended: 0x995500),
+            TicketAction.VoiceDeafen => (Pending: 0xCC66FF, Complete: 0x9900FF, Ended: 0x550099),
+            TicketAction.Role => (Pending: 0xFFFF99, Complete: 0xFFFF00, Ended: 0x999900),
             _ => (Pending: 0xFF55BB, Complete: 0xFF0099, Ended: 0x990055),
         };
 

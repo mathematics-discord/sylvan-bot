@@ -90,11 +90,14 @@ public sealed class TicketApprovalTests
         ticket.ModificationHistory[^1].Action.ShouldBe(action);
     }
 
-    [Test]
-    public void SetDuration_ApprovedTicket_PreservesApproval()
+    [TestCase(TicketAction.Ban)]
+    [TestCase(TicketAction.VoiceMute)]
+    [TestCase(TicketAction.VoiceDeafen)]
+    [TestCase(TicketAction.Role)]
+    public void SetDuration_ApprovedTicket_PreservesApproval(TicketAction action)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        var ticket = TicketTests.Create(action);
         ticket.Approve(new TicketActor(1, 4, true, false), ticket.Version);
         DateTimeOffset? approvedAt = ticket.ApprovedAtUtc;
         var version = ticket.Version;

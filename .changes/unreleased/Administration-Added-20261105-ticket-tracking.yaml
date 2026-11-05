@@ -1,0 +1,3 @@
+component: Administration
+kind: Added
+body: Administrators can choose which role grants create moderation tickets through the ticket configuration command.

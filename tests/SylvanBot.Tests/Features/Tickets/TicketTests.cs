@@ -23,6 +23,9 @@ public sealed class TicketTests
 
     [TestCase(TicketAction.Ban)]
     [TestCase(TicketAction.Timeout)]
+    [TestCase(TicketAction.VoiceMute)]
+    [TestCase(TicketAction.VoiceDeafen)]
+    [TestCase(TicketAction.Role)]
     public void SetHidden_ActiveRestriction_PreservesActionAndPendingOperation(TicketAction action)
     {
         // Arrange
@@ -245,4 +248,35 @@ public sealed class TicketTests
         // Assert
         Should.Throw<ArgumentOutOfRangeException>(Act);
     }
+    [TestCase(TicketAction.VoiceMute)]
+    [TestCase(TicketAction.VoiceDeafen)]
+    [TestCase(TicketAction.Role)]
+    public void ValidateEdit_ReversibleAction_AcceptsPermanentAndFiniteDuration(TicketAction action)
+    {
+        // Arrange
+        var ticket = Create(action);
+
+        // Act
+        var finite = ticket.ValidateEdit(TicketDetails.ParseFields("1 hour", null), DateTimeOffset.UtcNow);
+        var permanent = ticket.ValidateEdit(TicketDetails.ParseFields("permanent", null), DateTimeOffset.UtcNow);
+
+        // Assert
+        finite.ShouldBe("reason");
+        permanent.ShouldBe("reason");
+    }
+
+    [Test]
+    public void ValidateEdit_Kick_RejectsDuration()
+    {
+        // Arrange
+        var ticket = Create(TicketAction.Kick);
+
+        // Act
+        void Act() => ticket.ValidateEdit(TicketDetails.ParseFields("1 hour", null), DateTimeOffset.UtcNow);
+
+        // Assert
+        Should.Throw<BotCommandException>(Act);
+        ticket.Status.ShouldBe(TicketStatus.Applied);
+    }
+
 }

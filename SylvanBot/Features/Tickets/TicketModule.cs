@@ -130,7 +130,13 @@ public sealed class TicketModule(
                 throw new BotCommandException(
                     $"This historical comment exceeds the editor limit. Use /ticket set id:{number} comment: to replace it.");
 
-            if (ticket.Action == TicketAction.Note)
+            if (ticket.Action == TicketAction.Kick)
+            {
+                await RespondWithModalAsync(
+                    $"ticket-kick-edit:{actor.GuildId}:{actor.UserId}:{number}:{ticket.Version}",
+                    new TicketCommentModal { Title = $"Edit Ticket #{number}", Comment = ticket.Comment });
+            }
+            else if (ticket.Action == TicketAction.Note)
             {
                 await RespondWithModalAsync(
                     $"ticket-edit:{actor.GuildId}:{actor.UserId}:{number}:{ticket.Version}",
@@ -153,13 +159,20 @@ public sealed class TicketModule(
                     new TicketModerationEditModal
                     {
                         Title = $"Edit Ticket #{number}", Comment = ticket.Comment,
-                        Duration = ticket.Action is TicketAction.Ban or TicketAction.Timeout
+                        Duration = ticket.Action is not (TicketAction.Note or TicketAction.Kick)
                             ? ticket.DurationSeconds is { } seconds ? $"{seconds} seconds" : "permanent"
                             : string.Empty,
                     });
             }
         },
         defer: false);
+
+    [ModalInteraction("ticket-kick-edit:*:*:*:*", true)]
+    public Task SaveKickAsync(ulong guild, ulong owner, long number, int version, TicketCommentModal modal) => ExecuteAsync(async (actor, token) =>
+    {
+        RequireOwner(actor, guild, owner);
+        await ChangedAsync(await coordinator.EditAsync(actor, number, version, TicketDetails.ParseFields(null, modal.Comment), null, token));
+    });
 
     [ModalInteraction("ticket-edit:*:*:*:*", true)]
     public Task SaveNoteEditAsync(ulong guild, ulong owner, long number, int version, TicketEditModal modal) => ExecuteAsync(async (actor, token) =>

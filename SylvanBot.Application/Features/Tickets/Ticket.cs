@@ -77,6 +77,9 @@ public sealed class Ticket
                                                              TicketAction.Timeout => actor.CanTimeoutMembers,
                                                              TicketAction.Ban => actor.CanBanMembers,
                                                              TicketAction.VoiceMute => actor.CanMuteMembers,
+                                                             TicketAction.VoiceDeafen => actor.CanDeafenMembers,
+                                                             TicketAction.Kick => actor.CanKickMembers,
+                                                             TicketAction.Role => actor.CanManageRoles,
                                                              _ => false,
                                                          }));
 
@@ -105,7 +108,7 @@ public sealed class Ticket
         if (!details.HasDuration)
             return comment;
 
-        if (Action is not (TicketAction.Ban or TicketAction.Timeout or TicketAction.VoiceMute))
+        if (Action is not (TicketAction.Ban or TicketAction.Timeout or TicketAction.VoiceMute or TicketAction.VoiceDeafen or TicketAction.Role))
             throw new BotCommandException("This ticket type does not accept a duration.");
 
         _ = Action == TicketAction.Timeout
