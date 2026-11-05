@@ -9,7 +9,7 @@ public sealed class KickTicketStrategy : ITicketStrategy
 
     public Task<TicketResult> HandleAsync(BotDbContext db, TicketRequest request, CancellationToken token)
     {
-        if (request is ObserveModeration observed)
+        if (request.Value is ObserveModeration observed)
             return BanTicketStrategy.RecordObservedAsync(db, observed, token);
 
         throw new ArgumentException("Unsupported kick request.", nameof(request));

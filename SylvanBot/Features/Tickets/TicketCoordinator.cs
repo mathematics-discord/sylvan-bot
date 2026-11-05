@@ -45,15 +45,6 @@ public sealed class TicketCoordinator(
         await PrepareNoteAsync(db, actor, subject, token);
     }
 
-    private async Task PrepareNoteAsync(BotDbContext db, TicketActor actor, ulong subject, CancellationToken token)
-    {
-        if (subject == 0 || actor.UserId == 0 || actor is { IsAdministrator: false, CanViewAuditLog: false, CanTimeoutMembers: false })
-            throw new BotCommandException("Creating notes requires Moderate Members or Administrator and a valid subject.");
-
-        var config = await EnabledAsync(db, actor.GuildId, token);
-        await CheckReadAsync(actor, config.DestinationChannelId!.Value, token);
-    }
-
     public async Task<TicketResult> EditAsync(
         TicketActor actor,
         long number,
@@ -72,7 +63,7 @@ public sealed class TicketCoordinator(
             var ticket = await FindAsync(db, actor, number, token);
             var originalVersion = ticket.Version;
             var outcome = string.Empty;
-            var hasDetails = details.HasDuration || details.Comment is not TicketCommentEdit.Keep;
+            var hasDetails = details.HasDuration || details.Comment.Value is not TicketCommentEdit.Keep;
 
             if (hidden is not null && hasDetails && ticket.Action != TicketAction.Note)
                 throw new BotCommandException("Change visibility separately from ticket details.");
@@ -96,8 +87,8 @@ public sealed class TicketCoordinator(
                 if (details.HasDuration)
                     outcome = (await Strategy(ticket.Action).HandleAsync(db, new EditDetails(ticket, actor, details), token)).Outcome;
 
-                if (details.Comment is not TicketCommentEdit.Keep)
-                    ticket.SetComment(comment, actor.UserId, details.Comment is TicketCommentEdit.Append);
+                if (details.Comment.Value is not TicketCommentEdit.Keep)
+                    ticket.SetComment(comment, actor.UserId, details.Comment.Value is TicketCommentEdit.Append);
             }
 
             await SaveAsync(db, token);
@@ -164,11 +155,11 @@ public sealed class TicketCoordinator(
         await CheckReadAsync(actor, message.ChannelId, token);
 
         var ticket = await db.Tickets
-            .Where(value => value.GuildId == actor.GuildId
-                            && value.Hidden == hidden
-                            && value.Publications.Any(reference
-                                => reference.ChannelId == message.ChannelId && reference.MessageId == message.MessageId))
-            .SingleOrDefaultAsync(token);
+           .Where(value => value.GuildId == actor.GuildId
+                      && value.Hidden == hidden
+                      && value.Publications.Any(reference
+                                                    => reference.ChannelId == message.ChannelId && reference.MessageId == message.MessageId))
+           .SingleOrDefaultAsync(token);
 
         if (ticket is not null)
             await CheckTicketAsync(db, actor, ticket, token);
@@ -187,15 +178,15 @@ public sealed class TicketCoordinator(
         var senior = actor.IsAdministrator || actor.CanViewAuditLog;
 
         List<Ticket> tickets = await db.Tickets
-            .Where(ticket => ticket.GuildId == actor.GuildId
-                             && ticket.SubjectUserId == subject
-                             && (!hidden || ticket.Hidden)
-                             && (senior || !ticket.Hidden))
-            .OrderByDescending(ticket => ticket.CreatedAtUtc)
-            .ThenByDescending(ticket => ticket.Id)
-            .Skip((page - 1) * 10)
-            .Take(11)
-            .ToListAsync(token);
+           .Where(ticket => ticket.GuildId == actor.GuildId
+                      && ticket.SubjectUserId == subject
+                      && (!hidden || ticket.Hidden)
+                      && (senior || !ticket.Hidden))
+           .OrderByDescending(ticket => ticket.CreatedAtUtc)
+           .ThenByDescending(ticket => ticket.Id)
+           .Skip((page - 1) * 10)
+           .Take(11)
+           .ToListAsync(token);
 
         foreach (var ticket in tickets)
             await CheckTicketAsync(db, actor, ticket, token);
@@ -211,11 +202,11 @@ public sealed class TicketCoordinator(
         await EnabledAsync(db, actor.GuildId, token);
 
         IQueryable<Ticket> pending = db.Tickets
-            .Where(ticket => ticket.GuildId == actor.GuildId
-                             && !ticket.Hidden
-                             && !ticket.ReviewExempt
-                             && ticket.ApprovedByUserId == null
-                             && ticket.Action != TicketAction.Note);
+           .Where(ticket => ticket.GuildId == actor.GuildId
+                      && !ticket.Hidden
+                      && !ticket.ReviewExempt
+                      && ticket.ApprovedByUserId == null
+                      && ticket.Action != TicketAction.Note);
 
         long cursor = 0;
         var ready = 0;
@@ -227,10 +218,10 @@ public sealed class TicketCoordinator(
             var cursorAfter = cursor;
 
             List<Ticket> batch = await pending
-                .Where(ticket => ticket.Number > cursorAfter)
-                .OrderBy(ticket => ticket.Number)
-                .Take(100)
-                .ToListAsync(token);
+               .Where(ticket => ticket.Number > cursorAfter)
+               .OrderBy(ticket => ticket.Number)
+               .Take(100)
+               .ToListAsync(token);
 
             if (batch.Count == 0)
                 break;
@@ -287,7 +278,7 @@ public sealed class TicketCoordinator(
             await using var db = await contexts.CreateDbContextAsync(cancellationToken);
 
             var config = await db.TicketConfigurations
-                .SingleOrDefaultAsync(value => value.GuildId == actor.GuildId, cancellationToken);
+               .SingleOrDefaultAsync(value => value.GuildId == actor.GuildId, cancellationToken);
 
             if (config is null)
             {
@@ -314,10 +305,10 @@ public sealed class TicketCoordinator(
                 IQueryable<Ticket> tickets = db.Tickets;
 
                 List<TicketModerator> moderators = await db.TicketModerators
-                    .Where(moderator => tickets.Any(ticket =>
-                        ticket.GuildId == actor.GuildId
-                        && ticket.Id == moderator.ActiveTicketId))
-                    .ToListAsync(cancellationToken);
+                   .Where(moderator => tickets.Any(ticket =>
+                                                       ticket.GuildId == actor.GuildId
+                                                       && ticket.Id == moderator.ActiveTicketId))
+                   .ToListAsync(cancellationToken);
 
                 foreach (var moderator in moderators)
                 {
@@ -341,116 +332,6 @@ public sealed class TicketCoordinator(
             await SaveAsync(db, cancellationToken);
 
             return config;
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    internal async Task AcceptScanAsync(TicketConfiguration scannedConfig, TicketAuditScan scan, DateTimeOffset started, CancellationToken token)
-    {
-        await _gate.WaitAsync(token);
-
-        try
-        {
-            await using var db = await contexts.CreateDbContextAsync(token);
-            var config = await EnabledAsync(db, scannedConfig.GuildId, token);
-
-            if (config.CaptureFromUtc != scannedConfig.CaptureFromUtc)
-                return;
-
-            Dictionary<Guid, ulong> correlations = [];
-
-            foreach (var value in scan.Observations)
-                if (value.OperationId.TryGet(out var correlation))
-                    correlations[correlation] = Math.Max(correlations.GetValueOrDefault(correlation), value.AuditId);
-
-            IEnumerable<IGrouping<ulong, TicketObservation>> groups = scan.Observations.GroupBy(observation => observation.AuditId);
-
-            foreach (IGrouping<ulong, TicketObservation> group in groups)
-            {
-                List<long> affected = [];
-
-                await using (var transaction = await db.Database.BeginTransactionAsync(token))
-                {
-                    foreach (var observation in group)
-                    {
-                        var member = config.ReviewExemptRoleIds.Count == 0
-                            ? null
-                            : await client.Rest.GetGuildUserAsync(config.GuildId, observation.ModeratorUserId, TicketBoundary.Options(token));
-
-                        var exempt = member is not null
-                                     && (config.ReviewExemptRoleIds.Contains(checked((long)config.GuildId))
-                                         || member.RoleIds.Any(id => config.ReviewExemptRoleIds.Contains(checked((long)id))));
-
-                        var result = await Strategy(observation.Action)
-                            .HandleAsync(db, new ObserveModeration(observation, exempt, correlations), token);
-
-                        affected.AddRange(result.TicketIds);
-                    }
-
-                    config.LastAuditId = Math.Max(config.LastAuditId ?? 0, group.Key);
-                    await db.SaveChangesAsync(token);
-                    await transaction.CommitAsync(token);
-                }
-
-                await PublishAsync(config.GuildId, new TicketResult(affected.ToImmutableArray(), string.Empty), token);
-                db.ChangeTracker.Clear();
-                db.Attach(config);
-            }
-
-            config.LastAuditId = Math.Max(config.LastAuditId ?? 0, scan.LastAuditId.TryGet(out var last) ? last : 0);
-            config.LastAuditScanAtUtc = started;
-            await db.SaveChangesAsync(token);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    internal async Task RecoverAsync(ulong guildId, long id, bool auditCurrent, CancellationToken token)
-    {
-        await _gate.WaitAsync(token);
-
-        try
-        {
-            await using var db = await contexts.CreateDbContextAsync(token);
-            var config = await EnabledAsync(db, guildId, token);
-            auditCurrent = auditCurrent && config.LastAuditScanAtUtc >= config.CaptureFromUtc;
-
-            var ticket = await db.Tickets
-                .SingleAsync(value => value.GuildId == guildId && value.Id == id, token);
-
-            if (ticket.Action is not (TicketAction.Note or TicketAction.Kick))
-                await Strategy(ticket.Action).HandleAsync(db, new ReconcileTicket(ticket, auditCurrent), token);
-
-            await db.SaveChangesAsync(token);
-            await publisher.EnsureAsync(guildId, id, token);
-        }
-        finally
-        {
-            _gate.Release();
-        }
-    }
-
-    internal async Task SuspendRestrictionsAsync(ulong guildId, CancellationToken token)
-    {
-        await _gate.WaitAsync(token);
-
-        try
-        {
-            await using var db = await contexts.CreateDbContextAsync(token);
-
-            await db.Tickets
-                .Where(ticket => ticket.GuildId == guildId
-                                 && (ticket.Action == TicketAction.Ban
-                                     || ticket.Action == TicketAction.VoiceMute
-                                     || ticket.Action == TicketAction.VoiceDeafen
-                                     || ticket.Action == TicketAction.Role)
-                                 && ticket.Status == TicketStatus.Active)
-                .ExecuteUpdateAsync(update => update.SetProperty(ticket => ticket.ExpirySuspended, true), token);
         }
         finally
         {
@@ -491,6 +372,181 @@ public sealed class TicketCoordinator(
         }
     }
 
+    public void Dispose() => _gate.Dispose();
+
+    internal static async Task<TicketConfiguration> EnabledAsync(BotDbContext db, ulong guildId, CancellationToken token)
+    {
+        var config = await db.TicketConfigurations
+           .SingleOrDefaultAsync(value => value.GuildId == guildId, token);
+
+        return config is { Enabled: true, DestinationChannelId: not null }
+            ? config
+            : throw new BotCommandException("Tickets are not enabled in this server.");
+    }
+
+    internal async Task AcceptScanAsync(TicketConfiguration scannedConfig, TicketAuditScan scan, DateTimeOffset started, CancellationToken token)
+    {
+        await _gate.WaitAsync(token);
+
+        try
+        {
+            await using var db = await contexts.CreateDbContextAsync(token);
+            var config = await EnabledAsync(db, scannedConfig.GuildId, token);
+
+            if (config.CaptureFromUtc != scannedConfig.CaptureFromUtc)
+                return;
+
+            Dictionary<Guid, ulong> correlations = [];
+
+            foreach (var value in scan.Observations)
+                if (value.OperationId.TryGet(out var correlation))
+                    correlations[correlation] = Math.Max(correlations.GetValueOrDefault(correlation), value.AuditId);
+
+            IEnumerable<IGrouping<ulong, TicketObservation>> groups = scan.Observations.GroupBy(observation => observation.AuditId);
+
+            foreach (IGrouping<ulong, TicketObservation> group in groups)
+            {
+                List<long> affected = [];
+
+                await using (var transaction = await db.Database.BeginTransactionAsync(token))
+                {
+                    foreach (var observation in group)
+                    {
+                        var member = config.ReviewExemptRoleIds.Count == 0
+                            ? null
+                            : await client.Rest.GetGuildUserAsync(config.GuildId, observation.ModeratorUserId, TicketBoundary.Options(token));
+
+                        var exempt = member is not null
+                            && (config.ReviewExemptRoleIds.Contains(checked((long)config.GuildId))
+                                || member.RoleIds.Any(id => config.ReviewExemptRoleIds.Contains(checked((long)id))));
+
+                        var result = await Strategy(observation.Action)
+                           .HandleAsync(db, new ObserveModeration(observation, exempt, correlations), token);
+
+                        affected.AddRange(result.TicketIds);
+                    }
+
+                    config.LastAuditId = Math.Max(config.LastAuditId ?? 0, group.Key);
+                    await db.SaveChangesAsync(token);
+                    await transaction.CommitAsync(token);
+                }
+
+                await PublishAsync(config.GuildId, new TicketResult(affected.ToImmutableArray(), string.Empty), token);
+                db.ChangeTracker.Clear();
+                db.Attach(config);
+            }
+
+            config.LastAuditId = Math.Max(config.LastAuditId ?? 0, scan.LastAuditId.TryGet(out var last) ? last : 0);
+            config.LastAuditScanAtUtc = started;
+            await db.SaveChangesAsync(token);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    internal async Task RecoverAsync(ulong guildId, long id, bool auditCurrent, CancellationToken token)
+    {
+        await _gate.WaitAsync(token);
+
+        try
+        {
+            await using var db = await contexts.CreateDbContextAsync(token);
+            var config = await EnabledAsync(db, guildId, token);
+            auditCurrent = auditCurrent && config.LastAuditScanAtUtc >= config.CaptureFromUtc;
+
+            var ticket = await db.Tickets
+               .SingleAsync(value => value.GuildId == guildId && value.Id == id, token);
+
+            if (ticket.Action is not (TicketAction.Note or TicketAction.Kick))
+                await Strategy(ticket.Action).HandleAsync(db, new ReconcileTicket(ticket, auditCurrent), token);
+
+            await db.SaveChangesAsync(token);
+            await publisher.EnsureAsync(guildId, id, token);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    internal async Task ScheduleTimeoutChecksAsync(ulong guildId, ulong userId, CancellationToken token)
+    {
+        await _gate.WaitAsync(token);
+
+        try
+        {
+            await using var db = await contexts.CreateDbContextAsync(token);
+
+            await db.Tickets
+               .Where(ticket => ticket.GuildId == guildId
+                          && (userId == 0 || ticket.SubjectUserId == userId)
+                          && ticket.Action == TicketAction.Timeout
+                          && ticket.Status == TicketStatus.Active)
+               .ExecuteUpdateAsync(update => update.SetProperty(ticket => ticket.TimeoutCheckAtUtc, DateTimeOffset.UtcNow), token);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    internal async Task SuspendRestrictionsAsync(ulong guildId, CancellationToken token)
+    {
+        await _gate.WaitAsync(token);
+
+        try
+        {
+            await using var db = await contexts.CreateDbContextAsync(token);
+
+            await db.Tickets
+               .Where(ticket => ticket.GuildId == guildId
+                          && (ticket.Action == TicketAction.Ban
+                              || ticket.Action == TicketAction.Timeout
+                              || ticket.Action == TicketAction.VoiceMute
+                              || ticket.Action == TicketAction.VoiceDeafen
+                              || ticket.Action == TicketAction.Role)
+                          && !ticket.ExpirySuspended
+                          && ticket.Status == TicketStatus.Active)
+               .ExecuteUpdateAsync(
+                    update => update
+                       .SetProperty(ticket => ticket.ExpirySuspended, true)
+                       .SetProperty(
+                            ticket => ticket.Version,
+                            ticket => ticket.Action == TicketAction.Timeout ? ticket.Version + 1 : ticket.Version),
+                    token);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private static void RequireStaff(TicketActor actor, bool hidden)
+    {
+        var staff = actor.IsAdministrator
+            || actor.CanViewAuditLog
+            || actor.CanTimeoutMembers
+            || actor.CanBanMembers
+            || actor.CanKickMembers
+            || actor.CanMuteMembers
+            || actor.CanDeafenMembers
+            || actor.CanManageRoles;
+
+        if (actor.UserId == 0 || actor.GuildId == 0 || !staff || (hidden && actor is { IsAdministrator: false, CanViewAuditLog: false }))
+            throw new BotCommandException("Staff access is required; hidden tickets require View Audit Log or Administrator.");
+    }
+
+    private async Task PrepareNoteAsync(BotDbContext db, TicketActor actor, ulong subject, CancellationToken token)
+    {
+        if (subject == 0 || actor.UserId == 0 || actor is { IsAdministrator: false, CanViewAuditLog: false, CanTimeoutMembers: false })
+            throw new BotCommandException("Creating notes requires Moderate Members or Administrator and a valid subject.");
+
+        var config = await EnabledAsync(db, actor.GuildId, token);
+        await CheckReadAsync(actor, config.DestinationChannelId!.Value, token);
+    }
+
     private ITicketStrategy Strategy(TicketAction action) => action switch
     {
         TicketAction.Note => notes,
@@ -519,8 +575,8 @@ public sealed class TicketCoordinator(
             throw new BotCommandException("Supply a positive ticket number.");
 
         var ticket = await db.Tickets
-                         .SingleOrDefaultAsync(value => value.GuildId == actor.GuildId && value.Number == number, token)
-                     ?? throw new BotCommandException("No matching ticket in this server.");
+               .SingleOrDefaultAsync(value => value.GuildId == actor.GuildId && value.Number == number, token)
+            ?? throw new BotCommandException("No matching ticket in this server.");
 
         await CheckTicketAsync(db, actor, ticket, token);
 
@@ -533,9 +589,9 @@ public sealed class TicketCoordinator(
         var config = await EnabledAsync(db, actor.GuildId, token);
 
         var channel = ticket.Publications
-                          .FirstOrDefault(reference => reference is { Current: true, Removed: false })
-                          ?.ChannelId
-                      ?? config.DestinationChannelId!.Value;
+               .FirstOrDefault(reference => reference is { Current: true, Removed: false })
+              ?.ChannelId
+            ?? config.DestinationChannelId!.Value;
 
         await CheckReadAsync(actor, channel, token);
     }
@@ -548,31 +604,6 @@ public sealed class TicketCoordinator(
 
         if (channel is null || member?.GetPermissions(channel).ViewChannel != true)
             throw new BotCommandException("You must be able to view the tickets channel to access its records.");
-    }
-
-    internal static async Task<TicketConfiguration> EnabledAsync(BotDbContext db, ulong guildId, CancellationToken token)
-    {
-        var config = await db.TicketConfigurations
-            .SingleOrDefaultAsync(value => value.GuildId == guildId, token);
-
-        return config is { Enabled: true, DestinationChannelId: not null }
-            ? config
-            : throw new BotCommandException("Tickets are not enabled in this server.");
-    }
-
-    private static void RequireStaff(TicketActor actor, bool hidden)
-    {
-        var staff = actor.IsAdministrator
-                    || actor.CanViewAuditLog
-                    || actor.CanTimeoutMembers
-                    || actor.CanBanMembers
-                    || actor.CanKickMembers
-                    || actor.CanMuteMembers
-                    || actor.CanDeafenMembers
-                    || actor.CanManageRoles;
-
-        if (actor.UserId == 0 || actor.GuildId == 0 || !staff || (hidden && actor is { IsAdministrator: false, CanViewAuditLog: false }))
-            throw new BotCommandException("Staff access is required; hidden tickets require View Audit Log or Administrator.");
     }
 
     private async Task SaveAsync(BotDbContext db, CancellationToken token)
@@ -588,6 +619,4 @@ public sealed class TicketCoordinator(
             throw new BotCommandException("Saving could not be confirmed. Read the saved ticket before retrying.", exception);
         }
     }
-
-    public void Dispose() => _gate.Dispose();
 }

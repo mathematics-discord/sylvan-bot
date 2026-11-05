@@ -11,6 +11,8 @@ public sealed class TicketOperation
 
     public DateTimeOffset? ExpiryUtc { get; set; }
 
+    public DateTimeOffset? NativeExpiryUtc { get; set; }
+
     public ulong? RequestedBy { get; set; }
 
     public DateTimeOffset RequestedAtUtc { get; set; } = DateTimeOffset.UtcNow;

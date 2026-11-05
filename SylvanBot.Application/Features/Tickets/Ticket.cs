@@ -1,3 +1,5 @@
+using static SylvanBot.Application.Features.Tickets.TicketOperationCommand;
+
 namespace SylvanBot.Application.Features.Tickets;
 
 using static System.StringComparison;
@@ -26,6 +28,10 @@ public sealed class Ticket
     public long? DurationSeconds { get; private set; }
 
     public DateTimeOffset? ExpiresAtUtc { get; private set; }
+
+    public DateTimeOffset? AppliedTimeoutUntilUtc { get; private set; }
+
+    public DateTimeOffset? TimeoutCheckAtUtc { get; set; }
 
     public TicketStatus Status { get; private set; }
 
@@ -65,25 +71,40 @@ public sealed class Ticket
 
     [NotMapped]
     public bool Complete => !string.IsNullOrWhiteSpace(Comment)
-                            && (Action != TicketAction.Timeout
-                                || (DurationSeconds is > 0 && ExpiresAtUtc is not null));
+        && (Action != TicketAction.Timeout
+            || (DurationSeconds is > 0 && ExpiresAtUtc is not null));
+
+    public static DateTimeOffset NativeTimeoutExpiry(DateTimeOffset expiry, DateTimeOffset now)
+    {
+        var limit = now.AddDays(28).AddMinutes(-1);
+        var target = expiry < limit ? expiry : limit;
+
+        // Discord's returned timestamps have millisecond precision; recovery compares exactly.
+        return DateTimeOffset.FromUnixTimeMilliseconds(target.ToUnixTimeMilliseconds());
+    }
+
+    public static void ValidateComment(string comment)
+    {
+        if (string.IsNullOrWhiteSpace(comment) || comment.Length > CommentLimit)
+            throw new BotCommandException($"Comments must contain 1 to {CommentLimit} characters.");
+    }
 
     public bool CanCorrect(TicketActor actor) => actor.GuildId == GuildId
-                                                 && actor.UserId != 0
-                                                 && (actor.IsAdministrator
-                                                     || actor.CanViewAuditLog
-                                                     || (Action == TicketAction.Note && actor.CanTimeoutMembers)
-                                                     || (actor.UserId == ModeratorUserId
-                                                         && Action switch
-                                                         {
-                                                             TicketAction.Timeout => actor.CanTimeoutMembers,
-                                                             TicketAction.Ban => actor.CanBanMembers,
-                                                             TicketAction.VoiceMute => actor.CanMuteMembers,
-                                                             TicketAction.VoiceDeafen => actor.CanDeafenMembers,
-                                                             TicketAction.Kick => actor.CanKickMembers,
-                                                             TicketAction.Role => actor.CanManageRoles,
-                                                             _ => false,
-                                                         }));
+        && actor.UserId != 0
+        && (actor.IsAdministrator
+            || actor.CanViewAuditLog
+            || (Action == TicketAction.Note && actor.CanTimeoutMembers)
+            || (actor.UserId == ModeratorUserId
+                && Action switch
+                {
+                    TicketAction.Timeout => actor.CanTimeoutMembers,
+                    TicketAction.Ban => actor.CanBanMembers,
+                    TicketAction.VoiceMute => actor.CanMuteMembers,
+                    TicketAction.VoiceDeafen => actor.CanDeafenMembers,
+                    TicketAction.Kick => actor.CanKickMembers,
+                    TicketAction.Role => actor.CanManageRoles,
+                    _ => false,
+                }));
 
     public void RequireEdit(TicketActor actor, int version)
     {
@@ -99,12 +120,12 @@ public sealed class Ticket
 
     public string ValidateEdit(TicketDetails details, DateTimeOffset now)
     {
-        if (details.Duration is null || details.Comment is null)
+        if (details.Duration.Value is null || details.Comment.Value is null)
             throw new BotCommandException("Duration and comment edit choices are required.");
 
         var comment = details.Comment.Apply(Comment);
 
-        if (details.Comment is not TicketCommentEdit.Keep)
+        if (details.Comment.Value is not TicketCommentEdit.Keep)
             ValidateComment(comment);
 
         if (!details.HasDuration)
@@ -163,7 +184,7 @@ public sealed class Ticket
 
     public void Approve(TicketActor actor, int version)
     {
-        if (actor.GuildId != GuildId || actor.UserId == 0 || (!actor.IsAdministrator && !actor.CanViewAuditLog))
+        if (actor.GuildId != GuildId || actor.UserId == 0 || actor is { IsAdministrator: false, CanViewAuditLog: false })
             throw new BotCommandException("Approval requires Administrator or View Audit Log.");
 
         if (version != Version || Hidden || !Complete || Pending is not null)
@@ -210,11 +231,40 @@ public sealed class Ticket
 
     public void BeginTimeoutChange(TicketOperation operation)
     {
-        if (Action != TicketAction.Timeout || Pending is not null || operation.Command is not TicketOperationCommand.ChangeTimeout)
+        if (Action != TicketAction.Timeout || Pending is not null || operation.Command.Value is not ChangeTimeout)
             throw new BotCommandException("This ticket cannot accept that pending change.");
 
         Pending = operation;
         Version++;
+    }
+
+    public bool NeedsTimeoutRenewal(DateTimeOffset now) => Action == TicketAction.Timeout
+        && Status == TicketStatus.Active
+        && !ExpirySuspended
+        && ExpiresAtUtc > now
+        && (AppliedTimeoutUntilUtc is null
+            || (AppliedTimeoutUntilUtc < ExpiresAtUtc && AppliedTimeoutUntilUtc <= now.AddDays(7)));
+
+    public void ObserveTimeoutWindow(DateTimeOffset expiry, DateTimeOffset now)
+    {
+        AppliedTimeoutUntilUtc = expiry;
+        TimeoutCheckAtUtc = ExpiresAtUtc < now.AddDays(1) ? ExpiresAtUtc : now.AddDays(1);
+    }
+
+    public void ConfirmTimeoutChange(DateTimeOffset now)
+    {
+        var pending = Pending ?? throw new InvalidOperationException("No timeout change is pending.");
+
+        if (pending.Command.Value is not ChangeTimeout change)
+            throw new InvalidOperationException("The pending operation is not a timeout change.");
+
+        SetDuration(Math.Max(1, (long)Math.Ceiling((change.ExpiryUtc - CreatedAtUtc).TotalSeconds)), pending.RequestedBy, change.ExpiryUtc);
+        ObserveTimeoutWindow(pending.NativeExpiryUtc ?? change.ExpiryUtc, now);
+
+        if (change.ExpiryUtc <= now)
+            End(TicketStatus.Expired, pending.RequestedBy);
+
+        Pending = null;
     }
 
     public void Initialise(string comment, long? seconds, DateTimeOffset? expiry = null)
@@ -226,8 +276,10 @@ public sealed class Ticket
         if (comment.Length > CommentLimit)
             throw new BotCommandException("The comment is too long.");
 
-        InitialPromptPending = SourceAuditId is not null && !ReminderExempt
-                               && Action is TicketAction.Ban or TicketAction.Timeout;
+        InitialPromptPending = SourceAuditId is not null
+            && !ReminderExempt
+            && Action is TicketAction.Ban or TicketAction.Timeout;
+
         Comment = comment;
         DurationSeconds = seconds;
         ExpiresAtUtc = expiry ?? (seconds is { } finite ? CreatedAtUtc.AddSeconds(finite) : null);
@@ -238,11 +290,8 @@ public sealed class Ticket
             TicketAction.Kick => TicketStatus.Applied,
             _ => TicketStatus.Active,
         };
-    }
 
-    public static void ValidateComment(string comment)
-    {
-        if (string.IsNullOrWhiteSpace(comment) || comment.Length > CommentLimit)
-            throw new BotCommandException($"Comments must contain 1 to {CommentLimit} characters.");
+        if (Action == TicketAction.Timeout && ExpiresAtUtc is { } timeoutExpiry)
+            ObserveTimeoutWindow(timeoutExpiry, CreatedAtUtc);
     }
 }

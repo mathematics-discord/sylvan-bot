@@ -65,7 +65,7 @@ public sealed class TicketTests
     }
 
     [TestCase("permanent", "Replacement")]
-    [TestCase("29 days", "Replacement")]
+    [TestCase("10000 years", "Replacement")]
     public void ValidateEdit_InvalidCombinedTimeoutEdit_PreservesAllFields(string duration, string comment)
     {
         // Arrange

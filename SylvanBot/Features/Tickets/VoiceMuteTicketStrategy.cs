@@ -11,17 +11,17 @@ public sealed class VoiceMuteTicketStrategy(DiscordSocketClient client, TicketBo
 
     public async Task<TicketResult> HandleAsync(BotDbContext db, TicketRequest request, CancellationToken token)
     {
-        if (request is ObserveModeration observed)
+        if (request.Value is ObserveModeration observed)
             return await BanTicketStrategy.RecordObservedAsync(db, observed, token);
 
-        if (request is EditDetails edit)
+        if (request.Value is EditDetails edit)
         {
             edit.Ticket.SetDuration(edit.Details.DurationSeconds == long.MaxValue ? null : edit.Details.DurationSeconds, edit.Actor.UserId);
             await db.SaveChangesAsync(token);
             return new TicketResult([edit.Ticket.Id], "Duration saved. Expiry will follow audit reconciliation.");
         }
 
-        if (request is not ReconcileTicket recovery)
+        if (request.Value is not ReconcileTicket recovery)
             throw new ArgumentException("Unsupported voice request.", nameof(request));
 
         var ticket = recovery.Ticket;
@@ -49,7 +49,7 @@ public sealed class VoiceMuteTicketStrategy(DiscordSocketClient client, TicketBo
             return new TicketResult([], "A newer voice change awaits reconciliation.");
 
         var member = await client.Rest.GetGuildUserAsync(ticket.GuildId, ticket.SubjectUserId, TicketBoundary.Options(token));
-        if (member is null || !member.IsMuted)
+        if (member?.IsMuted != true)
         {
             ticket.End(TicketStatus.Expired);
             ticket.Pending = null;

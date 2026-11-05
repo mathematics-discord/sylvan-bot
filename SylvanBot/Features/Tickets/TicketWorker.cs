@@ -1,6 +1,7 @@
 namespace SylvanBot.Features.Tickets;
 
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Gateway;
 using SylvanBot.Application.Infrastructure.Data;
@@ -14,6 +15,7 @@ public sealed class TicketWorker(
 {
     private readonly SemaphoreSlim _wake = new SemaphoreSlim(0, 1);
     private readonly ILogger _logger = logger.ForContext<TicketWorker>();
+    private readonly ConcurrentDictionary<(ulong Guild, ulong User), byte> _timeoutChecks = new ConcurrentDictionary<(ulong, ulong), byte>();
     private bool _ready;
 
     public Task InitializeAsync(CancellationToken ct)
@@ -21,6 +23,8 @@ public sealed class TicketWorker(
         client.Ready += OnReadyAsync;
         client.AuditLogCreated += OnAuditAsync;
         client.UserVoiceStateUpdated += OnVoiceAsync;
+        client.UserJoined += OnJoinedAsync;
+        client.Connected += OnConnectedAsync;
 
         return Task.CompletedTask;
     }
@@ -30,6 +34,8 @@ public sealed class TicketWorker(
         client.Ready -= OnReadyAsync;
         client.AuditLogCreated -= OnAuditAsync;
         client.UserVoiceStateUpdated -= OnVoiceAsync;
+        client.UserJoined -= OnJoinedAsync;
+        client.Connected -= OnConnectedAsync;
     }
 
     public void Wake()
@@ -42,6 +48,18 @@ public sealed class TicketWorker(
         {
             // One pending wake-up already covers the durable work.
         }
+    }
+
+    public override async Task StopAsync(CancellationToken cancellationToken)
+    {
+        Unsubscribe();
+        await base.StopAsync(cancellationToken);
+    }
+
+    public override void Dispose()
+    {
+        _wake.Dispose();
+        base.Dispose();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -57,6 +75,12 @@ public sealed class TicketWorker(
 
                 try
                 {
+                    foreach (var check in _timeoutChecks.Keys)
+                    {
+                        await coordinator.ScheduleTimeoutChecksAsync(check.Guild, check.User, stoppingToken);
+                        _timeoutChecks.TryRemove(check, out _);
+                    }
+
                     await ProcessGuildsAsync(stoppingToken);
                     await ProcessModeratorsAsync(stoppingToken);
                 }
@@ -79,18 +103,6 @@ public sealed class TicketWorker(
         }
     }
 
-    public override async Task StopAsync(CancellationToken cancellationToken)
-    {
-        Unsubscribe();
-        await base.StopAsync(cancellationToken);
-    }
-
-    public override void Dispose()
-    {
-        _wake.Dispose();
-        base.Dispose();
-    }
-
     private Task OnVoiceAsync(SocketUser user, SocketVoiceState before, SocketVoiceState after)
     {
         Wake();
@@ -100,6 +112,21 @@ public sealed class TicketWorker(
     private Task OnReadyAsync()
     {
         _ready = true;
+        return OnConnectedAsync();
+    }
+
+    private Task OnConnectedAsync()
+    {
+        foreach (var guild in client.Guilds)
+            _timeoutChecks.TryAdd((guild.Id, 0), 0);
+
+        Wake();
+        return Task.CompletedTask;
+    }
+
+    private Task OnJoinedAsync(SocketGuildUser user)
+    {
+        _timeoutChecks.TryAdd((user.Guild.Id, user.Id), 0);
         Wake();
 
         return Task.CompletedTask;
@@ -175,6 +202,9 @@ public sealed class TicketWorker(
                                          && ticket.Id > after
                                          && (ticket.Pending != null
                                              || (ticket.Status == TicketStatus.Active && !ticket.ExpirySuspended && ticket.ExpiresAtUtc <= now)
+                                             || (ticket.Action == TicketAction.Timeout
+                                                 && ticket.Status == TicketStatus.Active && !ticket.ExpirySuspended
+                                                 && (ticket.TimeoutCheckAtUtc == null || ticket.TimeoutCheckAtUtc <= now))
                                              || (!ticket.Hidden
                                                  && !ticket.SendUncertain
                                                  && !ticket.Publications.Any(reference => reference.Current && !reference.Removed && reference.Revision == ticket.Version))

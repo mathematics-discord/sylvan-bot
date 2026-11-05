@@ -11,45 +11,50 @@ public sealed class VoiceDeafenTicketStrategy(DiscordSocketClient client, Ticket
 
     public async Task<TicketResult> HandleAsync(BotDbContext db, TicketRequest request, CancellationToken token)
     {
-        if (request is ObserveModeration observed)
+        if (request.Value is ObserveModeration observed)
             return await BanTicketStrategy.RecordObservedAsync(db, observed, token);
 
-        if (request is EditDetails edit)
+        if (request.Value is EditDetails edit)
         {
             edit.Ticket.SetDuration(edit.Details.DurationSeconds == long.MaxValue ? null : edit.Details.DurationSeconds, edit.Actor.UserId);
             await db.SaveChangesAsync(token);
+
             return new TicketResult([edit.Ticket.Id], "Duration saved. Expiry will follow audit reconciliation.");
         }
 
-        if (request is not ReconcileTicket recovery)
+        if (request.Value is not ReconcileTicket(var ticket, var auditCurrent))
             throw new ArgumentException("Unsupported voice request.", nameof(request));
 
-        var ticket = recovery.Ticket;
         if (ticket.SourceAuditId is null)
             ticket.ExpirySuspended = true;
 
         if (ticket.Status != TicketStatus.Active)
         {
             ticket.Pending = null;
+
             return new TicketResult([], string.Empty);
         }
 
-        if (!recovery.AuditCurrent || ticket.ExpirySuspended || ticket.ExpiresAtUtc is null || ticket.ExpiresAtUtc > DateTimeOffset.UtcNow)
+        if (!auditCurrent || ticket.ExpirySuspended || ticket.ExpiresAtUtc is null || ticket.ExpiresAtUtc > DateTimeOffset.UtcNow)
             return new TicketResult([], string.Empty);
 
         var config = await db.TicketConfigurations
-            .SingleAsync(value => value.GuildId == ticket.GuildId, token);
+           .SingleAsync(value => value.GuildId == ticket.GuildId, token);
+
         var scan = await boundary.ReadAuditAsync(ticket.GuildId, config.LastAuditScanAtUtc!.Value.AddMinutes(-10), token);
+
         var newer = scan.Observations
-            .Any(value => value.Action == Action && value.SubjectUserId == ticket.SubjectUserId
-                && value.AuditId > ticket.LastAuditId
-                && (!value.OperationId.HasValue || ticket.Pending == null || value.OperationId.Value != ticket.Pending.Id));
+           .Any(value => value.Action == Action
+                    && value.SubjectUserId == ticket.SubjectUserId
+                    && value.AuditId > ticket.LastAuditId
+                    && (!value.OperationId.HasValue || ticket.Pending == null || value.OperationId.Value != ticket.Pending.Id));
 
         if (newer)
             return new TicketResult([], "A newer voice change awaits reconciliation.");
 
         var member = await client.Rest.GetGuildUserAsync(ticket.GuildId, ticket.SubjectUserId, TicketBoundary.Options(token));
-        if (member is null || !member.IsDeafened)
+
+        if (member?.IsDeafened != true)
         {
             ticket.End(TicketStatus.Expired);
             ticket.Pending = null;
@@ -61,8 +66,10 @@ public sealed class VoiceDeafenTicketStrategy(DiscordSocketClient client, Ticket
                 ticket.Pending = new TicketOperation { Kind = "RemoveVoiceDeafen" };
                 ticket.Record(TicketHistoryAction.AuditObserved);
             }
+
             await db.SaveChangesAsync(token);
             var connected = client.GetGuild(ticket.GuildId)?.GetUser(ticket.SubjectUserId)?.VoiceChannel is not null;
+
             if (!connected)
                 return new TicketResult([ticket.Id], "Expiry is waiting for the member to reconnect to voice.");
 
@@ -84,16 +91,19 @@ public sealed class VoiceDeafenTicketStrategy(DiscordSocketClient client, Ticket
             catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden)
             {
                 logger.Warning("Voice expiry blocked for ticket {TicketId}: {Code}", ticket.Id, exception.DiscordCode);
+
                 return new TicketResult([ticket.Id], "Voice expiry remains pending. Check voice connection and permissions.");
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 logger.Warning("Voice expiry uncertain for ticket {TicketId}: {Failure}", ticket.Id, exception.GetType().Name);
+
                 return new TicketResult([ticket.Id], "Voice expiry could not be confirmed; recovery will reconcile it.");
             }
         }
 
         await db.SaveChangesAsync(token);
+
         return new TicketResult([ticket.Id], "Voice expiry reconciled.");
     }
 }

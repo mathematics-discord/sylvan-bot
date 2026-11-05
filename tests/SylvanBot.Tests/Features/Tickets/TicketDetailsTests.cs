@@ -1,4 +1,4 @@
-namespace SylvanBot.Tests.Features.Tickets;
+﻿namespace SylvanBot.Tests.Features.Tickets;
 
 using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
@@ -158,15 +158,17 @@ public sealed class TicketDetailsTests
     }
 
     [Test]
-    public void TimeoutExpiry_BeyondDiscordLimit_RejectsWithoutClamping()
+    public void TimeoutExpiry_BeyondDiscordLimit_PreservesFullDuration()
     {
         // Arrange
         var now = DateTimeOffset.UtcNow;
         var details = TicketDetails.ParseReply("29 days");
 
         // Act
+        var expiry = details.TimeoutExpiry(now, now);
+
         // Assert
-        Should.Throw<BotCommandException>(() => details.TimeoutExpiry(now, now));
+        expiry.ShouldBe(now.AddDays(29));
     }
 
     [Test]
@@ -184,7 +186,7 @@ public sealed class TicketDetailsTests
     }
 
     [Test]
-    public void TimeoutExpiry_OldActionTime_AppliesLimitFromNow()
+    public void TimeoutExpiry_OldActionTime_UsesOriginalActionTime()
     {
         // Arrange
         var now = DateTimeOffset.UtcNow;

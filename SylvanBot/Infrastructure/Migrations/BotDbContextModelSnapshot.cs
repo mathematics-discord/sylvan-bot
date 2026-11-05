@@ -390,6 +390,9 @@ namespace SylvanBot.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("AppliedTimeoutUntilUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("ApprovedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
@@ -460,6 +463,9 @@ namespace SylvanBot.Infrastructure.Migrations
 
                     b.Property<long?>("SupersededByNumber")
                         .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("TimeoutCheckAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
@@ -740,6 +746,9 @@ namespace SylvanBot.Infrastructure.Migrations
                             b1.Property<string>("Kind")
                                 .IsRequired()
                                 .HasColumnType("text");
+
+                            b1.Property<DateTimeOffset?>("NativeExpiryUtc")
+                                .HasColumnType("timestamp with time zone");
 
                             b1.Property<DateTimeOffset>("RequestedAtUtc")
                                 .HasColumnType("timestamp with time zone");

@@ -18,7 +18,7 @@ public sealed record TicketDetails
 
     public TicketDetails(TicketDurationEdit duration, TicketCommentEdit comment)
     {
-        if (duration is null || comment is null)
+        if (duration.Value is null || comment.Value is null)
             throw new BotCommandException("Duration and comment edit choices are required.");
 
         Duration = duration;
@@ -26,16 +26,17 @@ public sealed record TicketDetails
     }
 
     public TicketDurationEdit Duration { get; init; }
-    public TicketCommentEdit Comment { get; init; }
-    public bool HasDuration => Duration is TicketDurationEdit.Set or TicketDurationEdit.Permanent;
-    public long DurationSeconds => Duration switch
+    public TicketCommentEdit Comment { get; private init; }
+    public bool HasDuration => Duration.Value is TicketDurationEdit.Set or TicketDurationEdit.Permanent;
+
+    public long DurationSeconds => Duration.Value switch
     {
-        TicketDurationEdit.Set duration when duration.Seconds > 0 => duration.Seconds,
+        TicketDurationEdit.Set { Seconds: > 0 } duration => duration.Seconds,
         TicketDurationEdit.Permanent => long.MaxValue,
         _ => throw new BotCommandException("A positive duration is required."),
     };
 
-    static public TicketDetails ParseReply(string text)
+    public static TicketDetails ParseReply(string text)
     {
         if (text.Length > Ticket.CommentLimit + 200)
             throw new BotCommandException("The reply is too long. Nothing was changed.");
@@ -63,17 +64,20 @@ public sealed record TicketDetails
                     throw new BotCommandException("Duration items must be positive. Nothing was changed.");
 
                 var unit = match.Groups["unit"].Value;
-                var multiplier = string.Equals(unit, "M", StringComparison.Ordinal) ? 2592000 : unit.ToLowerInvariant() switch
-                {
-                    "s" or "sec" or "secs" or "second" or "seconds" => 1,
-                    "m" or "min" or "mins" or "minute" or "minutes" => 60,
-                    "h" or "hr" or "hrs" or "hour" or "hours" => 3600,
-                    "d" or "day" or "days" => 86400,
-                    "w" or "week" or "weeks" => 604800,
-                    "month" or "months" => 2592000,
-                    "y" or "year" or "years" => 31536000,
-                    _ => throw new BotCommandException("Unknown duration unit. Nothing was changed."),
-                };
+
+                var multiplier = string.Equals(unit, "M", StringComparison.Ordinal)
+                    ? 2592000
+                    : unit.ToLowerInvariant() switch
+                    {
+                        "s" or "sec" or "secs" or "second" or "seconds" => 1,
+                        "m" or "min" or "mins" or "minute" or "minutes" => 60,
+                        "h" or "hr" or "hrs" or "hour" or "hours" => 3600,
+                        "d" or "day" or "days" => 86400,
+                        "w" or "week" or "weeks" => 604800,
+                        "month" or "months" => 2592000,
+                        "y" or "year" or "years" => 31536000,
+                        _ => throw new BotCommandException("Unknown duration unit. Nothing was changed."),
+                    };
 
                 seconds = checked(seconds + checked(amount * multiplier));
                 offset = match.Index + match.Length;
@@ -92,7 +96,7 @@ public sealed record TicketDetails
 
         var comment = ReadComment(remainder);
 
-        if (offset == 0 && comment is TicketCommentEdit.Keep)
+        if (offset == 0 && comment.Value is TicketCommentEdit.Keep)
             throw new BotCommandException("Supply a duration or a nonblank comment. Nothing was changed.");
 
         return new TicketDetails(offset > 0 ? new TicketDurationEdit.Set(seconds) : new TicketDurationEdit.Keep(), comment);
@@ -101,11 +105,13 @@ public sealed record TicketDetails
     public static TicketDetails ParseFields(string? duration, string? comment)
     {
         if (duration is null)
-            return new TicketDetails(new TicketDurationEdit.Keep(), comment is null ? new TicketCommentEdit.Keep() : new TicketCommentEdit.Replace(RequireComment(comment)));
+            return new TicketDetails(
+                new TicketDurationEdit.Keep(),
+                comment is null ? new TicketCommentEdit.Keep() : new TicketCommentEdit.Replace(RequireComment(comment)));
 
         var details = ParseReply(duration);
 
-        if (!details.HasDuration || details.Comment is not TicketCommentEdit.Keep)
+        if (!details.HasDuration || details.Comment.Value is not TicketCommentEdit.Keep)
             throw new BotCommandException("The duration field must contain only a duration or 'permanent'. Nothing was changed.");
 
         return details with { Comment = comment is null ? new TicketCommentEdit.Keep() : new TicketCommentEdit.Replace(RequireComment(comment)) };
@@ -132,9 +138,6 @@ public sealed record TicketDetails
 
         if (expiry == DateTimeOffset.MaxValue)
             throw new BotCommandException("Discord timeouts cannot be permanent. Nothing was changed.");
-
-        if (expiry > now.AddDays(28))
-            throw new BotCommandException("Discord timeouts cannot end more than 28 days from now. Nothing was changed.");
 
         return expiry;
     }

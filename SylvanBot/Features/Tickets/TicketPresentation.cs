@@ -24,7 +24,7 @@ internal static class TicketPresentation
     {
         var builder = new ComponentBuilder();
         var moderation = UsesModerationEmbed(ticket);
-        var senior = actor is null || actor.IsAdministrator || actor.CanViewAuditLog;
+        var senior = actor?.IsAdministrator != false || actor.CanViewAuditLog;
         var canEditStoredType = actor is not null && (actor.IsAdministrator || actor.CanViewAuditLog);
 
         if (ticket.Action == TicketAction.Note || moderation || canEditStoredType)
@@ -154,7 +154,8 @@ internal static class TicketPresentation
         if (ticket.Pending is not null)
             embed.AddField("Pending", "Expiry or a Discord change is awaiting confirmation.");
         if (ticket.ExpirySuspended)
-            embed.AddField("Expiry paused", "Confirm the duration after audit recovery.");
+            embed.AddField(ticket.Action == TicketAction.Timeout ? "Enforcement paused" : "Expiry paused",
+                "Confirm the duration after audit recovery.");
 
         AddHistory(embed, ticket);
 
@@ -162,6 +163,27 @@ internal static class TicketPresentation
             AddStoredActionFields(embed, ticket);
 
         return embed.Build();
+    }
+
+    internal static string OperationalDetails(Ticket ticket)
+    {
+        var text = ticket.Complete ? "Details complete." : "A nonblank comment is required.";
+
+        if (ticket.ReminderExempt)
+            text += " Automated action; no moderator reminder required.";
+
+        if (ticket.Pending is not null)
+            text += " A Discord change is awaiting reconciliation.";
+
+        if (ticket.ExpirySuspended)
+            text += ticket.Action == TicketAction.Timeout
+                ? " Timeout enforcement is paused until the duration is confirmed."
+                : " Automatic expiry is paused until the duration is confirmed.";
+
+        if (ticket.Status == TicketStatus.Superseded)
+            text += $" Superseded by ticket #{ticket.SupersededByNumber}.";
+
+        return text;
     }
 
     private static void AddStoredActionFields(EmbedBuilder embed, Ticket ticket)
@@ -248,24 +270,5 @@ internal static class TicketPresentation
             colour = 0x000000;
 
         return new Color((uint)colour);
-    }
-
-    internal static string OperationalDetails(Ticket ticket)
-    {
-        var text = ticket.Complete ? "Details complete." : "A nonblank comment is required.";
-
-        if (ticket.ReminderExempt)
-            text += " Automated action; no moderator reminder required.";
-
-        if (ticket.Pending is not null)
-            text += " A Discord change is awaiting reconciliation.";
-
-        if (ticket.ExpirySuspended)
-            text += " Automatic expiry is paused until the duration is confirmed.";
-
-        if (ticket.Status == TicketStatus.Superseded)
-            text += $" Superseded by ticket #{ticket.SupersededByNumber}.";
-
-        return text;
     }
 }
