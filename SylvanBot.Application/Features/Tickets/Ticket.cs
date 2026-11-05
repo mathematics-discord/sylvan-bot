@@ -57,6 +57,8 @@ public sealed class Ticket
 
     public bool SendUncertain { get; set; }
 
+    public bool InitialPromptPending { get; set; }
+
     public IList<TicketPublication> Publications { get; } = [];
 
     public IList<TicketHistoryEntry> ModificationHistory { get; } = [];
@@ -224,6 +226,8 @@ public sealed class Ticket
         if (comment.Length > CommentLimit)
             throw new BotCommandException("The comment is too long.");
 
+        InitialPromptPending = SourceAuditId is not null && !ReminderExempt
+                               && Action is TicketAction.Ban or TicketAction.Timeout;
         Comment = comment;
         DurationSeconds = seconds;
         ExpiresAtUtc = expiry ?? (seconds is { } finite ? CreatedAtUtc.AddSeconds(finite) : null);

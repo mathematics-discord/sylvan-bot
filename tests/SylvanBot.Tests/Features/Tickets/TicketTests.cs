@@ -279,4 +279,43 @@ public sealed class TicketTests
         ticket.Status.ShouldBe(TicketStatus.Applied);
     }
 
+    [TestCase(TicketAction.Ban, true)]
+    [TestCase(TicketAction.Timeout, true)]
+    [TestCase(TicketAction.Kick, false)]
+    [TestCase(TicketAction.VoiceMute, false)]
+    public void Initialise_CompleteAuditTicket_QueuesInitialPromptForBanAndTimeout(TicketAction action, bool expected)
+    {
+        // Arrange
+        var ticket = new Ticket
+        {
+            GuildId = 1, Number = 1, SubjectUserId = 2, ModeratorUserId = 3,
+            CreatedAtUtc = DateTimeOffset.UtcNow, Action = action, SourceAuditId = 10,
+        };
+
+        // Act
+        ticket.Initialise("audit reason", action == TicketAction.Timeout ? 604800 : null);
+
+        // Assert
+        ticket.Complete.ShouldBeTrue();
+        ticket.InitialPromptPending.ShouldBe(expected);
+    }
+
+    [TestCase(TicketAction.Ban)]
+    [TestCase(TicketAction.Timeout)]
+    public void Initialise_AutomatedAuditTicket_DoesNotPromptBot(TicketAction action)
+    {
+        // Arrange
+        var ticket = new Ticket
+        {
+            GuildId = 1, Number = 1, SubjectUserId = 2, ModeratorUserId = 3,
+            CreatedAtUtc = DateTimeOffset.UtcNow, Action = action, SourceAuditId = 10, ReminderExempt = true,
+        };
+
+        // Act
+        ticket.Initialise("automated audit reason", action == TicketAction.Timeout ? 604800 : null);
+
+        // Assert
+        ticket.InitialPromptPending.ShouldBeFalse();
+    }
+
 }

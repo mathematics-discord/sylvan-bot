@@ -1,0 +1,3 @@
+component: Moderation
+kind: Changed
+body: Ticket prompts now work newest first. Moderators receive an Edit ticket DM for each new ban or timeout even when its duration and reason are already supplied in the audit log, so they can adjust those details after contacting the member.

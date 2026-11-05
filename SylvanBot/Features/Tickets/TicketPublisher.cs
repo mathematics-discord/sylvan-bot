@@ -241,17 +241,19 @@ public sealed class TicketPublisher(
                             && !value.Hidden
                             && !value.ReminderExempt
                             && value.Pending == null
-                            && (string.IsNullOrWhiteSpace(value.Comment) || (value.Action == TicketAction.Timeout && value.DurationSeconds == null))
+                            && (value.InitialPromptPending
+                                || string.IsNullOrWhiteSpace(value.Comment)
+                                || (value.Action == TicketAction.Timeout && value.DurationSeconds == null))
                             && enabled.Contains(value.GuildId))
-            .OrderBy(value => value.CreatedAtUtc)
-            .ThenBy(value => value.Id)
+            .OrderByDescending(value => value.CreatedAtUtc)
+            .ThenByDescending(value => value.Id)
             .FirstOrDefaultAsync(token);
 
         var moderator = await db.TicketModerators
             .SingleOrDefaultAsync(value => value.UserId == userId, token);
 
         if (requestedGuild is { } guildId && ticket is not null && ticket.GuildId != guildId)
-            throw new BotCommandException("Your oldest outstanding ticket is in another server. Request redelivery there.");
+            throw new BotCommandException("Your newest outstanding ticket is in another server. Request redelivery there.");
 
         if (moderator is null)
         {
@@ -300,6 +302,7 @@ public sealed class TicketPublisher(
         moderator.NextDeliveryUtc = DateTimeOffset.UtcNow.AddSeconds(config.ReminderIntervalSeconds);
         moderator.LastAttemptedVersion = ticket.Version;
         moderator.Version++;
+        ticket.InitialPromptPending = false;
         await db.SaveChangesAsync(token);
         var actor = await boundary.GetActorAsync(ticket.GuildId, userId, token);
         var guild = await client.Rest.GetGuildAsync(ticket.GuildId, TicketBoundary.Options(token));
@@ -313,7 +316,7 @@ public sealed class TicketPublisher(
         var channel = await user.CreateDMChannelAsync(TicketBoundary.Options(token));
 
         var prompt = await channel.SendMessageAsync(
-            $"**{guild.Name}** · Use **Edit** to complete this ticket.",
+            $"**{guild.Name}** · Use **Edit** to review or adjust this ticket.",
             embed: TicketPresentation.Describe(ticket),
             components: TicketDmModule.Buttons(ticket),
             options: TicketBoundary.Options(token),

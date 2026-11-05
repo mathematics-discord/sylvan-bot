@@ -424,6 +424,9 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<bool>("Hidden")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("InitialPromptPending")
+                        .HasColumnType("boolean");
+
                     b.Property<long?>("LastAuditId")
                         .HasColumnType("bigint");
 

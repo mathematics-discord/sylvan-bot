@@ -105,7 +105,7 @@ public sealed class TicketModule(
     public Task HideModerationAsync(long number, int version) => ExecuteAsync(async (actor, token) => await ChangedAsync(
         await coordinator.EditAsync(actor, number, version, TicketDetails.ParseFields(duration: null, comment: null), hidden: true, token)));
 
-    [SlashCommand("top", "Request DM redelivery of the oldest ticket in your moderator queue.")]
+    [SlashCommand("top", "Request DM redelivery of the newest ticket in your moderator stack.")]
     public Task TopAsync() => ExecuteAsync(async (actor, token) =>
     {
         await coordinator.RedeliverAsync(actor, token);

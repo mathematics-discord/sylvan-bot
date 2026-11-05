@@ -234,7 +234,7 @@ public sealed class TicketWorker(
             List<ulong> users = await db.Tickets
                 .Where(ticket => !ticket.Hidden
                                  && !ticket.ReminderExempt
-                                 && string.IsNullOrWhiteSpace(ticket.Comment)
+                                 && (ticket.InitialPromptPending || string.IsNullOrWhiteSpace(ticket.Comment))
                                  && enabled.Contains(ticket.GuildId))
                 .Select(ticket => ticket.ModeratorUserId)
                 .Union(moderators)
