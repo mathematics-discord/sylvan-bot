@@ -1,0 +1,3 @@
+component: Moderation
+kind: Added
+body: Senior Moderators can review, approve and manage all moderation ticket types. Restoring a persisted role keeps its original ticket and expiry.

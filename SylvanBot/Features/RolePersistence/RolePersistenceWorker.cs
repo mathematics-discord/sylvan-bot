@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.RolePersistence;
 using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Gateway;
+using SylvanBot.Application.Features.Tickets;
 
 namespace SylvanBot.Features.RolePersistence;
 
@@ -11,7 +12,7 @@ public sealed class RolePersistenceWorker(DiscordSocketClient client, IDbContext
     : BackgroundService,
         IDiscordGatewayHandler
 {
-    private readonly ConcurrentDictionary<ulong, SemaphoreSlim> _gates = new();
+    private readonly ConcurrentDictionary<ulong, SemaphoreSlim> _gates = new ConcurrentDictionary<ulong, SemaphoreSlim>();
     private readonly Channel<(ulong Guild, ulong User, ulong[]? Roles)> _work = Channel.CreateUnbounded<(ulong, ulong, ulong[]?)>(
         new UnboundedChannelOptions { SingleReader = true }
     );
@@ -78,12 +79,34 @@ public sealed class RolePersistenceWorker(DiscordSocketClient client, IDbContext
         if (guild is null)
             return;
         await using var db = await contexts.CreateDbContextAsync(ct);
-        var pending = await db.PendingRoles.Where(x => x.GuildId == guildId && x.UserId == userId).ToListAsync(ct);
-        var configured = await db.PersistentRoles.Where(x => x.GuildId == guildId).Select(x => x.RoleId).ToArrayAsync(ct);
+        var pending = await db.PendingRoles
+            .Where(x => x.GuildId == guildId && x.UserId == userId)
+            .ToListAsync(ct);
+        var configured = await db.PersistentRoles
+            .Where(x => x.GuildId == guildId)
+            .Select(x => x.RoleId)
+            .ToArrayAsync(ct);
+        var roleTickets = await db.Tickets
+            .AsNoTracking()
+            .Where(ticket => ticket.GuildId == guildId && ticket.SubjectUserId == userId && ticket.Action == TicketAction.Role
+                && configured.Contains(ticket.RoleId!.Value)
+                && !db.Tickets.Any(newer => newer.GuildId == guildId && newer.SubjectUserId == userId
+                    && newer.Action == TicketAction.Role && newer.RoleId == ticket.RoleId && newer.Number > ticket.Number))
+            .OrderByDescending(ticket => ticket.CreatedAtUtc)
+            .ThenByDescending(ticket => ticket.Number)
+            .ToListAsync(ct);
+        var latestTickets = roleTickets
+            .ToDictionary(ticket => ticket.RoleId!.Value);
+        var blockedRoles = latestTickets.Values
+            .Where(ticket => ticket.Status != TicketStatus.Active)
+            .Select(ticket => ticket.RoleId!.Value)
+            .ToHashSet();
+
         if (departedRoles is not null)
         {
             var selected = departedRoles
                 .Intersect(configured)
+                .Where(id => !blockedRoles.Contains(id))
                 .Where(id => guild.GetRole(id) is { } role && PersistentRolePolicy.IsSafe(guild, role))
                 .ToHashSet();
             db.PendingRoles.RemoveRange(pending.Where(x => !selected.Contains(x.RoleId)));
@@ -103,11 +126,18 @@ public sealed class RolePersistenceWorker(DiscordSocketClient client, IDbContext
         var member = await client.Rest.GetGuildUserAsync(guildId, userId, request);
         if (member is null)
             return;
-        var sources = await db.RoleColourOptions.Where(x => x.GuildId == guildId).Select(x => x.SourceRoleId).ToArrayAsync(ct);
+        var sources = await db.RoleColourOptions
+            .Where(x => x.GuildId == guildId)
+            .Select(x => x.SourceRoleId)
+            .ToArrayAsync(ct);
         foreach (var saved in pending.OrderByDescending(x => sources.Contains(x.RoleId)))
         {
             var role = guild.GetRole(saved.RoleId);
-            if (!configured.Contains(saved.RoleId) || role is null || !PersistentRolePolicy.IsSafe(guild, role))
+            if (latestTickets.TryGetValue(saved.RoleId, out var dueTicket)
+                && dueTicket.Status == TicketStatus.Active && dueTicket.ExpiresAtUtc <= DateTimeOffset.UtcNow)
+                continue;
+
+            if (blockedRoles.Contains(saved.RoleId) || !configured.Contains(saved.RoleId) || role is null || !PersistentRolePolicy.IsSafe(guild, role))
                 db.PendingRoles.Remove(saved);
             else if (member.RoleIds.Contains(saved.RoleId))
                 db.PendingRoles.Remove(saved);
@@ -117,6 +147,9 @@ public sealed class RolePersistenceWorker(DiscordSocketClient client, IDbContext
             {
                 try
                 {
+                    request.AuditLogReason = latestTickets.TryGetValue(saved.RoleId, out var ticket)
+                        ? $"Role persistence; ticket {ticket.Number}"
+                        : "Role persistence";
                     await member.AddRoleAsync(saved.RoleId, request);
                     db.PendingRoles.Remove(saved);
                 }
