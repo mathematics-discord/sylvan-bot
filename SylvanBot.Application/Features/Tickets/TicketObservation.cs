@@ -5,6 +5,9 @@ using System.Collections.Immutable;
 public sealed record TicketObservation(ulong GuildId, ulong AuditId, TicketAction Action, ulong SubjectUserId,
     ulong ModeratorUserId, bool ModeratorIsBot, string Reason, DateTimeOffset CreatedAtUtc)
 {
+    public ulong? RoleId { get; init; }
+    public long? RestoredTicketNumber { get; init; }
+
     public bool Removed { get; init; }
     public TicketTimeout PreviousTimeout { get; init; } = new TicketTimeout.None();
     public TicketTimeout Timeout { get; init; } = new TicketTimeout.None();

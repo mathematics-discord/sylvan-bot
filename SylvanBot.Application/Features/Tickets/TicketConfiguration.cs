@@ -2,6 +2,8 @@ namespace SylvanBot.Application.Features.Tickets;
 
 public sealed class TicketConfiguration
 {
+    public IList<long> TrackedRoleIds { get; set; } = [];
+
     public IList<long> ReviewExemptRoleIds { get; set; } = [];
 
     public ulong GuildId { get; init; }

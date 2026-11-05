@@ -32,16 +32,19 @@ public sealed class TicketPersistence : IEntityTypeConfiguration<Ticket>,
             .HasMaxLength(512);
         builder.HasIndex(ticket => new { ticket.GuildId, ticket.Number })
             .IsUnique();
-        builder.HasIndex(ticket => new { ticket.GuildId, ticket.SourceAuditId })
+        builder.HasIndex(ticket => new { ticket.GuildId, ticket.SourceAuditId, ticket.Action })
             .IsUnique()
-            .HasFilter("\"SourceAuditId\" IS NOT NULL");
+            .HasFilter("\"SourceAuditId\" IS NOT NULL AND \"RoleId\" IS NULL");
+        builder.HasIndex(ticket => new { ticket.GuildId, ticket.SourceAuditId, ticket.Action, ticket.RoleId })
+            .IsUnique()
+            .HasFilter("\"SourceAuditId\" IS NOT NULL AND \"RoleId\" IS NOT NULL");
         builder.HasIndex(ticket => new { ticket.GuildId, ticket.SubjectUserId, ticket.Hidden, ticket.Id });
         builder.HasIndex(ticket => new { ticket.GuildId, ticket.Status, ticket.ExpiresAtUtc });
         builder.HasIndex(ticket => new { ticket.ModeratorUserId, ticket.CreatedAtUtc, ticket.Id });
         builder.OwnsOne(ticket => ticket.Pending, pending =>
         {
             pending.ToTable("ticket_operations", table => table.HasCheckConstraint("CK_ticket_operations_command",
-                "(\"Kind\" = 'RemoveBan' OR (\"Kind\" = 'SetTimeoutExpiry' AND \"ExpiryUtc\" IS NOT NULL)) AND \"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid"));
+                "(\"Kind\" IN ('RemoveBan', 'RemoveVoiceMute', 'RemoveVoiceDeafen', 'RemoveRole') OR (\"Kind\" = 'SetTimeoutExpiry' AND \"ExpiryUtc\" IS NOT NULL)) AND \"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid"));
             pending.WithOwner()
                 .HasForeignKey("TicketId");
             pending.HasKey("TicketId");

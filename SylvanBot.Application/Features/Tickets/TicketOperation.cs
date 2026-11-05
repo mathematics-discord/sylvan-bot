@@ -22,6 +22,9 @@ public sealed class TicketOperation
     {
         "SetTimeoutExpiry" when ExpiryUtc is { } expiry => new ChangeTimeout(expiry),
         "RemoveBan" => new ExpireBan(),
+        "RemoveVoiceMute" => new ExpireVoiceMute(),
+        "RemoveVoiceDeafen" => new ExpireVoiceDeafen(),
+        "RemoveRole" => new ExpireRole(),
         _ => throw new InvalidOperationException("Invalid pending moderation command."),
     };
 }
