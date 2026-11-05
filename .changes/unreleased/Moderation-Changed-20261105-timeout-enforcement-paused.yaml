@@ -1,0 +1,4 @@
+component: Moderation
+kind: Changed
+body: Timeout tickets now show when enforcement is paused because audit history is incomplete. Trial Moderators and higher with permission to edit the ticket can confirm its duration after audit recovery to resume enforcement.
+time: 2026-11-05T20:34:38.2243834Z

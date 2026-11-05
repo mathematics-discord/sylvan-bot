@@ -1,0 +1,4 @@
+component: Internal
+kind: Added
+body: Persist the intended timeout expiry separately from the applied Discord window and next check time. A forward migration backfills existing timeout tickets and pending changes without altering their intended expiries.
+time: 2026-11-05T20:34:38.2701293Z

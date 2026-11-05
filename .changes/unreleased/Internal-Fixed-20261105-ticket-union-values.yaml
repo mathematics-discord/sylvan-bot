@@ -1,0 +1,4 @@
+component: Internal
+kind: Fixed
+body: Match ticket requests, duration and comment edits, timeout observations and pending commands through their union values so handlers and validation recognise the selected case.
+time: 2026-11-05T20:34:38.3181868Z

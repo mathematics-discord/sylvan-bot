@@ -1,0 +1,4 @@
+component: Moderation
+kind: Added
+body: Trial Moderators and higher can extend active timeouts beyond 28 days through ticket duration edits, subject to existing ticket permissions. Sylvan renews the timeout until its full duration ends, without creating extra tickets or changing approval or moderator history. Durations run from the original timeout; permanent timeouts remain unsupported.
+time: 2026-11-05T13:30:00+00:00

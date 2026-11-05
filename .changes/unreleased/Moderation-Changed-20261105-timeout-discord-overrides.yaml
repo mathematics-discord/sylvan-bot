@@ -1,0 +1,4 @@
+component: Moderation
+kind: Changed
+body: For Trial Moderators and higher, direct Discord timeout edits replace the duration managed by the ticket, and direct removal cancels it. Automatic renewals wait for audit reconciliation when another timeout change is detected.
+time: 2026-11-05T20:34:58.9466053Z

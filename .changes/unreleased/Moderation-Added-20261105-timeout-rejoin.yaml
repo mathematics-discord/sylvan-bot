@@ -1,0 +1,4 @@
+component: Moderation
+kind: Added
+body: Trial Moderators and higher can rely on active timeout tickets to retain the remaining restriction when a member leaves and rejoins. Sylvan checks returning members and recovers missed checks after startup or reconnection.
+time: 2026-11-05T20:34:38.1290834Z
