@@ -48,6 +48,7 @@ public sealed class AutomodMatcherTests
 
         // Assert
         result.Rule.Value.Id.ShouldBe(4);
+        result.Reason.Value.ShouldStartWith("Automatic action: message matches pattern 4\n");
     }
 
     [Test]
@@ -74,7 +75,69 @@ public sealed class AutomodMatcherTests
 
         // Act / Assert
         matcher.Match("goodbye").Rule.HasValue.ShouldBeFalse();
+        matcher.Match("goodbye").Reason.HasValue.ShouldBeFalse();
         new AutomodMatcher([]).Match("hello").Rule.HasValue.ShouldBeFalse();
+    }
+
+    [Test]
+    public void Match_Invite_UsesLegacyReasonText()
+    {
+        // Arrange
+        var matcher = new AutomodMatcher([new AutomodRule { Id = 240, Pattern = @"discord\.gg/\w+", MatchType = AutomodMatchType.Regex }]);
+
+        // Act
+        var result = matcher.Match("discord.gg/MC57wTZPaN");
+
+        // Assert
+        result.Reason.Value.ShouldBe("Automatic action: message matches pattern 240\n`discord.gg/MC57wTZPaN`");
+    }
+
+    [Test]
+    public void Match_MultilineMessage_PreservesContextOnOneLine()
+    {
+        // Arrange
+        var matcher = new AutomodMatcher([new AutomodRule { Id = 1, Pattern = "hello" }]);
+
+        // Act
+        var result = matcher.Match("before\n\t hello  \r\nafter");
+
+        // Assert
+        result.Reason.Value.ShouldBe("Automatic action: message matches pattern 1\n`before hello after`");
+    }
+
+    [TestCase(0)]
+    [TestCase(500)]
+    [TestCase(1000)]
+    public void Match_LongMessage_RetainsContextAroundSelectedMatch(int position)
+    {
+        // Arrange
+        var matcher = new AutomodMatcher([new AutomodRule { Id = 1, Pattern = "hello", MatchType = AutomodMatchType.Regex }]);
+        var text = new string('x', position) + "hello" + new string('y', 1000 - position);
+
+        // Act
+        var result = matcher.Match(text);
+
+        // Assert
+        result.Reason.Value.ShouldContain("hello");
+        result.Reason.Value.ShouldContain("...");
+        result.Reason.Value.Length.ShouldBeLessThanOrEqualTo(440);
+    }
+
+    [Test]
+    public void Match_BacktickHeavyMessage_KeepsReasonBoundedAndCodeDelimited()
+    {
+        // Arrange
+        var matcher = new AutomodMatcher([new AutomodRule { Id = 1, Pattern = "hello" }]);
+
+        // Act
+        var result = matcher.Match("hello " + new string('`', 380));
+
+        // Assert
+        var context = result.Reason.Value.Split('\n')[1];
+        context.ShouldStartWith("`` ");
+        context.ShouldEndWith(" ``");
+        context[2..^2].ShouldNotContain("``");
+        result.Reason.Value.Length.ShouldBeLessThanOrEqualTo(512);
     }
 
     [Test]

@@ -35,7 +35,9 @@ public sealed class AutomodBan
 
     public DateTimeOffset LastAttemptAt { get; set; }
 
-    public string Reason => $"Automod ban rule {RuleId}; automod operation {Id:D}";
+    public string? ActionReason { get; init; }
+
+    public string Reason => ActionReason ?? $"Automod ban rule {RuleId}; automod operation {Id:D}";
 
     public void Observe(ulong auditId, bool ownBan, bool ownRemoval)
     {

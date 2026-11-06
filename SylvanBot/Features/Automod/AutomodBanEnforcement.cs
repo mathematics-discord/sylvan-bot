@@ -17,7 +17,7 @@ public sealed class AutomodBanEnforcement(
 {
     private readonly SemaphoreSlim _gate = new SemaphoreSlim(1, 1);
 
-    public async Task BanAsync(ulong guildId, ulong userId, ulong messageId, AutomodRule rule, CancellationToken ct)
+    public async Task BanAsync(ulong guildId, ulong userId, ulong messageId, AutomodRule rule, string reason, CancellationToken ct)
     {
         DotNext.Optional<long> seconds = rule.DurationSeconds is { } duration ? new DotNext.Optional<long>(duration) : default;
         DotNext.Optional<DateTimeOffset> expiry = AutomodDuration.BanExpiry(seconds, clock.GetUtcNow());
@@ -45,6 +45,7 @@ public sealed class AutomodBanEnforcement(
             {
                 Id = Guid.NewGuid(), GuildId = guildId, UserId = userId,
                 MessageId = messageId, RuleId = rule.Id, RequestedAt = now,
+                ActionReason = reason,
                 CheckedAt = now, NextCheckAt = now.AddSeconds(30), LastAttemptAt = now, ExpiresAt = expiry,
             };
             db.AutomodBans.Add(operation);

@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.4.0-rc.3 - 2026-11-06
+## Moderation
+### Fixed
+- Automod bans and mutes use the legacy reason text: the matched pattern number followed by a quoted excerpt of the message.
 # v0.4.0-rc.2 - 2026-11-06
 ## Internal
 ### Fixed

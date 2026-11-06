@@ -39,6 +39,7 @@ public sealed class AutomodMatcher
         ArgumentNullException.ThrowIfNull(text);
         Optional<AutomodRule> selected = default;
         var earliestPosition = int.MaxValue;
+        var matchLength = 0;
         var timedOutRuleIds = ImmutableArray.CreateBuilder<long>();
 
         foreach (var (rule, regex) in _rules)
@@ -64,10 +65,45 @@ public sealed class AutomodMatcher
             {
                 selected = rule;
                 earliestPosition = match.Index;
+                matchLength = match.Length;
             }
         }
 
-        return new AutomodMatchResult(selected, timedOutRuleIds.ToImmutable());
+        Optional<string> reason = selected.HasValue
+            ? FormatReason(text, selected.Value.Id, earliestPosition, matchLength)
+            : default;
+
+        return new AutomodMatchResult(selected, timedOutRuleIds.ToImmutable(), reason);
+    }
+
+    private static string FormatReason(string text, long ruleId, int position, int length)
+    {
+        const int contextLimit = 390;
+        var context = text;
+
+        if (text.Length > contextLimit)
+        {
+            const int retainedLength = contextLimit - 6;
+            var start = Math.Clamp(position - Math.Max(0, retainedLength - length) / 2, 0, text.Length - retainedLength);
+            var end = start + retainedLength;
+            context = (start > 0 ? "..." : string.Empty) + text[start..end] + (end < text.Length ? "..." : string.Empty);
+        }
+
+        context = string.Join(" ", context.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        var delimiter = "`";
+
+        if (context.Contains('`'))
+        {
+            delimiter = "``";
+            context = context.Replace("`", "`\u200D", StringComparison.Ordinal);
+
+            if (context.Length > contextLimit)
+                context = context[..(contextLimit - 3)] + "...";
+
+            context = " " + context + " ";
+        }
+
+        return $"Automatic action: message matches pattern {ruleId}\n{delimiter}{context}{delimiter}";
     }
 
     internal static Regex CreateRegex(string pattern, AutomodMatchType matchType)

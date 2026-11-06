@@ -154,7 +154,7 @@ public sealed class AutomodGatewayHandler(
             foreach (var ruleId in result.TimedOutRuleIds)
                 _logger.Warning("Automod regex timed out for guild {GuildId}, message {MessageId}, rule {RuleId}", guildId, message.Id, ruleId);
 
-            if (result.Rule is not { HasValue: true, Value: var rule })
+            if (result.Rule is not { HasValue: true, Value: var rule } || result.Reason is not { HasValue: true, Value: var reason })
                 return;
 
             if (rule.Action is not (Delete or Mute or Ban))
@@ -174,11 +174,11 @@ public sealed class AutomodGatewayHandler(
             switch (rule.Action)
             {
                 case Ban:
-                    await bans.BanAsync(guildId, message.Author.Id, message.Id, rule, ct);
+                    await bans.BanAsync(guildId, message.Author.Id, message.Id, rule, reason, ct);
 
                     break;
                 case Mute:
-                    await MuteAsync(message, guildId, rule, ct);
+                    await MuteAsync(message, guildId, rule, reason, ct);
 
                     break;
                 case Delete:
@@ -237,7 +237,7 @@ public sealed class AutomodGatewayHandler(
         }
     }
 
-    private async Task MuteAsync(SocketMessage message, ulong guildId, AutomodRule rule, CancellationToken ct)
+    private async Task MuteAsync(SocketMessage message, ulong guildId, AutomodRule rule, string reason, CancellationToken ct)
     {
         await _muteGate.WaitAsync(ct);
 
@@ -245,7 +245,7 @@ public sealed class AutomodGatewayHandler(
         {
             DotNext.Optional<long> duration = rule.DurationSeconds is { } seconds ? new DotNext.Optional<long>(seconds) : default;
             var requestedExpiry = AutomodDuration.MuteExpiry(duration, DateTimeOffset.UtcNow);
-            var request = new RequestOptions { CancelToken = ct, RetryMode = RetryMode.AlwaysFail, AuditLogReason = $"Automod mute rule {rule.Id}" };
+            var request = new RequestOptions { CancelToken = ct, RetryMode = RetryMode.AlwaysFail, AuditLogReason = reason };
             var member = await client.Rest.GetGuildUserAsync(guildId, message.Author.Id, request);
 
             if (member is null)

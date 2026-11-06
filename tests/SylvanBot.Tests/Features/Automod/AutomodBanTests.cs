@@ -4,6 +4,28 @@ namespace SylvanBot.Tests.Features.Automod;
 
 public sealed class AutomodBanTests
 {
+    [Test]
+    public void Reason_ExistingOperation_PreservesLegacyOwnershipMarker()
+    {
+        // Arrange
+        var id = Guid.Parse("a4bf2a08-ae49-4d9c-8b3a-ce6fa19febe3");
+        var operation = new AutomodBan { Id = id, RuleId = 107 };
+
+        // Act / Assert
+        operation.Reason.ShouldBe("Automod ban rule 107; automod operation a4bf2a08-ae49-4d9c-8b3a-ce6fa19febe3");
+    }
+
+    [Test]
+    public void Reason_NewOperation_RetainsOriginalReasonForReconciliation()
+    {
+        // Arrange
+        const string reason = "Automatic action: message matches pattern 240\n`discord.gg/MC57wTZPaN`";
+        var operation = new AutomodBan { ActionReason = reason, RuleId = 240 };
+
+        // Act / Assert
+        operation.Reason.ShouldBe(reason);
+    }
+
     [TestCase("Pending", 0UL, false)]
     [TestCase("Active", 1UL, true)]
     [TestCase("Removing", 1UL, true)]
