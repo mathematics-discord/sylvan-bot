@@ -35,6 +35,24 @@ public sealed class TicketModule(
             await coordinator.ShowMessageAsync(actor, new TicketMessage(message.Channel.Id, message.Id), hidden: false, token),
             token));
 
+    [MessageCommand("Approve Ticket")]
+    [DefaultMemberPermissions(GuildPermission.ViewAuditLog)]
+    [RequireUserPermission(GuildPermission.ViewAuditLog)]
+    [CommandContextType(InteractionContextType.Guild)]
+    public Task ApproveMessageAsync(IMessage message) => ExecuteAsync(async (actor, token) =>
+    {
+        var ticket = await coordinator.ShowMessageAsync(
+            actor,
+            new TicketMessage(message.Channel.Id, message.Id),
+            hidden: false,
+            token);
+
+        if (ticket is null)
+            throw new BotCommandException("No matching ticket in this view of this server.");
+
+        await ChangedAsync(await coordinator.ApproveAsync(actor, ticket.Number, ticket.Version, token));
+    });
+
     [SlashCommand("note", "Save a moderator note and publish it to the staff tickets channel.")]
     public Task NoteAsync(
         [Summary("user", "Subject mention or user ID, including departed users.")] string user,

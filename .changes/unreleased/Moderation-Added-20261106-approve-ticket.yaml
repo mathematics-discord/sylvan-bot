@@ -1,0 +1,4 @@
+component: Moderation
+kind: Added
+body: "Senior Moderators: approve a ticket directly from its message using the Approve Ticket message command."
+time: 2026-11-06T03:00:00Z
