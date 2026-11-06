@@ -1,26 +1,30 @@
 using System.Globalization;
-using System.Text.Json;
+using System.Text;
 
 namespace SylvanBot.Features.Logging;
 
 internal static class BulkDeleteTranscript
 {
-    public static byte[] Create(IEnumerable<(ulong AuthorId, ulong ChannelId, string Content)> messages)
+    public static byte[] Create(IEnumerable<(DateTimeOffset Timestamp, string Channel, string Username, string Content)> messages)
     {
-        using var stream = new MemoryStream();
+        var transcript = new StringBuilder();
 
         foreach (var message in messages)
         {
-            using var writer = new Utf8JsonWriter(stream);
-            writer.WriteStartObject();
-            writer.WriteString("author_id", message.AuthorId.ToString(CultureInfo.InvariantCulture));
-            writer.WriteString("channel_id", message.ChannelId.ToString(CultureInfo.InvariantCulture));
-            writer.WriteString("content", value: message.Content);
-            writer.WriteEndObject();
-            writer.Flush();
-            stream.WriteByte((byte)'\n');
+            var timestamp = message.Timestamp.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            var channel = string.Join(" ", message.Channel.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            var username = string.Join(" ", message.Username.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            var lines = message.Content
+                .Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace('\r', '\n')
+                .Replace('\u2028', '\n')
+                .Replace('\u2029', '\n')
+                .Split('\n');
+
+            foreach (var line in lines)
+                transcript.Append(CultureInfo.InvariantCulture, $"[{timestamp}] #{channel} {username}: {line}\n");
         }
 
-        return stream.ToArray();
+        return Encoding.UTF8.GetBytes(transcript.ToString());
     }
 }

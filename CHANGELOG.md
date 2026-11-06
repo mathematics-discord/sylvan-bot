@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.4.0-rc.4 - 2026-11-06
+## Moderation
+### Changed
+- Bulk deletion logs attach a readable text chat log with UTC message times, channel names and usernames instead of a JSONL file.
 # v0.4.0-rc.3 - 2026-11-06
 ## Moderation
 ### Fixed

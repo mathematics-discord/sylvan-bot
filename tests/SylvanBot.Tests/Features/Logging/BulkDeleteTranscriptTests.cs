@@ -1,6 +1,4 @@
-using System.Globalization;
 using System.Text;
-using System.Text.Json;
 using SylvanBot.Features.Logging;
 
 namespace SylvanBot.Tests.Features.Logging;
@@ -9,53 +7,68 @@ namespace SylvanBot.Tests.Features.Logging;
 public sealed class BulkDeleteTranscriptTests
 {
     [Test]
-    public void Create_LargeIds_ExportsOnlyThreeFieldsWithExactStringIds()
+    public void Create_Message_UsesUtcTimeAndChatLogFormat()
     {
         // Arrange
-        (ulong AuthorId, ulong ChannelId, string Content)[] messages = [(ulong.MaxValue, 268882317391429632, "hello")];
+        var timestamp = new DateTimeOffset(2026, 11, 6, 14, 34, 56, TimeSpan.FromHours(2));
 
         // Act
-        var bytes = BulkDeleteTranscript.Create(messages);
+        var text = Encoding.UTF8.GetString(BulkDeleteTranscript.Create([(timestamp, "general", "ratgirl", "hello 🐀 café")]));
 
         // Assert
-        using var document = JsonDocument.Parse(bytes);
-        var row = document.RootElement;
-
-        var propertyCount = row.EnumerateObject().Count();
-
-        propertyCount.ShouldBe(3);
-        row.GetProperty("author_id").GetString().ShouldBe("18446744073709551615");
-        row.GetProperty("channel_id").GetString().ShouldBe("268882317391429632");
-        row.GetProperty("content").GetString().ShouldBe("hello");
-        bytes[^1].ShouldBe((byte)'\n');
+        text.ShouldBe("[12:34:56] #general ratgirl: hello 🐀 café\n");
     }
 
-    [TestCase("  first\r\nsecond\n\t\"quoted\" \\ backslash 🐀 café\u2028last  ")]
-    [TestCase("")]
-    public void Create_SpecialOrEmptyContent_PreservesContentOnOnePhysicalLine(string content)
+    [TestCase("\r\n")]
+    [TestCase("\n")]
+    [TestCase("\r")]
+    [TestCase("\u2028")]
+    [TestCase("\u2029")]
+    public void Create_MultilineContent_PrefixesEveryLine(string newline)
     {
         // Arrange
-        (ulong AuthorId, ulong ChannelId, string Content)[] messages = [(1, 2, content)];
+        var content = $"  first{newline}{newline}\t\"quoted\" \\ backslash 🐀 café  {newline}";
 
         // Act
-        var text = Encoding.UTF8.GetString(BulkDeleteTranscript.Create(messages));
+        var text = Encoding.UTF8.GetString(BulkDeleteTranscript.Create([(DateTimeOffset.UnixEpoch, "general", "alice", content)]));
 
         // Assert
-        text.Split('\n').Length.ShouldBe(2);
+        text.ShouldBe(
+            "[00:00:00] #general alice:   first\n"
+            + "[00:00:00] #general alice: \n"
+            + "[00:00:00] #general alice: \t\"quoted\" \\ backslash 🐀 café  \n"
+            + "[00:00:00] #general alice: \n");
+    }
 
-        using var document = JsonDocument.Parse(text);
-        document.RootElement.GetProperty("content").GetString().ShouldBe(content);
+    [Test]
+    public void Create_EmptyContent_StillIncludesMessageHeader()
+    {
+        // Act
+        var text = Encoding.UTF8.GetString(BulkDeleteTranscript.Create([(DateTimeOffset.UnixEpoch, "general", "alice", "")]));
+
+        // Assert
+        text.ShouldBe("[00:00:00] #general alice: \n");
+    }
+
+    [Test]
+    public void Create_NewlinesInLabels_CannotIntroduceUnprefixedLines()
+    {
+        // Act
+        var text = Encoding.UTF8.GetString(BulkDeleteTranscript.Create([(DateTimeOffset.UnixEpoch, "general\nchat", "alice\r\nbob", "hello")]));
+
+        // Assert
+        text.ShouldBe("[00:00:00] #general chat alice bob: hello\n");
     }
 
     [Test]
     public void Create_ManyLongMessages_PreservesEveryRecordAndFullContent()
     {
         // Arrange
-        var content = new string(c: 'x', count: 4000);
+        var content = new string('x', 4000);
 
-        (ulong AuthorId, ulong ChannelId, string Content)[] messages = Enumerable
-           .Range(start: 1, count: 100)
-           .Select(index => (AuthorId: (ulong)index, ChannelId: 268882317391429632UL, Content: content))
+        (DateTimeOffset, string, string, string content)[] messages = Enumerable
+           .Range(1, 100)
+           .Select(index => (DateTimeOffset.UnixEpoch.AddSeconds(index), "general", $"user{index}", content))
            .ToArray();
 
         // Act
@@ -67,11 +80,6 @@ public sealed class BulkDeleteTranscriptTests
         lines[^1].ShouldBeEmpty();
 
         for (var index = 0; index < messages.Length; index++)
-        {
-            using var document = JsonDocument.Parse(lines[index]);
-            var row = document.RootElement;
-            row.GetProperty("author_id").GetString().ShouldBe((index + 1).ToString(CultureInfo.InvariantCulture));
-            row.GetProperty("content").GetString().ShouldBe(content);
-        }
+            lines[index].ShouldBe($"[00:{(index + 1) / 60:00}:{(index + 1) % 60:00}] #general user{index + 1}: {content}");
     }
 }

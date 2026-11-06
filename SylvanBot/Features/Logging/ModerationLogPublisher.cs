@@ -5,6 +5,7 @@ namespace SylvanBot.Features.Logging;
 using DownloadedAttachment = ModerationLogComponents.DownloadedAttachment;
 
 public sealed class ModerationLogPublisher(
+    DiscordSocketClient client,
     LoggingScopeResolver scope,
     ModerationAuditLookup audit,
     HttpClient httpClient,
@@ -121,15 +122,59 @@ public sealed class ModerationLogPublisher(
             ? $"Bulk delete in <#{sourceChannel.Id}> by <@{actorId}> at {timestamp}."
             : $"Bulk delete in <#{sourceChannel.Id}> at {timestamp}. Moderator could not be determined.";
 
-        ImmutableArray<(ulong AuthorId, ulong ChannelId, string Content)> rows = messages
+        ImmutableArray<CachedMessageSnapshot> retained = messages
            .Where(message => message.ExpiresAtUtc > DateTimeOffset.UtcNow)
-           .Select(message => (message.AuthorId, message.ChannelId, message.Content))
+           .OrderBy(message => message.CreatedAtUtc)
+           .ThenBy(message => message.MessageId)
            .ToImmutableArray();
 
-        if (rows.IsEmpty)
+        if (retained.IsEmpty)
             return false;
 
-        var transcript = new DownloadedAttachment("bulk-delete.jsonl", "application/x-ndjson", BulkDeleteTranscript.Create(rows));
+        Dictionary<ulong, string> usernames = new Dictionary<ulong, string>();
+
+        var authors = retained
+           .Select(message => message.AuthorId)
+           .Distinct()
+           .ToArray();
+
+        using var usernameTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        usernameTimeout.CancelAfter(TimeSpan.FromSeconds(10));
+
+        foreach (var authorId in authors)
+        {
+            IUser? author = client.GetUser(authorId);
+
+            if (author is null && !usernameTimeout.IsCancellationRequested)
+            {
+                try
+                {
+                    author = await client.Rest.GetUserAsync(
+                        authorId,
+                        new RequestOptions { CancelToken = usernameTimeout.Token, RetryMode = RetryMode.AlwaysFail });
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    _logger.Warning("Bulk deletion author lookup failed for {AuthorId}: {ExceptionType}", authorId, exception.GetType().Name);
+                }
+            }
+
+            usernames[authorId] = author?.Username ?? authorId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        (DateTimeOffset CreatedAtUtc, string Name, string, string Content)[] rows = retained
+           .Where(message => message.ExpiresAtUtc > DateTimeOffset.UtcNow)
+           .Select(message => (message.CreatedAtUtc, sourceChannel.Name, usernames[message.AuthorId], message.Content))
+           .ToArray();
+
+        if (rows.Length == 0)
+            return false;
+
+        var transcript = new DownloadedAttachment("bulk-delete.txt", "text/plain; charset=utf-8", BulkDeleteTranscript.Create(rows));
 
         await SendLogAsync(logChannel: logChannel, [transcript], ct: ct, text: text);
 
@@ -163,8 +208,10 @@ public sealed class ModerationLogPublisher(
 
         try
         {
-            foreach (var attachment in attachments)
-                files.Add(new FileAttachment(new MemoryStream(buffer: attachment.Bytes, writable: false), fileName: attachment.FileName));
+            files.AddRange(
+                attachments.Select(attachment => new FileAttachment(
+                                       stream: new MemoryStream(buffer: attachment.Bytes, writable: false),
+                                       fileName: attachment.FileName)));
 
             await logChannel.SendFilesAsync(
                 attachments: files,
