@@ -5,9 +5,18 @@ sidebar:
   hidden: true
 ---
 
-SylvanMail lets people contact staff by sending Sylvan a direct message,
-even after leaving the server. Each conversation appears as a post in the
-private staff mail forum. Read the conversation and reply from that post.
+SylvanMail lets people contact staff by sending the dedicated **SylvanMail**
+bot a direct message. Open its profile from the server's staff-contact link
+or member list and choose **Message**. Each conversation appears as a post
+in the private staff mail forum. Main Sylvan publishes the post and handles
+staff drafts; the dedicated bot sends and receives member DMs.
+
+Discord must allow you to DM this particular bot. Sharing the server does
+not override DM privacy settings, blocking or Discord safety restrictions.
+After leaving, you may be unable to start or continue the conversation,
+especially if you no longer share a server with SylvanMail. An old DM with
+main Sylvan does not grant access to the new bot. If you cannot contact
+SylvanMail, contact a staff member directly. Main Sylvan no longer relays DMs.
 
 SylvanMail is out of beta as of v0.2.0.
 
@@ -23,9 +32,13 @@ messages from people outside the server show their username.
 
 If the person sends another message after a gap of at least three hours,
 Sylvan notifies the staff role again. Staff replies do not reset that gap.
+The dedicated account has its own DM history: the first message there also
+notifies staff in an existing case, without reading old main-account DMs.
 
 The sender receives a delivery acknowledgement once Discord accepts all
 parts of their message. This confirms delivery, not that staff have read it.
+The first acknowledgement in the new DM channel also explains how staff
+receive and answer mail. An interrupted acknowledgement is not retried.
 
 ## Reply to a conversation
 

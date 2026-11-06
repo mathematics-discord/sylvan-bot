@@ -5,9 +5,26 @@ using static SylvanBot.Features.SylvanMail.SylvanMailRequests;
 
 namespace SylvanBot.Features.SylvanMail;
 
-public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient http, ILogger logger) : ISylvanMailDiscord
+public sealed class SylvanMailDiscord(DiscordSocketClient client, SylvanMailClient mail, HttpClient http, ILogger logger) : ISylvanMailDiscord
 {
     private const int MaxAttachmentBytes = 8 * 1024 * 1024;
+
+    public void RequireReady(SylvanMailDestinationKind destination)
+    {
+        if (destination == SylvanMailDestinationKind.MemberDm)
+            mail.RequireReady();
+        else if (destination != SylvanMailDestinationKind.StaffThread)
+            throw new ArgumentOutOfRangeException(nameof(destination));
+        else if (client.ConnectionState != ConnectionState.Connected)
+            throw new BotCommandException("Not relayed: main Sylvan is disconnected.");
+    }
+
+    private DiscordSocketClient ClientFor(SylvanMailDestinationKind destination) => destination switch
+    {
+        SylvanMailDestinationKind.MemberDm => mail.Client,
+        SylvanMailDestinationKind.StaffThread => client,
+        _ => throw new ArgumentOutOfRangeException(nameof(destination)),
+    };
 
     public async Task<string> InboundPrefixAsync(ulong guildId, SylvanMailMessage message, CancellationToken ct)
     {
@@ -32,7 +49,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
     {
         try
         {
-            var dm = await MessageChannelAsync(client: client, channelId: message.SourceChannelId, ct: ct);
+            var dm = await MessageChannelAsync(client: mail.Client, channelId: message.SourceChannelId, ct: ct);
             var before = message.SourceMessageId;
 
             while (true)
@@ -59,23 +76,24 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
                         previous = item;
                 }
 
-                if (previous is not null)
+                var reachedStart = oldest == before;
+
+                if (previous is not null || reachedStart)
                 {
-                    if (message.Timestamp - previous.Timestamp < TimeSpan.FromHours(3))
+                    var recentInbound = previous is not null && message.Timestamp - previous.Timestamp < TimeSpan.FromHours(3);
+
+                    if (recentInbound)
                         return;
 
                     var thread = await MessageChannelAsync(client: client, channelId: threadId, ct: ct);
                     var everyone = roleId == guildId;
-
                     var mentions = everyone ? new AllowedMentions(AllowedMentionTypes.Everyone) : new AllowedMentions { RoleIds = [roleId] };
                     var text = everyone ? "@everyone" : $"<@&{roleId}>";
+
                     await AcceptedAsync(() => thread.SendMessageAsync(text: text, options: Options(ct), allowedMentions: mentions));
 
                     return;
                 }
-
-                if (oldest == before)
-                    return;
 
                 before = oldest;
             }
@@ -89,7 +107,8 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
 
     public async Task<ulong> OpenDmAsync(ulong userId, CancellationToken ct)
     {
-        var user = await client.Rest.GetUserAsync(id: userId, Options(ct));
+        mail.RequireReady();
+        var user = await mail.Client.Rest.GetUserAsync(id: userId, Options(ct));
 
         if (user is null)
             throw new BotCommandException("Discord could not resolve the recipient; no reply was sent.");
@@ -99,17 +118,24 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
         return channel.Id;
     }
 
-    public async Task<ulong> SendTextAsync(ulong channelId, string text, CancellationToken ct)
+    public async Task<ulong> SendTextAsync(SylvanMailDestination destination, string text, CancellationToken ct)
     {
-        var channel = await MessageChannelAsync(client: client, channelId: channelId, ct: ct);
+        RequireReady(destination.Kind);
+        var channel = await MessageChannelAsync(client: ClientFor(destination.Kind), channelId: destination.ChannelId, ct: ct);
         var sent = await AcceptedAsync(() => channel.SendMessageAsync(text: text, options: Options(ct), allowedMentions: AllowedMentions.None));
 
         return sent.Id;
     }
 
-    public async Task<ulong> SendAttachmentAsync(ulong channelId, SylvanMailAttachment attachment, byte[] bytes, string label, CancellationToken ct)
+    public async Task<ulong> SendAttachmentAsync(
+        SylvanMailDestination destination,
+        SylvanMailAttachment attachment,
+        byte[] bytes,
+        string label,
+        CancellationToken ct)
     {
-        var channel = await MessageChannelAsync(client: client, channelId: channelId, ct: ct);
+        RequireReady(destination.Kind);
+        var channel = await MessageChannelAsync(client: ClientFor(destination.Kind), channelId: destination.ChannelId, ct: ct);
         await using var stream = new MemoryStream(buffer: bytes, writable: false);
         using var file = new FileAttachment(stream: stream, Path.GetFileName(attachment.Filename), isSpoiler: attachment.Spoiler);
 
@@ -185,7 +211,14 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
                     + "If SylvanMail is busy, try again later. For partial or uncertain delivery, or any problem you cannot fix yourself, "
                     + "DM <@203864799870844928> directly or contact another member of staff. Ask them to check what arrived before resending.";
 
-                await SendTextAsync(channelId: source.SourceChannelId, $"{detail}\n\n{guidance}", ct: ct);
+                // Main may be disconnected while the dedicated client can still explain the failure.
+                mail.RequireDmReady();
+                var dm = await MessageChannelAsync(client: mail.Client, channelId: source.SourceChannelId, ct: ct);
+
+                await AcceptedAsync(() => dm.SendMessageAsync(
+                                        text: $"{detail}\n\n{guidance}",
+                                        options: Options(ct),
+                                        allowedMentions: AllowedMentions.None));
             }
             catch (Exception exception)
             {
@@ -239,9 +272,14 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, HttpClient htt
     {
         try
         {
-            var channel = await MessageChannelAsync(client: client, channelId: source.SourceChannelId, ct: ct);
+            mail.RequireDmReady();
+            var channel = await MessageChannelAsync(client: mail.Client, channelId: source.SourceChannelId, ct: ct);
 
-            var text = first ? "Delivered to staff. Please be patient, someone will get to you soon." : "Delivered.";
+            var text = first
+                ? "Delivered to staff. Please be patient, someone will get to you soon.\n\n"
+                + "Your DMs to SylvanMail reach staff in a private forum post. Staff replies are sent by SylvanMail after the author confirms them; "
+                + "edits and deletions after sending are not relayed."
+                : "Delivered.";
 
             var reference = new MessageReference(messageId: source.SourceMessageId, channelId: source.SourceChannelId, failIfNotExists: false);
 

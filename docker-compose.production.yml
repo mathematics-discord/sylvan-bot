@@ -25,6 +25,8 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       DISCORD__TOKEN: ${DISCORD__TOKEN}
+      SYLVANMAIL__TOKEN: ${SYLVANMAIL__TOKEN:?SylvanMail token must be provisioned in the server environment file}
+      SYLVANMAIL__BOTID: ${SYLVANMAIL__BOTID:?SylvanMail bot ID must be configured}
       DISCORD__MESSAGECACHESIZE: ${DISCORD__MESSAGECACHESIZE:-0}
       EMOJIANALYTICS__ENABLEDGUILDIDS__0: ${EMOJIANALYTICS__ENABLEDGUILDIDS__0}
       DB__HOST: postgres

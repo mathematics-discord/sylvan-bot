@@ -6,6 +6,7 @@ namespace SylvanBot.Features.SylvanMail;
 
 public sealed class SylvanMailGatewayHandler(
     DiscordSocketClient client,
+    SylvanMailClient mail,
     SylvanMailWorkflow workflow,
     SylvanMailDraftWorkflow drafts,
     ISylvanMailDiscord discord,
@@ -24,6 +25,7 @@ public sealed class SylvanMailGatewayHandler(
     public Task InitializeAsync(CancellationToken ct)
     {
         client.MessageReceived += ReceivedAsync;
+        mail.Client.MessageReceived += DmReceivedAsync;
         client.MessageUpdated += UpdatedAsync;
         client.ReactionAdded += ReactionAddedAsync;
 
@@ -33,6 +35,7 @@ public sealed class SylvanMailGatewayHandler(
     public void Unsubscribe()
     {
         client.MessageReceived -= ReceivedAsync;
+        StopMailAdmission();
         client.MessageUpdated -= UpdatedAsync;
         client.ReactionAdded -= ReactionAddedAsync;
         _messages.Writer.TryComplete();
@@ -111,13 +114,24 @@ public sealed class SylvanMailGatewayHandler(
 
     private Task ReceivedAsync(SocketMessage source)
     {
-        if (source is not IUserMessage message || !IsUserMessage(message))
+        if (source.Channel is IDMChannel || source is not IUserMessage message || !IsUserMessage(message))
             return Task.CompletedTask;
 
-        if (source.Channel is not IDMChannel)
-            return QueueDraftAsync(message: message, edited: false);
+        return QueueDraftAsync(message: message, edited: false);
+    }
+
+    public void StopMailAdmission() => mail.Client.MessageReceived -= DmReceivedAsync;
+
+    private Task DmReceivedAsync(SocketMessage source)
+    {
+        if (source.Channel is not IDMChannel || source is not IUserMessage message || !IsUserMessage(message))
+            return Task.CompletedTask;
 
         var input = SylvanMailDrafts.ReadMessage(source: message, guildId: null);
+
+        if (!mail.IsReady)
+            return RefuseBusyAsync(input, unavailable: true);
+
         var work = new InboundMail(input);
 
         return !_messages.Writer.TryWrite(work) ? RefuseBusyAsync(input) : Task.CompletedTask;
@@ -186,13 +200,16 @@ public sealed class SylvanMailGatewayHandler(
         }
     }
 
-    private async Task RefuseBusyAsync(SylvanMailMessage message)
+    private async Task RefuseBusyAsync(SylvanMailMessage message, bool unavailable = false)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         try
         {
-            await workflow.RefuseBusyAsync(message: message, ct: timeout.Token);
+            if (unavailable)
+                await workflow.RefuseUnavailableAsync(message: message, ct: timeout.Token);
+            else
+                await workflow.RefuseBusyAsync(message: message, ct: timeout.Token);
         }
         catch (Exception exception)
         {
@@ -207,7 +224,7 @@ public sealed class SylvanMailGatewayHandler(
                     source: message,
                     threadId: default,
                     receiptId: default,
-                    "Not relayed: SylvanMail is temporarily busy. Please try again later.",
+                    "Not relayed: SylvanMail is temporarily unavailable. Please try again later.",
                     ct: timeout.Token);
             }
             catch (Exception noticeException)

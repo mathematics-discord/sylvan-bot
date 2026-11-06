@@ -2,6 +2,13 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.4.0-rc.1 - 2026-11-06
+## General
+### Changed
+- Contact staff by messaging the dedicated SylvanMail bot. Main Sylvan no longer relays DMs. Existing cases and staff reply controls are preserved; Discord privacy settings and shared-server eligibility may limit who can contact the new bot.
+## Internal
+### Changed
+- Run SylvanMail's DM connection alongside main Sylvan with a separately provisioned token and verified bot ID. Preserve protected deployment environment-file ownership and permissions when updating the image.
 # v0.4.0-alpha.2 - 2026-11-03
 ## Moderation
 ### Added

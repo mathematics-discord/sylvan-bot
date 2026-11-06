@@ -33,66 +33,11 @@ public sealed class SylvanMailWorkflow(
         }
     }
 
-    public async Task RefuseBusyAsync(SylvanMailMessage message, CancellationToken ct)
-    {
-        // Do not wait behind relay's Discord calls when the transient buffer is full.
-        await using var db = await contexts.CreateDbContextAsync(ct);
+    public Task RefuseBusyAsync(SylvanMailMessage message, CancellationToken ct) =>
+        RefuseAsync(message, "Not relayed: SylvanMail is temporarily busy. This message was refused; please send it again later.", ct);
 
-        SylvanMailSettings[] settings = await db.SylvanMailSettings
-           .AsNoTracking()
-           .Take(2)
-           .ToArrayAsync(ct);
-
-        if (settings.Length != 1)
-        {
-            await ReportUnavailableAsync(message: message, ct: ct);
-
-            return;
-        }
-
-        var destination = settings[0];
-        var toStaff = message.GuildId is null;
-
-        IQueryable<SylvanMailConversation> conversationQuery = db.SylvanMailConversations
-           .AsNoTracking()
-           .Where(item => item.GuildId == destination.GuildId && item.ForumId == destination.ForumId && !item.Retired);
-
-        var conversation = toStaff
-            ? await conversationQuery
-               .SingleOrDefaultAsync(item => item.UserId == message.AuthorId, cancellationToken: ct)
-            : await conversationQuery
-               .SingleOrDefaultAsync(item => item.ThreadId == message.SourceChannelId, cancellationToken: ct);
-
-        if (!toStaff)
-        {
-            var mappedCase = message.GuildId == destination.GuildId && conversation is not null;
-
-            if (!mappedCase)
-                return;
-        }
-
-        var recorded = await db.SylvanMailOperations
-           .AnyAsync(item => item.SourceMessageId == message.SourceMessageId, cancellationToken: ct);
-
-        if (recorded)
-            return;
-
-        var operation = new SylvanMailOperation
-        {
-            SourceMessageId = message.SourceMessageId,
-            SourceChannelId = message.SourceChannelId,
-            AuthorId = message.AuthorId,
-            GuildId = destination.GuildId,
-            ConversationId = conversation?.Id,
-            ToStaff = toStaff,
-            State = "Refused",
-            Detail = "Not relayed: SylvanMail is temporarily busy. This message was refused; please send it again later.",
-        };
-
-        db.SylvanMailOperations.Add(operation);
-        await db.SaveChangesAsync(ct);
-        await reporting.ReportAsync(db: db, message: message, threadId: conversation?.ThreadId, op: operation);
-    }
+    public Task RefuseUnavailableAsync(SylvanMailMessage message, CancellationToken ct) =>
+        RefuseAsync(message, "Not relayed: SylvanMail is disconnected or not ready. Please send a new DM after service recovers.", ct);
 
     internal async Task RelayLockedAsync(BotDbContext db, SylvanMailMessage message, CancellationToken ct)
     {
@@ -151,7 +96,7 @@ public sealed class SylvanMailWorkflow(
         {
             try
             {
-                await discord.SendTextAsync(channelId: newThread, $".ticket show {conversation.UserId}", ct: ct);
+                await discord.SendTextAsync(new SylvanMailDestination(SylvanMailDestinationKind.StaffThread, newThread), $".ticket show {conversation.UserId}", ct: ct);
             }
             catch (Exception exception)
             {
@@ -197,27 +142,6 @@ public sealed class SylvanMailWorkflow(
         await db.SaveChangesAsync(ct);
 
         return operation;
-    }
-
-    private static async Task PublishAsync(BotDbContext db, SylvanMailOperation op, int ordinal, Func<Task<ulong>> publish, CancellationToken ct)
-    {
-        var delivery = new SylvanMailDelivery { SourceMessageId = op.SourceMessageId, Ordinal = ordinal };
-        op.Deliveries.Add(delivery);
-        op.State = "Sending";
-        await db.SaveChangesAsync(ct);
-        delivery.MessageId = await publish();
-
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch
-        {
-            // Discord accepted it but the durable confirmation failed
-            delivery.MessageId = null;
-
-            throw;
-        }
     }
 
     private static Task<SylvanMailConversation?> FindConversationAsync(
@@ -274,6 +198,90 @@ public sealed class SylvanMailWorkflow(
         return conversation;
     }
 
+    private async Task RefuseAsync(SylvanMailMessage message, string detail, CancellationToken ct)
+    {
+        // Do not wait behind relay's Discord calls when the transient buffer is full.
+        await using var db = await contexts.CreateDbContextAsync(ct);
+
+        SylvanMailSettings[] settings = await db.SylvanMailSettings
+           .AsNoTracking()
+           .Take(2)
+           .ToArrayAsync(ct);
+
+        if (settings.Length != 1)
+        {
+            await ReportUnavailableAsync(message: message, ct: ct);
+
+            return;
+        }
+
+        var destination = settings[0];
+        var toStaff = message.GuildId is null;
+
+        IQueryable<SylvanMailConversation> conversationQuery = db.SylvanMailConversations
+           .AsNoTracking()
+           .Where(item => item.GuildId == destination.GuildId && item.ForumId == destination.ForumId && !item.Retired);
+
+        var conversation = toStaff
+            ? await conversationQuery
+               .SingleOrDefaultAsync(item => item.UserId == message.AuthorId, cancellationToken: ct)
+            : await conversationQuery
+               .SingleOrDefaultAsync(item => item.ThreadId == message.SourceChannelId, cancellationToken: ct);
+
+        if (!toStaff)
+        {
+            var mappedCase = message.GuildId == destination.GuildId && conversation is not null;
+
+            if (!mappedCase)
+                return;
+        }
+
+        var recorded = await db.SylvanMailOperations
+           .AnyAsync(item => item.SourceMessageId == message.SourceMessageId, cancellationToken: ct);
+
+        if (recorded)
+            return;
+
+        var operation = new SylvanMailOperation
+        {
+            SourceMessageId = message.SourceMessageId,
+            SourceChannelId = message.SourceChannelId,
+            AuthorId = message.AuthorId,
+            GuildId = destination.GuildId,
+            ConversationId = conversation?.Id,
+            ToStaff = toStaff,
+            State = "Refused",
+            Detail = detail,
+        };
+
+        db.SylvanMailOperations.Add(operation);
+        await db.SaveChangesAsync(ct);
+        await reporting.ReportAsync(db: db, message: message, threadId: conversation?.ThreadId, op: operation);
+    }
+
+    private async Task PublishAsync(BotDbContext db, SylvanMailOperation op, int ordinal, Func<Task<ulong>> publish, CancellationToken ct)
+    {
+        discord.RequireReady(op.ToStaff ? SylvanMailDestinationKind.StaffThread : SylvanMailDestinationKind.MemberDm);
+
+        var delivery = new SylvanMailDelivery { SourceMessageId = op.SourceMessageId, Ordinal = ordinal };
+        op.Deliveries.Add(delivery);
+        op.State = "Sending";
+        await db.SaveChangesAsync(ct);
+        delivery.MessageId = await publish();
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch
+        {
+            // Discord accepted it but the durable confirmation failed
+            delivery.MessageId = null;
+
+            throw;
+        }
+    }
+
     private async Task ReportUnavailableAsync(SylvanMailMessage message, CancellationToken ct)
     {
         if (message.GuildId is not null)
@@ -296,7 +304,9 @@ public sealed class SylvanMailWorkflow(
         ImmutableArray<byte[]> attachments,
         CancellationToken ct)
     {
-        // An uncertain notice is not retried, but subsequent messages can still be delivered.
+        var destination = new SylvanMailDestination(
+            operation.ToStaff ? SylvanMailDestinationKind.StaffThread : SylvanMailDestinationKind.MemberDm,
+            destinationChannelId);
         var label = operation.ToStaff ? await discord.InboundPrefixAsync(guildId: guildId, message: message, ct: ct) : message.OutboundPrefix;
         ImmutableArray<string> chunks = SylvanMailContent.SplitContent(content: message.Content, 2000 - label.Length);
         var ordinal = 0;
@@ -306,7 +316,7 @@ public sealed class SylvanMailWorkflow(
                 db: db,
                 op: operation,
                 ordinal: ordinal++,
-                () => discord.SendTextAsync(channelId: destinationChannelId, label + chunk, ct: ct),
+                () => discord.SendTextAsync(destination: destination, label + chunk, ct: ct),
                 ct: ct);
 
         for (var index = 0; index < message.Attachments.Length; index++)
@@ -318,7 +328,7 @@ public sealed class SylvanMailWorkflow(
                 db: db,
                 op: operation,
                 ordinal: ordinal++,
-                () => discord.SendAttachmentAsync(channelId: destinationChannelId, attachment: attachment, bytes: bytes, label: label, ct: ct),
+                () => discord.SendAttachmentAsync(destination: destination, attachment: attachment, bytes: bytes, label: label, ct: ct),
                 ct: ct);
         }
     }
@@ -359,6 +369,8 @@ public sealed class SylvanMailWorkflow(
 
         try
         {
+            discord.RequireReady(toStaff ? SylvanMailDestinationKind.StaffThread : SylvanMailDestinationKind.MemberDm);
+
             // Discord already accepted outgoing drafts; only inbound delivery needs destination validation.
             if (toStaff)
             {
@@ -387,9 +399,6 @@ public sealed class SylvanMailWorkflow(
             operation.DestinationChannelId = toStaff ? threadId : await discord.OpenDmAsync(userId: conversation.UserId, ct: ct);
             await db.SaveChangesAsync(ct);
 
-            if (toStaff)
-                await SendFirstNoticeAsync(db: db, conversation: conversation, sourceChannelId: message.SourceChannelId, ct: ct);
-
             await PublishContentAsync(
                 db: db,
                 guildId: settings.GuildId,
@@ -409,20 +418,5 @@ public sealed class SylvanMailWorkflow(
         }
 
         return conversation;
-    }
-
-    private async Task SendFirstNoticeAsync(BotDbContext db, SylvanMailConversation conversation, ulong sourceChannelId, CancellationToken ct)
-    {
-        if (!conversation.NoticeStarted)
-        {
-            conversation.NoticeStarted = true;
-            await db.SaveChangesAsync(ct);
-
-            conversation.NoticeMessageId = await discord.SendTextAsync(
-                channelId: sourceChannelId,
-                "Your DMs to Sylvan reach staff in a private forum post. Staff replies are sent by Sylvan after the author confirms them; edits and deletions after sending are not relayed.",
-                ct: ct);
-            await db.SaveChangesAsync(ct);
-        }
     }
 }

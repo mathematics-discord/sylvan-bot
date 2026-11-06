@@ -33,6 +33,7 @@ public static class DependencyInjection
             services.AddFeatures(configuration);
             // Stop gateway admission before stopping feature consumers (host shutdown is reverse registration order).
             services.AddHostedService<DiscordBotHostedService>();
+            services.AddHostedService<SylvanMailHostedService>();
         }
 
         private void AddFeatures(IConfiguration configuration)
@@ -46,6 +47,14 @@ public static class DependencyInjection
             services.AddHostedService(sp => sp.GetRequiredService<AutomodRuntime>());
             services.AddSingleton<AutomodGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<AutomodGatewayHandler>());
+            services
+               .AddOptions<SylvanMailOptions>()
+               .Bind(configuration.GetSection(SylvanMailOptions.SectionName))
+               .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "SylvanMail token is required.")
+               .Validate(options => options.BotId != 0, "SylvanMail bot ID is required.")
+               .ValidateOnStart();
+
+            services.AddSingleton<SylvanMailClient>();
             services.AddSingleton<ISylvanMailDiscord, SylvanMailDiscord>();
             services.AddSingleton<ISylvanMailDrafts, SylvanMailDrafts>();
             services.AddSingleton<ISylvanMailForum, SylvanMailForum>();
@@ -153,7 +162,6 @@ public static class DependencyInjection
                         WebSocketProvider = sp.GetRequiredService<MessageUpdateGatewayAdapter>().CreateWebSocket,
                         GatewayIntents =
                             GatewayIntents.Guilds
-                            | GatewayIntents.DirectMessages
                             | GatewayIntents.GuildMembers
                             | GatewayIntents.GuildMessages
                             | GatewayIntents.GuildMessageReactions

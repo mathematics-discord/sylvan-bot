@@ -140,26 +140,37 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 compose_args=(-p "$PROJECT" -f compose.yaml)
-if [[ -f .env ]]; then
-  compose_args+=(--env-file .env)
-elif [[ -f .env.example ]]; then
-  echo "Missing required server-side .env in $REMOTE_DIR. A .env.example is present as a template." >&2
-  exit 1
-else
-  echo "Missing required server-side .env in $REMOTE_DIR." >&2
+if [[ -L .env || ! -f .env ]]; then
+  echo "A regular server-side .env is required." >&2
   exit 1
 fi
+
+env_mode="$(stat -c '%a' .env)"
+env_owner="$(stat -c '%u' .env)"
+env_group="$(stat -c '%g' .env)"
+if [[ "$env_owner" != "$(id -u)" || "$env_mode" != "600" ]]; then
+  echo "Server-side .env must be owned by the deployment user with mode 600." >&2
+  exit 1
+fi
+
+compose_args+=(--env-file .env)
 
 if [[ -n "${IMAGE_REF}" ]]; then
   export SYLVAN_BOT_IMAGE="$IMAGE_REF"
 fi
 
-docker compose "${compose_args[@]}" config >/dev/null
+if ! docker compose "${compose_args[@]}" config >/dev/null 2>&1; then
+  # Malformed environment-file diagnostics can include secret-bearing lines.
+  echo "Compose validation failed; check the protected server-side configuration locally." >&2
+  exit 1
+fi
 docker compose "${compose_args[@]}" pull
 docker compose "${compose_args[@]}" up -d --remove-orphans
 
 if [[ -n "${IMAGE_REF}" ]]; then
-  tmp_env_file=".env.tmp"
+  umask 077
+  tmp_env_file="$(mktemp .env.XXXXXXXX)"
+  trap 'rm -f -- "$tmp_env_file"' EXIT
   awk -v image_ref="$IMAGE_REF" '
     BEGIN { updated = 0 }
     /^SYLVAN_BOT_IMAGE=/ {
@@ -174,7 +185,14 @@ if [[ -n "${IMAGE_REF}" ]]; then
       }
     }
   ' .env > "$tmp_env_file"
+  chgrp -- "$env_group" "$tmp_env_file"
+  chmod --reference=.env "$tmp_env_file"
+  if [[ "$(stat -c '%u:%g:%a' "$tmp_env_file")" != "$env_owner:$env_group:$env_mode" ]]; then
+    echo "Could not preserve server-side .env ownership and mode." >&2
+    exit 1
+  fi
   mv "$tmp_env_file" .env
+  trap - EXIT
 
   state_dir=".deploy-state"
   mkdir -p "$state_dir"

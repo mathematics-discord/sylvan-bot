@@ -2,15 +2,17 @@
 
 public interface ISylvanMailDiscord
 {
+    void RequireReady(SylvanMailDestinationKind destination);
+
     Task<string> InboundPrefixAsync(ulong guildId, SylvanMailMessage message, CancellationToken ct);
 
     Task PingAfterGapAsync(ulong guildId, ulong roleId, ulong threadId, SylvanMailMessage message, CancellationToken ct);
 
     Task<ulong> OpenDmAsync(ulong userId, CancellationToken ct);
 
-    Task<ulong> SendTextAsync(ulong channelId, string text, CancellationToken ct);
+    Task<ulong> SendTextAsync(SylvanMailDestination destination, string text, CancellationToken ct);
 
-    Task<ulong> SendAttachmentAsync(ulong channelId, SylvanMailAttachment attachment, byte[] bytes, string label, CancellationToken ct);
+    Task<ulong> SendAttachmentAsync(SylvanMailDestination destination, SylvanMailAttachment attachment, byte[] bytes, string label, CancellationToken ct);
 
     Task<byte[]> DownloadAsync(SylvanMailAttachment attachment, CancellationToken ct);
 

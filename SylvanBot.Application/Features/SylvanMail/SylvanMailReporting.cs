@@ -28,9 +28,9 @@ public sealed class SylvanMailReporting(ISylvanMailDiscord discord, ISylvanMailD
                .AnyAsync(
                     item =>
                         item.GuildId == op.GuildId
-                        && item.ConversationId == op.ConversationId
+                        && item.SourceChannelId == message.SourceChannelId
                         && item.ToStaff
-                        && item.AcknowledgementMessageId != null,
+                        && item.AcknowledgementStarted,
                     cancellationToken: noticeToken);
             op.AcknowledgementStarted = true;
             await db.SaveChangesAsync(noticeToken);
