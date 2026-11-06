@@ -1,0 +1,22 @@
+---
+title: Reaction roles
+description: Let members choose ordinary roles by reacting to a message.
+---
+
+React to a configured message to receive its role. Remove your reaction to remove the role. Different emoji on one message can grant different roles, and the same emoji can be used on other messages.
+
+Administrators set up mappings with [/config rolereact](../../commands/role-react/). Each message-and-emoji pair grants one role. Existing reactions are not processed during setup; members need to remove and add their reaction again.
+
+## Role safety and removal
+
+Only ordinary roles without staff powers can be offered. Channel overrides count too. Sylvan checks safety again before each grant. If the role later gains staff powers, new grants stop; existing members are not automatically stripped of it.
+
+**Removing a reaction removes its role even if a moderator or another mapping also granted it.** Choose roles members can safely give up this way.
+
+Removing a mapping disables future grants and clears that emoji?s reactions where possible. Members keep the roles they already received, and the Discord role itself is left intact.
+
+## Missed or incomplete changes
+
+Reaction changes are processed while Sylvan is online. If you reacted before setup or while it was offline, remove and add your reaction again.
+
+A mapping can be saved even if adding the visible emoji fails. The command reply explains the incomplete update; after correcting the problem, repeat add with the same options. If reactions cannot be cleared when a mapping is removed, clear them manually. The disabled mapping will no longer grant roles.

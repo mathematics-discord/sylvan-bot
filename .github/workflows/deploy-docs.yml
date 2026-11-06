@@ -1,6 +1,16 @@
 name: Deploy Sylvan documentation
 
 on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Documentation commit to publish
+        required: true
+        type: string
+      version:
+        description: Existing bot version to display (does not create a release)
+        required: true
+        type: string
   workflow_call:
     inputs:
       source_sha:

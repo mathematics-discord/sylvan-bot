@@ -1,0 +1,12 @@
+---
+title: Display colours
+description: Choose a colour from the options your roles allow.
+---
+
+Use [/colour set](../../commands/color/#set) to choose a display colour or reset it. Your roles determine which colours appear in the menu. A source role grants access; a separate display role supplies the colour. For example, a Members ? Purple mapping lets members with Members choose Purple.
+
+Only you can use your picker. Choosing a colour replaces your other configured display colour roles. Reset removes them without choosing another. [/colour list](../../commands/color/#list) shows all mappings and their IDs, including colours you cannot use.
+
+Sylvan also checks colour roles when members join or their roles change. If you lose access to a colour, it can be removed. The bot keeps a single valid colour; invalid or conflicting configured display roles are removed so you can choose again. It does not select a replacement for you.
+
+Administrators manage mappings and run manual checks with [/config colour](../../commands/color-admin/). Saving a mapping does not automatically assign its colour to everyone who becomes eligible. Incomplete role updates do not undo a saved mapping; read the reply before retrying.

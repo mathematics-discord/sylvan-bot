@@ -85,3 +85,5 @@ Ask the person running the bot to check its logs for the cause.
 Anyone in the server can use [/colour list](../color/#list) to see all
 configured colour mappings and their IDs. Use a mapping ID with `upsert`
 to change it or `delete` to remove it.
+
+See the [Display colours](../../features/colours/) guide for automatic behaviour and limitations.

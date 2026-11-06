@@ -8,4 +8,5 @@ Discord bot.
 
 These guides are for members of Mathematics.
 
-Browse the [command guides](./commands/) for members, moderators, and administrators.
+Read the [feature guides](./features/) for what Sylvan does, or browse the
+[command reference](./commands/) for syntax and examples.

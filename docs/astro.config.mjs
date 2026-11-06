@@ -16,7 +16,17 @@ export default defineConfig({
         pagination: false,
         sidebar: [
             {slug: 'index', label: 'Introduction'},
-            {slug: 'commands/sylvanmail'},
+            {label: 'Features', items: [
+                {slug: 'features', label: 'Overview'},
+                {slug: 'features/colours'},
+                {slug: 'features/reaction-roles'},
+                {slug: 'features/persistence'},
+                {slug: 'features/working-hours'},
+                {slug: 'features/sylvanmail'},
+                {slug: 'features/logging'},
+                {slug: 'features/automod'},
+                {slug: 'features/image-spam'},
+            ]},
             {slug: 'commands', label: 'Command overview'},
             {
                 label: 'User commands',
@@ -31,12 +41,13 @@ export default defineConfig({
             },
             {
                 label: 'Senior moderator commands',
-                items: [{slug: 'commands/yoink'}, {slug: 'commands/persistence'}],
+                items: [{slug: 'commands/yoink'}, {slug: 'commands/persistence'}, {slug: 'commands/automod'}],
             },
             {
                 label: 'Administrator commands',
                 items: [
                     {slug: 'commands/color-admin'},
+                    {slug: 'commands/automod-admin'},
                     {label: '/config sylvanmail', link: 'https://math.ratgirl.dev/sylvan/commands/sylvanmail/#administrator-configuration'},
                     {slug: 'commands/role-react'},
                     {slug: 'commands/logging'},

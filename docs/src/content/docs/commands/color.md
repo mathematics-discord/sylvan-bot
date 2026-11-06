@@ -3,6 +3,8 @@ title: /colour
 description: Choose, reset, or list the display colours available in your server.
 ---
 
+Run these commands inside the server. Replies, including the colour list, are private.
+
 Use `/colour` to choose a display colour or see how the server's colour
 roles are set up.
 
@@ -50,3 +52,5 @@ If there are no mappings, Sylvan tells you that no colour options are configured
 
 Administrators can use the mapping IDs to change or remove mappings with
 [/config colour](../color-admin/).
+
+See the [Display colours](../../features/colours/) guide for automatic behaviour and limitations.

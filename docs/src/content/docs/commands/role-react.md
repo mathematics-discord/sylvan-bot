@@ -3,6 +3,8 @@ title: /config rolereact
 description: Let members choose ordinary server roles by reacting to a message.
 ---
 
+Run this command inside the server. Replies are private.
+
 Configure a message reaction that gives members a role when they react. Removing an individual reaction removes the role
 again.
 
@@ -80,3 +82,5 @@ Role changes are processed while Sylvan is online. If someone reacted
 before setup or while Sylvan was offline, ask them to remove and add their
 reaction again. If a role still does not update, ask the person running
 Sylvan to check its logs.
+
+See the [Reaction roles](../../features/reaction-roles/) guide for automatic behaviour and limitations.

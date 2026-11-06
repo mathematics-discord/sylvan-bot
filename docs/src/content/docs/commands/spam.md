@@ -30,3 +30,5 @@ Every supplied value must be a whole number greater than zero. All options
 are optional: supply only the settings you want to change. If no settings
 exist yet, supplying an option creates a configuration and uses defaults
 for the omitted values.
+
+See the [Image-spam detection](../../features/image-spam/) guide for automatic behaviour and limitations.

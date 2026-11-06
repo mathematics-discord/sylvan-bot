@@ -30,6 +30,12 @@ after detecting a committed release batch on `master` and scanning its exact
 commit. The docs workflow checks, builds and publishes that exact commit,
 independently of the bot's
 image build and deployment. Ordinary pushes do not deploy the docs.
+
+For a documentation-only update, manually run **Deploy Sylvan documentation**
+(`deploy-docs.yml`) on `master`, supplying the full documentation commit SHA
+as `source_sha` and the existing bot version as `version`. This publishes
+only the site, displays that version beside its title, and does not batch a
+release, change `version.json`, or deploy the bot.
 See [Preparing a release](releases.md) for the local batching procedure.
 
 The release version is passed as `DOCS_RELEASE` at build time and displayed

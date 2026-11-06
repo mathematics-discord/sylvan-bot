@@ -10,6 +10,8 @@ Find the command you need on <a href="https://discord.gg/math" target="_blank" r
 Mathematics</a>. Select a guide for examples
 and instructions.
 
+See the [feature guides](../features/) for automatic behaviour and staff workflows.
+
 ## User commands
 
 - [/hello](./hello/) — Ask Sylvan for a greeting.
@@ -30,6 +32,8 @@ and instructions.
 
 - [/persistence](./persistence/) — Remember selected safe roles across departures and rejoins.
 
+- [/automod](./automod/) ? Add, remove and browse message-matching rules.
+
 ## Administrator commands
 
 - [/config rolereact](./role-react/) — Add or remove message reactions
@@ -47,3 +51,5 @@ and instructions.
 
 - [/config working-hours](./working-conditions/) — Configure eligible roles,
   exemptions and the ping role used by Working Hours.
+
+- [/config automod](./automod-admin/) ? Enable actions and manage role exemptions.

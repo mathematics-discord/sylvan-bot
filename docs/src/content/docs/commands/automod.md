@@ -1,0 +1,44 @@
+---
+title: /automod
+description: Add, remove and list message-matching rules.
+---
+
+Manage rules inside the server. See [Automod](../../features/automod/) for matching behaviour, actions and limitations.
+
+## Add rules
+
+```text
+/automod add string:example, another example action:Delete
+/automod add string:example action:Mute duration:30m
+/automod add string:example action:Ban duration:2 days
+```
+
+| Option | Meaning |
+|---|---|
+| `string` | Required. Comma-separated words or phrases; surround regexes with backticks. |
+| `action` | Required. Choose Delete, Note, Mute or Ban. |
+| `duration` | Optional. A positive whole number followed by seconds, minutes, hours, days or weeks; short forms `s`, `m`, `h`, `d`, `w` also work. |
+
+For example, enter ``example, `offer\s+\d+` `` in `string` to create one word rule and one regex rule. Commas inside a backtick-delimited regex belong to that pattern. Triple-backtick code blocks are also accepted. Empty patterns, invalid regexes and patterns matching empty text are rejected; no rules from that request are added.
+
+Mute defaults to 28 days and cannot exceed that. Ban defaults to permanent. Delete and Note ignore `duration`. **Note rules do not execute yet.**
+
+The private reply lists the new IDs in input order. If the rules were saved but could not be applied immediately, the reply says so.
+
+## Remove a rule
+
+```text
+/automod remove id:12
+```
+
+Use the required rule ID from the list, not a message or user ID. Only rules in this server can be removed. The private reply confirms removal or explains that the ID was not found.
+
+## List rules
+
+```text
+/automod list
+```
+
+The list is public and includes rule IDs, patterns, actions and durations. Use **Prev** and **Next** to change pages. Other Senior Moderators can use the controls too. Listing rules does not enable disabled actions.
+
+Administrators manage action switches and exempt roles with [/config automod](../automod-admin/).

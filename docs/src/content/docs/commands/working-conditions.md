@@ -72,3 +72,5 @@ Enabling requires a valid ping role and at least one eligible role. Disabling
 suspends schedule-based changes and restores the normal defaults described
 above; it does not erase members' saved schedules. Read Sylvan's reply for
 any role updates still waiting to complete.
+
+See the [Working Hours](../../features/working-hours/) guide for automatic behaviour and limitations.
