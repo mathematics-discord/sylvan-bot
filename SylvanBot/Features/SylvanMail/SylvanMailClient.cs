@@ -67,14 +67,18 @@ public sealed class SylvanMailClient : IDisposable
         {
             await _mainReady.Task.WaitAsync(deadline.Token);
             await Client.LoginAsync(TokenType.Bot, _options.Token).WaitAsync(deadline.Token);
-            var user = await Client.Rest.GetCurrentUserAsync(new RequestOptions { CancelToken = deadline.Token });
+            var application = await Client.Rest.GetApplicationInfoAsync(new RequestOptions { CancelToken = deadline.Token });
 
-            if (!user.IsBot || user.Id != _options.BotId || user.Id == _main.CurrentUser.Id)
+            if (application.Id != _options.BotId || application.Id == _main.CurrentUser.Id)
                 throw new InvalidOperationException("Unexpected SylvanMail bot identity.");
 
-            _logger.Information("SylvanMail authenticated as bot {MailBotId}; main bot {MainBotId}", user.Id, _main.CurrentUser.Id);
+            _logger.Information("SylvanMail authenticated as bot {MailBotId}; main bot {MainBotId}", application.Id, _main.CurrentUser.Id);
             await Client.StartAsync().WaitAsync(deadline.Token);
             await _mailReady.Task.WaitAsync(deadline.Token);
+
+            if (Client.CurrentUser is not { IsBot: true } user || user.Id != _options.BotId || user.Id == _main.CurrentUser.Id)
+                throw new InvalidOperationException("Unexpected SylvanMail bot identity.");
+
             _started = true;
             _logger.Information("SylvanMail relay ready");
 

@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.4.0-rc.2 - 2026-11-06
+## Internal
+### Fixed
+- Validate SylvanMail's authenticated application before connecting and its bot identity after gateway readiness, avoiding a startup failure in Discord.NET's socket REST wrapper.
 # v0.4.0-rc.1 - 2026-11-06
 ## General
 ### Changed
