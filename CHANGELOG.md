@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v0.4.0-rc.5 - 2026-11-07
+## Administration
+### Changed
+- Administrators now manage role persistence with /config persistence add, remove and list. The role list is public and uses bullet points, including blocked or deleted roles.
 # v0.4.0-rc.4 - 2026-11-06
 ## Moderation
 ### Changed
