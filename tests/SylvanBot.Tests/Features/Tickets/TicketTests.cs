@@ -21,36 +21,66 @@ public sealed class TicketTests
         ticket.Status.ShouldBe(TicketStatus.NotApplicable);
     }
 
+    [Test]
+    [Combinatorial]
+    public void SetHidden_ActiveRestriction_RejectsVisibilityChange(
+        [Values(TicketAction.Ban, TicketAction.Timeout, TicketAction.VoiceMute, TicketAction.VoiceDeafen, TicketAction.Role)] TicketAction action,
+        [Values] bool pendingOperation)
+    {
+        // Arrange
+        var ticket = Create(action);
+        var pending = pendingOperation
+            ? new TicketOperation { Kind = action == TicketAction.Ban ? "RemoveBan" : "SetTimeoutExpiry", ExpiryUtc = DateTimeOffset.UtcNow }
+            : null;
+
+        ticket.Pending = pending;
+        DateTimeOffset? expiry = ticket.ExpiresAtUtc;
+        var version = ticket.Version;
+        var actor = new TicketActor(1, 3, IsAdministrator: true, CanTimeoutMembers: false);
+
+        // Act
+        void Act() => ticket.SetHidden(actor, ticket.Version, hidden: true);
+
+        // Assert
+        Should.Throw<BotCommandException>(Act);
+        ticket.Hidden.ShouldBeFalse();
+        ticket.Status.ShouldBe(TicketStatus.Active);
+        ticket.Version.ShouldBe(version);
+        ticket.ExpiresAtUtc.ShouldBe(expiry);
+        ticket.Pending.ShouldBeSameAs(pending);
+        ticket.ModificationHistory.ShouldBeEmpty();
+    }
+
     [TestCase(TicketAction.Ban)]
     [TestCase(TicketAction.Timeout)]
     [TestCase(TicketAction.VoiceMute)]
     [TestCase(TicketAction.VoiceDeafen)]
     [TestCase(TicketAction.Role)]
-    public void SetHidden_ActiveRestriction_PreservesActionAndPendingOperation(TicketAction action)
+    public void SetHidden_RevertedRestriction_HidesRecord(TicketAction action)
     {
         // Arrange
         var ticket = Create(action);
-        var pending = new TicketOperation { Kind = action == TicketAction.Ban ? "RemoveBan" : "SetTimeoutExpiry", ExpiryUtc = DateTimeOffset.UtcNow };
-        ticket.Pending = pending;
-        DateTimeOffset? expiry = ticket.ExpiresAtUtc;
         var actor = new TicketActor(1, 3, IsAdministrator: true, CanTimeoutMembers: false);
+        ticket.End(TicketStatus.Reverted, actor.UserId);
 
         // Act
         ticket.SetHidden(actor, ticket.Version, hidden: true);
 
         // Assert
         ticket.Hidden.ShouldBeTrue();
-        ticket.Status.ShouldBe(TicketStatus.Active);
-        ticket.ExpiresAtUtc.ShouldBe(expiry);
-        ticket.Pending.ShouldBeSameAs(pending);
-        ticket.ModificationHistory.ShouldHaveSingleItem().Action.ShouldBe(TicketHistoryAction.Hidden);
+        ticket.Status.ShouldBe(TicketStatus.Reverted);
+        ticket.ModificationHistory[^1].Action.ShouldBe(TicketHistoryAction.Hidden);
     }
 
-    [Test]
-    public void SetHidden_RestoringEndedAction_ChangesOnlyVisibility()
+    [TestCase(TicketAction.Ban)]
+    [TestCase(TicketAction.Timeout)]
+    [TestCase(TicketAction.VoiceMute)]
+    [TestCase(TicketAction.VoiceDeafen)]
+    [TestCase(TicketAction.Role)]
+    public void SetHidden_RestoringEndedAction_ChangesOnlyVisibility(TicketAction action)
     {
         // Arrange
-        var ticket = Create(TicketAction.Ban);
+        var ticket = Create(action);
         var actor = new TicketActor(1, 3, IsAdministrator: true, CanTimeoutMembers: false);
         ticket.End(TicketStatus.Reverted);
         ticket.SetHidden(actor, ticket.Version, hidden: true);

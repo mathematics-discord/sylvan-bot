@@ -1,0 +1,4 @@
+component: Moderation
+kind: Added
+body: "Senior Moderators: hiding a moderation ticket now lifts its active restriction before hiding the record and removing Sylvan's publications. Use Hide Ticket directly on its message. If the restriction cannot be lifted, the record stays visible. Restoring a hidden record does not reapply its restriction."
+time: 2026-11-07T12:00:00Z

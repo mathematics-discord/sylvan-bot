@@ -165,7 +165,7 @@ public sealed class Ticket
         Record(TicketHistoryAction.SetDuration, moderatorId)?.SetDuration(seconds ?? long.MaxValue);
     }
 
-    public void SetHidden(TicketActor actor, int version, bool hidden)
+    public void RequireVisibilityChange(TicketActor actor, int version)
     {
         var senior = actor.IsAdministrator || actor.CanViewAuditLog;
 
@@ -174,6 +174,16 @@ public sealed class Ticket
 
         if (version != Version)
             throw new BotCommandException("This ticket changed. Refresh it before changing visibility.");
+    }
+
+    public void SetHidden(TicketActor actor, int version, bool hidden)
+    {
+        RequireVisibilityChange(actor, version);
+        var restrictionUnresolved = Action is not (TicketAction.Note or TicketAction.Kick)
+            && (Status == TicketStatus.Active || Pending is not null);
+
+        if (hidden && restrictionUnresolved)
+            throw new BotCommandException("Lift the restriction and resolve pending changes before hiding this ticket.");
 
         if (Hidden == hidden)
             return;

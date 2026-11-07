@@ -53,6 +53,53 @@ public sealed class TicketModule(
         await ChangedAsync(await coordinator.ApproveAsync(actor, ticket.Number, ticket.Version, token));
     });
 
+    [MessageCommand("Revert Ticket")]
+    [DefaultMemberPermissions(GuildPermission.UseApplicationCommands)]
+    [CommandContextType(InteractionContextType.Guild)]
+    public Task RevertMessageAsync(IMessage message) => ExecuteAsync(async (actor, token) =>
+    {
+        var ticket = await coordinator.ShowMessageAsync(
+            actor,
+            new TicketMessage(message.Channel.Id, message.Id),
+            hidden: false,
+            token);
+
+        if (ticket is null)
+            throw new BotCommandException("No matching ticket in this view of this server.");
+
+        try
+        {
+            await ChangedAsync(await coordinator.RevertAsync(actor, ticket.Number, ticket.Version, token));
+        }
+        finally
+        {
+            worker.Wake();
+        }
+    });
+
+    [MessageCommand("Hide Ticket")]
+    [DefaultMemberPermissions(GuildPermission.UseApplicationCommands)]
+    [CommandContextType(InteractionContextType.Guild)]
+    public Task HideMessageAsync(IMessage message) => ExecuteAsync(async (actor, token) =>
+    {
+        var ticket = await coordinator.ShowMessageAsync(
+            actor,
+            new TicketMessage(message.Channel.Id, message.Id),
+            hidden: false,
+            token);
+
+        if (ticket is null)
+            throw new BotCommandException("No matching ticket in this view of this server.");
+
+        await ChangedAsync(await coordinator.EditAsync(
+            actor,
+            ticket.Number,
+            ticket.Version,
+            TicketDetails.ParseFields(duration: null, comment: null),
+            hidden: true,
+            token));
+    });
+
     [SlashCommand("note", "Save a moderator note and publish it to the staff tickets channel.")]
     public Task NoteAsync(
         [Summary("user", "Subject mention or user ID, including departed users.")] string user,
@@ -96,7 +143,7 @@ public sealed class TicketModule(
         [MinValue(1)] long id,
         string? duration = null,
         [MaxLength(Ticket.CommentLimit)] string? comment = null,
-        [Summary("hidden", "Hide or restore the record. Restrictions continue normally.")] bool? hidden = null)
+        [Summary("hidden", "Hide the record and lift its restriction, or restore the record without reapplying it.")] bool? hidden = null)
         => ExecuteAsync(async (actor, token)
             => await ChangedAsync(
                 await coordinator.EditAsync(actor, id, version: null, TicketDetails.ParseFields(duration, comment), hidden, token)));
@@ -112,7 +159,11 @@ public sealed class TicketModule(
                 hidden: null,
                 token)));
 
-    [SlashCommand("hide", "Hide the ticket record and remove its Sylvan-authored publications.")]
+    [SlashCommand("revert", "Lift the ticket's active restriction and keep its record.")]
+    public Task RevertAsync([MinValue(1)] long id) => ExecuteAsync(async (actor, token) => await ChangedAsync(
+        await coordinator.RevertAsync(actor, id, version: null, token)));
+
+    [SlashCommand("hide", "Lift the ticket's restriction, hide its record and remove its Sylvan-authored publications.")]
     public Task HideAsync([MinValue(1)] long id) => ExecuteAsync(async (actor, token) => await ChangedAsync(
         await coordinator.EditAsync(actor, id, version: null, TicketDetails.ParseFields(duration: null, comment: null), hidden: true, token)));
 

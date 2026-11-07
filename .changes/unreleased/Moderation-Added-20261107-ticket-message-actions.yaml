@@ -1,0 +1,4 @@
+component: Moderation
+kind: Added
+body: "Use /ticket revert id: or Revert Ticket on a ticket message to undo an active restriction while keeping its record, subject to your ticket and Discord permissions. Trial Moderators and higher can also use Hide Ticket on note messages."
+time: 2026-11-07T12:00:00Z

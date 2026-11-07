@@ -93,7 +93,7 @@ public sealed class TicketPublisher(
                 return "\nA new publication remains unconfirmed. Check the tickets channel; it will not be reposted automatically.";
 
             if (ticket.Hidden)
-                return "\nThe record is hidden; recorded channel copies were removed. Restrictions continue normally.";
+                return "\nThe record is hidden; recorded channel copies were removed.";
 
             var current = ticket.Publications
                 .FirstOrDefault(reference => reference.Current && !reference.Removed);
