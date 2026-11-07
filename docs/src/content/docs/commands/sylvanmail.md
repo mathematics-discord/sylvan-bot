@@ -5,7 +5,7 @@ description: Choose the private mail forum and notification role.
 
 Run this command inside the server. The configuration reply is private.
 
-Read the [SylvanMail guide](../../features/sylvanmail/) for contacting staff and sending replies.
+Read the [ModMail guide](../../features/sylvanmail/) for contacting staff and sending replies.
 
 ## Administrator configuration
 
@@ -34,6 +34,6 @@ Settings take effect immediately. Changing the forum leaves old case posts
 in place and stops replies being sent from them. Subsequent DMs use the new
 forum; old messages are not moved or replayed.
 
-Only one server can configure SylvanMail for a bot database. There is no
+Only one server can configure ModMail for a bot database. There is no
 disable command. Without a configured destination, DM senders receive an
 unavailable notice.
