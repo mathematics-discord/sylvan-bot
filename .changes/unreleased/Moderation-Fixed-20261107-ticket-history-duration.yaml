@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: "Ticket history displays duration changes as days.hours:minutes:seconds."
+time: 2026-11-07T22:15:00Z

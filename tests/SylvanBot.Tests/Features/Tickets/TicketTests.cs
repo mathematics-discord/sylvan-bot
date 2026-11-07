@@ -231,6 +231,21 @@ public sealed class TicketTests
         ticket.ModificationHistory.ShouldBeEmpty();
     }
 
+    [TestCase(60, "0.00:01:00")]
+    [TestCase(90061, "1.01:01:01")]
+    [TestCase(172800, "2.00:00:00")]
+    public void SetDuration_FiniteDuration_FormatsHistoryAsDaysAndTime(long seconds, string expected)
+    {
+        // Arrange
+        var ticket = Create(TicketAction.Ban);
+
+        // Act
+        ticket.SetDuration(seconds, 4);
+
+        // Assert
+        ticket.ModificationHistory[^1].Format().ShouldContain($"set duration to {expected} at ");
+    }
+
     [Test]
     public void SetDuration_SystemChange_PreservesModeratorHistory()
     {

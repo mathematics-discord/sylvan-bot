@@ -76,7 +76,7 @@ public sealed class TicketHistoryEntry
         var seconds = _durationSeconds ?? throw new InvalidOperationException("Duration history has no duration.");
         return seconds == long.MaxValue
             ? "Permanent"
-            : TimeSpan.FromSeconds(seconds).ToString(@"d\D\Thh\:mm\:ss", CultureInfo.InvariantCulture);
+            : TimeSpan.FromSeconds(seconds).ToString(@"d\.hh\:mm\:ss", CultureInfo.InvariantCulture);
     }
 }
 
