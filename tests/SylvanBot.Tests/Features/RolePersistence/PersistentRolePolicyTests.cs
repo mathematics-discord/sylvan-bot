@@ -1,5 +1,4 @@
 using Discord;
-using Discord.Interactions;
 using SylvanBot.Features.RolePersistence;
 
 namespace SylvanBot.Tests.Features.RolePersistence;
@@ -27,13 +26,5 @@ public sealed class PersistentRolePolicyTests
     {
         PersistentRolePolicy.IsSafe(0, []).ShouldBeTrue();
         PersistentRolePolicy.IsSafe((ulong)GuildPermission.ManageRoles, []).ShouldBeFalse();
-    }
-
-    [Test]
-    public void CommandsRequireAuditLogAtRegistrationAndRuntime()
-    {
-        var attributes = typeof(PersistenceModule).GetCustomAttributes(false);
-        attributes.OfType<DefaultMemberPermissionsAttribute>().Single().Permissions.ShouldBe(GuildPermission.ViewAuditLog);
-        attributes.OfType<RequireUserPermissionAttribute>().Single().GuildPermission.ShouldBe(GuildPermission.ViewAuditLog);
     }
 }

@@ -1,0 +1,4 @@
+component: Administration
+kind: Changed
+body: Administrators now manage role persistence with /config persistence add, remove and list. The role list is public and uses bullet points, including blocked or deleted roles.
+time: 2026-11-07T16:03:56Z
