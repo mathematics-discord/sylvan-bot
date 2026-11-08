@@ -11,6 +11,7 @@ public sealed class TicketWorker(
     IDbContextFactory<BotDbContext> contextFactory,
     TicketCoordinator coordinator,
     TicketBoundary boundary,
+    TicketReviewSummary reviewSummary,
     ILogger logger) : BackgroundService, IDiscordGatewayHandler
 {
     private readonly SemaphoreSlim _wake = new SemaphoreSlim(0, 1);
@@ -25,6 +26,8 @@ public sealed class TicketWorker(
         client.UserVoiceStateUpdated += OnVoiceAsync;
         client.UserJoined += OnJoinedAsync;
         client.Connected += OnConnectedAsync;
+        client.MessageReceived += OnMessageAsync;
+        client.MessageDeleted += OnMessageDeletedAsync;
 
         return Task.CompletedTask;
     }
@@ -36,6 +39,8 @@ public sealed class TicketWorker(
         client.UserVoiceStateUpdated -= OnVoiceAsync;
         client.UserJoined -= OnJoinedAsync;
         client.Connected -= OnConnectedAsync;
+        client.MessageReceived -= OnMessageAsync;
+        client.MessageDeleted -= OnMessageDeletedAsync;
     }
 
     public void Wake()
@@ -82,6 +87,7 @@ public sealed class TicketWorker(
                     }
 
                     await ProcessGuildsAsync(stoppingToken);
+                    await reviewSummary.RefreshAsync(stoppingToken);
                     await ProcessModeratorsAsync(stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -101,6 +107,22 @@ public sealed class TicketWorker(
         {
             _logger.Information("Ticket worker stopped");
         }
+    }
+
+    private Task OnMessageAsync(SocketMessage message)
+    {
+        if (reviewSummary.IsChannel(message.Channel.Id))
+            Wake();
+
+        return Task.CompletedTask;
+    }
+
+    private Task OnMessageDeletedAsync(Cacheable<IMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel)
+    {
+        if (reviewSummary.IsChannel(channel.Id))
+            Wake();
+
+        return Task.CompletedTask;
     }
 
     private Task OnVoiceAsync(SocketUser user, SocketVoiceState before, SocketVoiceState after)

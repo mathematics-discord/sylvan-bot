@@ -96,7 +96,7 @@ public sealed class TicketPublisher(
                 return "\nThe record is hidden; recorded channel copies were removed.";
 
             var current = ticket.Publications
-                .FirstOrDefault(reference => reference.Current && !reference.Removed);
+                .FirstOrDefault(reference => reference is { Current: true, Removed: false });
 
             if (current is not null)
                 return string.Empty;

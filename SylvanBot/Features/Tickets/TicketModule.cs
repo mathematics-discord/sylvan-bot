@@ -190,7 +190,7 @@ public sealed class TicketModule(
     private Task OpenEditorAsync(long number, ulong? reviewOwner = null) => ExecuteAsync(
         async (actor, token) =>
         {
-            if (reviewOwner is { } owner && (owner != actor.UserId || (!actor.IsAdministrator && !actor.CanViewAuditLog)))
+            if (reviewOwner is { } owner && (owner != actor.UserId || actor is { IsAdministrator: false, CanViewAuditLog: false }))
                 throw new BotCommandException("This review editor belongs to another moderator.");
 
             var ticket = await coordinator.PrepareEditAsync(actor, number, token);
@@ -280,6 +280,9 @@ public sealed class TicketModule(
     [SlashCommand("review", "Work through tickets awaiting approval.")]
     public Task ReviewAsync() => ExecuteAsync((actor, token) => QueueAsync(actor, 0, token));
 
+    [ComponentInteraction(TicketReviewSummary.ReviewButtonId, true)]
+    public Task OpenReviewAsync() => ReviewAsync();
+
     [ComponentInteraction("ticket:review:*:*:*", true)]
     public Task ReviewButtonAsync(ulong owner, long after, string action) => ExecuteAsync(async (actor, token) =>
     {
@@ -318,7 +321,7 @@ public sealed class TicketModule(
         {
             RequireOwner(actor, guild, owner);
 
-            if (!actor.IsAdministrator && !actor.CanViewAuditLog)
+            if (actor is { IsAdministrator: false, CanViewAuditLog: false })
                 throw new BotCommandException("Review requires Administrator or View Audit Log.");
 
             var result = await coordinator.EditAsync(

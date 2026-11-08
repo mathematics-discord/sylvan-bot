@@ -659,6 +659,12 @@ namespace SylvanBot.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("bigint[]");
 
+                    b.Property<long?>("ReviewSummaryChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ReviewSummaryMessageId")
+                        .HasColumnType("bigint");
+
                     b.PrimitiveCollection<long[]>("TrackedRoleIds")
                         .IsRequired()
                         .HasColumnType("bigint[]");

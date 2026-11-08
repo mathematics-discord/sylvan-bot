@@ -12,6 +12,10 @@ public sealed class TicketConfiguration
 
     public ulong? DestinationChannelId { get; set; }
 
+    public ulong? ReviewSummaryChannelId { get; set; }
+
+    public ulong? ReviewSummaryMessageId { get; set; }
+
     public DateTimeOffset? CaptureFromUtc { get; set; }
 
     public ulong? LastAuditId { get; set; }

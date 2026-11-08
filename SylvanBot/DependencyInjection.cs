@@ -68,6 +68,7 @@ public static class DependencyInjection
             services.AddSingleton<RoleTicketStrategy>();
             services.AddSingleton<TicketPublisher>();
             services.AddSingleton<TicketCoordinator>();
+            services.AddSingleton<TicketReviewSummary>();
             services.AddSingleton<TicketWorker>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<TicketWorker>());
             services.AddHostedService(sp => sp.GetRequiredService<TicketWorker>());
