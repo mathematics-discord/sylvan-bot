@@ -66,6 +66,11 @@ if [[ -z "$project" || -z "$remote_dir" ]]; then
   exit 1
 fi
 
+if [[ "$project" == sylvan-bot-staging ]]; then
+  local_compose="$repo_root/docker-compose.staging.yml"
+  local_env_example="$repo_root/env/staging.env.example"
+fi
+
 if [[ ! -f "$local_compose" ]]; then
   echo "Local compose file not found: $local_compose" >&2
   exit 1

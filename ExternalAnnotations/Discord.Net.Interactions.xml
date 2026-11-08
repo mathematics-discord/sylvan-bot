@@ -1,8 +1,14 @@
 <assembly name="Discord.Net.Interactions">
     <member name="T:Discord.Interactions.SlashCommandAttribute">
-        <attribute ctor="M:JetBrains.Annotations.MeansImplicitUseAttribute.#ctor" />
+        <attribute ctor="M:JetBrains.Annotations.MeansImplicitUseAttribute.#ctor"/>
     </member>
     <member name="T:Discord.Interactions.GroupAttribute">
-        <attribute ctor="M:JetBrains.Annotations.MeansImplicitUseAttribute.#ctor" />
+        <attribute ctor="M:JetBrains.Annotations.MeansImplicitUseAttribute.#ctor"/>
+    </member>
+    <member name="T:Discord.Interactions.MessageCommandAttribute">
+        <attribute ctor="M:JetBrains.Annotations.MeansImplicitUseAttribute.#ctor"/>
+    </member>
+    <member name="T:Discord.Interactions.UserCommandAttribute">
+        <attribute ctor="M:JetBrains.Annotations.MeansImplicitUseAttribute.#ctor"/>
     </member>
 </assembly>

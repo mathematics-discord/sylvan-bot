@@ -30,11 +30,11 @@ See the [feature guides](../features/) for automatic behaviour and staff workflo
 - [/yoink and Yoink emoji](./yoink/) — Copy a custom emoji into the server
   using a slash command or a message's Apps menu.
 
-- [/persistence](./persistence/) — Remember selected safe roles across departures and rejoins.
-
 - [/automod](./automod/) ? Add, remove and browse message-matching rules.
 
 ## Administrator commands
+
+- [/config persistence](./persistence/) — Remember selected safe roles across departures and rejoins.
 
 - [/config rolereact](./role-react/) — Add or remove message reactions
   that let members choose ordinary roles.

@@ -41,11 +41,12 @@ export default defineConfig({
             },
             {
                 label: 'Senior moderator commands',
-                items: [{slug: 'commands/yoink'}, {slug: 'commands/persistence'}, {slug: 'commands/automod'}],
+                items: [{slug: 'commands/yoink'}, {slug: 'commands/automod'}],
             },
             {
                 label: 'Administrator commands',
                 items: [
+                    {slug: 'commands/persistence'},
                     {slug: 'commands/color-admin'},
                     {slug: 'commands/automod-admin'},
                     {label: '/config sylvanmail', link: 'https://math.ratgirl.dev/sylvan/commands/sylvanmail/#administrator-configuration'},

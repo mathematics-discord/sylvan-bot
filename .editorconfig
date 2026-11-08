@@ -1,6 +1,13 @@
 root = true
 
 [*]
+resharper_wrap_chained_method_calls = chop_if_long
+resharper_wrap_before_arrow_with_expressions = true
+resharper_max_attribute_length_for_same_line = 10000
+resharper_instance_members_qualify_declared_in = base_class
+resharper_empty_string = string_empty
+resharper_csharp_wrap_before_binary_opsign = true
+resharper_blank_lines_after_multiline_statements = 1
 charset = utf-8-bom
 end_of_line = crlf
 indent_size = 4
@@ -979,7 +986,26 @@ dotnet_diagnostic.sa1313.severity = none
 
 dotnet_diagnostic.sa1008.severity = none
 
+
+dotnet_diagnostic.SA1118.severity = none
+
+
+dotnet_diagnostic.SA1008.severity = none
+
+
+dotnet_diagnostic.SA1111.severity = error
+
+
+dotnet_diagnostic.SA1313.severity = none
+
+
+dotnet_diagnostic.MA0076.severity = none
+
+
+dotnet_diagnostic.MA0015.severity = none
+
 [*.cs]
+dotnet_diagnostic.rcs1001.severity = none
 dotnet_diagnostic.rcs1123.severity = none
 dotnet_diagnostic.rcs1261.severity = error
 dotnet_diagnostic.sa1503.severity = none

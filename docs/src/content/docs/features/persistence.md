@@ -3,7 +3,7 @@ title: Role persistence
 description: Keep selected ordinary roles when leaving and rejoining.
 ---
 
-Role persistence remembers configured roles when a member leaves and restores them when they return. Staff choose which roles to remember with [/persistence](../../commands/persistence/).
+Role persistence remembers configured roles when a member leaves and restores them when they return. Administrators choose which roles to remember with [/config persistence](../../commands/persistence/).
 
 Only ordinary roles without staff or moderation powers qualify. Channel overrides count towards that safety check. Safety is checked again before restoration, so a role gaining moderation powers can no longer be restored.
 

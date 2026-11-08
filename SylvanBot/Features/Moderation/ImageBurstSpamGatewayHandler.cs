@@ -42,7 +42,7 @@ public sealed class ImageBurstSpamGatewayHandler(
             return;
 
         var reason =
-            "Automatic image-burst spam detection: "
+            "Permanent, Automatic image-burst spam detection: "
             + $"{detection.ChannelIds.Count} channels with {currentSettings.RequiredAttachmentCount}+ attachments "
             + $"in {currentSettings.Window} seconds.";
 

@@ -71,7 +71,9 @@ public static class WorkingHoursResponses
                 + "A positive attitude is no substitute for material participation, comrade. We look forward to seeing this reflected in your next declaration.");
         }
         else
+        {
             messages.Add("Your availability declaration has been accepted.");
+        }
 
         var fullNight = duration > 0 && overlap == duration && duration <= 9 * 3600 * scale;
 
@@ -81,7 +83,9 @@ public static class WorkingHoursResponses
                 "Thank you for volunteering for the night shift, comrade. While the masses sleep, you shall safeguard the means of moderation. Your sacrifice will be recognised through the allocation of additional responsibilities.");
         }
         else if (end > 22 * 3600 * scale || end < 7 * 3600 * scale)
+        {
             messages.Add("Your commitment has been noted. Your judgement has been questioned. It is past 10pm. Go to fucking bed.");
+        }
 
         AddStatutoryNotices(messages: messages, duration: duration, overlap: overlap, scale: scale);
 

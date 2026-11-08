@@ -7,6 +7,7 @@ using SylvanBot.Application.Features.RoleColours;
 using SylvanBot.Application.Features.RolePersistence;
 using SylvanBot.Application.Features.RoleReactions;
 using SylvanBot.Application.Features.SylvanMail;
+using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Application.Features.WorkingHours;
 
 namespace SylvanBot.Application.Infrastructure.Data;
@@ -23,6 +24,12 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
     public DbSet<AutomodRule> AutomodRules => Set<AutomodRule>();
 
     public DbSet<AutomodExemptRole> AutomodExemptRoles => Set<AutomodExemptRole>();
+
+    public DbSet<TicketConfiguration> TicketConfigurations => Set<TicketConfiguration>();
+
+    public DbSet<Ticket> Tickets => Set<Ticket>();
+
+    public DbSet<TicketModerator> TicketModerators => Set<TicketModerator>();
 
     public DbSet<CachedMessage> CachedMessages => Set<CachedMessage>();
 
@@ -58,6 +65,7 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasSequence<long>("ticket_numbers");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BotDbContext).Assembly);
     }
 }

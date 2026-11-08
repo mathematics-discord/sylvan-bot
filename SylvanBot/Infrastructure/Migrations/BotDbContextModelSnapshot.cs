@@ -22,6 +22,8 @@ namespace SylvanBot.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("ticket_numbers");
+
             modelBuilder.Entity("SylvanBot.Application.Features.Automod.AutomodBan", b =>
                 {
                     b.Property<Guid>("Id")
@@ -496,6 +498,213 @@ namespace SylvanBot.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SylvanBot.Application.Features.Tickets.Ticket", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("AppliedTimeoutUntilUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ApprovedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("AuditReason")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Comment")
+                        .IsRequired()
+                        .HasMaxLength(3000)
+                        .HasColumnType("character varying(3000)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("DurationSeconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("ExpirySuspended")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("InitialPromptPending")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("LastAuditId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ModeratorUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Number")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("ReminderExempt")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("ReviewExempt")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("SendUncertain")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("SourceAuditId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("SubjectUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("SupersededByNumber")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("TimeoutCheckAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GuildId", "Number")
+                        .IsUnique();
+
+                    b.HasIndex("GuildId", "SourceAuditId", "Action")
+                        .IsUnique()
+                        .HasFilter("\"SourceAuditId\" IS NOT NULL AND \"RoleId\" IS NULL");
+
+                    b.HasIndex("GuildId", "Status", "ExpiresAtUtc");
+
+                    b.HasIndex("ModeratorUserId", "CreatedAtUtc", "Id");
+
+                    b.HasIndex("GuildId", "SourceAuditId", "Action", "RoleId")
+                        .IsUnique()
+                        .HasFilter("\"SourceAuditId\" IS NOT NULL AND \"RoleId\" IS NOT NULL");
+
+                    b.HasIndex("GuildId", "SubjectUserId", "Hidden", "Id");
+
+                    b.ToTable("tickets", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_tickets_approval", "(\"ApprovedByUserId\" IS NULL) = (\"ApprovedAtUtc\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_tickets_audit", "\"SourceAuditId\" IS NULL OR (\"SourceAuditId\" > 0 AND \"LastAuditId\" IS NOT NULL AND \"LastAuditId\" >= \"SourceAuditId\")");
+
+                            t.HasCheckConstraint("CK_tickets_duration", "(\"DurationSeconds\" IS NULL OR \"DurationSeconds\" > 0) AND (\"Action\" <> 'Timeout' OR (\"DurationSeconds\" IS NOT NULL AND \"ExpiresAtUtc\" IS NOT NULL))");
+
+                            t.HasCheckConstraint("CK_tickets_identity", "\"GuildId\" > 0 AND \"SubjectUserId\" > 0 AND \"ModeratorUserId\" > 0");
+
+                            t.HasCheckConstraint("CK_tickets_note_duration", "\"Action\" <> 'Note' OR \"DurationSeconds\" IS NULL");
+
+                            t.HasCheckConstraint("CK_tickets_number", "\"Number\" > 0");
+
+                            t.HasCheckConstraint("CK_tickets_role", "\"Action\" <> 'Role' OR (\"RoleId\" IS NOT NULL AND \"RoleId\" > 0)");
+
+                            t.HasCheckConstraint("CK_tickets_supersession", "\"Status\" <> 'Superseded' OR (\"SupersededByNumber\" IS NOT NULL AND \"SupersededByNumber\" > 0 AND \"SupersededByNumber\" <> \"Number\")");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.Tickets.TicketConfiguration", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("CaptureFromUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("DestinationChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("LastAuditId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("LastAuditScanAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ReminderIntervalSeconds")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(86400);
+
+                    b.PrimitiveCollection<long[]>("ReviewExemptRoleIds")
+                        .IsRequired()
+                        .HasColumnType("bigint[]");
+
+                    b.PrimitiveCollection<long[]>("TrackedRoleIds")
+                        .IsRequired()
+                        .HasColumnType("bigint[]");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("ticket_configurations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ticket_configurations_enabled_channel", "NOT \"Enabled\" OR \"DestinationChannelId\" IS NOT NULL");
+
+                            t.HasCheckConstraint("CK_ticket_configurations_reminder", "\"ReminderIntervalSeconds\" >= 60");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.Tickets.TicketModerator", b =>
+                {
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ActiveTicketId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("ChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("LastAttemptedVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("NextDeliveryUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("PromptMessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int?>("PromptVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("ticket_moderators", (string)null);
+                });
+
             modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursEligibleRole", b =>
                 {
                     b.Property<long>("GuildId")
@@ -597,6 +806,122 @@ namespace SylvanBot.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("ConversationId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.Tickets.Ticket", b =>
+                {
+                    b.OwnsMany("SylvanBot.Application.Features.Tickets.TicketHistoryEntry", "ModificationHistory", b1 =>
+                        {
+                            b1.Property<long>("TicketId")
+                                .HasColumnType("bigint");
+
+                            b1.Property<int>("Sequence")
+                                .HasColumnType("integer");
+
+                            b1.Property<string>("Action")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.Property<string>("HistoricalText")
+                                .HasColumnType("text");
+
+                            b1.Property<long?>("_durationSeconds")
+                                .HasColumnType("bigint")
+                                .HasColumnName("DurationSeconds");
+
+                            b1.Property<string>("_initiatorKind")
+                                .HasColumnType("text")
+                                .HasColumnName("InitiatorKind");
+
+                            b1.Property<long?>("_moderatorId")
+                                .HasColumnType("bigint")
+                                .HasColumnName("ModeratorId");
+
+                            b1.Property<DateTimeOffset?>("_timestamp")
+                                .HasColumnType("timestamp with time zone")
+                                .HasColumnName("Timestamp");
+
+                            b1.HasKey("TicketId", "Sequence");
+
+                            b1.ToTable("ticket_history", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("TicketId");
+                        });
+
+                    b.OwnsOne("SylvanBot.Application.Features.Tickets.TicketOperation", "Pending", b1 =>
+                        {
+                            b1.Property<long>("TicketId")
+                                .HasColumnType("bigint");
+
+                            b1.Property<bool>("Attempted")
+                                .HasColumnType("boolean");
+
+                            b1.Property<DateTimeOffset?>("ExpiryUtc")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<Guid>("Id")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("Kind")
+                                .IsRequired()
+                                .HasColumnType("text");
+
+                            b1.Property<DateTimeOffset?>("NativeExpiryUtc")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<DateTimeOffset>("RequestedAtUtc")
+                                .HasColumnType("timestamp with time zone");
+
+                            b1.Property<long?>("RequestedBy")
+                                .HasColumnType("bigint");
+
+                            b1.HasKey("TicketId");
+
+                            b1.ToTable("ticket_operations", null, t =>
+                                {
+                                    t.HasCheckConstraint("CK_ticket_operations_command", "(\"Kind\" IN ('RemoveBan', 'RemoveVoiceMute', 'RemoveVoiceDeafen', 'RemoveRole') OR (\"Kind\" = 'SetTimeoutExpiry' AND \"ExpiryUtc\" IS NOT NULL)) AND \"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid");
+                                });
+
+                            b1.WithOwner()
+                                .HasForeignKey("TicketId");
+                        });
+
+                    b.OwnsMany("SylvanBot.Application.Features.Tickets.TicketPublication", "Publications", b1 =>
+                        {
+                            b1.Property<long>("TicketId")
+                                .HasColumnType("bigint");
+
+                            b1.Property<long>("ChannelId")
+                                .HasColumnType("bigint");
+
+                            b1.Property<long>("MessageId")
+                                .HasColumnType("bigint");
+
+                            b1.Property<bool>("Current")
+                                .HasColumnType("boolean");
+
+                            b1.Property<bool>("Removed")
+                                .HasColumnType("boolean");
+
+                            b1.Property<int>("Revision")
+                                .HasColumnType("integer");
+
+                            b1.HasKey("TicketId", "ChannelId", "MessageId");
+
+                            b1.HasIndex("ChannelId", "MessageId");
+
+                            b1.ToTable("ticket_publications", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("TicketId");
+                        });
+
+                    b.Navigation("ModificationHistory");
+
+                    b.Navigation("Pending");
+
+                    b.Navigation("Publications");
                 });
 
             modelBuilder.Entity("SylvanBot.Application.Features.WorkingHours.WorkingHoursEligibleRole", b =>

@@ -1,20 +1,20 @@
 ---
-title: /persistence
+title: /config persistence
 description: Restore selected roles when members rejoin.
 ---
 
-Run these commands inside the server. Replies are private.
+Run these commands inside the server. Add and remove replies are private; the role list is public.
 
 ```text
-/persistence add role:@Example
-/persistence remove role:@Example
-/persistence list
+/config persistence add role:@Example
+/config persistence remove role:@Example
+/config persistence list
 ```
 
-`role` is required for add and remove. Add remembers the role on future departures; list shows configured roles and any currently blocked from restoration. Remove stops remembering the role and clears pending restorations, leaving current members? roles unchanged.
+`role` is required for add and remove. Add remembers the role on future departures; list shows configured roles, including blocked or deleted roles. Remove stops remembering the role and clears pending restorations, leaving current members' roles unchanged.
 
 Only ordinary roles without staff or moderation permissions can be persisted. Channel overrides count too. The role must be below your highest role. Safety is checked again before restoration, so granting a configured role moderation powers blocks restoration.
 
-Sylvan must observe the departure with the member's roles cached. Departures missed while it is offline cannot be recovered. Failed restorations remain pending for a later rejoin; deleted or unsafe roles are discarded. Replies are private.
+Sylvan must observe the departure with the member's roles cached. Departures missed while it is offline cannot be recovered. Failed restorations remain pending for a later rejoin; deleted or unsafe roles are discarded.
 
 See the [Role persistence](../../features/persistence/) guide for automatic behaviour and limitations.

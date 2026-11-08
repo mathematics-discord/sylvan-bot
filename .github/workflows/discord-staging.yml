@@ -1,0 +1,23 @@
+name: Notify Discord of staging changes
+
+on:
+  push:
+    branches: [staging]
+
+permissions: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Send push to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_STAGING_WEBHOOK_URL }}
+        run: |
+          curl --fail --silent --show-error \
+            --connect-timeout 10 --max-time 30 \
+            --header 'Content-Type: application/json' \
+            --header 'X-GitHub-Event: push' \
+            --data-binary "@$GITHUB_EVENT_PATH" \
+            "${DISCORD_WEBHOOK_URL%/}/github"

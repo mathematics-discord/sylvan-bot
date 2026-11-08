@@ -1,7 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.Automod;
 using SylvanBot.Application.Features.SylvanMail;
+using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Features.EmojiYoink;
 using SylvanBot.Features.Automod;
@@ -12,6 +13,7 @@ using SylvanBot.Features.RoleColours;
 using SylvanBot.Features.RolePersistence;
 using SylvanBot.Features.RoleReactions;
 using SylvanBot.Features.SylvanMail;
+using SylvanBot.Features.Tickets;
 using SylvanBot.Features.WorkingHours;
 using SylvanBot.Gateway;
 using SylvanBot.Infrastructure.Data;
@@ -55,6 +57,21 @@ public static class DependencyInjection
                .ValidateOnStart();
 
             services.AddSingleton<SylvanMailClient>();
+
+            services.AddSingleton<TicketBoundary>();
+            services.AddSingleton<NoteTicketStrategy>();
+            services.AddSingleton<BanTicketStrategy>();
+            services.AddSingleton<TimeoutTicketStrategy>();
+            services.AddSingleton<KickTicketStrategy>();
+            services.AddSingleton<VoiceMuteTicketStrategy>();
+            services.AddSingleton<VoiceDeafenTicketStrategy>();
+            services.AddSingleton<RoleTicketStrategy>();
+            services.AddSingleton<TicketPublisher>();
+            services.AddSingleton<TicketCoordinator>();
+            services.AddSingleton<TicketWorker>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<TicketWorker>());
+            services.AddHostedService(sp => sp.GetRequiredService<TicketWorker>());
+
             services.AddSingleton<ISylvanMailDiscord, SylvanMailDiscord>();
             services.AddSingleton<ISylvanMailDrafts, SylvanMailDrafts>();
             services.AddSingleton<ISylvanMailForum, SylvanMailForum>();
@@ -162,7 +179,10 @@ public static class DependencyInjection
                         WebSocketProvider = sp.GetRequiredService<MessageUpdateGatewayAdapter>().CreateWebSocket,
                         GatewayIntents =
                             GatewayIntents.Guilds
+                            | GatewayIntents.DirectMessages
                             | GatewayIntents.GuildMembers
+                            | GatewayIntents.GuildVoiceStates
+                            | GatewayIntents.GuildBans
                             | GatewayIntents.GuildMessages
                             | GatewayIntents.GuildMessageReactions
                             | GatewayIntents.MessageContent,

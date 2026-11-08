@@ -54,8 +54,7 @@ dotnet build SylvanBot.slnx --configuration Release
 dotnet test SylvanBot.slnx --configuration Release --results-directory ./TestResults
 ```
 
-Use `--filter` for focused tests. Existing PostgreSQL integration tests require Docker and create their own databases;
-the bot need not be running.
+Use `--filter` for focused tests. The bot need not be running.
 
 See [the persistent message cache lifecycle](docs/message-cache.md) for moderation snapshot expiry, startup hydration,
 configuration, failure behaviour and telemetry.

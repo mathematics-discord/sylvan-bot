@@ -23,7 +23,7 @@ internal static class InteractionFailureResponder
         }
         catch (HttpException ex) when (ex.DiscordCode == DiscordErrorCode.UnknownMessage)
         {
-            await interaction.FollowupAsync(text: GenericFailureMessage, ephemeral: true, allowedMentions: AllowedMentions.None);
+            await interaction.FollowupAsync(text: message, ephemeral: true, allowedMentions: AllowedMentions.None);
 
             return;
         }
