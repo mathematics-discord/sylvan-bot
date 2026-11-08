@@ -16,6 +16,17 @@ npm run build
 The site is configured for `https://math.ratgirl.dev/sylvan/`. The static
 output is `docs/dist/` relative to the repository root.
 
+For `https://sylvan.mathematics.gg/`, build the same source with a separate
+site URL and base path:
+
+```sh
+DOCS_SITE=https://sylvan.mathematics.gg DOCS_BASE=/ npm run build
+```
+
+Keep the two outputs separate. Navigation, canonical URLs, sitemaps, asset
+URLs and Pagefind search settings are generated for each base path. A
+server rewrite cannot make the legacy output into a root-path build.
+
 Theme styling lives in `src/styles/theme.css`, using Starlight's built-in
 appearance handling. Source Sans 3 variable fonts are self-hosted in
 `src/assets/fonts/source-sans-3/`; their licence and source notices are in
@@ -25,20 +36,19 @@ and code keeps its monospace font.
 
 ## Deployment
 
-The production release workflow calls `.github/workflows/deploy-docs.yml`
-after detecting a committed release batch on `master` and scanning its exact
-commit. The docs workflow checks, builds and publishes that exact commit,
-independently of the bot's
-image build and deployment. Ordinary pushes do not deploy the docs.
+`.github/workflows/deploy-docs.yml` publishes both hostnames automatically
+when documentation, its workflow, or `version.json` changes on `master`.
+Documentation deployment is independent of bot releases and does not wait
+for the bot image build. Each queued run checks out the current `master`,
+so a delayed run cannot publish an older documentation snapshot.
 
-For a documentation-only update, manually run **Deploy Sylvan documentation**
-(`deploy-docs.yml`) on `master`, supplying the full documentation commit SHA
-as `source_sha` and the existing bot version as `version`. This publishes
-only the site, displays that version beside its title, and does not batch a
-release, change `version.json`, or deploy the bot.
+For a documentation-only retry, manually run **Deploy Sylvan documentation**
+(`deploy-docs.yml`) on `master`. It publishes the latest `master` docs and
+reads the displayed version from `version.json`; it does not create a bot
+release or deploy the bot.
 See [Preparing a release](releases.md) for the local batching procedure.
 
-The release version is passed as `DOCS_RELEASE` at build time and displayed
+The version from `version.json` is passed as `DOCS_RELEASE` at build time and displayed
 beside the site title. Local builds omit it unless that variable is set.
 
 The repository secrets `DOCS_DEPLOY_SSH_KEY` and `DOCS_DEPLOY_KNOWN_HOSTS`
@@ -47,9 +57,21 @@ can only stream a site archive to `/usr/local/sbin/sylvan-docs-deploy`,
 installed from `deploy/receive.sh`. Updates to that receiver need to be
 installed by a VPS administrator.
 
-Releases live in `/var/www/math/sylvan/releases/`. Deployment switches the
-`current` link atomically and restores the previous release if the public
-page does not match. Apache and certificate configuration are unchanged.
+The workflow builds both variants. The existing SSH command `deploy`
+publishes the legacy build to `/var/www/math/sylvan/releases/`. The command
+`deploy-root` publishes the root build to `/var/www/sylvan/releases/`, using
+the same restricted account and receiver. Root deployments reject archives
+with the legacy canonical URL or base-path references before publishing.
+Each deployment switches its own `current` link atomically and restores
+the previous release if the served page does not match. Root verification
+uses local hostname routing, following the HTTP-to-HTTPS redirect once it
+is enabled. Public workflow verification checks both HTTPS hostnames.
+
+The VPS receiver must support both commands before enabling this workflow.
+Both hostnames have their own Apache configuration and Certbot certificate.
+The legacy hostname retains its configuration and does not redirect to the
+new hostname. The new hostname serves a root-path build with its own
+navigation, assets, canonical URLs, sitemaps and Pagefind index.
 
 ## Role mentions
 
