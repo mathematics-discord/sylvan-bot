@@ -18,7 +18,7 @@ namespace SylvanBot.Infrastructure.Migrations
                 nullable: false,
                 defaultValue: true);
 
-            migrationBuilder.Sql("""ALTER TABLE tickets ALTER COLUMN "UseOriginalEmbedFormat" SET DEFAULT FALSE""");
+            migrationBuilder.Sql("""ALTER TABLE tickets ALTER COLUMN "UseOriginalEmbedFormat" SET DEFAULT FALSE;""");
         }
 
         /// <inheritdoc />
