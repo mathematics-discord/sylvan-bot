@@ -24,6 +24,8 @@ public sealed class TicketPersistence : IEntityTypeConfiguration<Ticket>,
             .HasConversion<string>();
         builder.Property(ticket => ticket.Status)
             .HasConversion<string>();
+        builder.Property(ticket => ticket.UseOriginalEmbedFormat)
+            .HasDefaultValue(false);
         builder.Property(ticket => ticket.Version)
             .IsConcurrencyToken();
         builder.Property(ticket => ticket.Comment)

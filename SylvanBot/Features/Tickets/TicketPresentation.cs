@@ -1,5 +1,6 @@
 namespace SylvanBot.Features.Tickets;
 
+using System.Globalization;
 using SylvanBot.Application.Features.Tickets;
 
 internal static class TicketPresentation
@@ -69,7 +70,7 @@ internal static class TicketPresentation
             .WithColor(ModerationColour(ticket))
             .WithTimestamp(ticket.CreatedAtUtc);
 
-        if (!isNote)
+        if (ticket.Action == TicketAction.Ban || (ticket.UseOriginalEmbedFormat && !isNote))
             embed.WithThumbnailUrl("https://media.tenor.com/PHREyAefRckAAAAM/packwatch.gif");
 
         if (ticket.Comment.Length > InlineCommentLimit)
@@ -77,9 +78,11 @@ internal static class TicketPresentation
         else if (ticket.Comment.Length > 0)
             description += $"\n\n{ticket.Comment}";
 
+        string FormatId(ulong id) => ticket.UseOriginalEmbedFormat ? $"`{id}`" : id.ToString(CultureInfo.InvariantCulture);
+
         embed.WithDescription(description);
-        embed.AddField("User ID", $"`{ticket.SubjectUserId}`", inline: true);
-        embed.AddField("Moderator ID", $"`{ticket.ModeratorUserId}`", inline: true);
+        embed.AddField("User ID", FormatId(ticket.SubjectUserId), inline: true);
+        embed.AddField("Moderator ID", FormatId(ticket.ModeratorUserId), inline: true);
 
         if (ticket.Action != TicketAction.Kick)
             embed.AddField("Duration", ticket.DurationSeconds is { } seconds

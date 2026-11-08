@@ -593,6 +593,11 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("TimeoutCheckAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("UseOriginalEmbedFormat")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");

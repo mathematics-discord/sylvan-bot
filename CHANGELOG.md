@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.0.0-rc.7 - 2026-11-08
+## Moderation
+### Changed
+- New ticket embeds show the user and moderator IDs as plain text. Only bans show the thumbnail GIF. The 250 most recent Mathematics tickets also use this format.
 # v1.0.0-rc.6 - 2026-11-08
 ## Moderation
 ### Changed
