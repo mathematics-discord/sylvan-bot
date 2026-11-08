@@ -671,6 +671,7 @@ public sealed partial class TicketCoordinator(
         var candidates = await db.Tickets.AsNoTracking()
             .Where(ticket => ticket.GuildId == guildId && !ticket.Hidden
                 && (configuration.LegacyChannelId == null || ticket.ImportedFromLegacy)
+                && (!configuration.OrderedPublicationPaused || ticket.Publications.Any())
                 && !ticket.Publications.Any(copy => copy.Current && !copy.Removed
                     && (ticket.PinnedPublicationChannelId == null || copy.ChannelId == ticket.PinnedPublicationChannelId)))
             // During the cutover, fill the staff's live channel before resuming the archive.
@@ -688,6 +689,9 @@ public sealed partial class TicketCoordinator(
             {
                 // A gateway or staff command may have saved another ticket since the first read.
                 var config = await EnabledAsync(db, guildId, token);
+                if (config.OrderedPublicationPaused)
+                    return false;
+
                 if (await db.Tickets.AnyAsync(ticket => ticket.GuildId == guildId && !ticket.Hidden
                     && (config.LegacyChannelId == null || ticket.ImportedFromLegacy)
                     && !ticket.Publications.Any(copy => copy.Current && !copy.Removed

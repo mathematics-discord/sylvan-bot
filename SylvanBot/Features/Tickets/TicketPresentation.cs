@@ -1,8 +1,5 @@
-using static System.StringComparison;
-
 namespace SylvanBot.Features.Tickets;
 
-using System.Globalization;
 using SylvanBot.Application.Features.Tickets;
 
 internal static class TicketPresentation
@@ -10,8 +7,6 @@ internal static class TicketPresentation
     internal const int InlineCommentLimit = 3500;
 
     internal static string Link(ulong guildId, ulong channelId, ulong messageId) => $"https://discord.com/channels/{guildId}/{channelId}/{messageId}";
-
-    internal static bool UsesModerationEmbed(Ticket ticket) => ticket.Action != TicketAction.Note;
 
     internal static string ActionName(TicketAction action) => action switch
     {
@@ -23,25 +18,19 @@ internal static class TicketPresentation
     internal static MessageComponent Buttons(Ticket ticket, TicketActor? actor = null)
     {
         var builder = new ComponentBuilder();
-        var moderation = UsesModerationEmbed(ticket);
+        var isNote = ticket.Action == TicketAction.Note;
         var senior = actor?.IsAdministrator != false || actor.CanViewAuditLog;
-        var canEditStoredType = actor is not null && (actor.IsAdministrator || actor.CanViewAuditLog);
 
-        if (ticket.Action == TicketAction.Note || moderation || canEditStoredType)
-        {
-            if (actor is null || ticket.CanCorrect(actor))
-                builder.WithButton("Edit", $"ticket:edit:{ticket.Number}");
+        if (actor is null || ticket.CanCorrect(actor))
+            builder.WithButton("Edit", $"ticket:edit:{ticket.Number}");
 
-            if (!ticket.Hidden && (ticket.Action == TicketAction.Note || moderation && senior))
-                builder.WithButton(
-                    "Hide",
-                    moderation
-                        ? $"ticket:moderation-hide:{ticket.Number}:{ticket.Version}"
-                        : $"ticket:hide:{ticket.Number}",
-                    ButtonStyle.Danger);
-        }
+        if (!ticket.Hidden && (isNote || senior))
+            builder.WithButton(
+                "Hide",
+                isNote ? $"ticket:hide:{ticket.Number}" : $"ticket:moderation-hide:{ticket.Number}:{ticket.Version}",
+                ButtonStyle.Danger);
 
-        if (moderation && senior)
+        if (!isNote && senior)
         {
             var label = ticket.ApprovedByUserId is null ? "Approve" : "Approved";
 
@@ -58,95 +47,47 @@ internal static class TicketPresentation
         return builder.Build();
     }
 
-    internal static MessageComponent ChannelMessage(Ticket ticket)
-    {
-        var description = Describe(ticket);
-
-        var container = new ContainerBuilder()
-            .WithTextDisplay(new TextDisplayBuilder().WithContent($"## {description.Title}"))
-            .WithTextDisplay(new TextDisplayBuilder().WithContent(description.Description));
-
-        if (ticket.Action == TicketAction.Note)
-            container.WithAccentColor(new Color(0x808080));
-
-        if (ticket.Comment.Length > InlineCommentLimit)
-            container.WithFile(
-                new FileComponentBuilder()
-                    .WithFile(new UnfurledMediaItemProperties($"attachment://{ticket.Number}-comment.txt")));
-
-        var fields = description.Fields
-            .Select(field => $"**{field.Name}:** {field.Value}")
-            .ToArray();
-
-        if (fields.Length > 0)
-            container.WithSeparator(new SeparatorBuilder())
-                .WithTextDisplay(new TextDisplayBuilder().WithContent(string.Join('\n', fields)));
-
-        IEnumerable<ActionRowComponent> rows = Buttons(ticket)
-            .Components
-            .OfType<ActionRowComponent>();
-
-        foreach (var row in rows)
-            container.WithActionRow(row.ToBuilder());
-
-        return new ComponentBuilderV2(container).Build();
-    }
-
     internal static Embed Describe(Ticket ticket)
     {
-        var embed = new EmbedBuilder();
-        var moderation = UsesModerationEmbed(ticket);
-        var description = $"{ActionName(ticket.Action)} for <@{ticket.SubjectUserId}>";
-
-        if (moderation)
+        var isNote = ticket.Action == TicketAction.Note;
+        var subject = $"<@{ticket.SubjectUserId}>";
+        var moderator = $"<@{ticket.ModeratorUserId}>";
+        var description = ticket.Action switch
         {
-            var verb = ticket.Action switch
-            {
-                TicketAction.Ban => "banned",
-                TicketAction.Timeout => "timed out",
-                TicketAction.VoiceMute => "muted",
-                TicketAction.VoiceDeafen => "deafened",
-                TicketAction.Kick => "kicked",
-                _ => $"given <@&{ticket.RoleId}>",
-            };
+            TicketAction.Note => $"**Note** for {subject} by {moderator}",
+            TicketAction.Ban => $"{subject} banned by {moderator}",
+            TicketAction.Timeout => $"{subject} timed out by {moderator}",
+            TicketAction.VoiceMute => $"{subject} muted by {moderator}",
+            TicketAction.VoiceDeafen => $"{subject} deafened by {moderator}",
+            TicketAction.Kick => $"{subject} kicked by {moderator}",
+            _ => $"{subject} given <@&{ticket.RoleId}> by {moderator}",
+        };
+        var unapproved = !isNote && ticket.ApprovedByUserId is null && !ticket.ReviewExempt;
+        var embed = new EmbedBuilder()
+            .WithAuthor($"Ticket #{ticket.Number}")
+            .WithTitle(ActionName(ticket.Action) + (unapproved ? " (UNAPPROVED)" : string.Empty) + (isNote && ticket.Hidden ? " · Hidden" : string.Empty))
+            .WithColor(ModerationColour(ticket))
+            .WithTimestamp(ticket.CreatedAtUtc);
 
-            description = $"<@{ticket.SubjectUserId}> {verb} by <@{ticket.ModeratorUserId}>";
-            var unapproved = ticket.ApprovedByUserId is null && !ticket.ReviewExempt;
+        if (!isNote)
+            embed.WithThumbnailUrl("https://media.tenor.com/PHREyAefRckAAAAM/packwatch.gif");
 
-            embed.WithAuthor($"Ticket #{ticket.Number}")
-                .WithTitle(ActionName(ticket.Action) + (unapproved ? " (UNAPPROVED)" : string.Empty))
-                .WithThumbnailUrl("https://media.tenor.com/PHREyAefRckAAAAM/packwatch.gif")
-                .WithColor(ModerationColour(ticket))
-                .WithTimestamp(ticket.CreatedAtUtc);
-        }
-        else
-        {
-            embed.WithTitle($"Ticket #{ticket.Number}" + (ticket.Hidden ? " · Hidden" : string.Empty));
-            embed.AddField("Moderator", $"<@{ticket.ModeratorUserId}>", inline: true);
-        }
-
-        if (!moderation && ticket.Comment.Length > InlineCommentLimit)
+        if (ticket.Comment.Length > InlineCommentLimit)
             description += "\n\nThe full comment is attached.";
         else if (ticket.Comment.Length > 0)
             description += $"\n\n{ticket.Comment}";
 
         embed.WithDescription(description);
         embed.AddField("User ID", $"`{ticket.SubjectUserId}`", inline: true);
+        embed.AddField("Moderator ID", $"`{ticket.ModeratorUserId}`", inline: true);
 
-        if (moderation)
-        {
-            embed.AddField("Moderator ID", $"`{ticket.ModeratorUserId}`", inline: true);
+        if (ticket.Action != TicketAction.Kick)
+            embed.AddField("Duration", ticket.DurationSeconds is { } seconds
+                ? TimeSpan.FromSeconds(seconds).ToString()
+                : "**Permanent**", inline: true);
 
-            if (ticket.Action != TicketAction.Kick)
-                embed.AddField(
-                "Duration",
-                ticket.DurationSeconds is { } seconds ? TimeSpan.FromSeconds(seconds).ToString() : "**Permanent**",
-                inline: true);
-
-            if (ticket.ExpiresAtUtc is { } expiry)
-                embed.AddField("Expires", FormatExpiry(expiry), inline: true);
-        }
-        else embed.AddField("Created", $"<t:{ticket.CreatedAtUtc.ToUnixTimeSeconds()}:f>", inline: true);
+        if (ticket.ExpiresAtUtc is { } expiry)
+            embed.AddField("Expires", FormatExpiry(expiry), inline: true);
 
         if (ticket.Action == TicketAction.Role)
             embed.AddField("Role", $"<@&{ticket.RoleId}> (`{ticket.RoleId}`)", inline: true);
@@ -158,9 +99,6 @@ internal static class TicketPresentation
                 "Confirm the duration after audit recovery.");
 
         AddHistory(embed, ticket);
-
-        if (!moderation && ticket.Action != TicketAction.Note)
-            AddStoredActionFields(embed, ticket);
 
         return embed.Build();
     }
@@ -190,39 +128,6 @@ internal static class TicketPresentation
             text += $" Superseded by ticket #{ticket.SupersededByNumber}.";
 
         return text;
-    }
-
-    private static void AddStoredActionFields(EmbedBuilder embed, Ticket ticket)
-    {
-        if (ticket.Status != TicketStatus.NotApplicable)
-        {
-            var status = ticket.Status.ToString();
-
-            if (ticket.Status == TicketStatus.Superseded)
-                status += $" · superseded by #{ticket.SupersededByNumber}";
-
-            embed.AddField("Status", status, inline: true);
-        }
-
-        if (ticket.DurationSeconds is { } seconds)
-            embed.AddField("Duration", TimeSpan.FromSeconds(seconds).ToString(), inline: true);
-
-        if (ticket.SourceAuditId is not null)
-        {
-            if (ticket.DurationSeconds is null)
-                embed.AddField("Duration", "Permanent", inline: true);
-
-            if (ticket.ExpiresAtUtc is { } expiry)
-                embed.AddField("Expires", FormatExpiry(expiry), inline: true);
-
-            embed.AddField("Details", OperationalDetails(ticket));
-
-            if (!string.IsNullOrWhiteSpace(ticket.AuditReason) && !string.Equals(ticket.AuditReason, ticket.Comment, OrdinalIgnoreCase))
-                embed.AddField("Original audit reason", ticket.AuditReason);
-        }
-
-        if (ticket.Action == TicketAction.Role)
-            embed.AddField("Role", ticket.RoleId!.Value.ToString(CultureInfo.InvariantCulture), inline: true);
     }
 
     private static void AddHistory(EmbedBuilder embed, Ticket ticket)
@@ -259,6 +164,7 @@ internal static class TicketPresentation
     {
         var palette = ticket.Action switch
         {
+            TicketAction.Note => (Pending: 0xFFFFFF, Complete: 0xFFFFFF, Ended: 0x666666),
             TicketAction.Ban => (Pending: 0xFF6666, Complete: 0xFF0000, Ended: 0x990000),
             TicketAction.Timeout => (Pending: 0xBBFF55, Complete: 0x99FF00, Ended: 0x559900),
             TicketAction.Kick => (Pending: 0xFFBB55, Complete: 0xFF9900, Ended: 0x995500),

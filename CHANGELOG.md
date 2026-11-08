@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.0.0-rc.5 - 2026-11-08
+## Moderation
+### Fixed
+- Staff notes now use the same embed layout as the other moderation tickets, with the legacy white colour, original timestamp, subject, moderator and comment. Use Apps → Manage Ticket to edit a note.
 # v1.0.0-rc.4 - 2026-11-08
 ## Moderation
 ### Changed

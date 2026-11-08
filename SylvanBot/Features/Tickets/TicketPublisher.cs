@@ -30,6 +30,10 @@ public sealed class TicketPublisher(
                 .Where(reference => !reference.Removed)
                 .ToList();
 
+            // Existing receipts can be repaired while first publication of imported tickets is paused.
+            if (config.OrderedPublicationPaused && config.AwaitsOrderedPublication(ticket) && ticket.Publications.Count == 0)
+                return "\nSaved. Publication of imported tickets is paused.";
+
             // While the imported queue drains, only its ordered reader may create a channel post.
             if (!orderedPublication && config.AwaitsOrderedPublication(ticket) && !ticket.Hidden && references.Count == 0)
                 return "\nSaved for publication in ticket-number order.";
@@ -63,7 +67,7 @@ public sealed class TicketPublisher(
                     if (message.Author.Id != client.CurrentUser.Id)
                         throw new BotCommandException("Sylvan can only change messages it authored.");
 
-                    var incompatible = TicketPresentation.UsesModerationEmbed(ticket) && message.Flags?.HasFlag(MessageFlags.ComponentsV2) == true;
+                    var incompatible = message.Flags?.HasFlag(MessageFlags.ComponentsV2) == true;
 
                     if (ticket.Hidden || !reference.Current || incompatible || wrongChannel)
                     {
@@ -156,52 +160,28 @@ public sealed class TicketPublisher(
     {
         var options = TicketBoundary.Options(token);
         options.RetryMode = RetryMode.RetryRatelimit;
-        if (TicketPresentation.UsesModerationEmbed(ticket))
-            return await channel.SendMessageAsync(
-                embed: TicketPresentation.Describe(ticket),
-                options: options,
-                allowedMentions: AllowedMentions.None);
-
+        var embed = TicketPresentation.Describe(ticket);
         if (ticket.Comment.Length <= TicketPresentation.InlineCommentLimit)
-            return await channel.SendMessageAsync(
-                options: options,
-                allowedMentions: AllowedMentions.None,
-                components: TicketPresentation.ChannelMessage(ticket),
-                flags: MessageFlags.ComponentsV2);
+            return await channel.SendMessageAsync(embed: embed, options: options, allowedMentions: AllowedMentions.None);
 
         await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(ticket.Comment));
-
         return await channel.SendFileAsync(
-            stream,
-            $"{ticket.Number}-comment.txt",
-            components: TicketPresentation.ChannelMessage(ticket),
-            flags: MessageFlags.ComponentsV2,
-            allowedMentions: AllowedMentions.None,
-            options: options);
+            stream, $"{ticket.Number}-comment.txt", embed: embed, allowedMentions: AllowedMentions.None, options: options);
     }
 
     private static async Task UpdateAsync(IMessageChannel channel, ulong messageId, Ticket ticket, CancellationToken token)
     {
         await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(ticket.Comment));
-        var moderation = TicketPresentation.UsesModerationEmbed(ticket);
-
         await channel.ModifyMessageAsync(
             messageId,
             properties =>
             {
                 properties.Content = string.Empty;
-                properties.Embeds = moderation ? new[] { TicketPresentation.Describe(ticket) } : Array.Empty<Embed>();
-                properties.Components = moderation ? new ComponentBuilder().Build() : TicketPresentation.ChannelMessage(ticket);
-
-                if (!moderation)
-                {
-                    properties.Flags = MessageFlags.ComponentsV2;
-
-                    properties.Attachments = ticket.Comment.Length > TicketPresentation.InlineCommentLimit
-                        ? new[] { new FileAttachment(stream, $"{ticket.Number}-comment.txt") }
-                        : Array.Empty<FileAttachment>();
-                }
-
+                properties.Embeds = new[] { TicketPresentation.Describe(ticket) };
+                properties.Components = new ComponentBuilder().Build();
+                properties.Attachments = ticket.Comment.Length > TicketPresentation.InlineCommentLimit
+                    ? new[] { new FileAttachment(stream, $"{ticket.Number}-comment.txt") }
+                    : Array.Empty<FileAttachment>();
                 properties.AllowedMentions = AllowedMentions.None;
             },
             TicketBoundary.Options(token));

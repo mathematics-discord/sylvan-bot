@@ -659,6 +659,9 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<long?>("LegacyChannelId")
                         .HasColumnType("bigint");
 
+                    b.Property<bool>("OrderedPublicationPaused")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("OrderedPublicationPending")
                         .HasColumnType("boolean");
 

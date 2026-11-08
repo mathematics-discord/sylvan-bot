@@ -10,6 +10,8 @@ public sealed class TicketConfiguration
 
     public bool OrderedPublicationPending { get; set; }
 
+    public bool OrderedPublicationPaused { get; set; }
+
     public bool Enabled { get; set; }
 
     public ulong? DestinationChannelId { get; set; }
