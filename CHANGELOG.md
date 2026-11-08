@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.0.0-rc.6 - 2026-11-08
+## Moderation
+### Changed
+- For the November cutover, the live channel is reserved for new tickets and recent legacy notes or active temporary restrictions issued in the preceding 24 months. Other visible legacy records belong in the archive.
 # v1.0.0-rc.5 - 2026-11-08
 ## Moderation
 ### Fixed

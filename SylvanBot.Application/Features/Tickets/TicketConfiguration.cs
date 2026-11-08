@@ -33,6 +33,8 @@ public sealed class TicketConfiguration
     public bool AwaitsOrderedPublication(Ticket ticket) =>
         OrderedPublicationPending && (LegacyChannelId is null || ticket.ImportedFromLegacy);
 
+    public bool HoldsImportedPublication(Ticket ticket) => OrderedPublicationPaused && AwaitsOrderedPublication(ticket);
+
     public ulong PublicationChannel(Ticket ticket) =>
         ticket.PinnedPublicationChannelId
         ?? (ticket.ImportedFromLegacy ? LegacyChannelId : null)

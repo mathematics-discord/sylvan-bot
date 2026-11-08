@@ -73,4 +73,4 @@ See the [ticket command reference](../../commands/tickets/) for syntax, duration
 
 ## Finding a ticket from the November 2026 cutover
 
-On Mathematics, the one-off transfer kept the old bot’s ticket numbers. Look in **〖tickets-new〗** for a transferred note or a restriction that was still in effect with a future expiry at the time of the transfer. Those messages stay there after expiry. Other visible records from the transfer appear in **〖tickets-legacy〗**. You can use the original ticket number for a lookup in either case.
+On Mathematics, the one-off transfer kept the old bot’s ticket numbers. For tickets issued in the 24 months before the transfer, **〖tickets-new〗** holds notes and temporary restrictions that were still in effect with a future expiry at cutover. Those tickets keep their channel after expiry. Older tickets and all other visible records from the transfer belong in **〖tickets-legacy〗**. Every ticket Sylvan creates goes to **〖tickets-new〗**. You can use the original ticket number for a lookup in either case.

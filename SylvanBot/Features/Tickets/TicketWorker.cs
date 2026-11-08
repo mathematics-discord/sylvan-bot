@@ -266,7 +266,8 @@ public sealed class TicketWorker(
                     after = ids[^1];
                 }
 
-                if (config.OrderedPublicationPending && await coordinator.PublishOrderedBatchAsync(config, token))
+                if (config.OrderedPublicationPending && !config.OrderedPublicationPaused
+                    && await coordinator.PublishOrderedBatchAsync(config, token))
                     Wake();
             }
 

@@ -671,7 +671,6 @@ public sealed partial class TicketCoordinator(
         var candidates = await db.Tickets.AsNoTracking()
             .Where(ticket => ticket.GuildId == guildId && !ticket.Hidden
                 && (configuration.LegacyChannelId == null || ticket.ImportedFromLegacy)
-                && (!configuration.OrderedPublicationPaused || ticket.Publications.Any())
                 && !ticket.Publications.Any(copy => copy.Current && !copy.Removed
                     && (ticket.PinnedPublicationChannelId == null || copy.ChannelId == ticket.PinnedPublicationChannelId)))
             // During the cutover, fill the staff's live channel before resuming the archive.

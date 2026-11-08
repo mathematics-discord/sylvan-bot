@@ -14,6 +14,23 @@ public sealed class TicketPublicationRoutingTests
         config.PublicationChannel(ticket).ShouldBe(10UL);
     }
 
+    [Test]
+    public void PauseHoldsAReclassifiedImportAndLetsNativeTicketsPublish()
+    {
+        var config = new TicketConfiguration
+        {
+            DestinationChannelId = 10,
+            LegacyChannelId = 20,
+            OrderedPublicationPending = true,
+            OrderedPublicationPaused = true,
+        };
+        var moved = new Ticket { ImportedFromLegacy = true, PinnedPublicationChannelId = 20 };
+        moved.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 42, Removed = true });
+
+        config.HoldsImportedPublication(moved).ShouldBeTrue();
+        config.HoldsImportedPublication(new Ticket()).ShouldBeFalse();
+    }
+
     [TestCase(false, true, false, true, 10)]
     [TestCase(false, true, true, true, 10)]
     [TestCase(true, true, false, false, 10)]

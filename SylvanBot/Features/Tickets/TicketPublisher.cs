@@ -30,8 +30,8 @@ public sealed class TicketPublisher(
                 .Where(reference => !reference.Removed)
                 .ToList();
 
-            // Existing receipts can be repaired while first publication of imported tickets is paused.
-            if (config.OrderedPublicationPaused && config.AwaitsOrderedPublication(ticket) && ticket.Publications.Count == 0)
+            // A paused import may still need to edit or remove a known channel message.
+            if (config.HoldsImportedPublication(ticket) && references.Count == 0)
                 return "\nSaved. Publication of imported tickets is paused.";
 
             // While the imported queue drains, only its ordered reader may create a channel post.
@@ -109,6 +109,10 @@ public sealed class TicketPublisher(
 
             if (current is not null)
                 return string.Empty;
+
+            // Also covers a stored copy removed above or an ordered batch selected before the pause.
+            if (config.HoldsImportedPublication(ticket))
+                return "\nSaved. Publication of imported tickets is paused.";
 
             if (!orderedPublication && config.AwaitsOrderedPublication(ticket))
                 return "\nSaved for publication in ticket-number order.";
