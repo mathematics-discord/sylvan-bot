@@ -1,6 +1,9 @@
 ﻿using System.Threading.Channels;
+using System.Diagnostics;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Gateway;
+using static System.StringComparison;
+using static SylvanBot.Features.SylvanMail.SylvanMailDrafts;
 
 namespace SylvanBot.Features.SylvanMail;
 
@@ -10,8 +13,7 @@ public sealed class SylvanMailGatewayHandler(
     SylvanMailWorkflow workflow,
     SylvanMailDraftWorkflow drafts,
     ISylvanMailDiscord discord,
-    ILogger logger
-) : BackgroundService, IDiscordGatewayHandler
+    ILogger logger) : BackgroundService, IDiscordGatewayHandler
 {
     // Bounded, transient work only. This is deliberately not a durable queue or a retry worker.
     private readonly Channel<MailWork> _messages = Channel.CreateBounded<MailWork>(
@@ -43,48 +45,43 @@ public sealed class SylvanMailGatewayHandler(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        List<Task> pending = [];
+        Dictionary<ulong, Task> conversations = new Dictionary<ulong, Task>();
+        using var workers = new SemaphoreSlim(8, 8);
+
         try
         {
             await foreach (var message in _messages.Reader.ReadAllAsync(stoppingToken))
+            {
+                if (pending.Count >= 64)
+                    await Task.WhenAny(pending).WaitAsync(stoppingToken);
+
+                pending.RemoveAll(task => task.IsCompleted);
+
+                var completed = conversations
+                   .Where(pair => pair.Value.IsCompleted)
+                   .Select(pair => pair.Key)
+                   .ToArray();
+
+                foreach (var user in completed)
+                    conversations.Remove(user);
+
                 try
                 {
-                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-                    timeout.CancelAfter(TimeSpan.FromMinutes(3));
+                    using var routingTimeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                    routingTimeout.CancelAfter(TimeSpan.FromSeconds(10));
 
-                    switch (message)
-                    {
-                        case InboundMail inbound:
-                            await workflow.RelayAsync(message: inbound.Message, ct: timeout.Token);
+                    DotNext.Optional<ulong> recipient = message is InboundMail inbound
+                        ? new DotNext.Optional<ulong>(inbound.AuthorId)
+                        : await drafts.ConversationUserAsync(message.ChannelId, routingTimeout.Token);
 
-                            break;
-                        case DraftUpdated draft:
-                            await drafts.HandleDraftAsync(
-                                threadId: draft.ChannelId,
-                                messageId: draft.MessageId,
-                                authorId: draft.AuthorId,
-                                action: SylvanMailDraftAction.Update,
-                                ct: timeout.Token);
+                    if (recipient is not { HasValue: true, Value: var userId })
+                        continue;
 
-                            break;
-                        case DraftConfirmed confirmation:
-                            await drafts.HandleDraftAsync(
-                                threadId: confirmation.ChannelId,
-                                messageId: confirmation.MessageId,
-                                authorId: confirmation.AuthorId,
-                                action: confirmation.Action,
-                                ct: timeout.Token);
-
-                            break;
-                        case DraftCancelled cancellation:
-                            await drafts.HandleDraftAsync(
-                                threadId: cancellation.ChannelId,
-                                messageId: cancellation.MessageId,
-                                authorId: cancellation.AuthorId,
-                                action: SylvanMailDraftAction.Cancel,
-                                ct: timeout.Token);
-
-                            break;
-                    }
+                    var previous = conversations.GetValueOrDefault(userId, Task.CompletedTask);
+                    var task = ProcessAfterAsync(message, previous, workers, stoppingToken);
+                    conversations[userId] = task;
+                    pending.Add(task);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -93,7 +90,7 @@ public sealed class SylvanMailGatewayHandler(
                 catch (Exception exception)
                 {
                     logger.Warning(
-                        "SylvanMail handling failed for source {SourceId} in channel {ChannelId} by author {AuthorId}: {ExceptionType}",
+                        "SylvanMail routing failed for source {SourceId} in channel {ChannelId} by author {AuthorId}: {ExceptionType}",
                         message.MessageId,
                         message.ChannelId,
                         message.AuthorId,
@@ -102,10 +99,87 @@ public sealed class SylvanMailGatewayHandler(
                     if (!stoppingToken.IsCancellationRequested && message is InboundMail inbound)
                         await ReportFailureAsync(inbound.Message);
                 }
+            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             // Undelivered in-memory events are not replayed on startup. Saved attempts remain available for reconciliation.
+        }
+        finally
+        {
+            // Every dispatched operation remains owned through shutdown.
+            await Task.WhenAll(pending);
+        }
+    }
+
+    private async Task ProcessAfterAsync(MailWork message, Task previous, SemaphoreSlim workers, CancellationToken stoppingToken)
+    {
+        using var sourceScope = Serilog.Context.LogContext.PushProperty("SourceId", message.MessageId);
+        using var channelScope = Serilog.Context.LogContext.PushProperty("ChannelId", message.ChannelId);
+        using var operationScope = Serilog.Context.LogContext.PushProperty("MailOperation", message.GetType().Name);
+        var started = Stopwatch.GetTimestamp();
+        var queueMs = 0.0;
+        var acquired = false;
+        var outcome = "completed";
+
+        try
+        {
+            await previous;
+            await workers.WaitAsync(stoppingToken);
+            acquired = true;
+            queueMs = Stopwatch.GetElapsedTime(message.QueuedAt).TotalMilliseconds;
+            started = Stopwatch.GetTimestamp();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            timeout.CancelAfter(TimeSpan.FromMinutes(3));
+
+            if (message is InboundMail inbound)
+            {
+                await workflow.RelayAsync(inbound.Message, timeout.Token);
+            }
+            else
+            {
+                var action = message switch
+                {
+                    DraftConfirmed confirmation => confirmation.Action,
+                    DraftCancelled => SylvanMailDraftAction.Cancel,
+                    _ => SylvanMailDraftAction.Update,
+                };
+
+                await drafts.HandleDraftAsync(message.ChannelId, message.MessageId, message.AuthorId, action, timeout.Token);
+            }
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            outcome = "stopped";
+        }
+        catch (Exception exception)
+        {
+            outcome = exception.GetType().Name;
+
+            logger.Warning(
+                "SylvanMail handling failed for source {SourceId} in channel {ChannelId} by author {AuthorId}: {ExceptionType}",
+                message.MessageId,
+                message.ChannelId,
+                message.AuthorId,
+                outcome);
+
+            if (!stoppingToken.IsCancellationRequested && message is InboundMail inbound)
+                await ReportFailureAsync(inbound.Message);
+        }
+        finally
+        {
+            if (acquired)
+                workers.Release();
+
+            logger.Debug(
+                "SylvanMail {Operation} for source {SourceId} in channel {ChannelId}: {Outcome}; queue {QueueMs} ms, execution {ExecutionMs} ms, total {TotalMs} ms",
+                message.GetType().Name,
+                message.MessageId,
+                message.ChannelId,
+                outcome,
+                acquired ? queueMs : Stopwatch.GetElapsedTime(message.QueuedAt).TotalMilliseconds,
+                acquired ? Stopwatch.GetElapsedTime(started).TotalMilliseconds : 0,
+                Stopwatch.GetElapsedTime(message.QueuedAt).TotalMilliseconds);
         }
     }
 
@@ -127,7 +201,7 @@ public sealed class SylvanMailGatewayHandler(
         if (source.Channel is not IDMChannel || source is not IUserMessage message || !IsUserMessage(message))
             return Task.CompletedTask;
 
-        var input = SylvanMailDrafts.ReadMessage(source: message, guildId: null);
+        var input = ReadMessage(source: message, guildId: null);
 
         if (!mail.IsReady)
             return RefuseBusyAsync(input, unavailable: true);
@@ -152,6 +226,7 @@ public sealed class SylvanMailGatewayHandler(
         var hasBodyMention =
             SylvanMailReply.Parse(message.Content ?? string.Empty, botId: client.CurrentUser.Id, replyToBot: false, replyPingEnabled: false)
                 is not null;
+
         var hasReplyPing = message.Type == MessageType.Reply && message.MentionedUserIds.Contains(client.CurrentUser.Id);
 
         if (!edited && !hasBodyMention && !hasReplyPing)
@@ -165,17 +240,20 @@ public sealed class SylvanMailGatewayHandler(
 
     private Task ReactionAddedAsync(Cacheable<IUserMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel, SocketReaction reaction)
     {
-        var name = reaction.Emote.Name.Replace("\uFE0F", string.Empty, StringComparison.Ordinal);
-        var anonymous = reaction.Emote is Emoji && name == SylvanMailDrafts.AnonymousEmoji;
-        var signed = reaction.Emote is Emoji && name == SylvanMailDrafts.SignedEmoji;
-        var cancel = string.Equals(a: reaction.Emote.Name, b: SylvanMailDrafts.CancelEmoji, comparisonType: StringComparison.Ordinal);
+        var name = reaction.Emote.Name.Replace("\uFE0F", string.Empty, Ordinal);
+        var anonymous = reaction.Emote is Emoji && string.Equals(name, AnonymousEmoji, Ordinal);
+        var signed = reaction.Emote is Emoji && string.Equals(name, SignedEmoji, Ordinal);
+        var cancel = string.Equals(reaction.Emote.Name, CancelEmoji, Ordinal);
 
         if (reaction.UserId == client.CurrentUser.Id || (!anonymous && !signed && !cancel))
             return Task.CompletedTask;
 
         MailWork work = cancel
             ? new DraftCancelled(ChannelId: channel.Id, MessageId: message.Id, AuthorId: reaction.UserId)
-            : new DraftConfirmed(ChannelId: channel.Id, MessageId: message.Id, AuthorId: reaction.UserId,
+            : new DraftConfirmed(
+                ChannelId: channel.Id,
+                MessageId: message.Id,
+                AuthorId: reaction.UserId,
                 Action: signed ? SylvanMailDraftAction.SendSigned : SylvanMailDraftAction.SendAnonymous);
 
         return !_messages.Writer.TryWrite(work) ? RefuseConfirmationAsync(work) : Task.CompletedTask;
@@ -262,7 +340,10 @@ public sealed class SylvanMailGatewayHandler(
         }
     }
 
-    private abstract record MailWork(ulong ChannelId, ulong MessageId, ulong AuthorId);
+    private abstract record MailWork(ulong ChannelId, ulong MessageId, ulong AuthorId)
+    {
+        public long QueuedAt { get; } = Stopwatch.GetTimestamp();
+    }
 
     private sealed record InboundMail(SylvanMailMessage Message) : MailWork(
         ChannelId: Message.SourceChannelId,

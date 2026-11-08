@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: <@&1522665207225127034> and above can look up tickets, create notes, correct or revert tickets they are authorised to change, and receive ticket reminders without access to the ticket publication channel. Apps -> List Tickets replies only to you; /ticket show remains public in the channel where it is used.
+time: 2026-11-08T23:35:13.6782002Z

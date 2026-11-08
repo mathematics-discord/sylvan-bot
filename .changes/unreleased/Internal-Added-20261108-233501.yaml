@@ -1,0 +1,4 @@
+component: Internal
+kind: Added
+body: Add correlated end-to-end interaction timings and stage timings for ticket processing and SylvanMail, including queue and lock waits, database work, Discord requests, publication, attachment downloads, and reaction rate-limit diagnostics.
+time: 2026-11-08T23:35:01.4547554Z

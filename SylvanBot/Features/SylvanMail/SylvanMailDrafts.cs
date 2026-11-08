@@ -11,8 +11,26 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
     // Consecutive reaction changes share Discord's rate limits. Wait within the caller's
     // cancellation budget; this policy must not be used for sending message payloads.
-    private static RequestOptions ReactionOptions(CancellationToken ct) =>
-        new RequestOptions { CancelToken = ct, RetryMode = RetryMode.RetryRatelimit };
+    private RequestOptions ReactionOptions(CancellationToken ct) =>
+        new RequestOptions
+        {
+            CancelToken = ct,
+            RetryMode = RetryMode.RetryRatelimit,
+            RatelimitCallback = info =>
+            {
+                if (info.Remaining == 0 || info.IsGlobal)
+                    logger.Debug(
+                        "SylvanMail reaction request exhausted rate bucket {Bucket}: limit {Limit}, remaining {Remaining}, reset after {ResetAfterMs} ms, retry after {RetryAfter}, global {Global}",
+                        info.Bucket,
+                        info.Limit,
+                        info.Remaining,
+                        info.ResetAfter?.TotalMilliseconds,
+                        info.RetryAfter,
+                        info.IsGlobal);
+
+                return Task.CompletedTask;
+            },
+        };
 
     public static SylvanMailMessage ReadMessage(IUserMessage source, ulong? guildId)
     {
@@ -66,6 +84,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
         var control = action == SylvanMailDraftAction.SendSigned ? SignedEmoji
             : action == SylvanMailDraftAction.Cancel ? CancelEmoji : AnonymousEmoji;
+
         var hasMarker = source.Reactions.TryGetValue(new Emoji(control), out var reaction) && reaction.IsMe;
 
         if (action != SylvanMailDraftAction.Update && !hasMarker)
@@ -82,7 +101,11 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
             if (!replyToBot && source.Reference?.MessageId.IsSpecified == true)
             {
-                var referenced = await channel.GetMessageAsync(id: source.Reference.MessageId.Value, mode: CacheMode.AllowDownload, ReactionOptions(ct));
+                var referenced = await channel.GetMessageAsync(
+                    id: source.Reference.MessageId.Value,
+                    mode: CacheMode.AllowDownload,
+                    ReactionOptions(ct));
+
                 replyToBot = referenced?.Author.Id == client.CurrentUser.Id;
             }
 
@@ -108,14 +131,19 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
     public async Task SetDraftReadyAsync(ulong threadId, ulong messageId, bool ready, CancellationToken ct)
     {
+        using var timing = new OperationTiming(logger.ForContext("SourceId", messageId), "sylvanmail.draft_controls", "channel");
+
         try
         {
             var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
+            timing.Next("message");
 
             if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, ReactionOptions(ct)) is not IUserMessage message)
                 return;
 
             var oldSend = new Emoji("\U0001F4E4");
+            timing.Next("legacy_control");
+
             if (message.Reactions.TryGetValue(oldSend, out var oldReaction) && oldReaction.IsMe)
                 await message.RemoveReactionAsync(oldSend, client.CurrentUser.Id, ReactionOptions(ct));
 
@@ -126,6 +154,8 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
                 if (ready == marked)
                     continue;
+
+                timing.Next($"{(ready ? "add" : "remove")}:{control}");
 
                 if (ready)
                     await message.AddReactionAsync(emote: emoji, ReactionOptions(ct));
@@ -149,13 +179,18 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
     public async Task MarkDeliveredAsync(SylvanMailMessage message, CancellationToken ct)
     {
+        using var timing = new OperationTiming(logger.ForContext("SourceId", message.SourceMessageId), "sylvanmail.delivered_marker", "channel");
+
         try
         {
             var channel = await MessageChannelAsync(client: client, channelId: message.SourceChannelId, ct: ct, retryMode: RetryMode.RetryRatelimit);
+            timing.Next("message");
 
             if (await channel.GetMessageAsync(id: message.SourceMessageId, mode: CacheMode.AllowDownload, ReactionOptions(ct)) is IUserMessage source)
             {
+                timing.Next("clear_reactions");
                 await source.RemoveAllReactionsAsync(ReactionOptions(ct));
+                timing.Next("success_reaction");
                 await source.AddReactionAsync(new Emoji("\u2705"), ReactionOptions(ct));
             }
         }

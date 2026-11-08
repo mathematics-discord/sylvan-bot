@@ -89,7 +89,7 @@ public sealed class TicketReviewSummary(
             ?? throw new InvalidOperationException("The tickets channel is unavailable.");
 
         var summary = await FindSummaryAtBottomAsync(channel, config.ReviewSummaryMessageId, token);
-        var text = await DescribeAsync(db, config, channel, token);
+        var text = await DescribeAsync(db, config, token);
 
         var row = new ActionRowBuilder()
            .WithButton("Review tickets", ReviewButtonId);
@@ -192,32 +192,19 @@ public sealed class TicketReviewSummary(
         }
     }
 
-    private async Task<string> DescribeAsync(BotDbContext db, TicketConfiguration config, ITextChannel channel, CancellationToken token)
+    private static async Task<string> DescribeAsync(BotDbContext db, TicketConfiguration config, CancellationToken token)
     {
-        var pending = TicketCoordinator.AwaitingApproval(db.Tickets.AsNoTracking(), config.GuildId);
+        IQueryable<Ticket> pending = TicketCoordinator.AwaitingApproval(db.Tickets.AsNoTracking(), config.GuildId);
         var count = await pending.CountAsync(token);
         var text = new StringBuilder(Heading)
            .AppendLine()
            .AppendLine(count == 0 ? "No tickets are awaiting approval." : $"**{count}** tickets awaiting approval.");
 
         var shown = 0;
-        var canDisplay = new Dictionary<ulong, bool> { [channel.Id] = true };
 
         await foreach (var ticket in pending.OrderBy(ticket => ticket.Number).AsAsyncEnumerable().WithCancellation(token))
         {
             var publication = ticket.Publications.FirstOrDefault(copy => copy.Current && !copy.Removed);
-            var sourceId = publication?.ChannelId ?? config.PublicationChannel(ticket);
-            if (!canDisplay.TryGetValue(sourceId, out var visible))
-            {
-                // A shared post may show case details only to readers of their source channel.
-                var source = client.GetGuild(config.GuildId)?.GetTextChannel(sourceId);
-                visible = source is not null && HasSameViewPermissions(source, channel);
-                canDisplay.Add(sourceId, visible);
-            }
-
-            if (!visible)
-                continue;
-
             DotNext.Optional<TicketMessage> published = publication is null
                 ? DotNext.Optional<TicketMessage>.None
                 : publication.Message();
@@ -257,13 +244,4 @@ public sealed class TicketReviewSummary(
         return false;
     }
 
-    private static bool HasSameViewPermissions(IGuildChannel source, IGuildChannel destination)
-    {
-        static IEnumerable<(ulong, PermissionTarget, PermValue)> ViewOverwrites(IGuildChannel channel) =>
-            channel.PermissionOverwrites
-                .Where(overwrite => overwrite.Permissions.ViewChannel != PermValue.Inherit)
-                .Select(overwrite => (overwrite.TargetId, overwrite.TargetType, overwrite.Permissions.ViewChannel));
-
-        return ViewOverwrites(source).ToHashSet().SetEquals(ViewOverwrites(destination));
-    }
 }

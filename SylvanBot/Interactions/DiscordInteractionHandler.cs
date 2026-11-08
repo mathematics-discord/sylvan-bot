@@ -56,6 +56,7 @@ public sealed class DiscordInteractionHandler(
 
         using var scope = InteractionLogScope.Begin(
             diagnostics.CreateInteractionLogScopeDetails(interaction: interaction, context: context, usage: usage));
+
         InteractionDiagnostics.LogCommandUsage(diagnostics.CreateInteractionDiagnosticsLogger(context), context: context, usage: usage);
         await HandleInteractionAsync(context);
     }
@@ -104,6 +105,7 @@ public sealed class DiscordInteractionHandler(
                .ForContext("user_id", value: context.User.Id)
                .ForContext("guild_id", value: context.Guild?.Id)
                .ForContext("channel_id", value: context.Channel?.Id)
+               .ForContext("end_to_end_ms", (DateTimeOffset.UtcNow - context.Interaction.CreatedAt).TotalMilliseconds)
                .ForContext("total_ms", Math.Round(value: stopwatch.Elapsed.TotalMilliseconds, digits: 2));
 
             if (result.IsSuccess)

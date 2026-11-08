@@ -1,5 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Infrastructure.Data;
+using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace SylvanBot.Application.Features.SylvanMail;
 
@@ -7,31 +9,60 @@ public sealed class SylvanMailDraftWorkflow(
     IDbContextFactory<BotDbContext> contexts,
     ISylvanMailDrafts drafts,
     ISylvanMailDiscord discord,
-    SylvanMailWorkflow relay
+    SylvanMailWorkflow relay,
+    ILogger<SylvanMailDraftWorkflow> logger
 )
 {
+    public async Task<Optional<ulong>> ConversationUserAsync(ulong threadId, CancellationToken ct)
+    {
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        var conversation = await ActiveConversationAsync(db, threadId, ct);
+
+        return conversation is null ? default : new Optional<ulong>(conversation.UserId);
+    }
+
     public async Task HandleDraftAsync(ulong threadId, ulong messageId, ulong authorId, SylvanMailDraftAction action, CancellationToken ct)
     {
-        if (action is not (SylvanMailDraftAction.Update or SylvanMailDraftAction.SendAnonymous or SylvanMailDraftAction.SendSigned or SylvanMailDraftAction.Cancel))
+        if (action is not (SylvanMailDraftAction.Update
+                           or SylvanMailDraftAction.SendAnonymous
+                           or SylvanMailDraftAction.SendSigned
+                           or SylvanMailDraftAction.Cancel))
             throw new ArgumentOutOfRangeException(nameof(action));
 
         await using var db = await contexts.CreateDbContextAsync(ct);
-        await SylvanMailSerialisation.EnterAsync(db: db, ct: ct);
+        var original = await ActiveConversationAsync(db, threadId, ct);
+
+        if (original is null)
+            return;
+
+        await SylvanMailSerialisation.EnterConversationAsync(db, original.UserId, logger, ct);
         Optional<SylvanMailMessage> observed = default;
 
         try
         {
             var conversation = await ActiveConversationAsync(db: db, threadId: threadId, ct: ct);
 
-            if (conversation is null)
+            if (conversation is null || conversation.Id != original.Id)
                 return;
 
-            observed = await drafts.ReadDraftAsync(
-                threadId: threadId,
-                messageId: messageId,
-                authorId: authorId,
-                action: action,
-                ct: ct);
+            var readStarted = Stopwatch.GetTimestamp();
+
+            try
+            {
+                observed = await drafts.ReadDraftAsync(
+                    threadId: threadId,
+                    messageId: messageId,
+                    authorId: authorId,
+                    action: action,
+                    ct: ct);
+            }
+            finally
+            {
+                logger.LogDebug(
+                    "SylvanMail draft read for source {SourceId}: {ElapsedMs} ms",
+                    messageId,
+                    Stopwatch.GetElapsedTime(readStarted).TotalMilliseconds);
+            }
 
             if (observed is not { HasValue: true, Value: var message })
                 return;
@@ -42,7 +73,8 @@ public sealed class SylvanMailDraftWorkflow(
                    .AnyAsync(item => item.SourceMessageId == messageId, cancellationToken: ct);
 
                 if (recorded)
-                    throw new BotCommandException("Cannot cancel: delivery has already been attempted. Check what arrived before sending another message.");
+                    throw new BotCommandException(
+                        "Cannot cancel: delivery has already been attempted. Check what arrived before sending another message.");
 
                 await drafts.ClearReactionsAsync(threadId: threadId, messageId: messageId, ct: ct);
             }
@@ -58,7 +90,8 @@ public sealed class SylvanMailDraftWorkflow(
                 var detail = "Delivery could not be confirmed. Some content may have arrived; do not assume it is safe to resend.";
 
                 if (action == SylvanMailDraftAction.Cancel)
-                    detail = "Cancellation could not be confirmed. Remove and re-add your cancel reaction to try again; contact staff if it continues to fail.";
+                    detail =
+                        "Cancellation could not be confirmed. Remove and re-add your cancel reaction to try again; contact staff if it continues to fail.";
 
                 if (exception is BotCommandException)
                     detail = exception.Message;
@@ -79,7 +112,7 @@ public sealed class SylvanMailDraftWorkflow(
         }
         finally
         {
-            await SylvanMailSerialisation.ExitAsync(db);
+            await SylvanMailSerialisation.ExitConversationAsync(db, original.UserId);
         }
     }
 

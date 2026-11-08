@@ -1,6 +1,7 @@
 ﻿using System.Collections.Immutable;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Application.Features.SylvanMail;
@@ -21,7 +22,7 @@ public sealed class SylvanMailWorkflow(
             return;
 
         await using var db = await contexts.CreateDbContextAsync(ct);
-        await SylvanMailSerialisation.EnterAsync(db: db, ct: ct);
+        await SylvanMailSerialisation.EnterConversationAsync(db, message.AuthorId, logger, ct);
 
         try
         {
@@ -29,7 +30,7 @@ public sealed class SylvanMailWorkflow(
         }
         finally
         {
-            await SylvanMailSerialisation.ExitAsync(db);
+            await SylvanMailSerialisation.ExitConversationAsync(db, message.AuthorId);
         }
     }
 
@@ -189,6 +190,7 @@ public sealed class SylvanMailWorkflow(
             uncertainDelivery: uncertainDelivery,
             uncertainPost: uncertainPost,
             refusal: refusal);
+
         operation.State = outcome.State;
         operation.Detail = outcome.Detail;
 
@@ -307,6 +309,7 @@ public sealed class SylvanMailWorkflow(
         var destination = new SylvanMailDestination(
             operation.ToStaff ? SylvanMailDestinationKind.StaffThread : SylvanMailDestinationKind.MemberDm,
             destinationChannelId);
+
         var label = operation.ToStaff ? await discord.InboundPrefixAsync(guildId: guildId, message: message, ct: ct) : message.OutboundPrefix;
         ImmutableArray<string> chunks = SylvanMailContent.SplitContent(content: message.Content, 2000 - label.Length);
         var ordinal = 0;
@@ -366,6 +369,20 @@ public sealed class SylvanMailWorkflow(
         CancellationToken ct)
     {
         var toStaff = operation.ToStaff;
+        var stage = "validate";
+        var stageStarted = Stopwatch.GetTimestamp();
+
+        void NextStage(string next)
+        {
+            logger.LogDebug(
+                "SylvanMail delivery for source {SourceId}, stage {Stage}: {ElapsedMs} ms",
+                message.SourceMessageId,
+                stage,
+                Stopwatch.GetElapsedTime(stageStarted).TotalMilliseconds);
+
+            stage = next;
+            stageStarted = Stopwatch.GetTimestamp();
+        }
 
         try
         {
@@ -385,10 +402,13 @@ public sealed class SylvanMailWorkflow(
             SylvanMailContent.Validate(message);
 
             // Download all attachments before publishing any of this message; retain at most 24 MiB of attachment payload.
+            NextStage("download_attachments");
             var attachments = ImmutableArray.CreateBuilder<byte[]>(message.Attachments.Length);
 
             foreach (var attachment in message.Attachments)
                 attachments.Add(await discord.DownloadAsync(attachment: attachment, ct: ct));
+
+            NextStage("resolve_conversation");
 
             if (toStaff)
                 conversation = await conversations.ResolveAsync(db: db, settings: settings, message: message, operation: operation, ct: ct);
@@ -396,8 +416,11 @@ public sealed class SylvanMailWorkflow(
             if (conversation is not { ThreadId: { } threadId })
                 throw new BotCommandException("The mapped post is unavailable. This message was not sent.");
 
+            NextStage("open_destination");
             operation.DestinationChannelId = toStaff ? threadId : await discord.OpenDmAsync(userId: conversation.UserId, ct: ct);
             await db.SaveChangesAsync(ct);
+
+            NextStage("publish_content");
 
             await PublishContentAsync(
                 db: db,
@@ -408,13 +431,19 @@ public sealed class SylvanMailWorkflow(
                 attachments.ToImmutable(),
                 ct: ct);
 
+            NextStage("save_outcome");
             operation.State = "Delivered";
             operation.Detail = "Delivered: Discord accepted every part.";
             await db.SaveChangesAsync(ct);
         }
         catch (Exception exception)
         {
+            NextStage("record_failure");
             conversation = await RecordDeliveryFailureAsync(db: db, operation: operation, conversation: conversation, exception: exception);
+        }
+        finally
+        {
+            NextStage("finished");
         }
 
         return conversation;

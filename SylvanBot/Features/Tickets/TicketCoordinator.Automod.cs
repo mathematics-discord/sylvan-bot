@@ -1,4 +1,4 @@
-using static System.StringComparison;
+﻿using static System.StringComparison;
 
 namespace SylvanBot.Features.Tickets;
 
@@ -35,7 +35,7 @@ public sealed partial class TicketCoordinator
 
         foreach (var id in due)
         {
-            await _gate.WaitAsync(token);
+            await WaitForGateAsync(token);
 
             try
             {
@@ -80,11 +80,14 @@ public sealed partial class TicketCoordinator
         }
 
         var scan = await boundary.ReadAuditAsync(op.GuildId, from.AddMinutes(-10), token);
-        var changes = scan.Observations.Where(o => o.Action == TicketAction.Ban && o.SubjectUserId == op.UserId).ToArray();
+        TicketObservation[] changes = scan.Observations
+           .Where(o => o.Action == TicketAction.Ban && o.SubjectUserId == op.UserId)
+           .ToArray();
 
         if (op.AuditId == 0)
         {
-            var matches = changes.Where(o => !o.Removed
+            TicketObservation[] matches = changes
+               .Where(o => !o.Removed
                                             && o.ModeratorUserId == client.CurrentUser.Id
                                             && o.CreatedAtUtc >= op.RequestedAt.AddSeconds(-1)
                                             && o.CreatedAtUtc <= op.RequestedAt.AddMinutes(5)
