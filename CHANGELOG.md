@@ -5,11 +5,13 @@ Release notes are curated by hand with [Changie](https://changie.dev/).
 # v1.0.0-rc.3 - 2026-11-08
 ## Moderation
 ### Changed
-- Imported tickets can keep an assigned channel after expiry. On Mathematics, visible legacy notes and restrictions still active with a future expiry join new tickets in the live channel. Other visible legacy tickets appear in the archive.
+- For the November Mathematics cutover, visible legacy notes and restrictions still active with a future expiry were assigned to the live channel. They keep their place after expiry. Other visible records from the old bot were assigned to the archive.
+
 # v1.0.0-rc.2 - 2026-11-08
 ## Moderation
 ### Changed
-- Sylvan can post new moderation tickets immediately in the live staff channel while imported tickets are published in number order in a separate archive. Edits and restored tickets retain their destination.
+- During the Mathematics cutover, newly issued tickets can reach staff while Sylvan posts the legacy records in number order.
+
 # v1.0.0-rc.1 - 2026-11-08
 ## Administration
 ### Added

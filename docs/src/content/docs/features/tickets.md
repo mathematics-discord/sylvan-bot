@@ -5,9 +5,7 @@ description: Complete, find and review a moderation ticket, change a restriction
 
 If you have just taken a moderation action, look for a DM from Sylvan. Choose **Edit**, check the duration if one applies, and record why you took the action. If you already have the ticket open in the staff channel, use the message’s **Apps → Manage Ticket** menu. Both routes edit the same record.
 
-## Where to find a ticket
-
-On Mathematics, Sylvan posts new tickets in **〖tickets-new〗**. Imported notes and restrictions that were active with a future expiry when the channels were split also appear there. They stay there after expiry. Other visible legacy tickets, including permanent bans, kicks and expired restrictions, appear in **〖tickets-legacy〗**. Sylvan posts imported tickets in number order within each channel. Newly created tickets can appear between them. Use the same ticket number for lookups, edits and reviews in either channel.
+Sylvan posts every new ticket in the server’s configured tickets channel.
 
 ## What gets a ticket?
 
@@ -29,7 +27,7 @@ Prompts work newest first. Use `/ticket top` in the server to request your newes
 
 Use `/ticket show user:@member` for a member’s history. A Discord user ID also works after the member has left. Use `id:` when you have a ticket number, or `message:` when you have a Sylvan ticket message link. Supply one selector at a time. A user lookup supports `page:`.
 
-The ticket shows recent changes and indicates when earlier entries were omitted. A senior moderator can use `/ticket showhidden` to inspect hidden records. Legacy ticket numbers carry over, so use the number when you have an old bot’s message. Hidden records stay out of the tickets channel.
+The ticket shows recent changes and indicates when earlier entries were omitted. A senior moderator can use `/ticket showhidden` to inspect hidden records. Hidden records stay out of the tickets channel.
 
 ## Review the queue
 
@@ -72,3 +70,7 @@ Staff need access to the relevant tickets channel. Sylvan checks the caller’s 
 | Configure tickets | Administrator |
 
 See the [ticket command reference](../../commands/tickets/) for syntax, duration formats and administrator settings.
+
+## Finding a ticket from the November 2026 cutover
+
+On Mathematics, the one-off transfer kept the old bot’s ticket numbers. Look in **〖tickets-new〗** for a transferred note or a restriction that was still in effect with a future expiry at the time of the transfer. Those messages stay there after expiry. Other visible records from the transfer appear in **〖tickets-legacy〗**. You can use the original ticket number for a lookup in either case.
