@@ -36,7 +36,7 @@ public sealed class TicketHistoryEntry
         || (_moderatorId is > 0 && Action is TicketHistoryAction.Approved
             or TicketHistoryAction.SetComment or TicketHistoryAction.AppendedComment
             or TicketHistoryAction.SetDuration or TicketHistoryAction.HideRequested
-            or TicketHistoryAction.Hidden or TicketHistoryAction.Unhidden);
+            or TicketHistoryAction.Hidden or TicketHistoryAction.Unhidden or TicketHistoryAction.StaffReverted);
 
     [NotMapped]
     public DateTimeOffset Timestamp => _timestamp
@@ -62,6 +62,7 @@ public sealed class TicketHistoryEntry
             TicketHistoryAction.Unhidden => "unhid",
             TicketHistoryAction.Expired => "expired the action",
             TicketHistoryAction.Reverted => "reverted the action",
+            TicketHistoryAction.StaffReverted => "reverted the action",
             TicketHistoryAction.Superseded => "superseded the action",
             TicketHistoryAction.AuditObserved => "recorded an audit update",
             _ => throw new InvalidOperationException("Unknown ticket history action."),
@@ -94,4 +95,5 @@ public enum TicketHistoryAction
     Reverted,
     Superseded,
     AuditObserved,
+    StaffReverted,
 }

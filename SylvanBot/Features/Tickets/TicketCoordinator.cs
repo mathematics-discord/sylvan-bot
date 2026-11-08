@@ -143,31 +143,32 @@ public sealed class TicketCoordinator(
         if (ticket.Status != TicketStatus.Active)
             throw new BotCommandException("This ticket no longer has an active restriction.");
 
-        var permitted = actor.IsAdministrator || ticket.Action switch
-        {
-            TicketAction.Ban => actor.CanBanMembers,
-            TicketAction.Timeout => actor.CanTimeoutMembers,
-            TicketAction.VoiceMute => actor.CanMuteMembers,
-            TicketAction.VoiceDeafen => actor.CanDeafenMembers,
-            TicketAction.Role => actor.CanManageRoles,
-            _ => false,
-        };
+        var permitted = actor.IsAdministrator
+            || ticket.Action switch
+            {
+                TicketAction.Ban => actor.CanBanMembers,
+                TicketAction.Timeout => actor.CanTimeoutMembers,
+                TicketAction.VoiceMute => actor.CanMuteMembers,
+                TicketAction.VoiceDeafen => actor.CanDeafenMembers,
+                TicketAction.Role => actor.CanManageRoles,
+                _ => false,
+            };
 
         if (!permitted)
             throw new BotCommandException("You need the Discord permission for this restriction to revert it.");
 
         var config = await EnabledAsync(db, actor.GuildId, token);
-        var from = config.LastAuditScanAtUtc;
+        DateTimeOffset? from = config.LastAuditScanAtUtc;
 
         if (ticket.SourceAuditId is null || from is null || from < DateTimeOffset.UtcNow.AddDays(-45))
             throw new BotCommandException("Refresh after audit reconciliation before reverting this restriction.");
 
         var scan = await boundary.ReadAuditAsync(actor.GuildId, from.Value.AddMinutes(-10), token);
-        var newer = scan.Observations
-            .Any(value => value.Action == ticket.Action
-                          && value.SubjectUserId == ticket.SubjectUserId
-                          && value.RoleId == ticket.RoleId
-                          && value.AuditId > ticket.LastAuditId);
+
+        var newer = scan.Observations.Any(value => value.Action == ticket.Action
+                                              && value.SubjectUserId == ticket.SubjectUserId
+                                              && value.RoleId == ticket.RoleId
+                                              && value.AuditId > ticket.LastAuditId);
 
         if (newer)
             throw new BotCommandException("A newer change awaits audit reconciliation. Refresh before reverting.");
@@ -180,15 +181,15 @@ public sealed class TicketCoordinator(
         try
         {
             await RevertRestrictionAsync(actor, ticket, token);
-            ticket.End(TicketStatus.Reverted, actor.UserId);
+            ticket.CompleteStaffReversal(actor.UserId, DateTimeOffset.UtcNow);
 
             if (ticket.Action == TicketAction.Role)
             {
                 await db.PendingRoles
-                    .Where(value => value.GuildId == actor.GuildId
-                                    && value.UserId == ticket.SubjectUserId
-                                    && value.RoleId == ticket.RoleId)
-                    .ExecuteDeleteAsync(token);
+                   .Where(value => value.GuildId == actor.GuildId
+                              && value.UserId == ticket.SubjectUserId
+                              && value.RoleId == ticket.RoleId)
+                   .ExecuteDeleteAsync(token);
             }
 
             await SaveAsync(db, token);
@@ -207,14 +208,16 @@ public sealed class TicketCoordinator(
         var moderator = await guild.GetUserAsync(actor.UserId, options);
         var member = await guild.GetUserAsync(ticket.SubjectUserId, options);
         var bot = await guild.GetCurrentUserAsync(options);
+
         var moderatorPosition = moderator.RoleIds
-            .Select(id => guild.GetRole(id)?.Position ?? 0)
-            .DefaultIfEmpty(0)
-            .Max();
+           .Select(id => guild.GetRole(id)?.Position ?? 0)
+           .DefaultIfEmpty(0)
+           .Max();
+
         var botPosition = bot.RoleIds
-            .Select(id => guild.GetRole(id)?.Position ?? 0)
-            .DefaultIfEmpty(0)
-            .Max();
+           .Select(id => guild.GetRole(id)?.Position ?? 0)
+           .DefaultIfEmpty(0)
+           .Max();
 
         if (ticket.SubjectUserId == actor.UserId || ticket.SubjectUserId == guild.OwnerId)
             throw new BotCommandException("You cannot revert a restriction on yourself or the server owner.");
@@ -222,9 +225,9 @@ public sealed class TicketCoordinator(
         if (member is not null)
         {
             var targetPosition = member.RoleIds
-                .Select(id => guild.GetRole(id)?.Position ?? 0)
-                .DefaultIfEmpty(0)
-                .Max();
+               .Select(id => guild.GetRole(id)?.Position ?? 0)
+               .DefaultIfEmpty(0)
+               .Max();
 
             var hierarchyBlocked = (actor.UserId != guild.OwnerId && moderatorPosition <= targetPosition)
                 || botPosition <= targetPosition;
@@ -248,6 +251,7 @@ public sealed class TicketCoordinator(
         if (ticket.Action == TicketAction.Role)
         {
             var role = guild.GetRole(ticket.RoleId!.Value);
+
             var cannotManageRole = role is null
                 || role.IsManaged
                 || role.Id == guild.Id
@@ -287,7 +291,9 @@ public sealed class TicketCoordinator(
         {
             logger.Warning("Revert could not be confirmed for ticket {TicketId}: {Failure}", ticket.Id, exception.GetType().Name);
 
-            throw new BotCommandException("Discord could not confirm the reversal. Check permissions, hierarchy and member state, then refresh after audit reconciliation before retrying.", exception);
+            throw new BotCommandException(
+                "Discord could not confirm the reversal. Check permissions, hierarchy and member state, then refresh after audit reconciliation before retrying.",
+                exception);
         }
     }
 
@@ -749,6 +755,8 @@ public sealed class TicketCoordinator(
     {
         var outcome = result.Outcome;
 
+        // ReSharper disable once ForeachCanBeConvertedToQueryUsingAnotherGetEnumerator
+        // this doesnt WORK for async methods u fuckin DOLT
         foreach (var id in result.TicketIds)
             outcome += await publisher.EnsureAsync(guildId, id, token);
 
@@ -760,8 +768,7 @@ public sealed class TicketCoordinator(
         if (number <= 0)
             throw new BotCommandException("Supply a positive ticket number.");
 
-        var ticket = await db.Tickets
-               .SingleOrDefaultAsync(value => value.GuildId == actor.GuildId && value.Number == number, token)
+        var ticket = await db.Tickets.SingleOrDefaultAsync(value => value.GuildId == actor.GuildId && value.Number == number, token)
             ?? throw new BotCommandException("No matching ticket in this server.");
 
         await CheckTicketAsync(db, actor, ticket, token);
@@ -774,9 +781,7 @@ public sealed class TicketCoordinator(
         RequireStaff(actor, ticket.Hidden);
         var config = await EnabledAsync(db, actor.GuildId, token);
 
-        var channel = ticket.Publications
-               .FirstOrDefault(reference => reference is { Current: true, Removed: false })
-              ?.ChannelId
+        var channel = ticket.Publications.FirstOrDefault(reference => reference is { Current: true, Removed: false })?.ChannelId
             ?? config.DestinationChannelId!.Value;
 
         await CheckReadAsync(actor, channel, token);

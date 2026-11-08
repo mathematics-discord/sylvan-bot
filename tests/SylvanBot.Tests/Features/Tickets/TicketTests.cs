@@ -6,6 +6,25 @@ using SylvanBot.Application.Features.Tickets;
 public sealed class TicketTests
 {
     [Test]
+    public void CompleteStaffReversal_RepeatedConfirmation_RetainsRequesterOnce()
+    {
+        // Arrange
+        var ticket = Create(TicketAction.Ban);
+        var timestamp = DateTimeOffset.UtcNow;
+
+        // Act
+        ticket.CompleteStaffReversal(42, timestamp);
+        ticket.CompleteStaffReversal(99, timestamp.AddMinutes(1));
+        ticket.End(TicketStatus.Reverted, 99);
+
+        // Assert
+        ticket.Status.ShouldBe(TicketStatus.Reverted);
+        ticket.ModificationHistory.Count.ShouldBe(1);
+        ticket.ModificationHistory[0].Timestamp.ShouldBe(timestamp);
+        ticket.ModificationHistory[0].Format().ShouldContain("<@42>");
+    }
+
+    [Test]
     public void Initialise_NoteAtCommentLimit_PreservesComment()
     {
         // Arrange

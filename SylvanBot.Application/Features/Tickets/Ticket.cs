@@ -208,6 +208,17 @@ public sealed class Ticket
         Record(TicketHistoryAction.Approved, actor.UserId);
     }
 
+    public void CompleteStaffReversal(ulong moderatorId, DateTimeOffset timestamp)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(moderatorId);
+
+        if (Status != TicketStatus.Active)
+            return;
+
+        End(TicketStatus.Reverted);
+        Record(TicketHistoryAction.StaffReverted, moderatorId, timestamp);
+    }
+
     public void End(TicketStatus status, ulong? moderatorId = null, long? successor = null)
     {
         if (Status == status)
