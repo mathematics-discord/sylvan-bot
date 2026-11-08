@@ -132,11 +132,11 @@ public sealed class TicketModule(
 
     [SlashCommand("show", "Look up a user's tickets or one visible ticket number.")]
     public Task ShowAsync(string? user = null, [MinValue(1)] long? id = null, string? message = null, int page = 1)
-        => ExecuteAsync((actor, token) => ShowAsync(actor, user, id, message, page, hidden: false, token));
+        => ExecuteAsync((actor, token) => ShowAsync(actor, user, id, message, page, hidden: false, token), ephemeral: false);
 
     [SlashCommand("showhidden", "Look up hidden tickets for a user or one ticket number.")]
     public Task ShowHiddenAsync(string? user = null, [MinValue(1)] long? id = null, string? message = null, int page = 1)
-        => ExecuteAsync((actor, token) => ShowAsync(actor, user, id, message, page, hidden: true, token));
+        => ExecuteAsync((actor, token) => ShowAsync(actor, user, id, message, page, hidden: true, token), ephemeral: false);
 
     [SlashCommand("set", "Replace supplied ticket fields.")]
     public Task SetAsync(
@@ -376,7 +376,7 @@ public sealed class TicketModule(
                 ? await coordinator.ShowAsync(actor, id, hidden, token)
                 : await coordinator.ShowMessageAsync(actor, TicketReference.ParseMessageLink(message!, actor.GuildId), hidden, token);
 
-            await DisplayAsync(actor, ticket, token);
+            await DisplayAsync(actor, ticket, token, ephemeral: false);
 
             return;
         }
@@ -420,7 +420,7 @@ public sealed class TicketModule(
         });
     }
 
-    private async Task DisplayAsync(TicketActor actor, Ticket? ticket, CancellationToken token, string? outcome = null)
+    private async Task DisplayAsync(TicketActor actor, Ticket? ticket, CancellationToken token, string? outcome = null, bool ephemeral = true)
     {
         if (ticket is null)
         {
@@ -449,11 +449,11 @@ public sealed class TicketModule(
         if (ticket.Comment.Length > TicketPresentation.InlineCommentLimit)
         {
             await using var stream = new MemoryStream(Encoding.UTF8.GetBytes(ticket.Comment));
-            await FollowupWithFileAsync(stream, $"{ticket.Number}-comment.txt", ephemeral: true, allowedMentions: AllowedMentions.None);
+            await FollowupWithFileAsync(stream, $"{ticket.Number}-comment.txt", ephemeral: ephemeral, allowedMentions: AllowedMentions.None);
         }
     }
 
-    private async Task ExecuteAsync(Func<TicketActor, CancellationToken, Task> operation, bool defer = true)
+    private async Task ExecuteAsync(Func<TicketActor, CancellationToken, Task> operation, bool defer = true, bool ephemeral = true)
     {
         if (defer)
         {
@@ -462,17 +462,17 @@ public sealed class TicketModule(
                 if (component.Message.Flags?.HasFlag(MessageFlags.Ephemeral) == true)
                     await component.DeferAsync();
                 else
-                    await component.DeferLoadingAsync(ephemeral: true);
+                    await component.DeferLoadingAsync(ephemeral: ephemeral);
             }
             else if (Context.Interaction is IModalInteraction modal)
             {
                 if (modal.Message?.Flags?.HasFlag(MessageFlags.Ephemeral) == true)
                     await modal.DeferAsync();
                 else
-                    await modal.DeferLoadingAsync(ephemeral: true);
+                    await modal.DeferLoadingAsync(ephemeral: ephemeral);
             }
             else
-                await DeferAsync(ephemeral: true);
+                await DeferAsync(ephemeral: ephemeral);
         }
 
         if (Context.User is not IGuildUser member || Context.Guild is null)
