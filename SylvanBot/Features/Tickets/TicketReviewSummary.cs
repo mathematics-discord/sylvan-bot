@@ -30,7 +30,8 @@ public sealed class TicketReviewSummary(
 
             List<TicketConfiguration> configurations = await db.TicketConfigurations
                .Where(config => config.GuildId > after
-                          && ((config.Enabled && !config.OrderedPublicationPending && config.DestinationChannelId != null)
+                          && ((config.Enabled && config.DestinationChannelId != null
+                              && (!config.OrderedPublicationPending || config.LegacyChannelId != null))
                               || config.ReviewSummaryMessageId != null))
                .OrderBy(config => config.GuildId)
                .Take(100)
@@ -88,7 +89,7 @@ public sealed class TicketReviewSummary(
             ?? throw new InvalidOperationException("The tickets channel is unavailable.");
 
         var summary = await FindSummaryAtBottomAsync(channel, config.ReviewSummaryMessageId, token);
-        var text = await DescribeAsync(db, config.GuildId, token);
+        var text = await DescribeAsync(db, config, token);
 
         var row = new ActionRowBuilder()
            .WithButton("Review tickets", ReviewButtonId);
@@ -191,11 +192,13 @@ public sealed class TicketReviewSummary(
         }
     }
 
-    private static async Task<string> DescribeAsync(BotDbContext db, ulong guildId, CancellationToken token)
+    private static async Task<string> DescribeAsync(BotDbContext db, TicketConfiguration config, CancellationToken token)
     {
+        var guildId = config.GuildId;
         IQueryable<Ticket> pending = db.Tickets
            .AsNoTracking()
            .Where(ticket => ticket.GuildId == guildId
+                      && (config.LegacyChannelId == null || config.LegacyChannelId == config.DestinationChannelId || !ticket.ImportedFromLegacy)
                       && !ticket.Hidden
                       && !ticket.ReviewExempt
                       && ticket.ApprovedByUserId == null

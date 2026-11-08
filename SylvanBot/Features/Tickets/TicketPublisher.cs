@@ -31,7 +31,7 @@ public sealed class TicketPublisher(
                 .ToList();
 
             // While the imported queue drains, only its ordered reader may create a channel post.
-            if (config.OrderedPublicationPending && !orderedPublication && !ticket.Hidden && references.Count == 0)
+            if (!orderedPublication && config.AwaitsOrderedPublication(ticket) && !ticket.Hidden && references.Count == 0)
                 return "\nSaved for publication in ticket-number order.";
 
             IGuild guild = (IGuild?)client.GetGuild(guildId) ?? await client.Rest.GetGuildAsync(guildId, TicketBoundary.Options(token));
@@ -105,10 +105,10 @@ public sealed class TicketPublisher(
             if (current is not null)
                 return string.Empty;
 
-            if (config.OrderedPublicationPending && !orderedPublication)
+            if (!orderedPublication && config.AwaitsOrderedPublication(ticket))
                 return "\nSaved for publication in ticket-number order.";
 
-            var destination = await guild.GetTextChannelAsync(config.DestinationChannelId!.Value, options: TicketBoundary.Options(token))
+            var destination = await guild.GetTextChannelAsync(config.PublicationChannel(ticket), options: TicketBoundary.Options(token))
                               ?? throw new BotCommandException("The tickets channel is unavailable.");
 
             ticket.SendUncertain = true;
@@ -316,7 +316,7 @@ public sealed class TicketPublisher(
         var actor = await boundary.GetActorAsync(ticket.GuildId, userId, token);
         var guild = await client.Rest.GetGuildAsync(ticket.GuildId, TicketBoundary.Options(token));
         var member = await guild.GetUserAsync(userId, TicketBoundary.Options(token));
-        var destination = await guild.GetTextChannelAsync(config.DestinationChannelId!.Value, options: TicketBoundary.Options(token));
+        var destination = await guild.GetTextChannelAsync(config.PublicationChannel(ticket), options: TicketBoundary.Options(token));
 
         if (!ticket.CanCorrect(actor) || destination is null || !member.GetPermissions(destination).ViewChannel)
             throw new BotCommandException("You no longer have access to complete this ticket.");

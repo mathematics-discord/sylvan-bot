@@ -5,6 +5,10 @@ description: Complete, find and review a moderation ticket, change a restriction
 
 If you have just taken a moderation action, look for a DM from Sylvan. Choose **Edit**, check the duration if one applies, and record why you took the action. If you already have the ticket open in the staff channel, use the message’s **Apps → Manage Ticket** menu. Both routes edit the same record.
 
+## Where to find a ticket
+
+On Mathematics, Sylvan posts new tickets in **〖tickets-new〗**. Tickets imported from the legacy bot appear in **〖tickets-legacy〗**, in ticket-number order. New tickets can appear while the archive is still being posted. Use the same ticket number for lookups, edits and reviews in either channel. The summary in the new channel lists new tickets awaiting approval.
+
 ## What gets a ticket?
 
 Sylvan reads the server audit log for bans, kicks, timeouts, server voice mutes and deafens, and grants of roles an administrator has selected for tracking. Each ticket has a number, a subject and a responsible moderator. Staff can also create a note with `/ticket note`. A note is useful when the context matters but there was no Discord sanction.

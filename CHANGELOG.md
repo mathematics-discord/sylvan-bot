@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.0.0-rc.2 - 2026-11-08
+## Moderation
+### Changed
+- Sylvan can post new moderation tickets immediately in the live staff channel while imported tickets are published in number order in a separate archive. Edits and restored tickets retain their destination.
 # v1.0.0-rc.1 - 2026-11-08
 ## Administration
 ### Added

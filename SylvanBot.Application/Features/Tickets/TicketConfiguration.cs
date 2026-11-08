@@ -14,6 +14,8 @@ public sealed class TicketConfiguration
 
     public ulong? DestinationChannelId { get; set; }
 
+    public ulong? LegacyChannelId { get; set; }
+
     public ulong? ReviewSummaryChannelId { get; set; }
 
     public ulong? ReviewSummaryMessageId { get; set; }
@@ -25,6 +27,14 @@ public sealed class TicketConfiguration
     public DateTimeOffset? LastAuditScanAtUtc { get; set; }
 
     public int ReminderIntervalSeconds { get; set; } = 86400;
+
+    public bool AwaitsOrderedPublication(Ticket ticket) =>
+        OrderedPublicationPending && (LegacyChannelId is null || ticket.ImportedFromLegacy);
+
+    public ulong PublicationChannel(Ticket ticket) =>
+        ticket.ImportedFromLegacy && LegacyChannelId is { } archive
+            ? archive
+            : DestinationChannelId ?? throw new InvalidOperationException("Tickets have no configured destination.");
 
     public void UpdateReviewExemptRoles(ulong? add, ulong? remove)
     {

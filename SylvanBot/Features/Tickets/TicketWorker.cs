@@ -229,7 +229,9 @@ public sealed class TicketWorker(
                                                  && ticket.Status == TicketStatus.Active && !ticket.ExpirySuspended
                                                  && (ticket.TimeoutCheckAtUtc == null || ticket.TimeoutCheckAtUtc <= now))
                                              || (!ticket.Hidden
-                                                 && (!config.OrderedPublicationPending || ticket.Publications.Any(reference => reference.Current && !reference.Removed))
+                                                 && (!config.OrderedPublicationPending
+                                                     || (config.LegacyChannelId != null && !ticket.ImportedFromLegacy)
+                                                     || ticket.Publications.Any(reference => reference.Current && !reference.Removed))
                                                  && !ticket.SendUncertain
                                                  && !ticket.Publications.Any(reference => reference.Current && !reference.Removed && reference.Revision == ticket.Version))
                                              || ticket.Publications.Any(reference => !reference.Removed && (ticket.Hidden || !reference.Current))))
@@ -264,7 +266,7 @@ public sealed class TicketWorker(
                     after = ids[^1];
                 }
 
-                if (config.OrderedPublicationPending && await coordinator.PublishOrderedBatchAsync(config.GuildId, token))
+                if (config.OrderedPublicationPending && await coordinator.PublishOrderedBatchAsync(config, token))
                     Wake();
             }
 

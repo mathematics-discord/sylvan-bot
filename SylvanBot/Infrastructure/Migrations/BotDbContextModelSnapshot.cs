@@ -547,6 +547,9 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<bool>("Hidden")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("ImportedFromLegacy")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("InitialPromptPending")
                         .HasColumnType("boolean");
 
@@ -649,6 +652,9 @@ namespace SylvanBot.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("LastAuditScanAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("LegacyChannelId")
+                        .HasColumnType("bigint");
 
                     b.Property<bool>("OrderedPublicationPending")
                         .HasColumnType("boolean");

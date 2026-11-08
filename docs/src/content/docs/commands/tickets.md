@@ -47,7 +47,7 @@ embed links. Audit capture also requires View Audit Log.
 | Option                                       | Effect                                                                                                                     |
 |----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------|
 | `enabled:`                                   | Enables or pauses ticket management for this server. Disabling pauses automated handling, including long-timeout renewals. |
-| `channel:`                                   | Sets the destination for ticket messages and the review summary.                                                           |
+| `channel:`                                   | Sets the channel for new tickets and the review summary. Imported tickets keep their separately configured archive channel.                                                           |
 | `reminder-minutes:`                          | Sets the DM reminder interval in whole minutes. Minimum 1, default 1,440.                                                  |
 | `exempt-role-add:` / `exempt-role-remove:`   | Changes which acting moderators are exempt from review for newly captured tickets.                                         |
 | `tracked-role-add:` / `tracked-role-remove:` | Changes which ordinary role grants create tickets. Role tracking and role persistence are configured separately.           |

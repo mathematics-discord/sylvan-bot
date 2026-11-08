@@ -663,12 +663,14 @@ public sealed partial class TicketCoordinator(
         }
     }
 
-    internal async Task<bool> PublishOrderedBatchAsync(ulong guildId, CancellationToken token)
+    internal async Task<bool> PublishOrderedBatchAsync(TicketConfiguration configuration, CancellationToken token)
     {
         const int batchSize = 25;
+        var guildId = configuration.GuildId;
         await using var db = await contexts.CreateDbContextAsync(token);
         var candidates = await db.Tickets.AsNoTracking()
             .Where(ticket => ticket.GuildId == guildId && !ticket.Hidden
+                && (configuration.LegacyChannelId == null || ticket.ImportedFromLegacy)
                 && !ticket.Publications.Any(copy => copy.Current && !copy.Removed))
             .OrderBy(ticket => ticket.Number)
             .Select(ticket => ticket.Id)
@@ -683,6 +685,7 @@ public sealed partial class TicketCoordinator(
                 // A gateway or staff command may have saved another ticket since the first read.
                 var config = await EnabledAsync(db, guildId, token);
                 if (await db.Tickets.AnyAsync(ticket => ticket.GuildId == guildId && !ticket.Hidden
+                    && (config.LegacyChannelId == null || ticket.ImportedFromLegacy)
                     && !ticket.Publications.Any(copy => copy.Current && !copy.Removed), token))
                     return true;
 
@@ -836,7 +839,7 @@ public sealed partial class TicketCoordinator(
         var config = await EnabledAsync(db, actor.GuildId, token);
 
         var channel = ticket.Publications.FirstOrDefault(reference => reference is { Current: true, Removed: false })?.ChannelId
-            ?? config.DestinationChannelId!.Value;
+            ?? config.PublicationChannel(ticket);
 
         await CheckReadAsync(actor, channel, token);
     }
