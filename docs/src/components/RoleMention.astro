@@ -9,7 +9,7 @@ const {id} = Astro.props;
 const role = roles[id];
 
 if (!role) {
-    throw new Error(`Unknown Discord role ID: ${id}. Add it to src/data/roles.json.`);
+    throw new Error(`Unknown role key: ${id}. Add it to src/data/roles.json.`);
 }
 ---
 

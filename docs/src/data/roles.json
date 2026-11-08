@@ -14,5 +14,9 @@
   "1522665207225127034": {
     "name": "Trial Moderators",
     "color": "#87e9ff"
+  },
+  "administrators": {
+    "name": "Administrators",
+    "color": null
   }
 }
