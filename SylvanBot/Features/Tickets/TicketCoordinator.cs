@@ -386,6 +386,13 @@ public sealed partial class TicketCoordinator(
         return new TicketPage(tickets.Take(10).ToImmutableArray(), page, tickets.Count > 10);
     }
 
+    internal static IQueryable<Ticket> AwaitingApproval(IQueryable<Ticket> tickets, ulong guildId) =>
+        tickets.Where(ticket => ticket.GuildId == guildId
+            && !ticket.Hidden
+            && !ticket.ReviewExempt
+            && ticket.ApprovedByUserId == null
+            && ticket.Action != TicketAction.Note);
+
     public async Task<(Ticket? Ticket, int Ready, int Waiting)> ReviewQueueAsync(TicketActor actor, long after, CancellationToken token)
     {
         actor = await boundary.GetActorAsync(actor.GuildId, actor.UserId, token);
@@ -393,12 +400,7 @@ public sealed partial class TicketCoordinator(
         await using var db = await contexts.CreateDbContextAsync(token);
         await EnabledAsync(db, actor.GuildId, token);
 
-        IQueryable<Ticket> pending = db.Tickets
-           .Where(ticket => ticket.GuildId == actor.GuildId
-                      && !ticket.Hidden
-                      && !ticket.ReviewExempt
-                      && ticket.ApprovedByUserId == null
-                      && ticket.Action != TicketAction.Note);
+        var pending = AwaitingApproval(db.Tickets, actor.GuildId);
 
         long cursor = 0;
         var ready = 0;

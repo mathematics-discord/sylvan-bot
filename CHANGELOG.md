@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.0.0-rc.8 - 2026-11-08
+## Moderation
+### Fixed
+- The approval summary now counts the same pending tickets as /ticket review, including archived cases. Each entry shows the ticket number, member, action and responsible moderator.
 # v1.0.0-rc.7 - 2026-11-08
 ## Moderation
 ### Changed
