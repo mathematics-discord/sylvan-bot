@@ -1,9 +1,12 @@
 import {defineConfig} from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+const site = process.env.DOCS_SITE ?? 'https://math.ratgirl.dev';
+const base = process.env.DOCS_BASE ?? '/sylvan';
+
 export default defineConfig({
-    site: 'https://math.ratgirl.dev',
-    base: '/sylvan',
+    site,
+    base,
     trailingSlash: 'always',
     output: 'static',
     integrations: [starlight({
@@ -50,7 +53,7 @@ export default defineConfig({
                     {slug: 'commands/persistence'},
                     {slug: 'commands/color-admin'},
                     {slug: 'commands/automod-admin'},
-                    {label: '/config sylvanmail', link: 'https://math.ratgirl.dev/sylvan/commands/sylvanmail/#administrator-configuration'},
+                    {label: '/config sylvanmail', link: new URL(`${base.replace(/\/$/, '')}/commands/sylvanmail/#administrator-configuration`, site).href},
                     {slug: 'commands/role-react'},
                     {slug: 'commands/logging'},
                     {slug: 'commands/spam'},
