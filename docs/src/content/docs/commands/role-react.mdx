@@ -3,6 +3,10 @@ title: /config rolereact
 description: Let members choose ordinary server roles by reacting to a message.
 ---
 
+import RoleMention from '../../../components/RoleMention.astro';
+
+Available to <RoleMention id="administrators" />.
+
 Run this command inside the server. Replies are private.
 
 Configure a message reaction that gives members a role when they react. Removing an individual reaction removes the role
@@ -41,8 +45,7 @@ the same message, emoji and role keeps the mapping and asks Sylvan to add its re
 The role must already exist in this server. It cannot be `@everyone` or an automatically managed role, such as an
 integration role.
 
-Roles with staff powers are rejected. This includes Administrator, View Audit Log, management permissions, member and
-voice moderation, pinning, slowmode bypass, server-wide mentions and server analytics access. Permissions allowed
+Staff roles, from <RoleMention id="1522665207225127034" /> through <RoleMention id="administrators" />, cannot be offered. Other roles with moderation or management powers are rejected too, as are roles allowing pinning, slowmode bypass, server-wide mentions or server analytics access. Permissions allowed
 through channel or category overrides are checked too.
 
 Unless you own the server, the target role must be below your highest role.

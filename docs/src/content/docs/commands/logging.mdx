@@ -3,6 +3,10 @@ title: /config logs
 description: Configure edit and deletion logs and choose which channels to exclude.
 ---
 
+import RoleMention from '../../../components/RoleMention.astro';
+
+Available to <RoleMention id="administrators" />.
+
 Run these commands in a server text channel or thread. Replies are visible
 only to you.
 
@@ -61,6 +65,5 @@ still prevent messages being logged; remove that exclusion separately.
 
 Sylvan lists the excluded channels, or confirms that there are none. Log
 destination channels and their threads are not logged back into themselves.
-
 
 See the [Moderation logging](../../features/logging/) guide for automatic behaviour and limitations.

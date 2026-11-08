@@ -3,6 +3,8 @@ title: ModMail
 description: Contact staff privately, or reply to members from the staff mail forum.
 ---
 
+import RoleMention from '../../../components/RoleMention.astro';
+
 ## For users: contact staff
 
 Send a direct message to the **ModMail** bot. You can open its profile from
@@ -65,6 +67,6 @@ and interactive content aren't supported. Long text is split into messages.
 
 If a reply reports a delivery problem, follow its explanation. For partial
 or uncertain delivery, check what arrived before sending again. Messages
-interrupted by a shutdown aren't automatically replayed. Administrators
+interrupted by a shutdown aren't automatically replayed. <RoleMention id="administrators" />
 can choose the forum and notification role with
 [/config sylvanmail](../../commands/sylvanmail/#administrator-configuration).

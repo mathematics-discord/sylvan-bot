@@ -3,6 +3,10 @@ title: /automod
 description: Add, remove and list message-matching rules.
 ---
 
+import RoleMention from '../../../components/RoleMention.astro';
+
+Available to <RoleMention id="1328097118644338779" /> and above.
+
 Manage rules inside the server. See [Automod](../../features/automod/) for matching behaviour, actions and limitations.
 
 ## Add rules
@@ -39,6 +43,6 @@ Use the required rule ID from the list, not a message or user ID. Only rules in 
 /automod list
 ```
 
-The list is public and includes rule IDs, patterns, actions and durations. Use **Prev** and **Next** to change pages. Other Senior Moderators can use the controls too. Listing rules does not enable disabled actions.
+The list is public and includes rule IDs, patterns, actions and durations. Use **Prev** and **Next** to change pages. <RoleMention id="1328097118644338779" /> and above can use the controls too. Listing rules does not enable disabled actions.
 
-Administrators manage action switches and exempt roles with [/config automod](../automod-admin/).
+<RoleMention id="administrators" /> manage action switches and exempt roles with [/config automod](../automod-admin/).

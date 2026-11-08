@@ -3,6 +3,8 @@ title: /colour
 description: Choose, reset, or list the display colours available in your server.
 ---
 
+import RoleMention from '../../../components/RoleMention.astro';
+
 Run these commands inside the server. Replies, including the colour list, are private.
 
 Use `/colour` to choose a display colour or see how the server's colour
@@ -25,8 +27,8 @@ Only you can use your menu. After a selection or reset, run `/colour set`
 again if you want to make another change.
 
 If no colours are available to you, Sylvan shows only the Reset button.
-Ask a server administrator about getting access to a colour. If you have
-more than 25 available colours, Sylvan asks you to contact an administrator
+Ask <RoleMention id="administrators" /> about getting access to a colour. If you have
+more than 25 available colours, Sylvan asks you to contact <RoleMention id="administrators" />
 and still lets you reset your colour.
 
 If a selection is no longer available or an update fails, Sylvan explains
@@ -50,7 +52,7 @@ use. Listing a colour does not give you access to it or apply it.
 
 If there are no mappings, Sylvan tells you that no colour options are configured.
 
-Administrators can use the mapping IDs to change or remove mappings with
+<RoleMention id="administrators" /> can use the mapping IDs to change or remove mappings with
 [/config colour](../color-admin/).
 
 See the [Display colours](../../features/colours/) guide for automatic behaviour and limitations.
