@@ -2,6 +2,7 @@ namespace SylvanBot.Application.Features.Tickets;
 
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Globalization;
+using System.Text.Json;
 
 public sealed class TicketHistoryEntry
 {
@@ -45,12 +46,38 @@ public sealed class TicketHistoryEntry
     // Persisted history from before structured entries.
     private string? HistoricalText { get; set; }
 
+    private const string ImportProvenancePrefix = "Legacy current record and import provenance:\n";
+
+    public bool TryGetLegacyListLink(out string link)
+    {
+        link = string.Empty;
+        if (Action != TicketHistoryAction.Historical || HistoricalText is not { } text
+            || !text.StartsWith(ImportProvenancePrefix, StringComparison.Ordinal))
+            return false;
+
+        try
+        {
+            using var json = JsonDocument.Parse(text.AsMemory(ImportProvenancePrefix.Length));
+            if (json.RootElement.ValueKind != JsonValueKind.Object
+                || !json.RootElement.TryGetProperty("legacy_list_link", out var property)
+                || property.ValueKind != JsonValueKind.String || property.GetString() is not { Length: > 0 } value)
+                return false;
+
+            link = value;
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
     public string Format()
     {
         if (Action == TicketHistoryAction.Historical)
         {
             var text = HistoricalText ?? throw new InvalidOperationException("Historical entry has no text.");
-            if (text.StartsWith("Legacy current record and import provenance:\n", StringComparison.Ordinal))
+            if (text.StartsWith(ImportProvenancePrefix, StringComparison.Ordinal))
                 return "Imported from the legacy ticket register.";
 
             const string marker = ", history version ";

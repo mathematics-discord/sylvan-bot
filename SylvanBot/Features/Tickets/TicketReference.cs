@@ -1,13 +1,20 @@
 ﻿namespace SylvanBot.Features.Tickets;
 
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 
 public static class TicketReference
 {
-    public static TicketMessage ParseMessageLink(string value, ulong guildId)
+    public static TicketMessage ParseMessageLink(string value, ulong guildId) =>
+        TryParseMessageLink(value, guildId, out var message)
+            ? message
+            : throw new BotCommandException("Provide a Discord message link in this server.");
+
+    internal static bool TryParseMessageLink(string value, ulong guildId, [NotNullWhen(true)] out TicketMessage? message)
     {
+        message = null;
         var normalized = value.Trim();
         if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri))
         {
@@ -27,11 +34,14 @@ public static class TicketReference
                 var validMessage = channelValid && messageValid && channelId != 0 && msgId != 0;
 
                 if (validMessage)
-                    return new TicketMessage(channelId, msgId);
+                {
+                    message = new TicketMessage(channelId, msgId);
+                    return true;
+                }
             }
         }
 
-        throw new BotCommandException("Provide a Discord message link in this server.");
+        return false;
     }
 
     public static ulong ParseUser(string value)

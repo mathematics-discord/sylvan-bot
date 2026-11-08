@@ -7,6 +7,17 @@ using SylvanBot.Features.Tickets;
 public sealed class TicketApprovalTests
 {
     [Test]
+    public void ReviewLineLinksOnlyTheNumberAndRetainsTheActionAndBothMentions()
+    {
+        var ticket = new Ticket { GuildId = 1, Number = 42, Action = TicketAction.Ban, SubjectUserId = 100, ModeratorUserId = 200 };
+
+        TicketReviewSummary.ReviewLine(ticket, new TicketMessage(10, 20))
+            .ShouldBe("- [#42](https://discord.com/channels/1/10/20) - <@100> banned by <@200>");
+        TicketReviewSummary.ReviewLine(ticket, DotNext.Optional<TicketMessage>.None)
+            .ShouldBe("- #42 - <@100> banned by <@200>");
+    }
+
+    [Test]
     public void AwaitingApprovalIncludesBothCutoverChannelsAndOmitsExemptTicketsAndNotes()
     {
         var live = new Ticket { GuildId = 1, Action = TicketAction.Timeout, PinnedPublicationChannelId = 10 };
