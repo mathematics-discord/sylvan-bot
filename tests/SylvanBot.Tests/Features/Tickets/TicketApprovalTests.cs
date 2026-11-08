@@ -2,9 +2,26 @@ namespace SylvanBot.Tests.Features.Tickets;
 
 using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
+using SylvanBot.Features.Tickets;
 
 public sealed class TicketApprovalTests
 {
+    [Test]
+    public void AwaitingApprovalIncludesBothCutoverChannelsAndOmitsExemptTicketsAndNotes()
+    {
+        var live = new Ticket { GuildId = 1, Action = TicketAction.Timeout, PinnedPublicationChannelId = 10 };
+        var archive = new Ticket { GuildId = 1, Action = TicketAction.Ban, ImportedFromLegacy = true, PinnedPublicationChannelId = 20 };
+        var pending = new[]
+        {
+            archive, live,
+            new Ticket { GuildId = 1, Action = TicketAction.Note },
+            new Ticket { GuildId = 1, Action = TicketAction.Ban, ReviewExempt = true },
+            new Ticket { GuildId = 2, Action = TicketAction.Ban },
+        }.AsQueryable();
+
+        TicketCoordinator.AwaitingApproval(pending, 1).ToArray().ShouldBe(new[] { archive, live });
+    }
+
     [Test]
     public void Approve_SeniorReviewer_RecordsOnlyOneApproval()
     {

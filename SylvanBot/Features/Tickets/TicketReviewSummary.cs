@@ -89,7 +89,7 @@ public sealed class TicketReviewSummary(
             ?? throw new InvalidOperationException("The tickets channel is unavailable.");
 
         var summary = await FindSummaryAtBottomAsync(channel, config.ReviewSummaryMessageId, token);
-        var text = await DescribeAsync(db, config, token);
+        var text = await DescribeAsync(db, config, channel, token);
 
         var row = new ActionRowBuilder()
            .WithButton("Review tickets", ReviewButtonId);
@@ -192,49 +192,34 @@ public sealed class TicketReviewSummary(
         }
     }
 
-    private static async Task<string> DescribeAsync(BotDbContext db, TicketConfiguration config, CancellationToken token)
+    private async Task<string> DescribeAsync(BotDbContext db, TicketConfiguration config, ITextChannel channel, CancellationToken token)
     {
-        var guildId = config.GuildId;
-        IQueryable<Ticket> pending = db.Tickets
-           .AsNoTracking()
-           .Where(ticket => ticket.GuildId == guildId
-                      && (!ticket.ImportedFromLegacy
-                          || (ticket.PinnedPublicationChannelId ?? config.LegacyChannelId ?? config.DestinationChannelId) == config.DestinationChannelId)
-                      && !ticket.Hidden
-                      && !ticket.ReviewExempt
-                      && ticket.ApprovedByUserId == null
-                      && ticket.Action != TicketAction.Note);
-
+        var pending = TicketCoordinator.AwaitingApproval(db.Tickets.AsNoTracking(), config.GuildId);
         var count = await pending.CountAsync(token);
-
-        List<Ticket> tickets = await pending
-           .OrderBy(ticket => ticket.Number)
-           .Take(25)
-           .ToListAsync(token);
-
         var text = new StringBuilder(Heading)
            .AppendLine()
            .AppendLine(count == 0 ? "No tickets are awaiting approval." : $"**{count}** tickets awaiting approval.");
 
         var shown = 0;
+        var canDisplay = new Dictionary<ulong, bool> { [channel.Id] = true };
 
-        foreach (var ticket in tickets)
+        await foreach (var ticket in pending.OrderBy(ticket => ticket.Number).AsAsyncEnumerable().WithCancellation(token))
         {
-            var publication = ticket.Publications
-               .FirstOrDefault(reference => reference is { Current: true, Removed: false });
+            var sourceId = ticket.Publications.FirstOrDefault(copy => copy.Current && !copy.Removed)?.ChannelId
+                ?? config.PublicationChannel(ticket);
+            if (!canDisplay.TryGetValue(sourceId, out var visible))
+            {
+                // A shared post may show case details only to readers of their source channel.
+                var source = client.GetGuild(config.GuildId)?.GetTextChannel(sourceId);
+                visible = source is not null && HasSameViewPermissions(source, channel);
+                canDisplay.Add(sourceId, visible);
+            }
 
-            var label = publication is null
-                ? $"**#{ticket.Number}**"
-                : $"[#{ticket.Number}]({TicketPresentation.Link(guildId, publication.ChannelId, publication.MessageId)})";
+            if (!visible)
+                continue;
 
-            var status = ticket.Pending is not null ? " · pending changes" : string.Empty;
-
-            if (!ticket.Complete)
-                status += " · awaiting details";
-
-            var line = $"{label} · {TicketPresentation.ActionName(ticket.Action)} · <@{ticket.SubjectUserId}>{status}";
-
-            if (text.Length + line.Length > 3500)
+            var line = $"- #{ticket.Number} - {TicketPresentation.ActionDescription(ticket)}";
+            if (text.Length + line.Length + 1 > 3950)
                 break;
 
             text.AppendLine(line);
@@ -242,10 +227,18 @@ public sealed class TicketReviewSummary(
         }
 
         if (shown < count)
-            text.AppendLine(CultureInfo.InvariantCulture, $"…and {count - shown} more. Open the review queue to continue.");
+            text.Append(CultureInfo.InvariantCulture, $"…and {count - shown} more.");
 
-        text.Append("\nSenior Moderators can use **Review tickets** to open their private review queue.");
+        return text.ToString().TrimEnd();
+    }
 
-        return text.ToString();
+    private static bool HasSameViewPermissions(IGuildChannel source, IGuildChannel destination)
+    {
+        static IEnumerable<(ulong, PermissionTarget, PermValue)> ViewOverwrites(IGuildChannel channel) =>
+            channel.PermissionOverwrites
+                .Where(overwrite => overwrite.Permissions.ViewChannel != PermValue.Inherit)
+                .Select(overwrite => (overwrite.TargetId, overwrite.TargetType, overwrite.Permissions.ViewChannel));
+
+        return ViewOverwrites(source).ToHashSet().SetEquals(ViewOverwrites(destination));
     }
 }

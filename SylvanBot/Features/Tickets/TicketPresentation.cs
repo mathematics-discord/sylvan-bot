@@ -48,12 +48,11 @@ internal static class TicketPresentation
         return builder.Build();
     }
 
-    internal static Embed Describe(Ticket ticket)
+    internal static string ActionDescription(Ticket ticket)
     {
-        var isNote = ticket.Action == TicketAction.Note;
         var subject = $"<@{ticket.SubjectUserId}>";
         var moderator = $"<@{ticket.ModeratorUserId}>";
-        var description = ticket.Action switch
+        return ticket.Action switch
         {
             TicketAction.Note => $"**Note** for {subject} by {moderator}",
             TicketAction.Ban => $"{subject} banned by {moderator}",
@@ -63,6 +62,12 @@ internal static class TicketPresentation
             TicketAction.Kick => $"{subject} kicked by {moderator}",
             _ => $"{subject} given <@&{ticket.RoleId}> by {moderator}",
         };
+    }
+
+    internal static Embed Describe(Ticket ticket)
+    {
+        var isNote = ticket.Action == TicketAction.Note;
+        var description = ActionDescription(ticket);
         var unapproved = !isNote && ticket.ApprovedByUserId is null && !ticket.ReviewExempt;
         var embed = new EmbedBuilder()
             .WithAuthor($"Ticket #{ticket.Number}")
