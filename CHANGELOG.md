@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.0.0-rc.9 - 2026-11-08
+## Moderation
+### Fixed
+- Ticket numbers in the approval summary link to their messages again. An imported ticket links to its original legacy post until its Sylvan copy is available.
 # v1.0.0-rc.8 - 2026-11-08
 ## Moderation
 ### Fixed

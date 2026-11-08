@@ -205,8 +205,8 @@ public sealed class TicketReviewSummary(
 
         await foreach (var ticket in pending.OrderBy(ticket => ticket.Number).AsAsyncEnumerable().WithCancellation(token))
         {
-            var sourceId = ticket.Publications.FirstOrDefault(copy => copy.Current && !copy.Removed)?.ChannelId
-                ?? config.PublicationChannel(ticket);
+            var publication = ticket.Publications.FirstOrDefault(copy => copy.Current && !copy.Removed);
+            var sourceId = publication?.ChannelId ?? config.PublicationChannel(ticket);
             if (!canDisplay.TryGetValue(sourceId, out var visible))
             {
                 // A shared post may show case details only to readers of their source channel.
@@ -218,7 +218,10 @@ public sealed class TicketReviewSummary(
             if (!visible)
                 continue;
 
-            var line = $"- #{ticket.Number} - {TicketPresentation.ActionDescription(ticket)}";
+            DotNext.Optional<TicketMessage> published = publication is null
+                ? DotNext.Optional<TicketMessage>.None
+                : publication.Message();
+            var line = ReviewLine(ticket, published);
             if (text.Length + line.Length + 1 > 3950)
                 break;
 
@@ -230,6 +233,28 @@ public sealed class TicketReviewSummary(
             text.Append(CultureInfo.InvariantCulture, $"…and {count - shown} more.");
 
         return text.ToString().TrimEnd();
+    }
+
+    internal static string ReviewLine(Ticket ticket, DotNext.Optional<TicketMessage> published)
+    {
+        var label = $"#{ticket.Number}";
+        if (published.TryGet(out var target) || TryGetLegacyMessage(ticket, out target))
+            label = $"[{label}]({TicketPresentation.Link(ticket.GuildId, target.ChannelId, target.MessageId)})";
+
+        return $"- {label} - {TicketPresentation.ActionDescription(ticket)}";
+    }
+
+    private static bool TryGetLegacyMessage(Ticket ticket, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out TicketMessage? message)
+    {
+        if (ticket.ImportedFromLegacy)
+        {
+            foreach (var entry in ticket.ModificationHistory)
+                if (entry.TryGetLegacyListLink(out var link) && TicketReference.TryParseMessageLink(link, ticket.GuildId, out message))
+                    return true;
+        }
+
+        message = null;
+        return false;
     }
 
     private static bool HasSameViewPermissions(IGuildChannel source, IGuildChannel destination)
