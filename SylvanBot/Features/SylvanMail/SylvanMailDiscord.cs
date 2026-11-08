@@ -1,11 +1,21 @@
 ﻿using System.Globalization;
+using System.Text;
 using Discord.Net;
+using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.SylvanMail;
+using SylvanBot.Application.Features.Tickets;
+using SylvanBot.Application.Infrastructure.Data;
+using SylvanBot.Features.Tickets;
 using static SylvanBot.Features.SylvanMail.SylvanMailRequests;
 
 namespace SylvanBot.Features.SylvanMail;
 
-public sealed class SylvanMailDiscord(DiscordSocketClient client, SylvanMailClient mail, HttpClient http, ILogger logger) : ISylvanMailDiscord
+public sealed class SylvanMailDiscord(
+    DiscordSocketClient client,
+    SylvanMailClient mail,
+    HttpClient http,
+    IDbContextFactory<BotDbContext> contexts,
+    ILogger logger) : ISylvanMailDiscord
 {
     private const int MaxAttachmentBytes = 8 * 1024 * 1024;
 
@@ -127,6 +137,96 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, SylvanMailClie
         return sent.Id;
     }
 
+    public async Task SendTicketListAsync(ulong guildId, ulong threadId, ulong userId, CancellationToken ct)
+    {
+        RequireReady(SylvanMailDestinationKind.StaffThread);
+        await using var db = await contexts.CreateDbContextAsync(ct);
+
+        var enabled = await db.TicketConfigurations
+           .AsNoTracking()
+           .AnyAsync(config => config.GuildId == guildId && config.Enabled && config.DestinationChannelId != null, ct);
+
+        if (!enabled)
+            return;
+
+        List<Ticket> tickets = await db.Tickets
+           .AsNoTracking()
+           .Where(ticket => ticket.GuildId == guildId && ticket.SubjectUserId == userId)
+           .OrderByDescending(ticket => ticket.CreatedAtUtc)
+           .ThenByDescending(ticket => ticket.Id)
+           .Take(11)
+           .ToListAsync(ct);
+
+        var hasMore = tickets.Count > 10;
+
+        if (hasMore)
+            tickets.RemoveAt(10);
+
+        var channel = await MessageChannelAsync(client, threadId, ct);
+
+        if (channel is not IThreadChannel thread || thread.GuildId != guildId)
+            throw new BotCommandException("The SylvanMail thread is not available in this server.");
+
+        var guild = thread.Guild;
+        var text = new StringBuilder();
+
+        foreach (var ticket in tickets)
+        {
+            if (ticket.Hidden)
+            {
+                text.AppendLine(CultureInfo.InvariantCulture, $"**Hidden:** #{ticket.Number}");
+                continue;
+            }
+
+            DotNext.Optional<TicketMessage> publication = await FindTicketMessageAsync(guild, ticket, ct);
+
+            text.Append(
+                CultureInfo.InvariantCulture,
+                $"**#{ticket.Number}** | {TicketPresentation.ActionName(ticket.Action)} | <@{ticket.ModeratorUserId}>");
+
+            if (publication.TryGet(out var message))
+                text.Append(CultureInfo.InvariantCulture, $" | {TicketPresentation.Link(guildId, message.ChannelId, message.MessageId)}");
+
+            text.AppendLine();
+        }
+
+        if (tickets.Count == 0)
+            text.AppendLine("No matching tickets.");
+
+        text.Append(hasMore ? $"More tickets: /ticket show user:{userId}" : "End of results.");
+
+        var embed = new EmbedBuilder()
+           .WithTitle($"Tickets | {userId} | page 1")
+           .WithDescription(text.ToString())
+           .Build();
+
+        await AcceptedAsync(() => channel.SendMessageAsync(embed: embed, options: Options(ct), allowedMentions: AllowedMentions.None));
+    }
+
+    private static async Task<DotNext.Optional<TicketMessage>> FindTicketMessageAsync(IGuild guild, Ticket ticket, CancellationToken ct)
+    {
+        IOrderedEnumerable<TicketPublication> publications = ticket.Publications
+           .Where(publication => !publication.Removed)
+           .OrderByDescending(publication => publication.Current);
+
+        foreach (var publication in publications)
+        {
+            try
+            {
+                var channel = await guild.GetTextChannelAsync(publication.ChannelId, options: Options(ct));
+
+                if (channel is not null && await channel.GetMessageAsync(publication.MessageId, options: Options(ct)) is not null)
+                    return new DotNext.Optional<TicketMessage>(publication.Message());
+            }
+            catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Forbidden)
+            {
+                // A missing or inaccessible publication does not hide the ticket from the list.
+            }
+        }
+
+        return DotNext.Optional<TicketMessage>.None;
+    }
+
     public async Task<ulong> SendAttachmentAsync(
         SylvanMailDestination destination,
         SylvanMailAttachment attachment,
@@ -139,8 +239,11 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, SylvanMailClie
         await using var stream = new MemoryStream(buffer: bytes, writable: false);
         using var file = new FileAttachment(stream: stream, Path.GetFileName(attachment.Filename), isSpoiler: attachment.Spoiler);
 
-        var sent = await AcceptedAsync(() =>
-                                           channel.SendFilesAsync([file], text: label, options: Options(ct), allowedMentions: AllowedMentions.None));
+        var sent = await AcceptedAsync(() => channel.SendFilesAsync(
+                                           [file],
+                                           text: label,
+                                           options: Options(ct),
+                                           allowedMentions: AllowedMentions.None));
 
         return sent.Id;
     }
@@ -184,8 +287,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, SylvanMailClie
 
             return destination.Length != attachment.Size
                 ? throw new BotCommandException("Not relayed: an attachment download was incomplete or its size changed.")
-                : destination
-                   .ToArray();
+                : destination.ToArray();
         }
         catch (HttpRequestException ex)
         {
@@ -257,6 +359,7 @@ public sealed class SylvanMailDiscord(DiscordSocketClient client, SylvanMailClie
                                                        options: Options(ct),
                                                        allowedMentions: AllowedMentions.None,
                                                        messageReference: reference));
+
                 receiptId = new DotNext.Optional<ulong>(sent.Id);
             }
         }

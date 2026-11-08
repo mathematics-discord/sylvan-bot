@@ -96,7 +96,7 @@ public sealed class SylvanMailWorkflow(
         {
             try
             {
-                await discord.SendTextAsync(new SylvanMailDestination(SylvanMailDestinationKind.StaffThread, newThread), $".ticket show {conversation.UserId}", ct: ct);
+                await discord.SendTicketListAsync(conversation.GuildId, newThread, conversation.UserId, ct);
             }
             catch (Exception exception)
             {
