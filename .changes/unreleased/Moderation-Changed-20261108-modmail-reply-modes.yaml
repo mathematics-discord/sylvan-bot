@@ -1,0 +1,4 @@
+component: Moderation
+kind: Changed
+body: "ModMail drafts now offer three reactions: levitate sends anonymously, person_standing sends with your username, and x cancels. Mentioning Sylvan or replying with the reply ping enabled prepares the same draft."
+time: 2026-11-08T22:30:00Z

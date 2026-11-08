@@ -9,26 +9,24 @@ public sealed class SylvanMailReplyTests
     [TestCase("<@!42> hello", arg2: false, arg3: false)]
     [TestCase("<@42> hello", arg2: true, arg3: true)]
     [TestCase("<@!42> hello", arg2: true, arg3: false)]
-    public void Parse_ExplicitBodyMention_UsesAnonymousMode(string text, bool reply, bool ping)
+    public void Parse_ExplicitBodyMention_PreparesDraft(string text, bool reply, bool ping)
     {
         // Act
         var draft = SylvanMailReply.Parse(content: text, botId: 42, replyToBot: reply, replyPingEnabled: ping);
 
         // Assert
         draft.ShouldNotBeNull();
-        draft.Anonymous.ShouldBeTrue();
         draft.Content.ShouldBe("hello");
     }
 
     [Test]
-    public void Parse_PingedReplyToSylvan_UsesSignedMode()
+    public void Parse_PingedReplyToSylvan_PreparesDraft()
     {
         // Act
         var draft = SylvanMailReply.Parse("hello <@99>", botId: 42, replyToBot: true, replyPingEnabled: true);
 
         // Assert
         draft.ShouldNotBeNull();
-        draft.Anonymous.ShouldBeFalse();
         draft.Content.ShouldBe("hello <@99>");
     }
 
@@ -45,7 +43,7 @@ public sealed class SylvanMailReplyTests
     }
 
     [Test]
-    public void Parse_EditedBodyMention_ReevaluatesSignedMode()
+    public void Parse_EditedBodyMention_KeepsReplyDraft()
     {
         // Arrange
         var original = SylvanMailReply.Parse("<@42> hello", botId: 42, replyToBot: true, replyPingEnabled: true);
@@ -54,8 +52,8 @@ public sealed class SylvanMailReplyTests
         var edited = SylvanMailReply.Parse("hello", botId: 42, replyToBot: true, replyPingEnabled: true);
 
         // Assert
-        original.ShouldNotBeNull().Anonymous.ShouldBeTrue();
-        edited.ShouldNotBeNull().Anonymous.ShouldBeFalse();
+        original.ShouldNotBeNull().Content.ShouldBe("hello");
+        edited.ShouldNotBeNull().Content.ShouldBe("hello");
     }
 
     [Test]
@@ -66,7 +64,6 @@ public sealed class SylvanMailReplyTests
 
         // Assert
         draft.ShouldNotBeNull();
-        draft.Anonymous.ShouldBeTrue();
         draft.Content.ShouldBeEmpty();
     }
 }

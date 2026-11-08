@@ -1,6 +1,6 @@
 namespace SylvanBot.Application.Features.SylvanMail;
 
-public sealed record SylvanMailReply(string Content, bool Anonymous)
+public sealed record SylvanMailReply(string Content)
 {
     public static SylvanMailReply? Parse(string content, ulong botId, bool replyToBot, bool replyPingEnabled)
     {
@@ -18,9 +18,9 @@ public sealed record SylvanMailReply(string Content, bool Anonymous)
                .Replace(oldValue: nicknameMention, newValue: string.Empty, comparisonType: StringComparison.Ordinal)
                .Trim();
 
-            return new SylvanMailReply(Content: body, Anonymous: true);
+            return new SylvanMailReply(Content: body);
         }
 
-        return replyToBot && replyPingEnabled ? new SylvanMailReply(Content: content, Anonymous: false) : null;
+        return replyToBot && replyPingEnabled ? new SylvanMailReply(Content: content) : null;
     }
 }

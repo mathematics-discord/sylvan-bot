@@ -1,0 +1,234 @@
+---
+title: Moderation tickets
+description: Find, complete, review and correct moderation records in Discord.
+---
+
+import RoleMention from '../../../components/RoleMention.astro';
+
+Open a ticket message's **Apps → Manage Ticket** menu to see its details and
+available controls. If you have its number, use `/ticket show id:1234`.
+Replace `1234` in these examples with the number on your ticket.
+
+## Who can do what?
+
+Tickets must be enabled. You need **View Channel** in the ticket's channel
+(or its configured destination if it has no current post), even when using
+a DM editor. Your current staff tier counts, not the one you held when
+the action happened.
+
+The four staff tiers on Mathematics are <RoleMention id="1522665207225127034" />, <RoleMention id="1522665074571870419" />,
+<RoleMention id="1328097118644338779" /> and <RoleMention id="administrators" />. Each tier includes the capabilities of those below it.
+
+| Task | Staff role |
+| --- | --- |
+| Read visible records; create, correct or hide any visible note | <RoleMention id="1522665207225127034" /> and above |
+| Correct your own timeout, kick, server voice mute or deafen | <RoleMention id="1522665207225127034" /> and above |
+| Correct your own ban | <RoleMention id="1522665074571870419" /> and above |
+| Correct tracked-role tickets or somebody else's action | <RoleMention id="1328097118644338779" /> and above |
+| Review, read hidden records, hide action tickets or restore records | <RoleMention id="1328097118644338779" /> and above |
+| Configure tickets | <RoleMention id="administrators" /> |
+
+For example, <RoleMention id="1522665074571870419" /> can correct their own ban ticket.
+<RoleMention id="1328097118644338779" /> and above can correct another moderator's ban, including its duration,
+and can lift it subject to the reversal checks below.
+Editing a ticket does not transfer responsibility from the original moderator.
+
+## What gets a ticket?
+
+Carry out the moderation action in Discord. Sylvan captures bans, kicks,
+timeouts, server voice mutes and deafens, and grants of roles selected by <RoleMention id="administrators" />. It saves a numbered record and attempts to post it in the
+tickets channel. Check the record before adding a note for the same incident.
+
+An audit reason can supply the comment and duration: for example,
+`2 days, repeated invite spam after a warning`. Check the captured details,
+especially the expiry. A newly captured timeout uses the expiry selected in
+Discord, even if its audit reason names a different duration. Set the intended
+total duration in the ticket editor, including for long timeouts.
+A timeout extension made directly in Discord can
+create a new ticket; shortening or removing it updates the existing action.
+
+For context without a sanction, run
+`/ticket note user:@member comment:Warned about repeated invite links in general.`
+Omit `comment:` to open an editor. A note records information; it does not
+warn, DM or restrict the member. A user ID works for someone who has left.
+The member's **Apps → Add Moderation Note** shortcut also opens the editor,
+available to <RoleMention id="1522665207225127034" /> and above.
+
+## Complete or correct a ticket
+
+1. Choose **Edit** in Sylvan's DM or the ticket controls, or run
+   `/ticket edit id:1234`. Use the server editor for somebody else's ticket;
+   their DM controls belong to them.
+2. Write the reason, what happened and any evidence another moderator needs.
+   Include message links where useful. Comments must contain 1–3,000 characters.
+3. For a restriction, check the duration and save. Read the whole response:
+   saving details does not always mean Discord confirmed the change.
+
+To add a development without replacing the original comment, use
+`/ticket append id:1234 comment:Member contacted staff through ModMail and acknowledged the warning.`
+The combined comment, including the separating newline, must fit within
+3,000 characters. To replace it, use
+`/ticket set id:1234 comment:Corrected reason and evidence.`
+Omitted fields keep their values; a blank comment cannot clear the record.
+If a historical comment is too long for the editor, replace it with
+`/ticket set`.
+
+Approval survives comment and duration edits. Recent moderator changes appear
+on the ticket; it says when older history entries have been omitted. If the
+ticket changed while your editor was open, reopen it and read the latest
+details before saving.
+
+DM prompts work newest first. Use `/ticket top` in the server to request
+your newest outstanding prompt again. If DMs are closed, tickets still missing
+details remain queued. An already complete ban or timeout can also get an
+initial prompt, but a failed delivery of that prompt may leave nothing for
+`/ticket top` to resend. Find the ticket in the channel or with `/ticket show`,
+then use `/ticket edit` in the server. Use the **Edit** button:
+ordinary text replies to Sylvan do not edit tickets.
+
+### Change the duration
+
+Run `/ticket set id:1234 duration:7 days`, or change **Duration** in the editor.
+This is the **total time from the original action**, not extra time from now.
+A ban made on Monday at noon with `7 days` expires the following Monday at
+noon. Changing it on Wednesday does not move that starting point.
+
+Use positive whole units, such as `90 minutes`, `2 days 6 hours` or
+`3 weeks`. A month is 30 days; a year is 365 days. Use `permanent` for an
+open-ended ban, voice restriction or tracked role. Timeouts need a finite
+duration. Notes and kicks do not accept durations.
+
+Check the displayed expiry date and remaining time. A total duration that
+has already elapsed can end an active restriction. Ban, voice and role expiry
+waits for Sylvan to check the audit log; voice expiry can also wait for the
+member to reconnect to voice. Editing an ended ticket's duration corrects
+the record and does not reapply the restriction.
+
+## Find a record
+
+Run `/ticket show user:@member` for their history, or use their Discord user
+ID after they leave. Add `page:2` for the next page. Use `id:1234` for one
+ticket, or `message:` with a Sylvan ticket message link. Supply exactly one
+of `user:`, `id:` or `message:`. The member's **Apps → List Tickets**
+shortcut is available to <RoleMention id="1522665207225127034" /> and above.
+
+**These lookups post their results in the channel where you run them.**
+Use a staff channel, including for `/ticket showhidden`. Having permission
+to read the ticket does not make the command response private.
+
+As <RoleMention id="1328097118644338779" /> or above, an ordinary user-history lookup also
+lists hidden ticket numbers, without their details or links. Other staff do
+not see those hidden entries. Use `/ticket showhidden id:1234` or
+`/ticket showhidden user:@member` to read hidden records; this view contains
+only hidden tickets. You still need access to their ticket channel.
+
+## Review the queue
+
+As <RoleMention id="1328097118644338779" /> or above, choose **Review tickets** on
+the summary at the bottom of the tickets channel, or run `/ticket review`.
+The queue is private to you.
+
+- **Approve & next** records your approval and opens the next eligible ticket.
+- **Edit** opens the details for correction. Saving does not approve the
+  ticket. Restriction edits return you to the queue; after editing a kick,
+  run `/ticket review` again to continue.
+- **Skip** leaves a ticket for another pass. **Start again** returns to skipped
+  tickets; **Refresh** checks for changes.
+
+For one ticket, choose **Approve** in its controls or **Apps → Approve Ticket**
+on its message. The details must be complete and no Discord change can be
+pending. Approval records a review; it does not lift a restriction.
+
+Notes, hidden tickets and review-exempt actions stay out of the queue.
+Exemptions use the acting moderator's roles when the action is captured;
+later configuration changes affect future captures.
+
+## Revert, hide or restore
+
+### Lift a restriction and keep the record
+
+Use **Apps → Revert Ticket** or `/ticket revert id:1234`.
+<RoleMention id="1522665207225127034" /> and above can lift their own timeouts and voice restrictions;
+<RoleMention id="1522665074571870419" /> and above can also lift their own bans.
+<RoleMention id="1328097118644338779" /> and above can lift another moderator's restriction or remove a tracked role.
+
+Sylvan checks for newer audit activity before acting. The member must be below
+both you and Sylvan in the role hierarchy (the server owner is exempt from
+the caller's hierarchy check). You cannot revert a restriction on yourself
+or the server owner. A tracked role must be an ordinary role below both you
+and Sylvan; voice restrictions require the member to be in the server.
+Sylvan also needs the Discord permission to perform the change. Even
+<RoleMention id="administrators" /> cannot bypass Sylvan's permissions or hierarchy.
+
+A successful reversal unbans, removes the timeout, clears the server voice
+mute/deafen or removes the tracked role. It keeps the visible record and
+records who reversed it. It cannot undo a kick; notes have no restriction
+to lift. An ended restriction cannot be reverted again.
+
+### Hide a record
+
+Choose **Hide**, **Apps → Hide Ticket**, or `/ticket hide id:1234`.
+
+For a note, you can also tick **Hidden ticket** in its editor and save.
+
+- **A visible note:** <RoleMention id="1522665207225127034" /> and above can hide it, regardless of who wrote it.
+  This changes the record's visibility; there is no member restriction to remove.
+- **An action ticket:** you need to be <RoleMention id="1328097118644338779" /> or above, even for your own action
+  or a kick. If its restriction is active, Sylvan first tries to lift it
+  using all the reversal checks above.
+- **An unresolved restriction:** a pending Discord operation or a blocked or
+  unconfirmed reversal prevents hiding. The saved ticket stays visible.
+  Discord may nevertheless have accepted an unconfirmed reversal: check the
+  member's state and refresh after audit reconciliation before retrying.
+
+After a successful hide, the record remains stored for <RoleMention id="1328097118644338779" /> and above and
+Sylvan removes its recorded channel copies. If removal fails, a copy may
+remain visible while Sylvan retries; hiding is not a guarantee that every
+channel copy has disappeared. Old messages authored by another bot cannot
+be removed by this operation. Earlier lookup replies and copies shared by
+staff are not tracked ticket publications and are not removed either.
+
+### Restore a record
+
+As <RoleMention id="1328097118644338779" /> or above, run
+`/ticket set id:1234 hidden:False`. This restores visibility and allows a
+new channel post; it does **not** reapply the restriction. You can also use
+`hidden:True` to hide through `/ticket set`. For action tickets, change
+visibility separately from the comment or duration.
+
+## Timeouts and other timed restrictions
+
+Set the full duration on a timeout ticket even if it exceeds Discord's
+28-day native window. Sylvan renews the native timeout as needed and checks
+the remaining time when the member rejoins. A direct Discord change is
+reconciled with the managed timeout. Permanent timeouts are unsupported.
+
+If the ticket says **Pending**, wait for reconciliation and check the live
+restriction before issuing another change. Pending operations block editing
+and approval. If **Enforcement paused** or **Expiry paused** appears, let audit
+recovery finish, verify the intended restriction and confirm the duration
+through the editor. Ask <RoleMention id="administrators" /> to investigate if the pause persists.
+
+### When a change is not confirmed
+
+| Reply or symptom | What to check before retrying |
+| --- | --- |
+| Saving could not be confirmed | Read the ticket again and check the member's live restriction. The save may have succeeded, or Discord may have lifted the restriction before the save failed. If it is already lifted, wait for audit reconciliation rather than repeat the reversal or hide. |
+| Ticket saved, publication unconfirmed | Check the saved ticket and tickets channel. Do not create a second note. Changes to known posts retry; an uncertain new post is not automatically reposted. Ask <RoleMention id="administrators" /> to investigate if it remains missing. |
+| Some channel copies could not be synchronised | The saved record remains. Check the old copies; Sylvan retries their updates or removal. |
+| Discord rejected a timeout change | The duration was not changed, but a comment submitted alongside it can still save. Read both fields; check Sylvan's permissions, hierarchy and member state before trying the duration again. |
+| Discord change unconfirmed or still pending | Check the member's live restriction and the saved ticket. Recovery will reconcile it; do not repeat the action blindly. |
+| Newer change awaits audit reconciliation | Let Sylvan read the audit change, then reopen the ticket. Do not overwrite another moderator's newer action. |
+
+## Finding a ticket from the November 2026 cutover
+
+The November 2026 transfer on Mathematics kept the old bot's ticket numbers.
+For tickets issued in the 24 months before the transfer, **〖tickets-new〗**
+was selected for notes and temporary restrictions still in effect with a
+future expiry at cutover. Those records keep their channel after expiry.
+Older tickets and all other visible transferred records were assigned to
+**〖tickets-legacy〗**. Use the original ticket number to find either kind.
+
+New tickets use the configured destination, **〖tickets-new〗** at cutover.
+This is historical routing guidance, not a setup step. Administrator setup
+is under [Ticket configuration](../../commands/tickets/#administrator-configuration).

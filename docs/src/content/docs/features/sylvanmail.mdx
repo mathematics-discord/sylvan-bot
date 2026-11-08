@@ -3,6 +3,8 @@ title: ModMail
 description: Contact staff privately, or reply to members from the staff mail forum.
 ---
 
+import RoleMention from '../../../components/RoleMention.astro';
+
 ## For users: contact staff
 
 Send a direct message to the **ModMail** bot. You can open its profile from
@@ -30,32 +32,37 @@ least three hours triggers a fresh notification.
 Anyone with access to write in the post can reply. The notification role
 doesn't decide who can answer.
 
+### Prepare a reply
+
+Write in the staff post and either **mention Sylvan in the message body** or
+use **Reply** on a message from Sylvan with the **reply ping enabled**.
+Both prepare the same draft. Neither chooses whether your name is shown.
+
 ### Send an anonymous reply
 
-1. Write your reply in the post and **mention Sylvan in the message**.
-2. Wait for Sylvan to add 📤, then click it on your own message to send.
-
-The member sees **From staff:** followed by your reply. Sylvan removes
-its own mention from the delivered text.
+Click ??? (`:levitate:`) on your own draft. The member sees **From staff:**
+followed by your reply.
 
 ### Send a reply with your username
 
-1. Use Discord's **Reply** action on a message from Sylvan in the post.
-2. Keep the reply ping enabled and write your reply.
-3. Wait for 📤, then click it on your own message to send.
-
-The member sees **From &lt;username&gt;:** followed by your reply. If you also
-mention Sylvan in the message body, the reply is anonymous instead.
+Click ?? (`:person_standing:`) on your own draft. The member sees
+**From &lt;username&gt;:** followed by your reply.
 
 ### Drafts and staff discussion
 
-Posting a draft doesn't send it. Only its author can click 📤 to send or
-❌ to cancel. You can edit the text and attachments before sending; ✅
-means Discord accepted the whole reply. Editing or deleting it afterwards
-doesn't change the member's copy.
+Wait for Sylvan to add all three controls: ??? **Anonymous**, ?? **Signed**
+and ? **Cancel**. Only the draft's author can use them. Posting or editing
+a draft does not send it; the send reaction you choose determines attribution.
+Sylvan removes its own mention from delivered text.
+
+Click ? to cancel. Edit a cancelled draft to prepare it again. You can edit
+text and attachments before sending. ? means Discord accepted the whole reply;
+editing or deleting it afterwards does not change the member's copy.
+Choosing a different send reaction afterwards does not send a second copy.
 
 Ordinary discussion without a Sylvan mention or a ping-enabled reply stays
-in the staff post. Other mentions in a delivered reply don't notify anyone.
+in the staff post. Other mentions in delivered replies do not notify anyone.
+For an old unsent draft with ??, edit it to get the new controls.
 
 ### Technical details and delivery problems
 
@@ -65,6 +72,6 @@ and interactive content aren't supported. Long text is split into messages.
 
 If a reply reports a delivery problem, follow its explanation. For partial
 or uncertain delivery, check what arrived before sending again. Messages
-interrupted by a shutdown aren't automatically replayed. Administrators
+interrupted by a shutdown aren't automatically replayed. <RoleMention id="administrators" />
 can choose the forum and notification role with
 [/config sylvanmail](../../commands/sylvanmail/#administrator-configuration).

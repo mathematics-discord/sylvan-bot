@@ -3,9 +3,11 @@ title: Reaction roles
 description: Let members choose ordinary roles by reacting to a message.
 ---
 
+import RoleMention from '../../../components/RoleMention.astro';
+
 React to a configured message to receive its role. Remove your reaction to remove the role. Different emoji on one message can grant different roles, and the same emoji can be used on other messages.
 
-Administrators set up mappings with [/config rolereact](../../commands/role-react/). Each message-and-emoji pair grants one role. Existing reactions are not processed during setup; members need to remove and add their reaction again.
+<RoleMention id="administrators" /> set up mappings with [/config rolereact](../../commands/role-react/). Each message-and-emoji pair grants one role. Existing reactions are not processed during setup; members need to remove and add their reaction again.
 
 ## Role safety and removal
 

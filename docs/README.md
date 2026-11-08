@@ -76,7 +76,8 @@ navigation, assets, canonical URLs, sitemaps and Pagefind index.
 ## Role mentions
 
 Role names and colours live in `src/data/roles.json`, keyed by Discord role
-ID. Keep IDs quoted as strings so their digits are preserved:
+ID where known. The neutral Administrators placeholder uses the descriptive
+key `administrators`; it is not a Discord ID. Keep IDs quoted as strings so their digits are preserved:
 
 ```json
 {
@@ -99,7 +100,7 @@ Available to <RoleMention id="1328097118644338779" /> on Mathematics.
 Use `"color": null` for a role with Discord's default colour. Its mention
 uses the theme's neutral text colour in both light and dark mode.
 
-The component adds the `@`, name, and colour. Unknown IDs fail the build
+The component adds the `@`, name, and colour. Unknown keys fail the build
 with a message pointing to the configuration file. Update that file when
 a role changes; it is not synchronised with Discord automatically.
 

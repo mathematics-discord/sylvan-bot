@@ -1,0 +1,102 @@
+---
+title: Ticket commands
+description: Look up ticket controls, permissions and administrator settings.
+---
+
+import RoleMention from '../../../components/RoleMention.astro';
+
+Use this page to find a command. For the steps and outcomes, open the linked
+task in [Moderation tickets](../../features/tickets/). Replace `1234` with
+your ticket number.
+
+## Look up tickets
+
+Lookups are available to <RoleMention id="1522665207225127034" /> and above. You also need View Channel in
+the ticket's channel and tickets must be enabled. **Results are posted in the channel where you run
+the command**, so choose a staff channel.
+
+| Command | Options |
+| --- | --- |
+| `/ticket show` | Exactly one of `user:` (mention or user ID), `id:` (ticket number) or `message:` (Sylvan ticket message link). Add `page:` for user history. |
+| `/ticket showhidden` | Same selectors, but only hidden records. Requires <RoleMention id="1328097118644338779" /> or above as well as channel access. |
+
+**Apps → List Tickets** on a member is available to <RoleMention id="1522665207225127034" /> and above.
+See [finding a record](../../features/tickets/#find-a-record) for hidden
+numbers and [old ticket locations](../../features/tickets/#finding-a-ticket-from-the-november-2026-cutover).
+
+## Create and edit
+
+Notes are available to <RoleMention id="1522665207225127034" /> and above. They can also correct their own
+timeouts, kicks and voice restrictions. <RoleMention id="1522665074571870419" /> and above can correct their
+own bans. <RoleMention id="1328097118644338779" /> and above can correct any action ticket, including tracked
+roles and other moderators' actions. Channel access is required too.
+
+| Command | Use |
+| --- | --- |
+| `/ticket note user:@member` | Opens a comment editor. Add `comment:` to save directly. A user ID works for a departed member. |
+| `/ticket edit id:1234` | Opens existing details. |
+| `/ticket set id:1234 duration:7 days` | Replaces the total duration measured from the original action. Optional `comment:` replaces the comment. Omitted fields keep their values. |
+| `/ticket append id:1234 comment:Member acknowledged the warning in ModMail.` | Adds text, keeping the existing comment. |
+| `/ticket top` | Attempts redelivery of your newest outstanding DM prompt. |
+
+Comments must be nonblank and at most 3,000 characters, including the combined
+text and separating newline when appending. Use positive durations such as
+`90 minutes`, `2 days 6 hours` or `3 weeks`; months are 30 days and years
+365 days. `permanent` works for bans, voice restrictions and tracked roles,
+but not timeouts. Notes and kicks have no duration. A duration already
+elapsed can end an active restriction; read
+[Change the duration](../../features/tickets/#change-the-duration) before shortening it.
+
+Use **Apps → Add Moderation Note** on a member (<RoleMention id="1522665207225127034" /> and above),
+or **Apps → Manage Ticket** on a ticket message to open its controls.
+DM prompts use **Edit**, not text replies.
+
+## Review and reverse
+
+| Command or control | Staff role and next step |
+| --- | --- |
+| `/ticket review`, **Review tickets**, **Approve**, **Apps → Approve Ticket** | <RoleMention id="1328097118644338779" /> or above. [Work through the review queue](../../features/tickets/#review-the-queue). |
+| `/ticket revert id:1234`, **Apps → Revert Ticket** | Own timeouts/voice restrictions: <RoleMention id="1522665207225127034" /> and above; own bans: <RoleMention id="1522665074571870419" /> and above; others' actions or tracked roles: <RoleMention id="1328097118644338779" /> and above. [Check reversal requirements](../../features/tickets/#lift-a-restriction-and-keep-the-record). |
+| `/ticket hide id:1234`, **Hide**, **Apps → Hide Ticket** | Visible notes: <RoleMention id="1522665207225127034" /> and above. Action tickets: <RoleMention id="1328097118644338779" /> and above; active restrictions must pass the reversal checks. [Hide a record](../../features/tickets/#hide-a-record). |
+| `/ticket set id:1234 hidden:False` | <RoleMention id="1328097118644338779" /> or above. Restores visibility without reapplying a restriction. |
+
+`/ticket set id:1234 hidden:True` follows the same hide rules.
+For action tickets, do not combine `hidden:` with comment or duration edits.
+If a reversal cannot be confirmed, hiding stops and the record stays visible.
+If hiding saves but removal of a channel copy fails, that copy may remain
+until a retry succeeds. Read [unconfirmed changes](../../features/tickets/#when-a-change-is-not-confirmed)
+before repeating an operation.
+
+## Administrator configuration
+
+Available to <RoleMention id="administrators" />. Run `/config tickets` with no options to display
+the destination, enabled state, reminder interval, review exemptions and
+tracked roles.
+
+1. Choose a staff text channel you can view. Give staff **View Channel** and
+   **Read Message History** there. Give Sylvan **View Channel**, **Read Message
+   History**, **Send Messages**, **Embed Links** and **Attach Files** (long
+   historical comments can be attached).
+2. Give Sylvan **View Audit Log** for capture and reconciliation. Give it the
+   relevant action permissions and role position to manage the restrictions
+   you expect it to lift or renew.
+3. Run `/config tickets channel:#tickets enabled:True`.
+4. Read the returned settings. After a moderation action, check that its
+   ticket appears and that staff can open it.
+
+| Option | Effect |
+| --- | --- |
+| `enabled:` | Enables or pauses ticket management. Disabling also blocks ticket lookups and edits and pauses automated expiry and long-timeout renewal; it does not lift existing restrictions. |
+| `channel:` | Destination for new ticket messages and the review summary. |
+| `reminder-minutes:` | Whole minutes between DM reminders: 1–35,791,394; default 1,440. |
+| `exempt-role-add:` / `exempt-role-remove:` | Changes which acting moderators' roles exempt newly captured actions from review. Existing tickets keep their exemption. |
+| `tracked-role-add:` / `tracked-role-remove:` | Starts or stops capturing new grants of an ordinary role. Managed roles and @everyone cannot be added. Role persistence is configured separately. |
+
+For example, `/config tickets reminder-minutes:720` changes reminders to
+12 hours. `/config tickets tracked-role-add:@Restricted` starts tracking
+future grants of that role. These settings do not grant staff permissions.
+
+Enabling starts capture from that time, including after a pause; do not
+expect actions performed while disabled to be backfilled. Check outstanding
+restrictions after re-enabling. The November 2026 transfer was a one-off
+operation and is not part of routine setup.
