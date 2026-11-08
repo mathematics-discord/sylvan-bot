@@ -13,7 +13,7 @@ the [command reference](../commands/).
 
 ## For staff
 
-- [Moderation tickets](./tickets/) — Complete, review, find and correct tickets.
+- [Moderation tickets](./tickets/) — Find and complete records, review actions, lift restrictions and hide or restore tickets.
 
 - [Automod](./automod/) — Apply rules to new and edited message text.
 - [Image-spam detection](./image-spam/) — Ban attachment bursts across several channels.

@@ -47,6 +47,7 @@ export default defineConfig({
             {
                 label: 'Administrator commands',
                 items: [
+                    {label: '/config tickets', link: 'https://math.ratgirl.dev/sylvan/commands/tickets/#administrator-configuration'},
                     {slug: 'commands/persistence'},
                     {slug: 'commands/color-admin'},
                     {slug: 'commands/automod-admin'},

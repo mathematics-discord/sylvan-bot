@@ -21,7 +21,7 @@ See the [feature guides](../features/) for automatic behaviour and staff workflo
 
 ## Moderator commands
 
-- [/ticket](./tickets/) — Record notes, complete tickets and manage active restrictions.
+- [/ticket](./tickets/) — Look up ticket controls, required permissions and what to check before retrying a change.
 
 - [/working-hours](./working-hours/) — Set your daily availability and
   let Sylvan manage your Moderators role. You must also hold one of the
