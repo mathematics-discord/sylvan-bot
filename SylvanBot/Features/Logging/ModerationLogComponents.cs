@@ -56,12 +56,17 @@ internal static class ModerationLogComponents
             omittedAttachmentCount > 0 ? $"\n*{omittedAttachmentCount} attachment(s) omitted (download failures or limits).*" : string.Empty;
 
         var contentLength = MaxComponentTextLength - header.Length - attachmentNotice.Length;
-        var contentBlock = CodeBlock(value: content, maxLength: contentLength, ansi: false);
+        var contentBlock = string.IsNullOrWhiteSpace(content) ? string.Empty : CodeBlock(value: content, maxLength: contentLength, ansi: false);
+        var body = (contentBlock + attachmentNotice).TrimStart('\n');
 
         var container = new ContainerBuilder()
-           .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
-           .WithSeparator(new SeparatorBuilder())
-           .WithTextDisplay(new TextDisplayBuilder().WithContent(contentBlock + attachmentNotice));
+           .WithTextDisplay(new TextDisplayBuilder().WithContent(header));
+
+        if (body.Length > 0)
+        {
+            container.WithSeparator(new SeparatorBuilder())
+               .WithTextDisplay(new TextDisplayBuilder().WithContent(body));
+        }
 
         if (attachments.Count > 0)
             AddAttachmentComponents(container: container, attachments: attachments);
