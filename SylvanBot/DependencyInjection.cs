@@ -41,9 +41,6 @@ public static class DependencyInjection
         private void AddFeatures(IConfiguration configuration)
         {
             services.AddSingleton<AutomodBanEnforcement>();
-            services.AddSingleton<AutomodBanWorker>();
-            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<AutomodBanWorker>());
-            services.AddHostedService(sp => sp.GetRequiredService<AutomodBanWorker>());
             services.AddSingleton<AutomodManagement>();
             services.AddSingleton<AutomodRuntime>();
             services.AddHostedService(sp => sp.GetRequiredService<AutomodRuntime>());

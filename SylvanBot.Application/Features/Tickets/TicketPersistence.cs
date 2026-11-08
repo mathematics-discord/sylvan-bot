@@ -12,7 +12,7 @@ public sealed class TicketPersistence : IEntityTypeConfiguration<Ticket>,
         {
             table.HasCheckConstraint("CK_tickets_number", "\"Number\" > 0");
             table.HasCheckConstraint("CK_tickets_identity", "\"GuildId\" > 0 AND \"SubjectUserId\" > 0 AND \"ModeratorUserId\" > 0");
-            table.HasCheckConstraint("CK_tickets_duration", "(\"DurationSeconds\" IS NULL OR \"DurationSeconds\" > 0) AND (\"Action\" <> 'Timeout' OR (\"DurationSeconds\" IS NOT NULL AND \"ExpiresAtUtc\" IS NOT NULL))");
+            table.HasCheckConstraint("CK_tickets_duration", "(\"DurationSeconds\" IS NULL OR \"DurationSeconds\" > 0 OR \"Status\" <> 'Active') AND (\"Action\" <> 'Timeout' OR (\"DurationSeconds\" IS NOT NULL AND \"ExpiresAtUtc\" IS NOT NULL))");
             table.HasCheckConstraint("CK_tickets_note_duration", "\"Action\" <> 'Note' OR \"DurationSeconds\" IS NULL");
             table.HasCheckConstraint("CK_tickets_approval", "(\"ApprovedByUserId\" IS NULL) = (\"ApprovedAtUtc\" IS NULL)");
             table.HasCheckConstraint("CK_tickets_audit", "\"SourceAuditId\" IS NULL OR (\"SourceAuditId\" > 0 AND \"LastAuditId\" IS NOT NULL AND \"LastAuditId\" >= \"SourceAuditId\")");

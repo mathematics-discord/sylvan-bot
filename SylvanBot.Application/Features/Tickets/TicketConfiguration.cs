@@ -8,6 +8,8 @@ public sealed class TicketConfiguration
 
     public ulong GuildId { get; init; }
 
+    public bool OrderedPublicationPending { get; set; }
+
     public bool Enabled { get; set; }
 
     public ulong? DestinationChannelId { get; set; }

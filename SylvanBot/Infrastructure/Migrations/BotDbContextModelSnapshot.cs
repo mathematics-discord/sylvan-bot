@@ -616,7 +616,7 @@ namespace SylvanBot.Infrastructure.Migrations
 
                             t.HasCheckConstraint("CK_tickets_audit", "\"SourceAuditId\" IS NULL OR (\"SourceAuditId\" > 0 AND \"LastAuditId\" IS NOT NULL AND \"LastAuditId\" >= \"SourceAuditId\")");
 
-                            t.HasCheckConstraint("CK_tickets_duration", "(\"DurationSeconds\" IS NULL OR \"DurationSeconds\" > 0) AND (\"Action\" <> 'Timeout' OR (\"DurationSeconds\" IS NOT NULL AND \"ExpiresAtUtc\" IS NOT NULL))");
+                            t.HasCheckConstraint("CK_tickets_duration", "(\"DurationSeconds\" IS NULL OR \"DurationSeconds\" > 0 OR \"Status\" <> 'Active') AND (\"Action\" <> 'Timeout' OR (\"DurationSeconds\" IS NOT NULL AND \"ExpiresAtUtc\" IS NOT NULL))");
 
                             t.HasCheckConstraint("CK_tickets_identity", "\"GuildId\" > 0 AND \"SubjectUserId\" > 0 AND \"ModeratorUserId\" > 0");
 
@@ -649,6 +649,9 @@ namespace SylvanBot.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("LastAuditScanAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("OrderedPublicationPending")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("ReminderIntervalSeconds")
                         .ValueGeneratedOnAdd()

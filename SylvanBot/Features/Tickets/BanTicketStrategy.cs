@@ -248,7 +248,7 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
         }
     }
 
-    private async Task<TicketResult> ReconcileAsync(BotDbContext db, Ticket ticket, bool auditCurrent, CancellationToken token)
+    internal async Task<TicketResult> ReconcileAsync(BotDbContext db, Ticket ticket, bool auditCurrent, CancellationToken token, DotNext.Optional<DateTimeOffset> auditFrom = default)
     {
         var version = ticket.Version;
         var now = DateTimeOffset.UtcNow;
@@ -267,9 +267,9 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
             return new TicketResult([], string.Empty);
 
         // Recheck immediately before unban. A new audit entry must be ingested first.
-        var configuration = await db.TicketConfigurations.SingleAsync(value => value.GuildId == ticket.GuildId, token);
-
-        var scan = await boundary.ReadAuditAsync(ticket.GuildId, configuration.LastAuditScanAtUtc!.Value.AddMinutes(-10), token);
+        var from = auditFrom.TryGet(out var checkpoint) ? checkpoint
+            : (await db.TicketConfigurations.SingleAsync(value => value.GuildId == ticket.GuildId, token)).LastAuditScanAtUtc!.Value;
+        var scan = await boundary.ReadAuditAsync(ticket.GuildId, from.AddMinutes(-10), token);
 
         var changed = scan.Observations
            .Any(value => value.Action == Action

@@ -1,3 +1,0 @@
-component: Moderation
-kind: Added
-body: The tickets channel keeps a list of tickets awaiting approval at the bottom, with a button for Senior Moderators to open their private review queue.

@@ -21,6 +21,8 @@ See the [feature guides](../features/) for automatic behaviour and staff workflo
 
 ## Moderator commands
 
+- [/ticket](./tickets/) — Record notes, complete tickets and manage active restrictions.
+
 - [/working-hours](./working-hours/) — Set your daily availability and
   let Sylvan manage your Moderators role. You must also hold one of the
   configured eligible staff roles.
@@ -33,6 +35,8 @@ See the [feature guides](../features/) for automatic behaviour and staff workflo
 - [/automod](./automod/) ? Add, remove and browse message-matching rules.
 
 ## Administrator commands
+
+- [/config tickets](./tickets/#administrator-configuration) — Configure capture, review exemptions and role tracking.
 
 - [/config persistence](./persistence/) — Remember selected safe roles across departures and rejoins.
 

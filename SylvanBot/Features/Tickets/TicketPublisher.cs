@@ -16,7 +16,7 @@ public sealed class TicketPublisher(
     ILogger logger)
 {
     // The coordinator holds the single mutation/publication gate for every entry here.
-    internal async Task<string> EnsureAsync(ulong guildId, long id, CancellationToken token)
+    internal async Task<string> EnsureAsync(ulong guildId, long id, CancellationToken token, bool orderedPublication = false)
     {
         try
         {
@@ -30,7 +30,11 @@ public sealed class TicketPublisher(
                 .Where(reference => !reference.Removed)
                 .ToList();
 
-            var guild = await client.Rest.GetGuildAsync(guildId, TicketBoundary.Options(token));
+            // While the imported queue drains, only its ordered reader may create a channel post.
+            if (config.OrderedPublicationPending && !orderedPublication && !ticket.Hidden && references.Count == 0)
+                return "\nSaved for publication in ticket-number order.";
+
+            IGuild guild = (IGuild?)client.GetGuild(guildId) ?? await client.Rest.GetGuildAsync(guildId, TicketBoundary.Options(token));
             var incomplete = false;
 
             foreach (var reference in references)
@@ -101,6 +105,9 @@ public sealed class TicketPublisher(
             if (current is not null)
                 return string.Empty;
 
+            if (config.OrderedPublicationPending && !orderedPublication)
+                return "\nSaved for publication in ticket-number order.";
+
             var destination = await guild.GetTextChannelAsync(config.DestinationChannelId!.Value, options: TicketBoundary.Options(token))
                               ?? throw new BotCommandException("The tickets channel is unavailable.");
 
@@ -146,15 +153,17 @@ public sealed class TicketPublisher(
 
     private static async Task<IUserMessage> SendAsync(IMessageChannel channel, Ticket ticket, CancellationToken token)
     {
+        var options = TicketBoundary.Options(token);
+        options.RetryMode = RetryMode.RetryRatelimit;
         if (TicketPresentation.UsesModerationEmbed(ticket))
             return await channel.SendMessageAsync(
                 embed: TicketPresentation.Describe(ticket),
-                options: TicketBoundary.Options(token),
+                options: options,
                 allowedMentions: AllowedMentions.None);
 
         if (ticket.Comment.Length <= TicketPresentation.InlineCommentLimit)
             return await channel.SendMessageAsync(
-                options: TicketBoundary.Options(token),
+                options: options,
                 allowedMentions: AllowedMentions.None,
                 components: TicketPresentation.ChannelMessage(ticket),
                 flags: MessageFlags.ComponentsV2);
@@ -167,7 +176,7 @@ public sealed class TicketPublisher(
             components: TicketPresentation.ChannelMessage(ticket),
             flags: MessageFlags.ComponentsV2,
             allowedMentions: AllowedMentions.None,
-            options: TicketBoundary.Options(token));
+            options: options);
     }
 
     private static async Task UpdateAsync(IMessageChannel channel, ulong messageId, Ticket ticket, CancellationToken token)

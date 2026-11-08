@@ -30,7 +30,7 @@ public sealed class TicketReviewSummary(
 
             List<TicketConfiguration> configurations = await db.TicketConfigurations
                .Where(config => config.GuildId > after
-                          && ((config.Enabled && config.DestinationChannelId != null)
+                          && ((config.Enabled && !config.OrderedPublicationPending && config.DestinationChannelId != null)
                               || config.ReviewSummaryMessageId != null))
                .OrderBy(config => config.GuildId)
                .Take(100)

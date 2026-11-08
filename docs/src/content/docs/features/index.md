@@ -13,6 +13,8 @@ the [command reference](../commands/).
 
 ## For staff
 
+- [Moderation tickets](./tickets/) — Complete, review, find and correct tickets.
+
 - [Automod](./automod/) — Apply rules to new and edited message text.
 - [Image-spam detection](./image-spam/) — Ban attachment bursts across several channels.
 - [Moderation logging](./logging/) — Read edit logs, deletion evidence and bulk transcripts.

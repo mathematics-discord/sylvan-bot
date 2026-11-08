@@ -86,6 +86,7 @@ public sealed class TicketWorker(
                         _timeoutChecks.TryRemove(check, out _);
                     }
 
+                    await coordinator.RecoverAutomodBansAsync(stoppingToken);
                     await ProcessGuildsAsync(stoppingToken);
                     await reviewSummary.RefreshAsync(stoppingToken);
                     await ProcessModeratorsAsync(stoppingToken);
@@ -228,6 +229,7 @@ public sealed class TicketWorker(
                                                  && ticket.Status == TicketStatus.Active && !ticket.ExpirySuspended
                                                  && (ticket.TimeoutCheckAtUtc == null || ticket.TimeoutCheckAtUtc <= now))
                                              || (!ticket.Hidden
+                                                 && (!config.OrderedPublicationPending || ticket.Publications.Any(reference => reference.Current && !reference.Removed))
                                                  && !ticket.SendUncertain
                                                  && !ticket.Publications.Any(reference => reference.Current && !reference.Removed && reference.Revision == ticket.Version))
                                              || ticket.Publications.Any(reference => !reference.Removed && (ticket.Hidden || !reference.Current))))
@@ -261,6 +263,9 @@ public sealed class TicketWorker(
 
                     after = ids[^1];
                 }
+
+                if (config.OrderedPublicationPending && await coordinator.PublishOrderedBatchAsync(config.GuildId, token))
+                    Wake();
             }
 
             cursor = configurations[^1].GuildId;

@@ -28,15 +28,20 @@ public sealed class VoiceDeafenTicketStrategy(DiscordSocketClient client, Ticket
         if (ticket.SourceAuditId is null)
             ticket.ExpirySuspended = true;
 
-        if (ticket.Status != TicketStatus.Active)
+        var owedCleanup = ticket.Pending?.Kind == "RemoveVoiceDeafen";
+        if (ticket.Status != TicketStatus.Active && !owedCleanup)
         {
             ticket.Pending = null;
 
             return new TicketResult([], string.Empty);
         }
 
-        if (!auditCurrent || ticket.ExpirySuspended || ticket.ExpiresAtUtc is null || ticket.ExpiresAtUtc > DateTimeOffset.UtcNow)
+        if (!auditCurrent || ticket.ExpirySuspended || (!owedCleanup && (ticket.ExpiresAtUtc is null || ticket.ExpiresAtUtc > DateTimeOffset.UtcNow)))
             return new TicketResult([], string.Empty);
+
+        var member = client.GetGuild(ticket.GuildId)?.GetUser(ticket.SubjectUserId);
+        if (member?.VoiceChannel is null)
+            return new TicketResult([], "Expiry is waiting for the member to reconnect to voice.");
 
         var config = await db.TicketConfigurations
            .SingleAsync(value => value.GuildId == ticket.GuildId, token);
@@ -52,11 +57,11 @@ public sealed class VoiceDeafenTicketStrategy(DiscordSocketClient client, Ticket
         if (newer)
             return new TicketResult([], "A newer voice change awaits reconciliation.");
 
-        var member = await client.Rest.GetGuildUserAsync(ticket.GuildId, ticket.SubjectUserId, TicketBoundary.Options(token));
 
-        if (member?.IsDeafened != true)
+        if (!member.IsDeafened)
         {
-            ticket.End(TicketStatus.Expired);
+            if (ticket.Status == TicketStatus.Active)
+                ticket.End(TicketStatus.Expired);
             ticket.Pending = null;
         }
         else
@@ -68,11 +73,6 @@ public sealed class VoiceDeafenTicketStrategy(DiscordSocketClient client, Ticket
             }
 
             await db.SaveChangesAsync(token);
-            var connected = client.GetGuild(ticket.GuildId)?.GetUser(ticket.SubjectUserId)?.VoiceChannel is not null;
-
-            if (!connected)
-                return new TicketResult([ticket.Id], "Expiry is waiting for the member to reconnect to voice.");
-
             if (ticket.Pending.Attempted && ticket.Pending.RequestedAtUtc > DateTimeOffset.UtcNow.AddSeconds(-30))
                 return new TicketResult([], "Voice expiry is awaiting confirmation.");
 
@@ -85,7 +85,8 @@ public sealed class VoiceDeafenTicketStrategy(DiscordSocketClient client, Ticket
             try
             {
                 await member.ModifyAsync(properties => properties.Deaf = false, options);
-                ticket.End(TicketStatus.Expired);
+                if (ticket.Status == TicketStatus.Active)
+                    ticket.End(TicketStatus.Expired);
                 ticket.Pending = null;
             }
             catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden)

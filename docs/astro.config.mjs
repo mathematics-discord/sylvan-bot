@@ -23,6 +23,7 @@ export default defineConfig({
                 {slug: 'features/persistence'},
                 {slug: 'features/working-hours'},
                 {slug: 'features/sylvanmail'},
+                {slug: 'features/tickets'},
                 {slug: 'features/logging'},
                 {slug: 'features/automod'},
                 {slug: 'features/image-spam'},
@@ -37,7 +38,7 @@ export default defineConfig({
             },
             {
                 label: 'Moderator commands',
-                items: [{slug: 'commands/working-hours'}],
+                items: [{slug: 'commands/tickets'}, {slug: 'commands/working-hours'}],
             },
             {
                 label: 'Senior moderator commands',

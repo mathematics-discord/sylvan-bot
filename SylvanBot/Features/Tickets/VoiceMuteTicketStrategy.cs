@@ -28,14 +28,19 @@ public sealed class VoiceMuteTicketStrategy(DiscordSocketClient client, TicketBo
         if (ticket.SourceAuditId is null)
             ticket.ExpirySuspended = true;
 
-        if (ticket.Status != TicketStatus.Active)
+        var owedCleanup = ticket.Pending?.Kind == "RemoveVoiceMute";
+        if (ticket.Status != TicketStatus.Active && !owedCleanup)
         {
             ticket.Pending = null;
             return new TicketResult([], string.Empty);
         }
 
-        if (!recovery.AuditCurrent || ticket.ExpirySuspended || ticket.ExpiresAtUtc is null || ticket.ExpiresAtUtc > DateTimeOffset.UtcNow)
+        if (!recovery.AuditCurrent || ticket.ExpirySuspended || (!owedCleanup && (ticket.ExpiresAtUtc is null || ticket.ExpiresAtUtc > DateTimeOffset.UtcNow)))
             return new TicketResult([], string.Empty);
+
+        var member = client.GetGuild(ticket.GuildId)?.GetUser(ticket.SubjectUserId);
+        if (member?.VoiceChannel is null)
+            return new TicketResult([], "Expiry is waiting for the member to reconnect to voice.");
 
         var config = await db.TicketConfigurations
             .SingleAsync(value => value.GuildId == ticket.GuildId, token);
@@ -48,10 +53,10 @@ public sealed class VoiceMuteTicketStrategy(DiscordSocketClient client, TicketBo
         if (newer)
             return new TicketResult([], "A newer voice change awaits reconciliation.");
 
-        var member = await client.Rest.GetGuildUserAsync(ticket.GuildId, ticket.SubjectUserId, TicketBoundary.Options(token));
-        if (member?.IsMuted != true)
+        if (!member.IsMuted)
         {
-            ticket.End(TicketStatus.Expired);
+            if (ticket.Status == TicketStatus.Active)
+                ticket.End(TicketStatus.Expired);
             ticket.Pending = null;
         }
         else
@@ -62,10 +67,6 @@ public sealed class VoiceMuteTicketStrategy(DiscordSocketClient client, TicketBo
                 ticket.Record(TicketHistoryAction.AuditObserved);
             }
             await db.SaveChangesAsync(token);
-            var connected = client.GetGuild(ticket.GuildId)?.GetUser(ticket.SubjectUserId)?.VoiceChannel is not null;
-            if (!connected)
-                return new TicketResult([ticket.Id], "Expiry is waiting for the member to reconnect to voice.");
-
             if (ticket.Pending.Attempted && ticket.Pending.RequestedAtUtc > DateTimeOffset.UtcNow.AddSeconds(-30))
                 return new TicketResult([], "Voice expiry is awaiting confirmation.");
 
@@ -78,7 +79,8 @@ public sealed class VoiceMuteTicketStrategy(DiscordSocketClient client, TicketBo
             try
             {
                 await member.ModifyAsync(properties => properties.Mute = false, options);
-                ticket.End(TicketStatus.Expired);
+                if (ticket.Status == TicketStatus.Active)
+                    ticket.End(TicketStatus.Expired);
                 ticket.Pending = null;
             }
             catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden)

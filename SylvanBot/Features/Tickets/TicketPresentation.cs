@@ -144,7 +144,7 @@ internal static class TicketPresentation
                 inline: true);
 
             if (ticket.ExpiresAtUtc is { } expiry)
-                embed.AddField("Expires", TimestampTag.FormatFromDateTimeOffset(expiry, TimestampTagStyles.Relative), inline: true);
+                embed.AddField("Expires", FormatExpiry(expiry), inline: true);
         }
         else embed.AddField("Created", $"<t:{ticket.CreatedAtUtc.ToUnixTimeSeconds()}:f>", inline: true);
 
@@ -153,7 +153,7 @@ internal static class TicketPresentation
 
         if (ticket.Pending is not null)
             embed.AddField("Pending", "Expiry or a Discord change is awaiting confirmation.");
-        if (ticket.ExpirySuspended)
+        if (ticket.ExpirySuspended && ticket.Status == TicketStatus.Active)
             embed.AddField(ticket.Action == TicketAction.Timeout ? "Enforcement paused" : "Expiry paused",
                 "Confirm the duration after audit recovery.");
 
@@ -163,6 +163,12 @@ internal static class TicketPresentation
             AddStoredActionFields(embed, ticket);
 
         return embed.Build();
+    }
+
+    private static string FormatExpiry(DateTimeOffset expiry)
+    {
+        var timestamp = expiry.ToUnixTimeSeconds();
+        return $"<t:{timestamp}:F>, <t:{timestamp}:R>";
     }
 
     internal static string OperationalDetails(Ticket ticket)
@@ -207,7 +213,7 @@ internal static class TicketPresentation
                 embed.AddField("Duration", "Permanent", inline: true);
 
             if (ticket.ExpiresAtUtc is { } expiry)
-                embed.AddField("Expires", $"<t:{expiry.ToUnixTimeSeconds()}:f>", inline: true);
+                embed.AddField("Expires", FormatExpiry(expiry), inline: true);
 
             embed.AddField("Details", OperationalDetails(ticket));
 

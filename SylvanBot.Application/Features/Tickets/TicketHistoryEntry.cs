@@ -48,7 +48,26 @@ public sealed class TicketHistoryEntry
     public string Format()
     {
         if (Action == TicketHistoryAction.Historical)
-            return HistoricalText ?? throw new InvalidOperationException("Historical entry has no text.");
+        {
+            var text = HistoricalText ?? throw new InvalidOperationException("Historical entry has no text.");
+            if (text.StartsWith("Legacy current record and import provenance:\n", StringComparison.Ordinal))
+                return "Imported from the legacy ticket register.";
+
+            const string marker = ", history version ";
+            var versionStart = text.IndexOf(marker, StringComparison.Ordinal);
+            var versionEnd = text.IndexOf(" (raw sparse row;", StringComparison.Ordinal);
+            if (text.StartsWith("Legacy ticket #", StringComparison.Ordinal) && versionStart > 0
+                && versionEnd > versionStart + marker.Length
+                && int.TryParse(text.AsSpan(versionStart + marker.Length, versionEnd - versionStart - marker.Length),
+                    NumberStyles.None, CultureInfo.InvariantCulture, out var version))
+            {
+                return _timestamp is { } time
+                    ? $"Legacy revision {version} · <t:{time.ToUnixTimeSeconds()}:f>"
+                    : $"Legacy revision {version}";
+            }
+
+            return text;
+        }
 
         var actor = _moderatorId is { } moderator ? $"<@{moderator}>" : "Sylvan";
         var action = Action switch

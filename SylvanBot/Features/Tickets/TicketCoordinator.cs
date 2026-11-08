@@ -6,7 +6,7 @@ using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Features.RolePersistence;
 
-public sealed class TicketCoordinator(
+public sealed partial class TicketCoordinator(
     IDbContextFactory<BotDbContext> contexts,
     DiscordSocketClient client,
     NoteTicketStrategy notes,
@@ -661,6 +661,60 @@ public sealed class TicketCoordinator(
         {
             _gate.Release();
         }
+    }
+
+    internal async Task<bool> PublishOrderedBatchAsync(ulong guildId, CancellationToken token)
+    {
+        const int batchSize = 25;
+        await using var db = await contexts.CreateDbContextAsync(token);
+        var candidates = await db.Tickets.AsNoTracking()
+            .Where(ticket => ticket.GuildId == guildId && !ticket.Hidden
+                && !ticket.Publications.Any(copy => copy.Current && !copy.Removed))
+            .OrderBy(ticket => ticket.Number)
+            .Select(ticket => ticket.Id)
+            .Take(batchSize)
+            .ToListAsync(token);
+
+        if (candidates.Count == 0)
+        {
+            await _gate.WaitAsync(token);
+            try
+            {
+                // A gateway or staff command may have saved another ticket since the first read.
+                var config = await EnabledAsync(db, guildId, token);
+                if (await db.Tickets.AnyAsync(ticket => ticket.GuildId == guildId && !ticket.Hidden
+                    && !ticket.Publications.Any(copy => copy.Current && !copy.Removed), token))
+                    return true;
+
+                config.OrderedPublicationPending = false;
+                await db.SaveChangesAsync(token);
+                return false;
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
+
+        foreach (var id in candidates)
+        {
+            await _gate.WaitAsync(token);
+            try
+            {
+                await publisher.EnsureAsync(guildId, id, token, orderedPublication: true);
+                // The send may have failed or reached Discord before its reference was saved.
+                // Keep later numbers behind this one until its publication is accounted for.
+                if (!await db.Tickets.AnyAsync(ticket => ticket.GuildId == guildId && ticket.Id == id
+                    && (ticket.Hidden || ticket.Publications.Any(copy => copy.Current && !copy.Removed)), token))
+                    return false;
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
+
+        return true;
     }
 
     internal async Task ScheduleTimeoutChecksAsync(ulong guildId, ulong userId, CancellationToken token)

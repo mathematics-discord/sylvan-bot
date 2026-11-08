@@ -2,6 +2,19 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.0.0-rc.1 - 2026-11-08
+## Administration
+### Added
+- Use /config tickets to choose the staff channel, set the DM reminder interval, track role grants and exempt moderators with selected roles from review.
+## Moderation
+### Added
+- Sylvan records bans, kicks, timeouts, voice mutes, voice deafens and configured role grants. Use /ticket note to add a staff note, including for a member who has left. Look up a case by ticket number, user or Sylvan message link.
+- Complete a ticket from the Edit button in your DM or use /ticket edit. Newest prompts arrive first. Use /ticket append to add a follow-up while keeping the original comment.
+- Open the review queue from the summary at the bottom of the tickets channel or with /ticket review. Senior moderators can approve, edit or skip a ticket. Approval survives later comment and duration edits.
+- Use Revert Ticket to lift an active restriction and keep the record visible. Hide Ticket lifts an active restriction before removing the channel post. Restoring the record leaves the sanction lifted.
+- Timed restrictions show the full expiry date and time alongside a relative timestamp. Timeout tickets support durations beyond 28 days and preserve the intended end time across rejoins. Direct Discord edits update the ticket.
+- Automod ban tickets retain the rule’s original deadline. Editing the ticket changes when Sylvan lifts the ban.
+- New SylvanMail staff threads include the member’s visible ticket list. The staff guide covers ticket lookup, corrections, review, reversals and troubleshooting.
 # v0.4.0-rc.5 - 2026-11-07
 ## Administration
 ### Changed
