@@ -2,6 +2,12 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.0.0-rc.4 - 2026-11-08
+## Moderation
+### Changed
+- For the November ticket cutover, Sylvan posts the remaining imported notes and active temporary restrictions in the live staff channel first, then resumes the archive. Newly issued tickets continue to appear immediately.
+### Fixed
+- Omit empty code blocks from attachment-only message deletion logs.
 # v1.0.0-rc.3 - 2026-11-08
 ## Moderation
 ### Changed

@@ -673,7 +673,10 @@ public sealed partial class TicketCoordinator(
                 && (configuration.LegacyChannelId == null || ticket.ImportedFromLegacy)
                 && !ticket.Publications.Any(copy => copy.Current && !copy.Removed
                     && (ticket.PinnedPublicationChannelId == null || copy.ChannelId == ticket.PinnedPublicationChannelId)))
-            .OrderBy(ticket => ticket.Number)
+            // During the cutover, fill the staff's live channel before resuming the archive.
+            .OrderByDescending(ticket => configuration.LegacyChannelId != null
+                && ticket.PinnedPublicationChannelId == configuration.DestinationChannelId)
+            .ThenBy(ticket => ticket.Number)
             .Select(ticket => ticket.Id)
             .Take(batchSize)
             .ToListAsync(token);
