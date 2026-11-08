@@ -39,6 +39,8 @@ public sealed class Ticket
 
     public ulong? PinnedPublicationChannelId { get; init; }
 
+    public bool UseOriginalEmbedFormat { get; init; }
+
     public bool ImportedFromLegacy { get; init; }
 
     public bool ReviewExempt { get; init; }
