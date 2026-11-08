@@ -1,4 +1,0 @@
-component: Moderation
-kind: Fixed
-body: Omit empty code blocks from attachment-only message deletion logs.
-time: 2026-11-08T00:00:00Z
