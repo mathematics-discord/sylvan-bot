@@ -1,4 +1,0 @@
-component: Moderation
-kind: Fixed
-body: <@&1328097118644338779> and above can read hidden tickets, review the queue, and approve tickets without access to their publication channels. Reviewing tickets avoids repeated access checks, and the approval summary includes pending tickets from other ticket channels.
-time: 2026-11-08T23:35:00.7904631Z

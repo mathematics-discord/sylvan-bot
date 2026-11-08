@@ -1,4 +1,0 @@
-component: General
-kind: Fixed
-body: SylvanMail now handles separate conversations concurrently, so a slow reply or reaction in one conversation no longer holds up every other conversation.
-time: 2026-11-08T23:35:00.6770497Z
