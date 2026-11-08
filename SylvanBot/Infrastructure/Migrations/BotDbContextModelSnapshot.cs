@@ -562,6 +562,9 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<long>("Number")
                         .HasColumnType("bigint");
 
+                    b.Property<long?>("PinnedPublicationChannelId")
+                        .HasColumnType("bigint");
+
                     b.Property<bool>("ReminderExempt")
                         .HasColumnType("boolean");
 

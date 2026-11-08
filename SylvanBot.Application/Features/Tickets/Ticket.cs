@@ -37,6 +37,8 @@ public sealed class Ticket
 
     public bool Hidden { get; private set; }
 
+    public ulong? PinnedPublicationChannelId { get; init; }
+
     public bool ImportedFromLegacy { get; init; }
 
     public bool ReviewExempt { get; init; }

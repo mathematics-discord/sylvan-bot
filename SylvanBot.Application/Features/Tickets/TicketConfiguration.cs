@@ -32,9 +32,10 @@ public sealed class TicketConfiguration
         OrderedPublicationPending && (LegacyChannelId is null || ticket.ImportedFromLegacy);
 
     public ulong PublicationChannel(Ticket ticket) =>
-        ticket.ImportedFromLegacy && LegacyChannelId is { } archive
-            ? archive
-            : DestinationChannelId ?? throw new InvalidOperationException("Tickets have no configured destination.");
+        ticket.PinnedPublicationChannelId
+        ?? (ticket.ImportedFromLegacy ? LegacyChannelId : null)
+        ?? DestinationChannelId
+        ?? throw new InvalidOperationException("Tickets have no configured destination.");
 
     public void UpdateReviewExemptRoles(ulong? add, ulong? remove)
     {

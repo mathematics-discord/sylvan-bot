@@ -41,7 +41,8 @@ public sealed class TicketPublisher(
             {
                 try
                 {
-                    if (!ticket.Hidden && reference.Current && reference.Revision == ticket.Version)
+                    var wrongChannel = ticket.PinnedPublicationChannelId is { } pinned && reference.ChannelId != pinned;
+                    if (!ticket.Hidden && reference.Current && !wrongChannel && reference.Revision == ticket.Version)
                         continue;
 
                     var channel = await guild.GetTextChannelAsync(reference.ChannelId, options: TicketBoundary.Options(token));
@@ -64,7 +65,7 @@ public sealed class TicketPublisher(
 
                     var incompatible = TicketPresentation.UsesModerationEmbed(ticket) && message.Flags?.HasFlag(MessageFlags.ComponentsV2) == true;
 
-                    if (ticket.Hidden || !reference.Current || incompatible)
+                    if (ticket.Hidden || !reference.Current || incompatible || wrongChannel)
                     {
                         await channel.DeleteMessageAsync(reference.MessageId, TicketBoundary.Options(token));
                         reference.Removed = true;

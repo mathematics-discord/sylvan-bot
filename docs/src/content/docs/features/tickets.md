@@ -7,7 +7,7 @@ If you have just taken a moderation action, look for a DM from Sylvan. Choose **
 
 ## Where to find a ticket
 
-On Mathematics, Sylvan posts new tickets in **〖tickets-new〗**. Tickets imported from the legacy bot appear in **〖tickets-legacy〗**, in ticket-number order. New tickets can appear while the archive is still being posted. Use the same ticket number for lookups, edits and reviews in either channel. The summary in the new channel lists new tickets awaiting approval.
+On Mathematics, Sylvan posts new tickets in **〖tickets-new〗**. Imported notes and restrictions that were active with a future expiry when the channels were split also appear there. They stay there after expiry. Other visible legacy tickets, including permanent bans, kicks and expired restrictions, appear in **〖tickets-legacy〗**. Sylvan posts imported tickets in number order within each channel. Newly created tickets can appear between them. Use the same ticket number for lookups, edits and reviews in either channel.
 
 ## What gets a ticket?
 

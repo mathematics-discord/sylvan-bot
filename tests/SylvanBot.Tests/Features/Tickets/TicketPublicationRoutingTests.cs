@@ -4,6 +4,16 @@ using SylvanBot.Application.Features.Tickets;
 
 public sealed class TicketPublicationRoutingTests
 {
+    [Test]
+    public void ImportedTicketKeepsItsPinnedChannelAfterExpiryAndReconfiguration()
+    {
+        var ticket = new Ticket { ImportedFromLegacy = true, PinnedPublicationChannelId = 10, Action = TicketAction.Ban };
+        ticket.End(TicketStatus.Expired);
+        var config = new TicketConfiguration { DestinationChannelId = 30, LegacyChannelId = 20 };
+
+        config.PublicationChannel(ticket).ShouldBe(10UL);
+    }
+
     [TestCase(false, true, false, true, 10)]
     [TestCase(false, true, true, true, 10)]
     [TestCase(true, true, false, false, 10)]

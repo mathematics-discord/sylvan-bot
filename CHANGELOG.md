@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.0.0-rc.3 - 2026-11-08
+## Moderation
+### Changed
+- Imported tickets can keep an assigned channel after expiry. On Mathematics, visible legacy notes and restrictions still active with a future expiry join new tickets in the live channel. Other visible legacy tickets appear in the archive.
 # v1.0.0-rc.2 - 2026-11-08
 ## Moderation
 ### Changed

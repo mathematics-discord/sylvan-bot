@@ -198,7 +198,8 @@ public sealed class TicketReviewSummary(
         IQueryable<Ticket> pending = db.Tickets
            .AsNoTracking()
            .Where(ticket => ticket.GuildId == guildId
-                      && (config.LegacyChannelId == null || config.LegacyChannelId == config.DestinationChannelId || !ticket.ImportedFromLegacy)
+                      && (!ticket.ImportedFromLegacy
+                          || (ticket.PinnedPublicationChannelId ?? config.LegacyChannelId ?? config.DestinationChannelId) == config.DestinationChannelId)
                       && !ticket.Hidden
                       && !ticket.ReviewExempt
                       && ticket.ApprovedByUserId == null

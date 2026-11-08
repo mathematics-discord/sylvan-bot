@@ -671,7 +671,8 @@ public sealed partial class TicketCoordinator(
         var candidates = await db.Tickets.AsNoTracking()
             .Where(ticket => ticket.GuildId == guildId && !ticket.Hidden
                 && (configuration.LegacyChannelId == null || ticket.ImportedFromLegacy)
-                && !ticket.Publications.Any(copy => copy.Current && !copy.Removed))
+                && !ticket.Publications.Any(copy => copy.Current && !copy.Removed
+                    && (ticket.PinnedPublicationChannelId == null || copy.ChannelId == ticket.PinnedPublicationChannelId)))
             .OrderBy(ticket => ticket.Number)
             .Select(ticket => ticket.Id)
             .Take(batchSize)
@@ -686,7 +687,8 @@ public sealed partial class TicketCoordinator(
                 var config = await EnabledAsync(db, guildId, token);
                 if (await db.Tickets.AnyAsync(ticket => ticket.GuildId == guildId && !ticket.Hidden
                     && (config.LegacyChannelId == null || ticket.ImportedFromLegacy)
-                    && !ticket.Publications.Any(copy => copy.Current && !copy.Removed), token))
+                    && !ticket.Publications.Any(copy => copy.Current && !copy.Removed
+                    && (ticket.PinnedPublicationChannelId == null || copy.ChannelId == ticket.PinnedPublicationChannelId)), token))
                     return true;
 
                 config.OrderedPublicationPending = false;
@@ -708,7 +710,8 @@ public sealed partial class TicketCoordinator(
                 // The send may have failed or reached Discord before its reference was saved.
                 // Keep later numbers behind this one until its publication is accounted for.
                 if (!await db.Tickets.AnyAsync(ticket => ticket.GuildId == guildId && ticket.Id == id
-                    && (ticket.Hidden || ticket.Publications.Any(copy => copy.Current && !copy.Removed)), token))
+                    && (ticket.Hidden || ticket.Publications.Any(copy => copy.Current && !copy.Removed
+                        && (ticket.PinnedPublicationChannelId == null || copy.ChannelId == ticket.PinnedPublicationChannelId))), token))
                     return false;
             }
             finally
