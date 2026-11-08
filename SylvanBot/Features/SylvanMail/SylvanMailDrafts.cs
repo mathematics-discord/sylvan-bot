@@ -5,7 +5,8 @@ namespace SylvanBot.Features.SylvanMail;
 
 public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger) : ISylvanMailDrafts
 {
-    public const string SendEmoji = "\U0001F4E4";
+    public const string AnonymousEmoji = "\U0001F574";
+    public const string SignedEmoji = "\U0001F9CD";
     public const string CancelEmoji = "\u274C";
 
     // Consecutive reaction changes share Discord's rate limits. Wait within the caller's
@@ -44,7 +45,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         ulong threadId,
         ulong messageId,
         ulong authorId,
-        bool requireReadyMarker,
+        SylvanMailDraftAction action,
         CancellationToken ct)
     {
         var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
@@ -63,16 +64,18 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         if (!authorMatches || !supportedType)
             return default;
 
-        var hasMarker = source.Reactions.TryGetValue(new Emoji(SendEmoji), out var reaction) && reaction.IsMe;
+        var control = action == SylvanMailDraftAction.SendSigned ? SignedEmoji
+            : action == SylvanMailDraftAction.Cancel ? CancelEmoji : AnonymousEmoji;
+        var hasMarker = source.Reactions.TryGetValue(new Emoji(control), out var reaction) && reaction.IsMe;
 
-        if (requireReadyMarker && !hasMarker)
+        if (action != SylvanMailDraftAction.Update && !hasMarker)
             return default;
 
         var content = source.Content ?? string.Empty;
         var reply = SylvanMailReply.Parse(content: content, botId: client.CurrentUser.Id, replyToBot: false, replyPingEnabled: false);
         var hasReplyPing = source.Type == MessageType.Reply && source.MentionedUserIds.Contains(client.CurrentUser.Id);
 
-        // An explicit body mention wins without depending on the referenced message still being accessible.
+        // A body mention prepares a draft without needing the referenced message.
         if (reply is null && hasReplyPing)
         {
             var replyToBot = source.ReferencedMessage?.Author.Id == client.CurrentUser.Id;
@@ -93,7 +96,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
             return new DotNext.Optional<SylvanMailMessage>(ReadMessage(source: source, guildId: thread.GuildId));
         }
 
-        var prefix = reply.Anonymous ? "From staff: " : $"From {Format.Sanitize(source.Author.Username)}: ";
+        var prefix = action != SylvanMailDraftAction.SendSigned ? "From staff: " : $"From {Format.Sanitize(source.Author.Username)}: ";
 
         return new DotNext.Optional<SylvanMailMessage>(
             ReadMessage(source: source, guildId: thread.GuildId) with
@@ -112,7 +115,11 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
             if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, ReactionOptions(ct)) is not IUserMessage message)
                 return;
 
-            foreach (var control in new[] { SendEmoji, CancelEmoji })
+            var oldSend = new Emoji("\U0001F4E4");
+            if (message.Reactions.TryGetValue(oldSend, out var oldReaction) && oldReaction.IsMe)
+                await message.RemoveReactionAsync(oldSend, client.CurrentUser.Id, ReactionOptions(ct));
+
+            foreach (var control in new[] { AnonymousEmoji, SignedEmoji, CancelEmoji })
             {
                 var emoji = new Emoji(control);
                 var marked = message.Reactions.TryGetValue(key: emoji, out var reaction) && reaction.IsMe;

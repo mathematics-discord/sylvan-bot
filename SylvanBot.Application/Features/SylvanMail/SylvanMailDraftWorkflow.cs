@@ -12,7 +12,7 @@ public sealed class SylvanMailDraftWorkflow(
 {
     public async Task HandleDraftAsync(ulong threadId, ulong messageId, ulong authorId, SylvanMailDraftAction action, CancellationToken ct)
     {
-        if (action is not (SylvanMailDraftAction.Update or SylvanMailDraftAction.Confirm or SylvanMailDraftAction.Cancel))
+        if (action is not (SylvanMailDraftAction.Update or SylvanMailDraftAction.SendAnonymous or SylvanMailDraftAction.SendSigned or SylvanMailDraftAction.Cancel))
             throw new ArgumentOutOfRangeException(nameof(action));
 
         await using var db = await contexts.CreateDbContextAsync(ct);
@@ -30,7 +30,7 @@ public sealed class SylvanMailDraftWorkflow(
                 threadId: threadId,
                 messageId: messageId,
                 authorId: authorId,
-                requireReadyMarker: action != SylvanMailDraftAction.Update,
+                action: action,
                 ct: ct);
 
             if (observed is not { HasValue: true, Value: var message })
@@ -85,7 +85,7 @@ public sealed class SylvanMailDraftWorkflow(
 
     public async Task RefuseConfirmationAsync(ulong threadId, ulong messageId, ulong authorId, SylvanMailDraftAction action, CancellationToken ct)
     {
-        if (action is not (SylvanMailDraftAction.Confirm or SylvanMailDraftAction.Cancel))
+        if (action is not (SylvanMailDraftAction.SendAnonymous or SylvanMailDraftAction.SendSigned or SylvanMailDraftAction.Cancel))
             throw new ArgumentOutOfRangeException(nameof(action));
 
         await using var db = await contexts.CreateDbContextAsync(ct);
@@ -98,7 +98,7 @@ public sealed class SylvanMailDraftWorkflow(
             threadId: threadId,
             messageId: messageId,
             authorId: authorId,
-            requireReadyMarker: true,
+            action: action,
             ct: ct);
 
         if (observed is { HasValue: true, Value: var message })
@@ -130,7 +130,7 @@ public sealed class SylvanMailDraftWorkflow(
 
         if (recorded)
         {
-            if (action == SylvanMailDraftAction.Confirm)
+            if (action is SylvanMailDraftAction.SendAnonymous or SylvanMailDraftAction.SendSigned)
                 await relay.RelayLockedAsync(db: db, message: message, ct: ct);
 
             await drafts.SetDraftReadyAsync(threadId: message.SourceChannelId, messageId: message.SourceMessageId, ready: false, ct: ct);
@@ -143,7 +143,7 @@ public sealed class SylvanMailDraftWorkflow(
 
         SylvanMailContent.Validate(message);
 
-        if (action == SylvanMailDraftAction.Confirm)
+        if (action is SylvanMailDraftAction.SendAnonymous or SylvanMailDraftAction.SendSigned)
         {
             await relay.RelayLockedAsync(db: db, message: message, ct: ct);
             await drafts.SetDraftReadyAsync(threadId: message.SourceChannelId, messageId: message.SourceMessageId, ready: false, ct: ct);
