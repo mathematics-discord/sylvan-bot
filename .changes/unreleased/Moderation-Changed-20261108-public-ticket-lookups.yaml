@@ -1,4 +1,0 @@
-component: Moderation
-kind: Changed
-body: Make /ticket show and /ticket showhidden responses public, including comment attachments.
-time: 2026-11-08T17:10:50Z

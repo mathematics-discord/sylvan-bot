@@ -2,6 +2,11 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.0.1 - 2026-11-08
+## Moderation
+### Changed
+- Make /ticket show and /ticket showhidden responses public, including comment attachments.
+- ModMail drafts now offer three reactions: levitate sends anonymously, person_standing sends with your username, and x cancels. Mentioning Sylvan or replying with the reply ping enabled prepares the same draft.
 # v1.0.0-rc.9 - 2026-11-08
 ## Moderation
 ### Fixed
