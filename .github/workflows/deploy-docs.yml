@@ -1,31 +1,13 @@
 name: Deploy Sylvan documentation
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - 'docs/**'
+      - 'version.json'
+      - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
-    inputs:
-      source_sha:
-        description: Documentation commit to publish
-        required: true
-        type: string
-      version:
-        description: Existing bot version to display (does not create a release)
-        required: true
-        type: string
-  workflow_call:
-    inputs:
-      source_sha:
-        description: Published release commit
-        required: true
-        type: string
-      version:
-        description: Release version
-        required: true
-        type: string
-    secrets:
-      DOCS_DEPLOY_SSH_KEY:
-        required: true
-      DOCS_DEPLOY_KNOWN_HOSTS:
-        required: true
 
 permissions:
   contents: read
@@ -44,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.source_sha }}
+          ref: master
           persist-credentials: false
 
       - uses: actions/setup-node@v4
@@ -53,11 +35,26 @@ jobs:
           cache: npm
           cache-dependency-path: docs/package-lock.json
 
+      - name: Select current documentation version
+        run: |
+          node --input-type=module -e '
+            import {readFileSync, appendFileSync} from "node:fs";
+            const {version} = JSON.parse(readFileSync("../version.json", "utf8"));
+            appendFileSync(process.env.GITHUB_ENV, `DOCS_RELEASE=${version}\n`);
+          '
+
       - run: npm ci
       - run: npm run check
       - run: npm run build
+
+      - name: Preserve build for current hostname
+        run: tar -czf "$RUNNER_TEMP/docs.tar.gz" -C dist .
+
+      - name: Build new hostname at its root
+        run: npm run build
         env:
-          DOCS_RELEASE: ${{ inputs.version }}
+          DOCS_SITE: https://sylvan.mathematics.gg
+          DOCS_BASE: /
 
       - name: Publish static documentation
         env:
@@ -73,13 +70,21 @@ jobs:
           trap 'rm -rf "$ssh_dir"' EXIT
           printf '%s\n' "$DOCS_DEPLOY_SSH_KEY" > "$ssh_dir/key"
           printf '%s\n' "$DOCS_DEPLOY_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
-          tar -czf "$RUNNER_TEMP/docs.tar.gz" -C dist .
+          tar -czf "$RUNNER_TEMP/docs-root.tar.gz" -C dist .
           ssh -i "$ssh_dir/key" \
             -o BatchMode=yes -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$ssh_dir/known_hosts" \
             -o ConnectTimeout=15 \
             sylvan-docs-deploy@57.131.51.51 deploy < "$RUNNER_TEMP/docs.tar.gz"
+          ssh -i "$ssh_dir/key" \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$ssh_dir/known_hosts" \
+            -o ConnectTimeout=15 \
+            sylvan-docs-deploy@57.131.51.51 deploy-root < "$RUNNER_TEMP/docs-root.tar.gz"
 
       - name: Verify public documentation
-        run: curl --fail --silent --show-error https://math.ratgirl.dev/sylvan/ -o /dev/null
+        run: |
+          curl --fail --silent --show-error https://math.ratgirl.dev/sylvan/ -o /dev/null
+          curl --fail --silent --show-error https://sylvan.mathematics.gg/ -o /dev/null
