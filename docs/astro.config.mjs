@@ -50,7 +50,7 @@ export default defineConfig({
             {
                 label: 'Administrator commands',
                 items: [
-                    {label: '/config tickets', link: 'https://math.ratgirl.dev/sylvan/commands/tickets/#administrator-configuration'},
+                    {label: '/config tickets', link: new URL(`${base.replace(/\/$/, '')}/commands/tickets/#administrator-configuration`, site).href},
                     {slug: 'commands/persistence'},
                     {slug: 'commands/color-admin'},
                     {slug: 'commands/automod-admin'},
