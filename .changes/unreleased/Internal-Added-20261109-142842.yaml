@@ -1,4 +1,0 @@
-component: Internal
-kind: Added
-body: Record ticket lock wait and hold times with the resource and operation identifiers, plus reaction approval queue delays and processing stages.
-time: 2026-11-09T14:28:42.6558347Z

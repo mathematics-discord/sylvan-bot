@@ -1,4 +1,0 @@
-component: Moderation
-kind: Added
-body: "<@&1328097118644338779> and above can approve an unapproved ticket by reacting with ✅, \U0001F44D, or :ratified: to its current ticket-channel entry. Sylvan records the reacting moderator as the approver and clears all reactions once after approval. Later reactions do nothing; reactions on old copies or DM reminders do not approve tickets."
-time: 2026-11-09T14:28:42.6018158Z
