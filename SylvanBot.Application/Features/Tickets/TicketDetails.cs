@@ -36,6 +36,9 @@ public sealed record TicketDetails
         _ => throw new BotCommandException("A positive duration is required."),
     };
 
+    public bool ChangesDuration(long? currentSeconds) => HasDuration
+        && DurationSeconds != (currentSeconds ?? long.MaxValue);
+
     public static TicketDetails ParseReply(string text)
     {
         if (text.Length > Ticket.CommentLimit + 200)

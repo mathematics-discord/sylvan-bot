@@ -100,7 +100,8 @@ public sealed partial class TicketCoordinator(
 
                 var comment = ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
 
-                if (details.HasDuration)
+                // Editors submit their pre-filled duration even when only the comment changed.
+                if (details.ChangesDuration(ticket.DurationSeconds))
                     outcome = (await Strategy(ticket.Action).HandleAsync(db, new EditDetails(ticket, actor, details), token)).Outcome;
 
                 if (details.Comment.Value is not TicketCommentEdit.Keep)

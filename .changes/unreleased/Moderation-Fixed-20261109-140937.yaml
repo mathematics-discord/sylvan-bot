@@ -1,0 +1,4 @@
+component: Moderation
+kind: Fixed
+body: <@&1522665207225127034> and above can save ticket comments without reapplying an unchanged duration in ticket, review, and DM editors. Comment edits preserve existing expiry times and leave paused expiry unchanged. Duration changes remain available in the same editor. Notes opened from DMs now show only a comment field.
+time: 2026-11-09T14:09:37.2966486Z

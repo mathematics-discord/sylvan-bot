@@ -26,7 +26,7 @@ public sealed class TicketDmModule(TicketCoordinator coordinator, TicketBoundary
         if (ticket is null || ticket.ModeratorUserId != ownerId || !ticket.CanCorrect(actor))
             throw new BotCommandException("This ticket is no longer available to edit.");
 
-        if (ticket.Action == TicketAction.Kick)
+        if (ticket.Action is TicketAction.Note or TicketAction.Kick)
         {
             await RespondWithModalAsync(
                 $"ticket-dm-kick-save:{guildId}:{ownerId}:{number}:{ticket.Version}",

@@ -5,6 +5,29 @@ using SylvanBot.Application.Features.Tickets;
 
 public sealed class TicketDetailsTests
 {
+    [TestCase("604802 seconds", 604802L, false)]
+    [TestCase("1 hour", 3600L, false)]
+    [TestCase("60 minutes", 3600L, false)]
+    [TestCase("2 hours", 3600L, true)]
+    [TestCase("1 hour", 7200L, true)]
+    [TestCase("permanent", null, false)]
+    [TestCase("permanent", 3600L, true)]
+    [TestCase("1 hour", null, true)]
+    [TestCase(null, 3600L, false)]
+    [TestCase(null, null, false)]
+    public void ChangesDuration_CommentEdit_RequiresDifferentDuration(string? duration, long? currentSeconds, bool expected)
+    {
+        // Arrange
+        var details = TicketDetails.ParseFields(duration, "updated comment");
+
+        // Act
+        var changesDuration = details.ChangesDuration(currentSeconds);
+
+        // Assert
+        changesDuration.ShouldBe(expected);
+        details.Comment.Apply("old comment").ShouldBe("updated comment");
+    }
+
     [Test]
     public void PermanentDuration_Expiry_DoesNotOverflow()
     {
