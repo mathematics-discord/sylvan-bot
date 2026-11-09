@@ -1,20 +1,18 @@
 ---
-title: Image-spam detection
-description: Automatic bans for attachment bursts across several channels.
+title: Investigate an image-spam ban
+description: Trace an automatic attachment-spam ban through the audit reason, the qualifying messages and the member’s permissions.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
-
-Image-spam detection watches for one member posting messages with enough attachments across several distinct server text channels within a short window. Repeated messages in the same channel do not count as additional channels. When the threshold is reached, Sylvan attempts to ban the member.
-
-Despite the name, **this counts attachments; it does not check whether they are images**, inspect their contents or require the attachments to be identical. Threads are not included. Bots and webhooks are ignored.
+Look for **Automatic image-burst spam detection** in the server audit log. The reason gives the number of channels involved, the minimum attachments per message and the time window. Check the server ban list for the member’s current status.
 
 ## Thresholds
 
-The defaults are four distinct channels, at least two attachments on each qualifying message, within 45 seconds. <RoleMention id="administrators" /> can view or change them with [/config image-spam](../../commands/spam/). Detection needs an enabled configuration; viewing settings alone does not create one. Supplying a setting creates a configuration if needed.
+Sylvan watches for one member posting attachments across several channels in the same server. With the default settings, **four distinct channels** must each receive a message with **at least two attachments** from that member **within 45 seconds**. Use the thresholds recorded in the audit reason when investigating a particular ban.
+
+Count each qualifying channel once. Four posts in the same channel count as one channel. Two single-file messages in a channel do not meet a two-attachment minimum. Threads have their own channel IDs and count separately. Any file type counts, and the files can differ across messages. Sylvan only checks new messages from members.
 
 ## Exemptions and outcomes
 
-<RoleMention id="1522665207225127034" /> and above are exempt. Outside these tiers, members who can manage the server or messages, ban, kick or time out members are also exempt. The operator can also configure user and role allowlists. These are separate from Automod?s role exemptions.
+Bots and webhooks are exempt. A member is exempt if they have **Administrator**, **Manage Server**, **Manage Messages**, **Ban Members**, **Kick Members** or **Timeout Members** at server level. The bot operator can also exempt users and roles through the image-spam allowlist. The [Automod role exemptions](../../commands/automod-admin/#change-an-exemption) apply only to text rules.
 
-This feature issues a ban, rather than a warning or timeout. Recent message history may be removed according to the bot?s configured ban settings. If Discord rejects the ban, detection alone does not prove that moderation succeeded. Contact staff about an unresolved incident.
+When the threshold is met, Sylvan attempts a **permanent ban**. Some messages from the burst may already be gone if Sylvan was configured to delete recent message history with the ban. If you need the current thresholds, an administrator can [check the detector settings](../../commands/spam/#view-the-settings).

@@ -2,6 +2,8 @@
 
 A Discord bot built with C#, Discord.NET and PostgreSQL.
 
+For member guides, the staff handbook and server setup, see the [Sylvan documentation](https://sylvan.mathematics.gg/).
+
 ## Run locally
 
 Install the .NET SDK specified in [global.json](global.json) and Docker with Compose. Invite a development bot to a test
@@ -36,9 +38,7 @@ dotnet run --project SylvanBot --launch-profile SylvanBot.Local
 The bot applies database migrations and registers commands on startup. Stopping it leaves PostgreSQL running.
 `docker compose down` stops the local stack and preserves its data.
 
-[SylvanMail](docs/src/content/docs/commands/sylvanmail.md) relays DMs to a private staff forum. Configure it with
-`/config sylvanmail enable:<forum-channel> role:<role>` (Administrator only). The role is a ping target; anyone with thread
-write access can draft an anonymous or signed reply and confirm it with the send reaction. Incoming DMs relay automatically.
+To test SylvanMail, [configure a private staff forum and ping role](https://sylvan.mathematics.gg/setup/sylvanmail/) on your test server.
 
 ## Development
 

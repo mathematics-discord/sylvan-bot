@@ -1,0 +1,45 @@
+---
+import { movedPages } from '../../redirects.mjs';
+
+export function getStaticPaths() {
+    return Object.entries(movedPages).map(([from, destination]) => {
+        const [section, page] = from.split('/');
+        return { params: { section, page }, props: destination };
+    });
+}
+
+interface Props {
+    to: string;
+    title: string;
+    sections?: Record<string, string>;
+}
+
+const { to, title, sections = {} } = Astro.props;
+const href = import.meta.env.BASE_URL.replace(/\/$/, '') + '/' + to;
+const canonical = new URL(href.split('#')[0], Astro.site);
+---
+<!doctype html>
+<html lang="en-GB">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="noindex" />
+        <link rel="canonical" href={canonical} />
+        <title>Guide moved · Sylvan</title>
+    </head>
+    <body data-pagefind-ignore="all">
+        <main>
+            <h1>This guide has moved</h1>
+            <p>Continue to <a id="destination" href={href} data-sections={JSON.stringify(sections)}>{title}</a>.</p>
+        </main>
+        <script is:inline>
+            const link = document.getElementById('destination');
+            const target = new URL(link.href);
+            const sections = JSON.parse(link.dataset.sections);
+            target.search = location.search;
+            const section = location.hash.slice(1);
+            if (section) target.hash = Object.hasOwn(sections, section) ? sections[section] : section;
+            location.replace(target.href);
+        </script>
+    </body>
+</html>

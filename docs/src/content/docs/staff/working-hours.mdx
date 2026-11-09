@@ -1,43 +1,69 @@
 ---
 title: Set your working hours
-description: Choose the hours when an @Moderators ping includes you, change your schedule, or go back to the default.
+description: Choose when a mention of the moderator role includes you, including overnight shifts and fixed UTC hours.
 ---
 
 import RoleMention from '../../../components/RoleMention.astro';
 
-Every moderator can choose when they receive <RoleMention id="268886789983436800" />
-pings. Run `/working-hours` in the server to set your own schedule. Only you
-see the reply.
+Use `/working-hours` in the server to choose when you hold the
+<RoleMention id="268886789983436800" /> ping role on Mathematics. Your
+staff role and moderation permissions stay with you throughout the day.
+You need **Mute Members** and a staff role that an administrator has made
+eligible for scheduling.
+
+<span id="set-your-hours" />
 
 ## Set a daily schedule
 
-1. In Discord, select `/working-hours` and set **enable** to **True**.
-2. Enter **start** and **end** in 24-hour time, including seconds. Choose
-   your **timezone** from the suggestions. For 9 am to 5 pm in London, enter
-   the following command.
+This example makes you pingable from 9 am to 5 pm UK time every day, including weekends.
 
-   ```text
-   /working-hours enable:True start:09:00:00 end:17:00:00 timezone:Europe/London
-   ```
+```text
+/working-hours enable:True start:09:00:00 end:17:00:00 timezone:Europe/London
+```
 
-3. Look for **Saved.** in the private reply. With these times, Sylvan adds
-   the ping role at 09:00 and removes it at 17:00 London time. Check the
-   roles on your Discord profile. If the update is pending, Sylvan will retry it.
+Choose your time zone from the suggestions and enter both times in
+24-hour format, including seconds. You can include a fraction of a second,
+such as `09:00:00.5`. Choose a window of at least 20 minutes.
 
-The same hours apply every day. Choose a window of at least 20 minutes.
+<span id="while-your-schedule-is-enabled" />
+
+Look for **Saved.** in the private reply. Check the roles on your server
+profile. In this example, Sylvan adds the ping role at 09:00 London time
+and removes it at 17:00. If the reply says the update is pending, Sylvan
+has saved the schedule and will retry the role change.
+
+<span id="time-format-and-overnight-hours" />
 
 ## Work overnight or change your hours
 
-To be pingable from 10 pm until 7 am the next morning, enter the earlier
-clock time as the end. Replace the time zone with your own.
+Submit the whole schedule again to replace it. An end time earlier than
+the start means the shift ends the following day. This example covers
+10 pm to 7 am.
 
 ```text
 /working-hours enable:True start:22:00:00 end:07:00:00 timezone:Europe/London
 ```
 
-To change your hours again, send the whole schedule with both times and
-your time zone or [UTC offset](../../commands/working-hours/#use-a-fixed-utc-offset).
-The new schedule takes effect as soon as Sylvan applies it.
+<span id="when-the-clocks-change" />
+
+A named time zone keeps the same local hours when the clocks change. If
+the clock skips your chosen start or end time, Sylvan shifts that time
+forward by the length of the gap. If the clock passes it twice, Sylvan
+uses the first occurrence.
+
+### Use a fixed UTC offset
+
+For the same UTC hours year-round, put `Z` on both times and omit
+`timezone`. You can also use the same numeric offset on both times. This
+example runs from 08:00 to 16:00 UTC throughout the year.
+
+```text
+/working-hours enable:True start:09:00:00+01:00 end:17:00:00+01:00
+```
+
+<span id="disable-your-schedule" />
+<span id="when-do-i-have-the-role" />
+<span id="defaults-and-suspension" />
 
 ## Turn off your schedule
 
@@ -45,9 +71,32 @@ The new schedule takes effect as soon as Sylvan applies it.
 /working-hours enable:False
 ```
 
-**By default, turning your schedule off makes you pingable around the clock.**
-If an administrator has exempted one of your staff roles, Sylvan leaves
-your current ping role in place for manual changes. To use a schedule again,
-submit your times with **enable** set to **True**.
+Leave all other fields empty. **Turning off your schedule normally makes
+you pingable around the clock.** If one of your eligible staff roles has
+an exemption, Sylvan leaves your ping role as it is and staff can change
+it manually. The same defaults apply if an administrator pauses schedules
+server-wide.
 
-If your profile still shows the wrong role, see [Troubleshoot Working Hours](../../help/working-hours/).
+## If your hours aren’t taking effect
+
+### Sylvan rejected my times
+
+Include seconds on both times. Use either a named zone or matching offsets.
+Identical times count as a zero-minute window. A rejected submission leaves
+your previous hours in effect.
+
+<span id="the-role-update-is-pending" />
+
+### I still have the role outside my hours
+
+Check whether your hours use a named zone or a fixed offset. While your
+schedule is on, Sylvan corrects manual changes to the ping role. If the
+role update stays pending, ask an administrator to check
+`/config working-hours show`.
+
+### I can’t set a schedule
+
+If you rejoined the server or regained an eligible role, submit your hours
+again. If Sylvan reports that scheduling is disabled or you need an eligible
+role, contact an administrator. If it says member data is unavailable and
+*no preference was changed*, try again once Sylvan has reconnected.

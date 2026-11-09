@@ -1,0 +1,35 @@
+---
+title: Set up ModMail
+description: Give Sylvan access to a private forum and choose the role that receives new-mail notifications.
+---
+
+You need Discord’s **Administrator** permission to run `/config sylvanmail` in the server. Members DM the ModMail account. Sylvan handles the staff side in the forum you choose.
+
+<span id="set-forum-access"></span>
+
+## Prepare the private forum
+
+1. Create or choose a **forum** channel. In its permission overwrites, explicitly deny **View Channel** to `@everyone`.
+2. Grant forum access to the people who should read mail. Anyone who can write in a case post can send a reply to its member.
+3. Give **Sylvan** the following permissions in that forum: **View Channel**, **Send Messages (Create Posts)**, **Send Messages in Threads**, **Read Message History**, **Attach Files**, **Manage Threads**, **Embed Links** and **Add Reactions**.
+4. Choose a notification role. Make it mentionable, or give Sylvan permission to mention all roles in the forum. Choosing `@everyone` requires that permission. Choosing a role here does not give its members forum access.
+
+If posts require a tag, create at least one. Sylvan uses the first available tag.
+
+## Administrator configuration
+
+Run the command with your forum and notification role. Both options are required.
+
+```text
+/config sylvanmail enable:#staff-mail role:@Mail
+```
+
+The private confirmation names the forum and role. To check delivery, send a DM to ModMail and look for the new message in the forum. Use the [staff reply guide](../../staff/sylvanmail/) to send a reply back to the DM.
+
+<span id="change-the-destination"></span>
+
+## Change the forum or notification role
+
+Run the same command again with both options. Changes apply immediately. If you change the forum, staff can still read old posts in the previous forum, subject to their Discord permissions. Replies from those posts stop being relayed. The member’s next DM goes to the selected forum.
+
+A Sylvan installation can route mail to one server at a time. There is no disable option on this command. Until a destination is configured, ModMail tells senders that their messages could not be relayed.

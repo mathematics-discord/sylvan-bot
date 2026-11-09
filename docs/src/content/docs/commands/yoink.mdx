@@ -1,34 +1,26 @@
 ---
-title: /yoink
-description: Copy a custom emoji into your server.
+title: Copy a custom emoji
+description: Use a message’s Apps menu or /yoink to add a static or animated custom emoji to your server.
 ---
 
 import RoleMention from '../../../components/RoleMention.astro';
 
-Available to <RoleMention id="1328097118644338779" /> and above.
+Use these commands in the server that should receive the emoji. You need **View Audit Log**, which <RoleMention id="1328097118644338779" /> and above have on Mathematics. Sylvan needs **Create Expressions**.
 
-Use this feature in the server that should receive the emoji.
+## Copy an emoji from a message
+
+1. Find a message containing one custom emoji from another server. It can include ordinary text around the emoji.
+2. Open the message menu and choose **Apps → Yoink emoji**.
+3. Look for Sylvan’s **Added emoji** reply in the channel. The emoji is now available in the server’s picker.
+
+The shortcut reads the message body. If the emoji is in a reaction, or the message contains several custom emoji, use the slash command to choose one.
 
 ## Copy an emoji with a command
 
-Run `/yoink` and put one custom emoji in its required `emoji` option:
+Run `/yoink` and place a single custom emoji in the required `emoji` field. Choose the actual static or animated emoji. A Unicode character, image URL or message link will be rejected.
 
 ```text
 /yoink emoji:<:example:123456789012345678>
 ```
 
-Use the actual custom emoji you want to copy, rather than the example ID.
-The option accepts a single custom emoji, including animated emoji. Ordinary
-Unicode emoji, image URLs and surrounding text are not accepted.
-
-## Copy an emoji from a message
-
-Open a message's context menu, choose **Apps**, then **Yoink emoji**.
-The message must contain exactly one custom emoji, and it must not already
-belong to this server. Text around that emoji is allowed. The action reads
-the message body, not its reactions or attachments.
-
-Sylvan posts the newly added emoji when the import succeeds. If the server
-has no available emoji slots, the source is unavailable, or Discord rejects
-the image, the reply explains the problem. Downloads larger than 256 KiB
-are rejected.
+If the import fails, check the reply. The server needs a free emoji slot, and Sylvan must be able to download the source image. It rejects downloads larger than **256 KiB**.

@@ -1,38 +1,28 @@
 ---
-title: /config image-spam
-description: View or adjust detection of image bursts across several channels.
+title: Configure image-spam bans
+description: Set the channel, attachment and time thresholds that trigger an automatic permanent ban.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
-
-Available to <RoleMention id="administrators" />.
-
-Run this command in a server. Replies are visible only to you.
+You need **Administrator** to run `/config image-spam` in the server. The detector counts attachments of any type. Saving a setting enables it, and a qualifying burst can trigger a permanent ban.
 
 ## View the settings
 
-```text
-/config image-spam
-```
-
-Sylvan shows the current settings, or says that image spam detection has
-not been configured for the server.
+Run `/config image-spam` without options. The private reply gives the active thresholds or says detection is unconfigured. Viewing the settings does not enable detection.
 
 ## Change the settings
+
+Choose the number of channels, the minimum number of files in each qualifying message and the time allowed for the burst.
+
+| Option | What it measures | Default on first setup |
+| --- | --- | --- |
+| `number-of-channels` | Distinct channels reached by one member | 4 |
+| `attachment-count` | Attachments on a single message | 2 |
+| `burst-duration` | Length of the window in seconds | 45 |
+
+For example, this enables detection for a member who posts at least two attachments in each of three distinct channels within ten seconds.
 
 ```text
 /config image-spam number-of-channels:3 attachment-count:2 burst-duration:10
 ```
 
-| Option               | Meaning                                                                  |
-|----------------------|--------------------------------------------------------------------------|
-| `number-of-channels` | How many distinct channels must be involved in a burst.                  |
-| `attachment-count`   | How many attachments a message needs before it counts towards detection. |
-| `burst-duration`     | The time window for a burst, in seconds.                                 |
-
-Every supplied value must be a whole number greater than zero. All options
-are optional: supply only the settings you want to change. If no settings
-exist yet, supplying an option creates a configuration and uses defaults
-for the omitted values.
-
-See the [Image-spam detection](../../features/image-spam/) guide for automatic behaviour and limitations.
+Every supplied value must be a positive whole number. Set only the values you want to change. On first setup, omitted values take their defaults. On later changes, they keep their saved values. Check the three thresholds in the private reply. For exemptions and the audit reason, see [Investigate an image-spam ban](../../features/image-spam/).

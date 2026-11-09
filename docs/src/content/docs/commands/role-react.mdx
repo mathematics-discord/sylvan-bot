@@ -1,89 +1,64 @@
 ---
-title: /config rolereact
-description: Let members choose ordinary server roles by reacting to a message.
+title: Set up reaction roles
+description: Connect an emoji on a server message to a role members can claim or give up.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
+Use `/config rolereact` in the server with Discord’s **Administrator**
+permission. Replies are private. Each emoji on a message can grant one
+role. For example, a message can offer Art with 🎨 and Music with 🎵.
 
-Available to <RoleMention id="administrators" />.
+## Choose a safe role
 
-Run this command inside the server. Replies are private.
+Use an ordinary server role that members can safely give up. When someone
+removes their reaction, Sylvan removes that role even if another message
+or a moderator also gave it to them.
 
-Configure a message reaction that gives members a role when they react. Removing an individual reaction removes the role
-again.
+- Use a role below your highest role, unless you own the server. Sylvan
+  always needs **Manage Roles** and a highest role above the one it grants.
+- Choose a role without staff powers. Sylvan checks server permissions
+  and permissions granted in channels and categories, including powers
+  such as managing messages, pinning messages, and mentioning everyone.
+  Discord-managed roles and `@everyone` cannot be offered.
 
 ## Add a reaction role
 
-1. Create or choose an ordinary member role, such as Art.
-2. Copy the link to the message members should react to. In Discord, open
-   the message's menu and choose **Copy Message Link**.
-3. Run `/config rolereact`, select **add** from the `action` dropdown,
-   and supply the message link, emoji and role.
+1. Post or find a message explaining which emoji gives which role. Open
+   its menu and choose **Copy Message Link**. You can use a message in
+   another channel or thread in the same server.
+2. Check that you and Sylvan can **View Channel** and **Read Message
+   History** there. Sylvan also needs **Add Reactions**.
+3. Run `/config rolereact`, choose **add**, paste the full link, and
+   supply one Unicode emoji or a custom emoji Sylvan can use. Select the
+   target role in `role_mention`.
 
 ```text
 /config rolereact action:add message_link:<copied-message-link> emoji:🎨 role_mention:@Art
 ```
 
-| Option         | What to enter                                                                     |
-|----------------|-----------------------------------------------------------------------------------|
-| `action`       | Choose `add` or `remove` from the dropdown.                                       |
-| `message_link` | A full Discord message link from this server. A message ID alone is not accepted. |
-| `emoji`        | One Unicode emoji, or a custom emoji Sylvan can use.                              |
-| `role_mention` | Choose the role to grant. Required for `add`; leave it out for `remove`.          |
-
-The linked message can be in another channel or a thread in this server.
-
-Sylvan adds the emoji to the message. Members can then select that reaction to receive the role and select it again to
-remove their reaction and role. Existing reactions are not processed when you create the mapping.
-
-You can configure several different emoji on one message and reuse an emoji on other messages. Each message and emoji
-pair grants one role. To change that role, remove the mapping and add it again with the new role. Repeating `add` with
-the same message, emoji and role keeps the mapping and asks Sylvan to add its reaction again.
-
-## Choose a safe role
-
-The role must already exist in this server. It cannot be `@everyone` or an automatically managed role, such as an
-integration role.
-
-Staff roles, from <RoleMention id="1522665207225127034" /> through <RoleMention id="administrators" />, cannot be offered. Other roles with moderation or management powers are rejected too, as are roles allowing pinning, slowmode bypass, server-wide mentions or server analytics access. Permissions allowed
-through channel or category overrides are checked too.
-
-Unless you own the server, the target role must be below your highest role.
-
-Sylvan checks the role's permissions again before each new grant. If the
-role later gains staff powers, new grants stop. Existing members are not
-automatically stripped of that role.
-
-**Unreacting removes the role even if a moderator or another reaction
-mapping also granted it.** Choose roles that members can safely give up
-this way.
+Sylvan adds the reaction to the message. Members can now
+[react to receive the role](../../features/reaction-roles/). Anyone who
+already reacted needs to remove and add their reaction again.
 
 ## Remove a reaction role
 
-Select **remove** and supply the same message link and emoji. No role
-option is needed.
+Use **remove** with the same message link and emoji. Omit `role_mention`.
+If the message was deleted, you can still use its original link.
 
 ```text
 /config rolereact action:remove message_link:<copied-message-link> emoji:🎨
 ```
 
-Sylvan removes the mapping and clears that emoji's reactions from the
-message. Other emoji on the message are left alone. **Members keep roles
-they already received**, and the Discord role itself is not deleted.
-
-You can remove the mapping even if its message has been deleted. If Sylvan
-cannot clear the visible reactions, its reply explains that the mapping is
-disabled and asks you to clear those reactions manually.
+Members keep roles they’ve already received. Sylvan stops processing that
+pair and tries to clear its reactions. If it lacks **Manage Messages**,
+you may need to clear the reactions yourself. To offer a different role
+for that emoji, add the new mapping after removing the old one.
 
 ## Incomplete updates
 
-If the mapping is saved but Sylvan cannot add the emoji, the reply says so.
-Read the error in Sylvan's reply, correct the problem, then repeat `add`
-with the same options.
+If Sylvan saved the mapping but couldn’t add its reaction, check channel
+permissions and emoji availability. Repeat **add** with the same link,
+emoji, and role to put the reaction on the message.
 
-Role changes are processed while Sylvan is online. If someone reacted
-before setup or while Sylvan was offline, ask them to remove and add their
-reaction again. If a role still does not update, ask the person running
-Sylvan to check its logs.
-
-See the [Reaction roles](../../features/reaction-roles/) guide for automatic behaviour and limitations.
+If the reaction appears but new members receive no role, check the role’s
+permissions and position. Sylvan checks these again before granting it.
+Giving the role staff powers blocks new grants. Existing holders keep it.

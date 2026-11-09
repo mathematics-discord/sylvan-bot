@@ -1,72 +1,87 @@
 ---
-title: Set up Working Hours
-description: Give every moderator access to a personal ping schedule, choose the ping role, and verify the setup.
+title: Configure the moderator ping role
+description: Give moderators access to working hours, set the default for staff without a schedule, and pause or resume scheduling.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
+You need **Administrator** to configure Working Hours. Use a separate role
+for pings so moderators keep their staff permissions outside their hours.
 
-As an administrator, choose the role people ping and identify the staff who
-can schedule it. On Mathematics, the pingable role is
-<RoleMention id="268886789983436800" />. Each moderator keeps their staff
-role while Sylvan adds or removes the ping role.
+<span id="check-the-current-configuration" />
+<span id="config-working-hours-show" />
+
+Run `/config working-hours show` in the server. The private reply lists
+the ping role, eligible staff roles, exemptions and any problems Sylvan
+can identify. If scheduling is already enabled, [pause it](#pause-or-resume-scheduling)
+before replacing the ping role.
+
+<span id="set-up-the-roles" />
+<span id="config-working-hours-ping-role" />
 
 ## Choose the roles
 
-1. Run `/config working-hours show` to see the current settings. For a new
-   setup, start with scheduling disabled. If you’re replacing the ping role
-   on an existing setup, [pause scheduling](#pause-or-resume-scheduling) first.
-2. Choose a mentionable role for pings. Sylvan needs **Manage Roles**, and
-   its highest role must be above the ping role. Select the role in Discord.
+1. Choose the role that members will mention, such as `@Moderators`. Give
+   Sylvan **Manage Roles** and put its highest role above the ping role.
+   Select an ordinary server role. Sylvan rejects `@everyone`, roles
+   managed by an integration and roles already marked eligible.
 
    ```text
    /config working-hours ping-role role:@Moderators
    ```
 
-3. Add the staff roles that identify moderators. Repeat this command for
-   each moderator tier so everyone is covered. Select the actual role from
-   Discord’s role picker. Moderators also need the **Mute Members** permission
-   to run the personal command.
+2. Add each staff role whose holders should receive pings. Select a role
+   other than `@everyone` or the ping role. Staff also need **Mute Members**
+   to set their own hours.
 
    ```text
    /config working-hours eligible-role action:add role:@Trial Moderators
    ```
 
+<span id="set-exemptions-for-staff-without-a-schedule" />
+<span id="config-working-hours-exempt-role" />
+
 ## Choose who manages the role without a schedule
 
-Eligible moderators who leave their schedule off receive the ping role
-around the clock. To give some moderators manual control in that situation,
-add an exemption for a role you’ve already made eligible. For example,
-if you want Senior Moderators to manage their role manually when unscheduled,
-select their role here.
+By default, eligible staff with no schedule receive the ping role all day.
+To let holders of a particular staff role manage their ping role manually
+instead, make that staff role eligible first, then add its exemption.
 
 ```text
 /config working-hours exempt-role action:add role:@Senior Moderators
 ```
 
-A moderator with an exemption can still set hours. While their schedule is
-on, Sylvan manages the ping role at the times they chose.
+An exempt moderator can still set [personal working hours](../../staff/working-hours/).
+While their schedule is enabled and running, Sylvan manages their ping role.
+
+<span id="config-working-hours-enable" />
 
 ## Enable and verify
 
 Run `/config working-hours enable`, then `/config working-hours show`.
-Check that scheduling is enabled, the intended role is listed as the ping
-role, and all moderator tiers are covered by the eligible roles. Fix any
-configuration problems in the reply.
+Check that scheduling is enabled, the correct ping role is listed and at
+least one staff role is eligible. If a saved change is still pending,
+check the bot’s **Manage Roles** permission and role position. If the reply
+says member data is unavailable, check again after Sylvan reconnects.
 
-A moderator can now [set their hours](../../staff/working-hours/) and check
-whether the ping role on their profile matches their current window. If a
-change stays pending, [check the role and Sylvan’s permissions](../../help/working-hours/#the-role-update-is-pending).
+<span id="config-working-hours-eligible-role" />
+
+## Remove a staff role
+
+Use `/config working-hours exempt-role action:remove role:@Senior Moderators`
+to end an exemption. To remove a role from Working Hours altogether,
+remove its exemption first, then run `/config working-hours eligible-role`
+with `action:remove` and the same role. A moderator who loses their last
+eligible role loses the ping role and their personal schedule is disabled.
+Pause scheduling before removing the last eligible role on the server.
+
+<span id="enable-or-suspend-scheduling" />
+<span id="config-working-hours-disable" />
 
 ## Pause or resume scheduling
 
-Run `/config working-hours disable` to pause schedules across the server.
-Eligible moderators receive the ping role by default during the pause. Those
-with an exemption keep manual control. Sylvan keeps the saved schedules.
+Run `/config working-hours disable` to pause the server’s schedules.
+Eligible staff receive the ping role throughout the pause. Exempt staff
+keep manual control. Sylvan retains the saved hours. Run
+`/config working-hours enable` to resume them at the current time.
 
-Run `/config working-hours enable` to resume. Enabled personal schedules
-take effect according to the current time. If you changed the ping role
-during the pause, review who still holds the old role separately. Sylvan
-leaves its existing assignments in place.
-
-For the fields and restrictions of each command, see
-[`/config working-hours`](../../commands/working-conditions/).
+If you replace the ping role during a pause, review the old role’s
+assignments separately. Members who held it still have it.

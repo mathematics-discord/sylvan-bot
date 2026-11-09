@@ -1,14 +1,19 @@
 ---
-title: Role persistence
-description: Keep selected ordinary roles when leaving and rejoining.
+title: Which roles come back when you rejoin?
+description: Find out which roles Sylvan can restore after you leave the server.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
+The server can choose roles for you to keep across visits. If Art is one
+of those roles and you hold it when you leave, Sylvan remembers it. When
+you rejoin, Sylvan gives it back automatically.
 
-Role persistence remembers configured roles when a member leaves and restores them when they return. <RoleMention id="administrators" /> choose which roles to remember with [/config persistence](../../commands/persistence/).
+## If a role is missing
 
-Only ordinary roles without staff or moderation powers qualify. Channel overrides count towards that safety check. Safety is checked again before restoration, so a role gaining moderation powers can no longer be restored.
+Sylvan needs to have seen you leave and had your roles available at the
+time. It can only remember roles the server had already chosen for
+restoration. If the role was deleted, gained staff permissions, or was
+removed from that list while you were away, Sylvan can’t give it back.
 
-Sylvan must observe the departure with the member?s roles cached. A departure missed while the bot was offline cannot be recovered. Failed restorations remain pending for a later rejoin; deleted or unsafe roles are discarded.
-
-Removing a role from persistence clears its pending restorations and stops remembering it. It leaves roles held by current members unchanged and does not delete the Discord role.
+If the role came from a [reaction message](../reaction-roles/), you can
+use that message to claim it again. Otherwise, ask a server administrator
+to check whether the role is still configured and Sylvan can assign it.

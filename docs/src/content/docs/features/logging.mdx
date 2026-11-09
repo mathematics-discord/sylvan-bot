@@ -1,26 +1,24 @@
 ---
-title: Moderation logging
-description: Understand edit logs, deletion evidence and bulk transcripts.
+title: Read an edit or deletion log
+description: Read before-and-after text, recoverable attachments and bulk deletion transcripts in the staff log channels.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
-
-Sylvan can publish message edits and deletions to separate log channels. <RoleMention id="administrators" /> choose destinations and exclusions with [/config logs](../../commands/logging/).
+Open the server’s edit log for a changed message or its deletion log for a removed one. Both can share a channel. The author named on a log wrote the original message.
 
 ## Edits and single deletions
 
-Edit logs identify the author and channel, link to the message and show before-and-after text with changes highlighted. Earlier text can be unavailable. Long text is truncated to fit the log.
+**Message Edit** links to the surviving message and identifies its author and channel. Read the first block for the previous text and the second for the edited text. When Sylvan has both versions, it highlights the changes. *Unavailable* means Sylvan lacks that version. *Content truncated* means more text existed than would fit in the log.
 
-A single-deletion log shows the cached author and text, with a link to the preceding message when one can be found. Sylvan attempts to download the deleted message?s attachments at deletion time and upload them with the log. Downloads can fail or exceed limits; the log reports omitted attachments. A deletion log is not a guarantee that every attachment was recovered.
+**Message Delete** shows the author, channel and text Sylvan last saw. **Preceding message**, when present, takes you to the conversation immediately before the deletion. Sylvan also tries to download the attachments at deletion time. An omission count tells you how many files it could not include because of download failures or size limits.
 
 ## Bulk deletions
 
-Bulk deletions produce a summary and a `bulk-delete.txt` attachment containing eligible cached messages in chronological order. Each line includes the original message time in UTC, channel name, username and text. Multiline messages appear on multiple lines. User IDs stand in for usernames that cannot be resolved.
+The summary gives the channel, the time of deletion and, when the audit log identifies them, the moderator who cleared the messages. Open `bulk-delete.txt` for the people who wrote them. Entries are ordered oldest first. Each line gives the **original posting time in UTC**, channel, author and text. A multiline message occupies several lines. A numeric user ID stands in for an unavailable username.
 
-The summary includes the deletion time and, when audit information can identify them, the moderator who performed it. That moderator is distinct from the authors in the transcript. Bulk transcripts contain message text; they do not recover attachments from each deleted message.
+Bulk transcripts contain text only and can cover fewer messages than Discord deleted.
 
 ## What can be recovered
 
-Eligible message snapshots last **24 hours from message creation**, including across restarts. Editing a message does not extend that window. Messages Sylvan did not observe, or whose snapshots have expired, cannot supply deletion evidence. If no eligible cached messages remain, no deletion log is published. A bulk transcript may therefore contain fewer messages than were deleted.
+Sylvan keeps a copy of each eligible member message for **24 hours from its original posting time**. The deadline survives a restart and stays the same after an edit. Once the copy expires, Sylvan can no longer use it to publish a deletion log. Logs already posted in Discord stay in their log channel.
 
-Channel, thread, forum and category exclusions apply to the relevant messages beneath them. Log destination channels and their threads are excluded from logging back into themselves. Published logs are not automatically deleted when the cache window ends.
+If a deletion has no log, check the message’s age and whether logging covered that channel when Sylvan observed the message and when it was deleted. Excluded channels, their threads and excluded categories can explain gaps. Log destinations and their threads are automatically excluded. An administrator can [check the destinations and exclusions](../../commands/logging/). Turning logging back on does not recover messages missed while it was off.

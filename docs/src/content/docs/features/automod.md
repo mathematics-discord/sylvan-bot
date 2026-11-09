@@ -1,31 +1,35 @@
 ---
-title: Automod
-description: Match message text against rules and apply automatic moderation.
+title: Investigate an Automod action
+description: Identify the rule behind a deletion, timeout or ban and check what happened to the member.
 ---
 
-Automod checks members? new messages and content edits against the server?s rules. It ignores bots, webhooks and empty text. It checks message text, including in threads; it does not inspect the contents of attachments.
+For an Automod timeout or ban, start with Sylvan’s entry in the server audit log. The reason includes the rule ID and an excerpt from the message. A deletion reason gives the rule ID. To look up the pattern and action, use [`/automod list`](../../commands/automod/#list-rules) in a staff channel.
 
 ## How matching works
 
-Plain patterns match whole words or phrases, ignoring case. Backtick-delimited patterns are regexes, also ignoring case. If several enabled rules match, the match appearing earliest in the message wins; ties go to the lowest rule ID. Only that rule is selected. The most severe action does not take priority.
+Sylvan checks a member’s message text when they post or edit it, including in threads. Words and phrases match at word boundaries. Regular expressions match the pattern you supplied. Both ignore case.
 
-| Action | What happens |
-|---|---|
-| Delete | Attempts to delete the message. |
-| Mute | Attempts to delete the message and time out its author. An existing longer timeout is kept. |
-| Ban | Attempts to delete the message and ban its author, permanently or for the configured duration. |
-| Note | The rule is saved, but no action is executed yet. |
+Only one rule wins. Find the match that starts earliest in the message. If two matches start at the same character, the lower rule ID wins. For example, if a Delete pattern appears before a Ban pattern, Sylvan selects Delete.
 
-A selected Note rule can therefore prevent another matching rule from taking action. Disabled actions are excluded from matching. A regex that takes too long is skipped for that message; other rules can still match.
+| Winning action | Expected outcome |
+| --- | --- |
+| Delete | Sylvan attempts to delete the message. |
+| Mute | Sylvan attempts to delete the message and time out its author. A longer existing timeout keeps its expiry. |
+| Ban | Sylvan attempts to delete the message and ban its author for the rule’s duration, or permanently. |
+| Note | Sylvan takes no action and creates no ticket. A Note rule can still win the match. |
+
+For Mute and Ban, a failed deletion does not prevent the restriction attempt. Check the member’s timeout or the server ban list to confirm the result.
 
 ## Exemptions and settings
 
-Members holding any configured exempt role are skipped. Staff are not automatically exempt: configure their roles if they should be excluded. If required member-role information cannot be obtained, Automod skips enforcement rather than guessing whether an exemption applies.
+If a rule you expected to match was skipped, check the following.
 
-Use [/automod](../../commands/automod/) to add, remove and list rules. Use [/config automod](../../commands/automod-admin/) to switch actions on or off and manage exemptions. Saved changes normally take effect immediately. If a reply reports an unsuccessful refresh, the previous active configuration remains in use.
+- **Message.** Sylvan ignores bots, webhooks, empty text and attachment contents. Messages sent while Sylvan was offline are never replayed for moderation.
+- **Role.** Any exempt role skips the member, including `@everyone`. Staff can match rules unless they have an exempt role. If Sylvan needs to check a member’s roles and cannot retrieve them, it skips that member.
+- **Rule.** An administrator can [check which actions are enabled](../../commands/automod-admin/#show-settings). Disabled actions drop out of matching. A regular expression that times out drops out for that message only.
 
 ## Timed bans and failures
 
-Timed bans are recorded across restarts. Sylvan removes a ban when it expires only when it can confirm that it still owns that ban. A later ban or unban can supersede it; missing or unreadable audit history can delay removal or require manual review. A ban reaching its nominal expiry is therefore not a guarantee that the member has already been unbanned.
+Removing a rule, disabling Ban or restarting Sylvan does not cancel a recorded ban’s expiry. Once Sylvan matches the ban to its audit entry, use [the ticket to change the duration or lift the restriction](../../staff/tickets/change-a-restriction/).
 
-Deleting a rule or disabling Ban does not cancel a recorded ban or its expiry handling. Messages received while Sylvan is offline are not replayed for moderation. Discord actions can fail independently: a failed deletion does not prevent an attempted timeout or ban. Ask staff to review an unresolved outcome.
+At expiry Sylvan checks that the ban still belongs to that action. A later ban or unban can supersede it. If the audit history is missing or ambiguous, expiry can be delayed or paused for review. Check the current ban and [the ticket’s status](../../help/tickets/) before acting.
