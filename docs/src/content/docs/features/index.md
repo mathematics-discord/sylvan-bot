@@ -13,11 +13,11 @@ the [command reference](../commands/).
 
 ## For staff
 
-- [Moderation tickets](./tickets/) — Find and complete records, review actions, lift restrictions and hide or restore tickets.
+- [Moderation tickets](./tickets/) — See which actions Sylvan records, what a ticket’s status means and who can act on it. For instructions, open the [ticket handbook](../staff/tickets/).
 
 - [Automod](./automod/) — Apply rules to new and edited message text.
 - [Image-spam detection](./image-spam/) — Ban attachment bursts across several channels.
 - [Moderation logging](./logging/) — Read edit logs, deletion evidence and bulk transcripts.
 - [Reaction roles](./reaction-roles/) — Choose ordinary roles through message reactions.
 - [Role persistence](./persistence/) — Restore selected roles when members rejoin.
-- [Working Hours](./working-hours/) — Control staff ping availability with a daily schedule.
+- [Working Hours](./working-hours/) — Choose when an `@Moderators` ping includes you. Every moderator can [set their own hours](../staff/working-hours/).

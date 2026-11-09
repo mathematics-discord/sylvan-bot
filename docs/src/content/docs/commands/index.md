@@ -21,11 +21,10 @@ See the [feature guides](../features/) for automatic behaviour and staff workflo
 
 ## Moderator commands
 
-- [/ticket](./tickets/) — Look up ticket controls, required permissions and what to check before retrying a change.
+- [/ticket](./tickets/) — Find a ticket command or Apps shortcut, its fields, and who can see the reply.
 
-- [/working-hours](./working-hours/) — Set your daily availability and
-  let Sylvan manage your Moderators role. You must also hold one of the
-  configured eligible staff roles.
+- [/working-hours](./working-hours/) — Set the hours when you hold the
+  pingable `@Moderators` role. All moderators can use it.
 
 ## Senior moderator commands
 
@@ -36,7 +35,7 @@ See the [feature guides](../features/) for automatic behaviour and staff workflo
 
 ## Administrator commands
 
-- [/config tickets](./tickets/#administrator-configuration) — Configure capture, review exemptions and role tracking.
+- [/config tickets](./config-tickets/) — Configure capture, reminders, review exemptions and role tracking.
 
 - [/config persistence](./persistence/) — Remember selected safe roles across departures and rejoins.
 
@@ -53,7 +52,7 @@ See the [feature guides](../features/) for automatic behaviour and staff workflo
 
 - [/config image-spam](./spam/) — View or adjust image burst detection.
 
-- [/config working-hours](./working-conditions/) — Configure eligible roles,
-  exemptions and the ping role used by Working Hours.
+- [/config working-hours](./working-conditions/) — Choose the ping role,
+  include moderator tiers, and pause or resume scheduling for the server.
 
 - [/config automod](./automod-admin/) ? Enable actions and manage role exemptions.

@@ -1,0 +1,53 @@
+---
+title: Set your working hours
+description: Choose the hours when an @Moderators ping includes you, change your schedule, or go back to the default.
+---
+
+import RoleMention from '../../../components/RoleMention.astro';
+
+Every moderator can choose when they receive <RoleMention id="268886789983436800" />
+pings. Run `/working-hours` in the server to set your own schedule. Only you
+see the reply.
+
+## Set a daily schedule
+
+1. In Discord, select `/working-hours` and set **enable** to **True**.
+2. Enter **start** and **end** in 24-hour time, including seconds. Choose
+   your **timezone** from the suggestions. For 9 am to 5 pm in London, enter
+   the following command.
+
+   ```text
+   /working-hours enable:True start:09:00:00 end:17:00:00 timezone:Europe/London
+   ```
+
+3. Look for **Saved.** in the private reply. With these times, Sylvan adds
+   the ping role at 09:00 and removes it at 17:00 London time. Check the
+   roles on your Discord profile. If the update is pending, Sylvan will retry it.
+
+The same hours apply every day. Choose a window of at least 20 minutes.
+
+## Work overnight or change your hours
+
+To be pingable from 10 pm until 7 am the next morning, enter the earlier
+clock time as the end. Replace the time zone with your own.
+
+```text
+/working-hours enable:True start:22:00:00 end:07:00:00 timezone:Europe/London
+```
+
+To change your hours again, send the whole schedule with both times and
+your time zone or [UTC offset](../../commands/working-hours/#use-a-fixed-utc-offset).
+The new schedule takes effect as soon as Sylvan applies it.
+
+## Turn off your schedule
+
+```text
+/working-hours enable:False
+```
+
+**By default, turning your schedule off makes you pingable around the clock.**
+If an administrator has exempted one of your staff roles, Sylvan leaves
+your current ping role in place for manual changes. To use a schedule again,
+submit your times with **enable** set to **True**.
+
+If your profile still shows the wrong role, see [Troubleshoot Working Hours](../../help/working-hours/).

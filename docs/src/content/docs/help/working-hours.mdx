@@ -1,0 +1,57 @@
+---
+title: Troubleshoot Working Hours
+description: Work out why a schedule was rejected, why a role update is pending, or why you still receive @Moderators pings.
+---
+
+import RoleMention from '../../../components/RoleMention.astro';
+
+## I still have the role outside my hours
+
+- **You turned your schedule off.** The default gives you
+  <RoleMention id="268886789983436800" /> around the clock. If one of your
+  staff roles is exempt, turning off the schedule instead leaves the ping
+  role as it was.
+- **Your schedule is on.** Check the time zone and both ends of the window.
+  A fixed offset stays the same when local clocks change. An overnight
+  window continues into the next day. To correct it, [submit your hours
+  again](../../staff/working-hours/#work-overnight-or-change-your-hours).
+- **Everyone’s schedule seems to have stopped.** Ask an administrator to
+  check `/config working-hours show`. A server-wide pause restores the
+  usual unscheduled defaults.
+
+## Sylvan rejected my times
+
+Include seconds on both times, for example `09:00:00`. With local times,
+choose a named `timezone`. With a fixed offset, include it on both times
+and leave `timezone` empty. A window shorter than 20 minutes is rejected,
+including one where the start and end are identical. A rejected submission
+leaves your previous schedule in effect.
+
+For accepted formats and examples, see the [personal command](../../commands/working-hours/).
+
+## The role update is pending
+
+If the reply starts with **Saved.**, Sylvan has recorded the change and will
+retry the role update. Give it time, then check the roles on your Discord
+profile. Manually changing the ping role while your schedule is on only
+lasts until Sylvan next applies your hours.
+
+If the update stays pending, an administrator can use
+[`/config working-hours show`](../../commands/working-conditions/#config-working-hours-show)
+to check that the ping role still exists and sits below Sylvan’s highest role.
+The reply also flags a missing **Manage Roles** permission or unavailable member data.
+
+## I can’t set a schedule
+
+Run `/working-hours` in the server. If the command is missing or Sylvan
+says you need an eligible staff role, ask an administrator to check that
+your moderator role is included in the setup and that you have **Mute
+Members**. If scheduling is disabled, an administrator must enable it
+before anyone can change their hours.
+
+If you leave the server or lose your last eligible role, Sylvan disables
+your personal schedule when it detects the change. Once you’re eligible
+again, [set your hours](../../staff/working-hours/) to resume.
+
+If the reply says member data is unavailable and **no preference was changed**,
+try the command again once Sylvan has reconnected.

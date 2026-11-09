@@ -1,0 +1,80 @@
+---
+title: Find a ticket or member history
+description: Look up a moderation ticket by number or message link, or find a member’s tickets after they leave.
+---
+
+import RoleMention from '../../../../components/RoleMention.astro';
+
+If you have a ticket post open, choose **Apps → Manage Ticket** on the
+message to read its details privately. To look up a ticket by number or
+message link, use `/ticket show`. Sylvan posts the result in the channel.
+
+On Mathematics, <RoleMention id="1522665207225127034" /> and above can look up
+visible records when tickets are enabled.
+
+## Find a member’s history
+
+Open the member’s menu and choose **Apps → List Tickets**. Only you see the
+reply. To post their history in the channel, use their mention with
+`/ticket show`. If they’ve left, enter their Discord user ID in the `user` field.
+
+```text
+/ticket show user:@member
+```
+
+Sylvan lists up to ten tickets, newest first. Each visible entry gives the
+ticket number, action, and responsible moderator. Follow its message link or
+open the ticket by number. If there are more entries, the **Next** command
+at the bottom of the list posts the next page in the channel, even if you
+opened the first page privately.
+
+## Open one ticket
+
+**With a ticket number**, replace `1234` with the number on the record.
+
+```text
+/ticket show id:1234
+```
+
+**With a message link**, select `/ticket show` and paste the link into
+`message`. To get the link, open the menu on Sylvan’s ticket post in this
+server and choose **Copy Message Link**.
+
+Choose exactly one of `user`, `id`, or `message` per lookup. When you open a
+ticket by number or link, choose **Jump to ticket message** if the result
+includes a link to the posted ticket.
+
+## Find a hidden ticket
+
+If you have **View Audit Log** or **Administrator**, an ordinary member-history
+lookup includes the number of each hidden ticket. When other staff run the
+lookup, their results contain visible entries only.
+
+To open one hidden ticket, use its number. `/ticket showhidden` posts the
+details in the channel.
+
+```text
+/ticket showhidden id:1234
+```
+
+To see a member’s hidden history, use `user` in place of `id`. The lookup
+leaves the saved record hidden.
+
+## In a ModMail conversation
+
+When a member opens a [ModMail conversation](../../../features/sylvanmail/),
+Sylvan can post their ten most recent tickets in the new staff post. Everyone
+reading that post sees the same list. A hidden ticket appears by number only.
+Use **Apps → List Tickets** on the member for a fresh private lookup.
+
+## If you can’t find the record
+
+- **The history is empty.** Check the member’s ID and start on page 1.
+  `/ticket showhidden` searches hidden records only.
+- **A message link gives no match.** Check that it points to Sylvan’s ticket
+  post. If you have the ticket number, look it up with `id` instead.
+
+If the record exists but its post is missing, see [Troubleshoot a ticket](../../../help/tickets/#the-ticket-is-missing).
+
+For the full list of lookup fields, see [`/ticket show`](../../../commands/tickets/#ticket-show)
+and [`/ticket showhidden`](../../../commands/tickets/#ticket-showhidden).

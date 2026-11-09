@@ -19,6 +19,24 @@ export default defineConfig({
         pagination: false,
         sidebar: [
             {slug: 'index', label: 'Introduction'},
+            {label: 'Staff handbook', collapsed: true, items: [
+                {slug: 'staff/working-hours'},
+                {slug: 'staff/tickets', label: 'Ticket overview'},
+                {slug: 'staff/tickets/complete-a-ticket'},
+                {slug: 'staff/tickets/add-a-note'},
+                {slug: 'staff/tickets/find-a-ticket', label: 'Find tickets and member history'},
+                {slug: 'staff/tickets/review-tickets', label: 'Review tickets'},
+                {slug: 'staff/tickets/change-a-restriction', label: 'Change or lift a restriction'},
+                {slug: 'staff/tickets/hide-or-restore'},
+            ]},
+            {label: 'Server setup', items: [
+                {slug: 'setup/tickets'},
+                {slug: 'setup/working-hours'},
+            ]},
+            {label: 'Troubleshooting', items: [
+                {slug: 'help/tickets'},
+                {slug: 'help/working-hours'},
+            ]},
             {label: 'Features', items: [
                 {slug: 'features', label: 'Overview'},
                 {slug: 'features/colours'},
@@ -50,7 +68,7 @@ export default defineConfig({
             {
                 label: 'Administrator commands',
                 items: [
-                    {label: '/config tickets', link: new URL(`${base.replace(/\/$/, '')}/commands/tickets/#administrator-configuration`, site).href},
+                    {slug: 'commands/config-tickets'},
                     {slug: 'commands/persistence'},
                     {slug: 'commands/color-admin'},
                     {slug: 'commands/automod-admin'},

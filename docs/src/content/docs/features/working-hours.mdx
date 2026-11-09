@@ -1,20 +1,47 @@
 ---
 title: Working Hours
-description: Let your daily availability control the staff ping role.
+description: How the pingable @Moderators role follows your daily schedule, including overnight hours and days when the clocks change.
 ---
 
 import RoleMention from '../../../components/RoleMention.astro';
 
-Working Hours adds the configured ping role during your daily availability and removes it outside those hours. On Mathematics, this is the <RoleMention id="268886789983436800" /> role. Your moderation powers and colour roles are unaffected.
+Every moderator on Mathematics can choose when they hold the pingable
+<RoleMention id="268886789983436800" /> role. Working Hours adds it during
+the hours you choose, so a mention of the role includes you then.
+Your staff role and moderation permissions stay with you throughout the day.
 
-Use [/working-hours](../../commands/working-hours/) to set or disable your schedule. You must hold a configured eligible role as well as have access to the command. A named timezone follows daylight-saving changes; a fixed UTC offset stays fixed all year. Overnight windows are supported, and windows must last at least 20 minutes. Start times are included; end times are excluded.
+[Set your working hours](../../staff/working-hours/) to choose your daily times,
+change them, or turn your schedule off.
 
-While your schedule is enabled, Sylvan controls the ping role and corrects manual changes. An eligible role?s exemption affects staff without an active personal schedule; enabling a personal schedule still hands control to Sylvan.
+## When do I have the role?
+
+| Your schedule | What happens to the ping role |
+| --- | --- |
+| On | Sylvan gives you the role at the start of your hours and removes it at the end. It corrects manual changes, including for moderators with an exemption. |
+| Off, or never set | You hold the role around the clock by default. |
+| Off, with an exempt staff role | Sylvan leaves your ping role as it is. Staff can add or remove it manually. |
+
+One time window repeats every day, including weekends. If you choose
+22:00 to 07:00, you’re included from 22:00 through the night. At 07:00
+your window ends. It opens again at 22:00 that evening. Role updates can
+take a short time to appear in Discord.
+
+## When the clocks change
+
+Choose a named time zone such as `Europe/London` to keep the same local
+hours through daylight-saving changes. If you want the same UTC hours all
+year, use a [fixed offset](../../commands/working-hours/#use-a-fixed-utc-offset).
+
+If a clock change skips your chosen start or end time, Sylvan moves that
+time forward by the size of the gap. If it occurs twice, Sylvan uses the
+first occurrence. For example, a London schedule of 01:15 to 01:45 runs
+during the first 01:15 to 01:45 when the clocks go back.
 
 ## Defaults and suspension
 
-Eligible staff without an active schedule receive the ping role by default. Staff with a configured exemption retain manual control instead. Disabling your schedule restores those defaults.
+If an administrator pauses Working Hours for the server, the defaults for
+moderators without a schedule apply. Sylvan keeps enabled schedules and
+resumes them from the current time when the feature is switched back on.
 
-<RoleMention id="administrators" /> use [/config working-hours](../../commands/working-conditions/) to choose the ping role, eligible roles and exemptions, or suspend scheduling. Suspending restores ordinary defaults without deleting saved schedules. Changing the ping role leaves the old role unchanged.
-
-Role changes may take a short time. A reply saying your schedule was saved but role updates are pending means the schedule is retained and the role change still needs to finish.
+If the role looks wrong, [check your ping role](../../help/working-hours/).
+Administrators can [set up the roles or pause scheduling](../../setup/working-hours/).

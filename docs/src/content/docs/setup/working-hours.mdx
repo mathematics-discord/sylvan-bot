@@ -1,0 +1,72 @@
+---
+title: Set up Working Hours
+description: Give every moderator access to a personal ping schedule, choose the ping role, and verify the setup.
+---
+
+import RoleMention from '../../../components/RoleMention.astro';
+
+As an administrator, choose the role people ping and identify the staff who
+can schedule it. On Mathematics, the pingable role is
+<RoleMention id="268886789983436800" />. Each moderator keeps their staff
+role while Sylvan adds or removes the ping role.
+
+## Choose the roles
+
+1. Run `/config working-hours show` to see the current settings. For a new
+   setup, start with scheduling disabled. If you’re replacing the ping role
+   on an existing setup, [pause scheduling](#pause-or-resume-scheduling) first.
+2. Choose a mentionable role for pings. Sylvan needs **Manage Roles**, and
+   its highest role must be above the ping role. Select the role in Discord.
+
+   ```text
+   /config working-hours ping-role role:@Moderators
+   ```
+
+3. Add the staff roles that identify moderators. Repeat this command for
+   each moderator tier so everyone is covered. Select the actual role from
+   Discord’s role picker. Moderators also need the **Mute Members** permission
+   to run the personal command.
+
+   ```text
+   /config working-hours eligible-role action:add role:@Trial Moderators
+   ```
+
+## Choose who manages the role without a schedule
+
+Eligible moderators who leave their schedule off receive the ping role
+around the clock. To give some moderators manual control in that situation,
+add an exemption for a role you’ve already made eligible. For example,
+if you want Senior Moderators to manage their role manually when unscheduled,
+select their role here.
+
+```text
+/config working-hours exempt-role action:add role:@Senior Moderators
+```
+
+A moderator with an exemption can still set hours. While their schedule is
+on, Sylvan manages the ping role at the times they chose.
+
+## Enable and verify
+
+Run `/config working-hours enable`, then `/config working-hours show`.
+Check that scheduling is enabled, the intended role is listed as the ping
+role, and all moderator tiers are covered by the eligible roles. Fix any
+configuration problems in the reply.
+
+A moderator can now [set their hours](../../staff/working-hours/) and check
+whether the ping role on their profile matches their current window. If a
+change stays pending, [check the role and Sylvan’s permissions](../../help/working-hours/#the-role-update-is-pending).
+
+## Pause or resume scheduling
+
+Run `/config working-hours disable` to pause schedules across the server.
+Eligible moderators receive the ping role by default during the pause. Those
+with an exemption keep manual control. Sylvan keeps the saved schedules.
+
+Run `/config working-hours enable` to resume. Enabled personal schedules
+take effect according to the current time. If you changed the ping role
+during the pause, review who still holds the old role separately. Sylvan
+leaves its existing assignments in place.
+
+For the fields and restrictions of each command, see
+[`/config working-hours`](../../commands/working-conditions/).

@@ -1,102 +1,148 @@
 ---
 title: Ticket commands
-description: Look up ticket controls, permissions and administrator settings.
+description: Slash commands and Discord Apps-menu actions for moderation tickets, with fields, reply visibility, and examples.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
-
-Use this page to find a command. For the steps and outcomes, open the linked
-task in [Moderation tickets](../../features/tickets/). Replace `1234` with
-your ticket number.
+Run ticket commands in the server. Replace `1234` with the ticket number
+and `@member` with the member’s mention. For step-by-step instructions, see
+the [ticket handbook](../../staff/tickets/). The [permissions table](../../features/tickets/#who-can-do-what)
+covers each action.
 
 ## Look up tickets
 
-Lookups are available to <RoleMention id="1522665207225127034" /> and above. You also need View Channel in
-the ticket's channel and tickets must be enabled. **Results are posted in the channel where you run
-the command**, so choose a staff channel.
+### `/ticket show`
 
-| Command | Options |
+Posts the result in the channel. Choose exactly one lookup field.
+
+| Field | What to enter |
 | --- | --- |
-| `/ticket show` | Exactly one of `user:` (mention or user ID), `id:` (ticket number) or `message:` (Sylvan ticket message link). Add `page:` for user history. |
-| `/ticket showhidden` | Same selectors, but only hidden records. Requires <RoleMention id="1328097118644338779" /> or above as well as channel access. |
+| `user` | A member mention or Discord user ID, including someone who has left. Lists their history. |
+| `id` | A positive ticket number. Opens one visible ticket. |
+| `message` | A link to a Sylvan ticket message in this server. Opens the associated visible ticket. |
 
-**Apps → List Tickets** on a member is available to <RoleMention id="1522665207225127034" /> and above.
-See [finding a record](../../features/tickets/#find-a-record) for hidden
-numbers and [old ticket locations](../../features/tickets/#finding-a-ticket-from-the-november-2026-cutover).
+```text
+/ticket show user:@member page:2
+```
+
+`page` is optional for member history. It starts at 1 and accepts whole
+numbers up to 1,000,000. Each page lists up to ten tickets, newest first.
+Senior staff also see the numbers of hidden tickets in ordinary history.
+For a private member lookup, choose [Apps → List Tickets](#list-tickets).
+
+### `/ticket showhidden`
+
+Posts matching hidden records in the channel. Requires **View Audit Log**
+or **Administrator**. Use the same lookup fields and pagination as
+`/ticket show`.
+
+```text
+/ticket showhidden id:1234
+```
 
 ## Create and edit
 
-Notes are available to <RoleMention id="1522665207225127034" /> and above. They can also correct their own
-timeouts, kicks and voice restrictions. <RoleMention id="1522665074571870419" /> and above can correct their
-own bans. <RoleMention id="1328097118644338779" /> and above can correct any action ticket, including tracked
-roles and other moderators' actions. Channel access is required too.
+### `/ticket note`
 
-| Command | Use |
+Creates a note and publishes it in the tickets channel. `user` is required
+and accepts a mention or Discord user ID. Omit `comment` to open a private
+editor, or supply it to save immediately and receive a private confirmation.
+
+```text
+/ticket note user:@member comment:Discussed the rule on unsolicited invites.
+```
+
+### `/ticket edit`
+
+Opens a private editor for the required ticket `id`. The fields depend on
+the action. Closing the editor without submitting leaves the ticket as it was.
+
+```text
+/ticket edit id:1234
+```
+
+### `/ticket set`
+
+Requires `id`. Supply the fields you want to replace. The confirmation is
+private, and saved changes update the ticket.
+
+| Field | Effect |
 | --- | --- |
-| `/ticket note user:@member` | Opens a comment editor. Add `comment:` to save directly. A user ID works for a departed member. |
-| `/ticket edit id:1234` | Opens existing details. |
-| `/ticket set id:1234 duration:7 days` | Replaces the total duration measured from the original action. Optional `comment:` replaces the comment. Omitted fields keep their values. |
-| `/ticket append id:1234 comment:Member acknowledged the warning in ModMail.` | Adds text, keeping the existing comment. |
-| `/ticket top` | Attempts redelivery of your newest outstanding DM prompt. |
+| `comment` | Replaces the comment with 1–3,000 characters of nonblank text. |
+| `duration` | Sets the **total** duration from the original action. Accepts positive whole units, including combinations such as `2 days 6 hours`. See [which actions accept a duration or `permanent`](../../staff/tickets/change-a-restriction/#change-the-duration). |
+| `hidden` | `True` hides the record and first lifts any active restriction. `False` restores the record without reapplying the restriction. |
 
-Comments must be nonblank and at most 3,000 characters, including the combined
-text and separating newline when appending. Use positive durations such as
-`90 minutes`, `2 days 6 hours` or `3 weeks`; months are 30 days and years
-365 days. `permanent` works for bans, voice restrictions and tracked roles,
-but not timeouts. Notes and kicks have no duration. A duration already
-elapsed can end an active restriction; read
-[Change the duration](../../features/tickets/#change-the-duration) before shortening it.
+```text
+/ticket set id:1234 duration:7 days
+```
 
-Use **Apps → Add Moderation Note** on a member (<RoleMention id="1522665207225127034" /> and above),
-or **Apps → Manage Ticket** on a ticket message to open its controls.
-DM prompts use **Edit**, not text replies.
+Omitted fields keep their values. For action tickets, change visibility
+separately from comment or duration. Read [Hide or restore a ticket](../../staff/tickets/hide-or-restore/)
+before changing `hidden`.
+
+### `/ticket append`
+
+Requires `id` and `comment`. Adds a new line to the existing comment and
+confirms privately. The combined text, including that newline, must fit
+within 3,000 characters.
+
+```text
+/ticket append id:1234 comment:Member acknowledged the warning.
+```
+
+### `/ticket top`
+
+Requests another DM for your newest outstanding prompt. Takes no options.
+The private reply confirms the attempt. If the DM never arrives, open the
+ticket with [`/ticket edit`](#ticket-edit).
 
 ## Review and reverse
 
-| Command or control | Staff role and next step |
-| --- | --- |
-| `/ticket review`, **Review tickets**, **Approve**, **Apps → Approve Ticket** | <RoleMention id="1328097118644338779" /> or above. [Work through the review queue](../../features/tickets/#review-the-queue). |
-| `/ticket revert id:1234`, **Apps → Revert Ticket** | Own timeouts/voice restrictions: <RoleMention id="1522665207225127034" /> and above; own bans: <RoleMention id="1522665074571870419" /> and above; others' actions or tracked roles: <RoleMention id="1328097118644338779" /> and above. [Check reversal requirements](../../features/tickets/#lift-a-restriction-and-keep-the-record). |
-| `/ticket hide id:1234`, **Hide**, **Apps → Hide Ticket** | Visible notes: <RoleMention id="1522665207225127034" /> and above. Action tickets: <RoleMention id="1328097118644338779" /> and above; active restrictions must pass the reversal checks. [Hide a record](../../features/tickets/#hide-a-record). |
-| `/ticket set id:1234 hidden:False` | <RoleMention id="1328097118644338779" /> or above. Restores visibility without reapplying a restriction. |
+### `/ticket review`
 
-`/ticket set id:1234 hidden:True` follows the same hide rules.
-For action tickets, do not combine `hidden:` with comment or duration edits.
-If a reversal cannot be confirmed, hiding stops and the record stays visible.
-If hiding saves but removal of a channel copy fails, that copy may remain
-until a retry succeeds. Read [unconfirmed changes](../../features/tickets/#when-a-change-is-not-confirmed)
-before repeating an operation.
+Opens your private review queue. Takes no options. Requires **View Audit
+Log** or **Administrator**. Use **Approve & next**, **Edit**, or **Skip**
+to [work through the queue](../../staff/tickets/review-tickets/).
+
+### `/ticket revert`
+
+Requires `id`. Lifts the active restriction and keeps the record visible.
+The result is private. Check the member’s current restriction if Sylvan
+reports an uncertain outcome. See the [reversal requirements](../../staff/tickets/change-a-restriction/#lift-a-restriction-now).
+
+```text
+/ticket revert id:1234
+```
+
+### `/ticket hide`
+
+Requires `id`. Hides a note or action ticket and removes its recorded posts.
+For an active restriction, Sylvan must first confirm the reversal. Read
+the private result to see whether the record was hidden and its posts removed.
+
+```text
+/ticket hide id:1234
+```
+
+To make the record visible again, senior staff can run
+`/ticket set id:1234 hidden:False`.
+
+## Discord Apps menu
+
+Open **Apps** on the indicated member or on a Sylvan ticket message. These
+shortcuts open private controls or replies. Saving a note, approving,
+reverting, or hiding still changes the shared record.
+
+| Where to start | Action | Result |
+| --- | --- | --- |
+| Member | <span id="list-tickets"></span>**List Tickets** | Shows the member’s history only to you. Running a subsequent `/ticket show` posts that lookup in the channel. |
+| Member | <span id="add-moderation-note"></span>**Add Moderation Note** | Opens the note editor with the member already selected. |
+| Ticket message | <span id="manage-ticket"></span>**Manage Ticket** | Opens the ticket details and controls privately. |
+| Ticket message | <span id="approve-ticket"></span>**Approve Ticket** | Records approval on one eligible ticket. |
+| Ticket message | <span id="revert-ticket"></span>**Revert Ticket** | Lifts the restriction and keeps the ticket visible. |
+| Ticket message | <span id="hide-ticket"></span>**Hide Ticket** | Hides the record, lifting an active restriction first. |
 
 ## Administrator configuration
 
-Available to <RoleMention id="administrators" />. Run `/config tickets` with no options to display
-the destination, enabled state, reminder interval, review exemptions and
-tracked roles.
-
-1. Choose a staff text channel you can view. Give staff **View Channel** and
-   **Read Message History** there. Give Sylvan **View Channel**, **Read Message
-   History**, **Send Messages**, **Embed Links** and **Attach Files** (long
-   historical comments can be attached).
-2. Give Sylvan **View Audit Log** for capture and reconciliation. Give it the
-   relevant action permissions and role position to manage the restrictions
-   you expect it to lift or renew.
-3. Run `/config tickets channel:#tickets enabled:True`.
-4. Read the returned settings. After a moderation action, check that its
-   ticket appears and that staff can open it.
-
-| Option | Effect |
-| --- | --- |
-| `enabled:` | Enables or pauses ticket management. Disabling also blocks ticket lookups and edits and pauses automated expiry and long-timeout renewal; it does not lift existing restrictions. |
-| `channel:` | Destination for new ticket messages and the review summary. |
-| `reminder-minutes:` | Whole minutes between DM reminders: 1–35,791,394; default 1,440. |
-| `exempt-role-add:` / `exempt-role-remove:` | Changes which acting moderators' roles exempt newly captured actions from review. Existing tickets keep their exemption. |
-| `tracked-role-add:` / `tracked-role-remove:` | Starts or stops capturing new grants of an ordinary role. Managed roles and @everyone cannot be added. Role persistence is configured separately. |
-
-For example, `/config tickets reminder-minutes:720` changes reminders to
-12 hours. `/config tickets tracked-role-add:@Restricted` starts tracking
-future grants of that role. These settings do not grant staff permissions.
-
-Enabling starts capture from that time, including after a pause; do not
-expect actions performed while disabled to be backfilled. Check outstanding
-restrictions after re-enabling. The November 2026 transfer was a one-off
-operation and is not part of routine setup.
+See [`/config tickets`](../config-tickets/) for settings and defaults, or
+[Set up moderation tickets](../../setup/tickets/) to enable capture and verify
+the first ticket.
