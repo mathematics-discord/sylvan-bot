@@ -3,6 +3,7 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -17,6 +18,7 @@ from release_batch import parse_sections, release_from_commits
 USER_AGENT = "DiscordBot (https://github.com/ratgirl-laboratories/sylvan-bot, 1.0)"
 MAX_TEXT_UNITS = 4000
 MAX_COMPONENTS = 40
+MODERATORS_ROLE_ID = "268886789983436800"
 
 
 def length(text):
@@ -93,20 +95,26 @@ def container_message(version, chunks, part=None, total=None):
     for chunk in chunks:
         children.append({"type": 14, "divider": False, "spacing": 1})
         children.append({"type": 10, "content": chunk})
+    roles = list(dict.fromkeys(re.findall(r"<@&(\d+)>", "\n".join(chunks))))
+    allowed_mentions = {"parse": []}
+    if roles:
+        allowed_mentions["roles"] = roles
     return {"flags": 32768, "components": [{"type": 17, "accent_color": colour, "components": children}],
-            "allowed_mentions": {"parse": []}}
+            "allowed_mentions": allowed_mentions}
 
 
 def build_messages(version, notes, notes_url):
     sections = parse_sections(version, notes)
     has_internal = any(section["name"] == "Internal" for section in sections)
     sections = [section for section in sections if section["name"] != "Internal"]
+    opening_chunks = ([f"<@&{MODERATORS_ROLE_ID}>"]
+                      if any(section["name"] == "Moderation" for section in sections) else [])
     closing_chunks = []
     if has_internal and not sections:
         closing_chunks.append("Maintenance release; no user-facing changes.")
     if has_internal:
         closing_chunks.append(f"-# Internal changes are listed in the [full release notes]({notes_url}).")
-    chunks = [section_text(section) for section in sections] + closing_chunks
+    chunks = opening_chunks + [section_text(section) for section in sections] + closing_chunks
     title = f"# v{version}"
     if (length(title) + sum(map(length, chunks)) <= MAX_TEXT_UNITS
             and 2 + 2 * len(chunks) <= MAX_COMPONENTS):
@@ -119,7 +127,7 @@ def build_messages(version, notes, notes_url):
     if limit <= length("## General\n### Changed\n- "):
         raise ValueError("Release version leaves no room for Discord components.")
 
-    chunks = [chunk for section in sections for chunk in section_chunks(section, limit)]
+    chunks = opening_chunks + [chunk for section in sections for chunk in section_chunks(section, limit)]
     if any(length(chunk) > limit for chunk in closing_chunks):
         raise ValueError("Release notes summary cannot fit in a Discord Text Display.")
     chunks.extend(closing_chunks)
@@ -136,8 +144,16 @@ def build_messages(version, notes, notes_url):
         used += length(chunk)
     if current:
         groups.append(current)
-    return [container_message(version, group, number, len(groups))
-            for number, group in enumerate(groups, 1)]
+    messages = [container_message(version, group, number, len(groups))
+                for number, group in enumerate(groups, 1)]
+    notified_roles = set()
+    for message in messages:
+        mentions = message["allowed_mentions"]
+        roles = mentions.get("roles", [])
+        if roles:
+            mentions["roles"] = [role for role in roles if role not in notified_roles]
+            notified_roles.update(roles)
+    return messages
 
 
 def webhook_with_options(url):
@@ -164,6 +180,14 @@ def post(url, messages):
                     receipt = json.load(response)
                     if response.status != 200 or not isinstance(receipt, dict) or not receipt.get("id"):
                         raise RuntimeError(f"Discord did not confirm message {number}/{len(messages)}.")
+                    expected_roles = set(message["allowed_mentions"].get("roles", []))
+                    confirmed_roles = set(receipt.get("mention_roles", []))
+                    if expected_roles - confirmed_roles:
+                        raise RuntimeError(
+                            f"Discord posted message {number}/{len(messages)} but did not confirm all role mentions."
+                        )
+                    if expected_roles:
+                        print(f"Discord confirmed role mentions: {', '.join(sorted(expected_roles))}.")
                     break
             except HTTPError as error:
                 body = error.read(4096)

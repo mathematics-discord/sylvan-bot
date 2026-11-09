@@ -1,4 +1,6 @@
 import importlib.util
+import io
+import json
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -104,7 +106,49 @@ class ReleaseAnnouncementTests(unittest.TestCase):
         messages = announce.build_messages("1.2.3", notes, NOTES_URL)
 
         self.assertEqual(messages, [announce.container_message(
-            "1.2.3", ["## Moderation\n### Fixed\n- A visible fix."])])
+            "1.2.3", [f"<@&{announce.MODERATORS_ROLE_ID}>", "## Moderation\n### Fixed\n- A visible fix."])])
+
+    def test_moderation_release_pings_moderators_and_visible_staff_roles_only(self):
+        notes = ("# v1.2.3\n## Moderation\n### Fixed\n"
+                 "- <@&1522665207225127034> can edit tickets.\n"
+                 "- <@&1522665207225127034> can use @everyone and <@123> safely.\n"
+                 "## Internal\n### Changed\n- <@&456> hidden details.\n")
+
+        messages = announce.build_messages("1.2.3", notes, NOTES_URL)
+
+        self.assertEqual(messages[0]["allowed_mentions"],
+                         {"parse": [], "roles": [announce.MODERATORS_ROLE_ID, "1522665207225127034"]})
+        self.assertIn(f"<@&{announce.MODERATORS_ROLE_ID}>", texts(messages))
+
+    def test_nonmoderation_release_does_not_ping_moderators(self):
+        for section in ["General", "Administration", "Internal"]:
+            with self.subTest(section=section):
+                notes = f"# v1.2.3\n## {section}\n### Changed\n- A change.\n"
+                messages = announce.build_messages("1.2.3", notes, NOTES_URL)
+                self.assertEqual(messages[0]["allowed_mentions"], {"parse": []})
+
+    def test_repeated_staff_mentions_ping_each_role_once_across_parts(self):
+        notes = ("# v1.2.3\n## Moderation\n### Fixed\n"
+                 + "".join("- <@&1522665207225127034> " + "x" * 200 + "\n" for _ in range(60)))
+        messages = announce.build_messages("1.2.3", notes, NOTES_URL)
+
+        self.assertGreater(len(messages), 1)
+        roles = [role for message in messages for role in message["allowed_mentions"].get("roles", [])]
+        self.assertEqual(roles, [announce.MODERATORS_ROLE_ID, "1522665207225127034"])
+
+    def test_webhook_requires_discord_to_confirm_requested_role_mentions(self):
+        message = announce.container_message("1.2.3", [f"<@&{announce.MODERATORS_ROLE_ID}>"])
+        for confirmed in [[], [announce.MODERATORS_ROLE_ID]]:
+            with self.subTest(confirmed=confirmed):
+                response = io.BytesIO(json.dumps({"id": "123", "mention_roles": confirmed}).encode())
+                response.status = 200
+                with patch.object(announce, "urlopen", return_value=response) as request:
+                    if confirmed:
+                        announce.post("https://example.invalid", [message])
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, "did not confirm all role mentions"):
+                            announce.post("https://example.invalid", [message])
+                request.assert_called_once()
 
     def test_large_release_keeps_footer_once_at_end_within_discord_limits(self):
         notes = ("# v1.2.3\n## Moderation\n### Fixed\n"
@@ -120,10 +164,12 @@ class ReleaseAnnouncementTests(unittest.TestCase):
         self.assertNotIn("Hidden detail", output)
         for number in range(60):
             self.assertEqual(output.count(f"- Fix {number}:"), 1)
-        for message in messages:
+        self.assertEqual(output.count(f"<@&{announce.MODERATORS_ROLE_ID}>"), 1)
+        for number, message in enumerate(messages):
             self.assertLessEqual(sum(announce.length(text) for text in texts([message])), 4000)
             self.assertLessEqual(1 + len(message["components"][0]["components"]), 40)
-            self.assertEqual(message["allowed_mentions"], {"parse": []})
+            self.assertEqual(message["allowed_mentions"],
+                             {"parse": [], "roles": [announce.MODERATORS_ROLE_ID]} if number == 0 else {"parse": []})
 
     def test_footer_can_move_to_next_message_without_overflow(self):
         header = "# v1.2.3\n## Moderation\n### Fixed\n- "

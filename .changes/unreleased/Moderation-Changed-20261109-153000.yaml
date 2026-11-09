@@ -1,0 +1,4 @@
+component: Moderation
+kind: Changed
+body: Releases with moderation changes now ping <@&268886789983436800>. Staff-role mentions in release announcements also notify the named roles, once per role for each release.
+time: 2026-11-09T15:30:00Z
