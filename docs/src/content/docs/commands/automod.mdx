@@ -1,48 +1,37 @@
 ---
-title: /automod
-description: Add, remove and list message-matching rules.
+title: Manage Automod rules
+description: Add word or regex rules, review the public rule list, and remove a rule by ID.
 ---
 
 import RoleMention from '../../../components/RoleMention.astro';
 
-Available to <RoleMention id="1328097118644338779" /> and above.
-
-Manage rules inside the server. See [Automod](../../features/automod/) for matching behaviour, actions and limitations.
+You need **View Audit Log** to manage rules in this server. On Mathematics, <RoleMention id="1328097118644338779" /> and above have it. Use a staff channel to list rules because anyone who can read the channel can see the patterns.
 
 ## Add rules
 
-```text
-/automod add string:example, another example action:Delete
-/automod add string:example action:Mute duration:30m
-/automod add string:example action:Ban duration:2 days
-```
-
-| Option | Meaning |
-|---|---|
-| `string` | Required. Comma-separated words or phrases; surround regexes with backticks. |
-| `action` | Required. Choose Delete, Note, Mute or Ban. |
-| `duration` | Optional. A positive whole number followed by seconds, minutes, hours, days or weeks; short forms `s`, `m`, `h`, `d`, `w` also work. |
-
-For example, enter ``example, `offer\s+\d+` `` in `string` to create one word rule and one regex rule. Commas inside a backtick-delimited regex belong to that pattern. Triple-backtick code blocks are also accepted. Empty patterns, invalid regexes and patterns matching empty text are rejected; no rules from that request are added.
-
-Mute defaults to 28 days and cannot exceed that. Ban defaults to permanent. Delete and Note ignore `duration`. **Note rules do not execute yet.**
-
-The private reply lists the new IDs in input order. If the rules were saved but could not be applied immediately, the reply says so.
-
-## Remove a rule
+Enter the patterns in `string` and choose one `action` for the batch. This example creates two Delete rules.
 
 ```text
-/automod remove id:12
+/automod add string:sample phrase, another phrase action:Delete
 ```
 
-Use the required rule ID from the list, not a message or user ID. Only rules in this server can be removed. The private reply confirms removal or explains that the ID was not found.
+Plain text matches a whole word or phrase. To use a regular expression, wrap it in backticks. For example, enter ``sample phrase, `offer\s+\d+` `` to create one phrase rule and one regex rule. Commas inside a backtick-delimited regex belong to the regex. Triple backticks also work. If any pattern is empty, invalid or matches the empty string, Sylvan rejects the entire batch.
+
+| Action | Duration to enter |
+| --- | --- |
+| Delete | Omit `duration`. |
+| Mute | A timeout up to 28 days. Omitting `duration` gives the member a 28-day timeout. |
+| Ban | Include `duration` for a timed ban. Omitting it makes the ban permanent. |
+| Note | Omit `duration`. A winning Note rule takes no action and creates no note. |
+
+For a duration, enter a positive whole number and one unit, such as `30m` or `2 days`. Sylvan accepts seconds, minutes, hours, days and weeks, including the abbreviations `s`, `m`, `h`, `d` and `w`.
+
+The private reply lists one rule ID per pattern, in the order you entered them. If it reports a refresh failure, the rules were saved and the previous rules are still in use.
 
 ## List rules
 
-```text
-/automod list
-```
+Run `/automod list` to post the server’s rule IDs, patterns, actions and durations. Anyone with **View Audit Log** can use **Prev** and **Next** on the public reply. Disabled actions can still have listed rules. To see which rule applies when patterns overlap, [check how matching works](../../features/automod/#how-matching-works).
 
-The list is public and includes rule IDs, patterns, actions and durations. Use **Prev** and **Next** to change pages. <RoleMention id="1328097118644338779" /> and above can use the controls too. Listing rules does not enable disabled actions.
+## Remove a rule
 
-<RoleMention id="administrators" /> manage action switches and exempt roles with [/config automod](../automod-admin/).
+Find the ID in the rule list, then run `/automod remove id:12`, substituting that rule’s ID. The private reply confirms removal or tells you the server has no rule with that ID. Existing timeouts and bans keep their expiry.

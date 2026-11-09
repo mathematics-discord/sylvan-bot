@@ -1,38 +1,30 @@
 ---
-title: /config automod
-description: Control Automod actions and role exemptions.
+title: Set Automod actions and exemptions
+description: Enable or pause enforcement for an action and choose which roles Automod skips.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
+You need **Administrator** to run `/config automod` in this server. Run it in a staff channel if the action settings or exempt roles should be private. All three commands post their replies in the channel.
 
-Available to <RoleMention id="administrators" />.
+## Show settings
 
-Run these commands inside the server. All three commands reply publicly, including exemption changes and the settings list.
+Run `/config automod show` to check the four action switches and exempt roles. A deleted role appears by ID. For the patterns assigned to each action, see [Manage Automod rules](../automod/#list-rules).
 
 ## Enable or disable actions
 
+All four actions start enabled. Set `action` to **Delete**, **Note**, **Mute** or **Ban** to change one switch. Omitting it changes **all four**.
+
 ```text
 /config automod set enabled:false action:Ban
-/config automod set enabled:true
 ```
 
-`enabled` is required. `action` is optional: choose Delete, Note, Mute or Ban, or omit it to change all four. Actions are enabled by default. Disabling an action retains its rules and exemptions. Enabling Note still does not execute Note rules.
+This takes Ban rules out of matching while keeping the rules and exemptions. Recorded bans still run to their existing expiry. To bring Ban rules back into use, run the command with `enabled:true action:Ban`. Enabling Note allows Note rules to win a match, even though they take no action.
 
 ## Change an exemption
 
 ```text
 /config automod exempt role:@Example enabled:true
-/config automod exempt role:@Example enabled:false
 ```
 
-Both options are required. Choose a role in this server. `true` exempts members with that role; `false` removes that exemption. Other exemptions still apply. Exempting `@everyone` exempts the whole server.
+Choose a server role. Anyone with that role skips all Automod rules. Choose `enabled:false` to remove its exemption. A member who holds another exempt role is still exempt. Exempting `@everyone` skips every member.
 
-## Show settings
-
-```text
-/config automod show
-```
-
-Shows all four action switches and the exempt roles, including saved references to deleted roles. It does not list rules; use [/automod list](../automod/#list-rules).
-
-A reply may say the settings were saved but could not be applied immediately. The previous active settings remain in use until a successful refresh. See [Automod](../../features/automod/) for enforcement and timed-ban behaviour.
+Run `/config automod show` to check the saved settings. If a change reports that the refresh failed, Sylvan continues enforcing the previous settings until a refresh succeeds.

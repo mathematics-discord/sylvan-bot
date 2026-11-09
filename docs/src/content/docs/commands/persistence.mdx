@@ -1,24 +1,48 @@
 ---
-title: /config persistence
-description: Restore selected roles when members rejoin.
+title: Restore roles when members rejoin
+description: Select ordinary server roles to remember on departure and check whether Sylvan can restore them.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
+Use `/config persistence` in the server with Discord’s **Administrator**
+permission. Adding and removing roles gives you a private confirmation.
+**Listing roles posts the result in the channel.**
 
-Available to <RoleMention id="administrators" />.
+## Remember a role
 
-Run these commands inside the server. Add and remove replies are private; the role list is public.
+1. Choose an ordinary role, such as Art. Sylvan checks server permissions
+   and channel and category overrides for staff or moderation powers.
+   Discord-managed roles and `@everyone` cannot be selected.
+2. Give Sylvan **Manage Roles** and put its highest role above Art. Unless
+   you own the server, Art must also sit below your highest role.
+3. Run the command with the role you want Sylvan to remember.
 
 ```text
-/config persistence add role:@Example
-/config persistence remove role:@Example
-/config persistence list
+/config persistence add role:@Art
 ```
 
-`role` is required for add and remove. Add remembers the role on future departures; list shows configured roles, including blocked or deleted roles. Remove stops remembering the role and clears pending restorations, leaving current members' roles unchanged.
+From now on, when Sylvan sees a member leave with Art, it can
+[restore Art when they rejoin](../../features/persistence/). It needs the
+member’s roles at departure. Enabling restoration after someone has left
+can’t recover their old roles.
 
-Only ordinary roles without staff or moderation permissions can be persisted. Channel overrides count too. The role must be below your highest role. Safety is checked again before restoration, so granting a configured role moderation powers blocks restoration.
+## Check which roles can be restored
 
-Sylvan must observe the departure with the member's roles cached. Departures missed while it is offline cannot be recovered. Failed restorations remain pending for a later rejoin; deleted or unsafe roles are discarded.
+Run `/config persistence list` in a channel where you want the list to
+appear. A **restoration blocked** entry means the role has unsafe
+permissions or Sylvan can no longer manage it. A deleted role appears by
+its Discord ID.
 
-See the [Role persistence](../../features/persistence/) guide for automatic behaviour and limitations.
+If a member is missing a role, check the role’s permissions and hierarchy
+first. A failed Discord update or a missing bot permission can leave a
+restoration pending. Sylvan discards saved roles that were deleted or
+became unsafe. If the role was a tracked restriction, Sylvan also checks
+its ticket before restoring it. Ended or expired restrictions stay off.
+
+## Stop remembering a role
+
+```text
+/config persistence remove role:@Art
+```
+
+Removing Art clears its pending restorations. Members who already have
+Art keep it, and Sylvan stops remembering it on future departures.

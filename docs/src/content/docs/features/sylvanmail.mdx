@@ -1,80 +1,31 @@
 ---
-title: ModMail
-description: Contact staff privately, or reply to members from the staff mail forum.
+title: Contact the moderators through ModMail
+description: Send a private message or screenshot to the Mathematics moderation team through ModMail.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
+<span id="for-users-contact-staff"></span>
 
-## For users: contact staff
+Open [ModMail’s Discord profile](https://discord.com/users/1567888927048863784), choose **Message**, and write to the moderators. Staff see your message, username and user ID in a private forum post. Their replies come back to this DM. You can keep replying here.
 
-Send a direct message to the **ModMail** bot. You can open its profile from
-the server's member list or staff-contact link, then choose **Message**.
-Write what you need help with; you can include screenshots or other attachments.
-There are no commands to learn.
+ModMail replies **Delivered to staff** the first time and **Delivered** on subsequent messages. This confirms that your message reached the staff forum. A moderator may read and answer it later. If you need to correct something you’ve sent, send a follow-up. Editing or deleting your DM leaves the staff copy in place.
 
-Your message goes to a private staff conversation, where moderators can
-read it and reply. Their replies arrive in your DMs with ModMail, so you
-can carry on the conversation there. Send your messages to ModMail rather
-than the main Sylvan bot.
+## Send a screenshot or file
 
-You'll receive an acknowledgement when your message is delivered. This
-means it reached the staff conversation, not that someone has read it yet.
-If Discord won't let you message ModMail, contact a staff member directly.
+Attach the file to your DM. Each message can carry up to 10 files, with a limit of 8 MiB per file and 24 MiB altogether. You can send text and attachments together. For a forwarded message, sticker, poll or voice message, send a description or screenshot instead.
 
-## For moderators: read and reply
+<span id="technical-details-and-delivery-problems"></span>
 
-Incoming mail appears in the private staff mail forum, with a separate
-post for each person. The opening message identifies them by username and
-user ID. Messages and attachments appear in the post, and the configured
-staff role is notified of new mail. Another message after a gap of at
-least three hours triggers a fresh notification.
+## If your message doesn’t go through
 
-When tickets are enabled, the new staff post can also include the member’s
-[recent ticket history](../../staff/tickets/find-a-ticket/#in-a-modmail-conversation).
+- **File too large or unsupported content.** Correct the problem described in the notice and send a new DM.
+- **ModMail is busy.** Try again later.
+- **Delivery was partial or uncertain.** Ask a moderator to check what arrived before sending another copy.
+- **Discord won’t open the DM, or ModMail is unavailable.** Contact a moderator directly.
 
-Anyone with access to write in the post can reply. The notification role
-doesn't decide who can answer.
+<span id="for-moderators-read-and-reply"></span>
+<span id="prepare-a-reply"></span>
+<span id="send-an-anonymous-reply"></span>
+<span id="send-a-reply-with-your-username"></span>
+<span id="drafts-and-staff-discussion"></span>
 
-### Prepare a reply
-
-Write in the staff post and either **mention Sylvan in the message body** or
-use **Reply** on a message from Sylvan with the **reply ping enabled**.
-Both prepare the same draft. Neither chooses whether your name is shown.
-
-### Send an anonymous reply
-
-Click ??? (`:levitate:`) on your own draft. The member sees **From staff:**
-followed by your reply.
-
-### Send a reply with your username
-
-Click ?? (`:person_standing:`) on your own draft. The member sees
-**From &lt;username&gt;:** followed by your reply.
-
-### Drafts and staff discussion
-
-Wait for Sylvan to add all three controls: ??? **Anonymous**, ?? **Signed**
-and ? **Cancel**. Only the draft's author can use them. Posting or editing
-a draft does not send it; the send reaction you choose determines attribution.
-Sylvan removes its own mention from delivered text.
-
-Click ? to cancel. Edit a cancelled draft to prepare it again. You can edit
-text and attachments before sending. ? means Discord accepted the whole reply;
-editing or deleting it afterwards does not change the member's copy.
-Choosing a different send reaction afterwards does not send a second copy.
-
-Ordinary discussion without a Sylvan mention or a ping-enabled reply stays
-in the staff post. Other mentions in delivered replies do not notify anyone.
-For an old unsent draft with ??, edit it to get the new controls.
-
-### Technical details and delivery problems
-
-Messages support up to 16,000 characters and 10 attachments, with limits
-of 8 MiB per attachment and 24 MiB in total. Stickers, polls, voice messages
-and interactive content aren't supported. Long text is split into messages.
-
-If a reply reports a delivery problem, follow its explanation. For partial
-or uncertain delivery, check what arrived before sending again. Messages
-interrupted by a shutdown aren't automatically replayed. <RoleMention id="administrators" />
-can choose the forum and notification role with
-[/config sylvanmail](../../commands/sylvanmail/#administrator-configuration).
+If you’re answering mail in the staff forum, see [Reply to ModMail](../../staff/sylvanmail/#prepare-a-reply).

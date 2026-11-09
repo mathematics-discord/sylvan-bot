@@ -1,58 +1,60 @@
 ---
-title: Commands
-description: Find Sylvan commands for members, moderators, and administrators on Mathematics.
-sidebar:
-  label: Overview
-  order: 0
+title: Slash commands and Apps shortcuts
+description: Find a Sylvan command by its name in Discord. Look up the fields, access requirements and result in the linked guide.
 ---
 
-Find the command you need on <a href="https://discord.gg/math" target="_blank" rel="noopener noreferrer">
-Mathematics</a>. Select a guide for examples
-and instructions.
+Type `/` in a server channel to find a slash command. For an **Apps** shortcut, open the menu on a member or message. Each guide explains who can use the command and where its reply appears.
 
-See the [feature guides](../features/) for automatic behaviour and staff workflows.
+<span id="user-commands"></span>
 
-## User commands
+## Member commands
 
-- [/hello](./hello/) — Ask Sylvan for a greeting.
+| Command | Use it to |
+| --- | --- |
+| [`/colour list`](./color/#list) | See the server’s display colours and the role needed for each. |
+| [`/colour set`](./color/#set) | Choose a colour or reset your preference. |
+| [`/hello`](./hello/) | Ask Sylvan for a greeting. |
 
-- [/colour](./color/) — Choose or reset your display colour, or list the
-  server's colour options.
+To [contact the moderators](../features/sylvanmail/), send a direct message to ModMail.
 
-## Moderator commands
+<span id="moderator-commands"></span>
+<span id="senior-moderator-commands"></span>
 
-- [/ticket](./tickets/) — Find a ticket command or Apps shortcut, its fields, and who can see the reply.
+## Staff commands
 
-- [/working-hours](./working-hours/) — Set the hours when you hold the
-  pingable `@Moderators` role. All moderators can use it.
+Ticket access depends on the action, the original moderator and your Discord permissions. Check [who can do what](../features/tickets/#who-can-do-what) if a command is unavailable.
 
-## Senior moderator commands
+| Commands | Use them to |
+| --- | --- |
+| `/ticket show`, `/ticket showhidden` | [Look up a ticket or a member’s history](./tickets/#look-up-tickets). Both commands post successful lookups in the channel. |
+| `/ticket note`, `/ticket edit`, `/ticket set`, `/ticket append`, `/ticket top` | [Create a note, correct a record or work through your incomplete tickets](./tickets/#create-and-edit). |
+| `/ticket review`, `/ticket revert`, `/ticket hide` | [Review the queue, lift a restriction or change a record’s visibility](./tickets/#review-and-reverse). |
+| `/working-hours` | [Set your daily ping schedule](../staff/working-hours/). You need **Mute Members** and an eligible staff role to set hours. |
+| `/automod add`, `/automod list`, `/automod remove` | [Manage message-matching rules](./automod/). You need **View Audit Log**. The rule list posts in the channel. |
+| `/yoink` | [Copy a custom emoji](./yoink/). You need **View Audit Log**. |
 
-- [/yoink and Yoink emoji](./yoink/) — Copy a custom emoji into the server
-  using a slash command or a message's Apps menu.
+## Apps shortcuts
 
-- [/automod](./automod/) ? Add, remove and browse message-matching rules.
+| Open the menu on | Choose |
+| --- | --- |
+| A server member | [**List Tickets** or **Add Moderation Note**](./tickets/#discord-apps-menu). |
+| A ticket message | [**Manage Ticket**, **Approve Ticket**, **Revert Ticket** or **Hide Ticket**](./tickets/#discord-apps-menu). |
+| A message containing a custom emoji | [**Yoink emoji**](./yoink/). |
 
-## Administrator commands
+<span id="administrator-commands"></span>
 
-- [/config tickets](./config-tickets/) — Configure capture, reminders, review exemptions and role tracking.
+## Server configuration
 
-- [/config persistence](./persistence/) — Remember selected safe roles across departures and rejoins.
+These commands require **Administrator**. When a command has subcommands, choose one of the names in the second column.
 
-- [/config rolereact](./role-react/) — Add or remove message reactions
-  that let members choose ordinary roles.
-
-- [/config sylvanmail](./sylvanmail/#administrator-configuration) — Select
-  the private mail forum and staff role.
-
-- [/config colour](./color-admin/) — Configure which roles grant access
-  to display colours and check members' colour roles.
-
-- [/config logs](./logging/) — Choose log destinations and channel exclusions.
-
-- [/config image-spam](./spam/) — View or adjust image burst detection.
-
-- [/config working-hours](./working-conditions/) — Choose the ping role,
-  include moderator tiers, and pause or resume scheduling for the server.
-
-- [/config automod](./automod-admin/) ? Enable actions and manage role exemptions.
+| Command | Subcommands | Guide |
+| --- | --- | --- |
+| `/config automod` | `show`, `set`, `exempt` | [Set Automod actions and exemptions](./automod-admin/). |
+| `/config colour` | `upsert`, `delete`, `sync` | [Offer a display colour or change who can use it](./color-admin/). |
+| `/config image-spam` | — | [Set the thresholds for attachment-spam bans](./spam/). |
+| `/config logs` | `setup`, `exclude`, `include`, `exclusions` | [Choose where edit and deletion logs go](./logging/). |
+| `/config persistence` | `add`, `list`, `remove` | [Choose which roles return when a member rejoins](./persistence/). |
+| `/config rolereact` | — | [Attach a role to a reaction](./role-react/). |
+| `/config sylvanmail` | — | [Set the private forum and notification role](../setup/sylvanmail/). |
+| `/config tickets` | — | [Look up ticket configuration options](./config-tickets/). |
+| `/config working-hours` | `show`, `ping-role`, `eligible-role`, `exempt-role`, `enable`, `disable` | [Configure moderator ping schedules](../setup/working-hours/). |

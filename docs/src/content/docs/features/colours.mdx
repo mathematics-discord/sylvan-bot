@@ -1,14 +1,28 @@
 ---
-title: Display colours
-description: Choose a colour from the options your roles allow.
+title: Choose a display colour
+description: Choose the colour of your name in the server, change it, or reset it.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
+1. Run `/colour set` in the server. Only you can see and use the picker.
+2. Open **Choose a colour…** and select a role. Sylvan applies it immediately
+   and removes your other configured display colour roles.
+3. To change it later, run `/colour set` again. Choose **Reset** to remove
+   your configured display colour. Another Discord role may still give
+   your name a colour.
 
-Use [/colour set](../../commands/color/#set) to choose a display colour or reset it. Your roles determine which colours appear in the menu. A source role grants access; a separate display role supplies the colour. For example, a Members ? Purple mapping lets members with Members choose Purple.
+## Find a colour that’s missing
 
-Only you can use your picker. Choosing a colour replaces your other configured display colour roles. Reset removes them without choosing another. [/colour list](../../commands/color/#list) shows all mappings and their IDs, including colours you cannot use.
+Your roles determine which colours appear in your picker. For example, if
+the server offers Violet to members with the Art role, you need Art before
+you can choose Violet. Run [`/colour list`](../../commands/color/#list) to
+see which role gives access to each colour.
 
-Sylvan also checks colour roles when members join or their roles change. If you lose access to a colour, it can be removed. The bot keeps a single valid colour; invalid or conflicting configured display roles are removed so you can choose again. It does not select a replacement for you.
+If the picker shows only **Reset**, read the message above it. When none
+of your roles grant a colour, check the list for the role you would need.
+If you qualify for more than 25 colours, ask a server administrator to
+reduce the number available to you.
 
-<RoleMention id="administrators" /> manage mappings and run manual checks with [/config colour](../../commands/color-admin/). Saving a mapping does not automatically assign its colour to everyone who becomes eligible. Incomplete role updates do not undo a saved mapping; read the reply before retrying.
+Sylvan checks your colour when you join and when your roles change. It
+can remove a colour you’ve lost access to, or clear conflicting display
+colours. Run `/colour set` to choose again. If Discord reports an
+incomplete update, check which roles you have before reopening the picker.

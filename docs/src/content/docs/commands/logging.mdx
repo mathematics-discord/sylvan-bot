@@ -1,69 +1,30 @@
 ---
-title: /config logs
-description: Configure edit and deletion logs and choose which channels to exclude.
+title: Set up edit and deletion logs
+description: Choose log channels, exclude private conversations and check which sources are covered.
 ---
 
-import RoleMention from '../../../components/RoleMention.astro';
-
-Available to <RoleMention id="administrators" />.
-
-Run these commands in a server text channel or thread. Replies are visible
-only to you.
+You need **Administrator**. Run `/config logs` commands in a server text channel or thread. Their replies are private. Anyone with access to a log destination can read message text posted there, including text deleted from the original channel.
 
 ## View or change log destinations
 
-Run `/config logs setup` without options to see the current settings.
-
-To set destinations and enable logging:
+1. Choose one or two text or announcement channels with the intended staff access. Sylvan can send edit and deletion logs to the same channel.
+2. Run the command below, selecting your destinations. You can enable logging with just one destination if you only want that kind of log.
+3. Run `/config logs setup` without options to confirm whether logging is enabled and where each kind of log goes.
 
 ```text
 /config logs setup enabled:true delete-log-channel:#deleted-messages edit-log-channel:#edited-messages
 ```
 
-| Option               | What it changes                                      |
-|----------------------|------------------------------------------------------|
-| `enabled`            | Enables or disables moderation logging.              |
-| `delete-log-channel` | Destination for deleted messages and bulk deletions. |
-| `edit-log-channel`   | Destination for message edits.                       |
-
-All options are optional. Omitted settings stay as they are. Destinations
-can be text or announcement channels. Set at least one destination before
-enabling logging; each kind of log needs its own configured destination.
-
-To pause logging without discarding its destinations:
-
-```text
-/config logs setup enabled:false
-```
+`delete-log-channel` receives single deletions and bulk transcripts. `edit-log-channel` receives message edits. Supply just the option you want to change. To pause logging and keep the destinations, run `/config logs setup enabled:false`.
 
 ## Exclude a channel
 
-```text
-/config logs exclude
-/config logs exclude channel:#private-discussion
-```
-
-Leave `channel` out to exclude the current channel. You can select a channel,
-thread, forum or category. An exclusion on a parent channel or category
-also applies to messages beneath it.
+Run `/config logs exclude channel:#private-discussion` for a specific source, or `/config logs exclude` for the current channel. You can select a text or announcement channel, thread, forum or category. An excluded forum covers its posts. An excluded category covers the channels and threads beneath it.
 
 ## Remove an exclusion
 
-```text
-/config logs include channel:#private-discussion
-```
-
-This removes the exclusion for the selected channel. Leave `channel` out
-to use the current channel. A parent channel or category exclusion can
-still prevent messages being logged; remove that exclusion separately.
+Run `/config logs include channel:#private-discussion`, or omit `channel` to use the current one. This removes the exclusion set directly on that channel. If its parent channel or category is also excluded, messages there continue to be skipped.
 
 ## List exclusions
 
-```text
-/config logs exclusions
-```
-
-Sylvan lists the excluded channels, or confirms that there are none. Log
-destination channels and their threads are not logged back into themselves.
-
-See the [Moderation logging](../../features/logging/) guide for automatic behaviour and limitations.
+Run `/config logs exclusions` to see explicit exclusions. Log destinations and their threads are always excluded, even if the list is empty. To interpret a published entry or a gap in a transcript, see [Read an edit or deletion log](../../features/logging/).

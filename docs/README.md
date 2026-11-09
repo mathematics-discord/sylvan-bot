@@ -1,8 +1,9 @@
 # Public documentation
 
-This is an independent Astro + Starlight site. Only Markdown and MDX in
-`src/content/docs/` is published; the existing notes elsewhere in `docs/`
-remain outside the site. Navigation is selected in `astro.config.mjs`.
+This is an independent Astro + Starlight site. Public guides live in
+`src/content/docs/`. Operational notes elsewhere in `docs/` are for
+contributors. The sidebar in `astro.config.mjs` determines where a guide
+appears, independently of its URL.
 
 Use Node.js 22.23.4 or newer. From this directory:
 
@@ -33,6 +34,22 @@ appearance handling. Source Sans 3 variable fonts are self-hosted in
 `public/fonts/source-sans-3/` so they accompany the build. Astro bundles
 the fonts with base-aware URLs. The Sylvan wordmark keeps its Georgia font,
 and code keeps its monospace font.
+
+## Adding a guide
+
+Choose the reader and the task before choosing a title. A member reporting
+a problem, a moderator replying to it and an administrator choosing a mail
+forum each need a different page. Link between those pages at the hand-off.
+The ticket handbook is the model for staff procedures.
+
+Give the command or Discord menu action, the permission it requires, and
+what the reader should see after using it. Say where the reply appears
+when it could expose information in a channel. Keep the command index at
+`src/content/docs/commands/index.md` in step with command registrations.
+
+Keep existing URLs when reorganising the sidebar. When combining pages,
+add the retired path to `src/redirects.mjs` and preserve or map section
+IDs that people may already have bookmarked.
 
 ## Deployment
 
