@@ -6,6 +6,97 @@ using SylvanBot.Features.Tickets;
 
 public sealed class TicketApprovalTests
 {
+    [TestCase("✅", false, true)]
+    [TestCase("✅\uFE0F", false, true)]
+    [TestCase("👍", false, true)]
+    [TestCase("ratified", true, true)]
+    [TestCase("ratified", false, false)]
+    [TestCase("white_check_mark", true, false)]
+    [TestCase("thumbsup", true, false)]
+    [TestCase("❌", false, false)]
+    public void IsApprovalEmoji_OnlyRequestedEmoji_AcceptsReaction(string name, bool custom, bool expected)
+    {
+        // Arrange
+        // Act
+        var accepted = TicketReactionGatewayHandler.IsApprovalEmoji(name, custom);
+
+        // Assert
+        accepted.ShouldBe(expected);
+    }
+
+    [Test]
+    public void TryApproveReaction_DefinitiveMessage_RecordsFirstReviewerOnly()
+    {
+        // Arrange
+        var ticket = TicketTests.Create(TicketAction.Ban);
+        ticket.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 20, Current = true, Revision = ticket.Version });
+        var first = new TicketActor(1, 4, false, false, CanViewAuditLog: true);
+        var second = new TicketActor(1, 5, true, false);
+
+        // Act
+        var approved = ticket.TryApproveReaction(first, 10, 20);
+        var repeated = ticket.TryApproveReaction(second, 10, 20);
+
+        // Assert
+        approved.ShouldBeTrue();
+        repeated.ShouldBeFalse();
+        ticket.ApprovedByUserId.ShouldBe(4UL);
+        ticket.ModificationHistory.ShouldHaveSingleItem().Action.ShouldBe(TicketHistoryAction.Approved);
+    }
+
+    [TestCase(10UL, 20UL, false, false)]
+    [TestCase(10UL, 20UL, true, true)]
+    [TestCase(10UL, 21UL, true, false)]
+    [TestCase(11UL, 20UL, true, false)]
+    public void TryApproveReaction_OldOrDifferentMessage_DoesNothing(ulong channel, ulong message, bool current, bool removed)
+    {
+        // Arrange
+        var ticket = TicketTests.Create(TicketAction.Ban);
+        ticket.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 20, Current = current, Removed = removed });
+        var reviewer = new TicketActor(1, 4, true, false);
+
+        // Act
+        var approved = ticket.TryApproveReaction(reviewer, channel, message);
+
+        // Assert
+        approved.ShouldBeFalse();
+        ticket.ApprovedByUserId.ShouldBeNull();
+        ticket.ModificationHistory.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void TryApproveReaction_CommunityModerator_UsesExistingApprovalPermissions()
+    {
+        // Arrange
+        var ticket = TicketTests.Create(TicketAction.Ban);
+        ticket.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 20, Current = true });
+        var moderator = new TicketActor(1, 3, false, true, CanBanMembers: true);
+
+        // Act
+        void Act() => ticket.TryApproveReaction(moderator, 10, 20);
+
+        // Assert
+        Should.Throw<BotCommandException>(Act);
+        ticket.ApprovedByUserId.ShouldBeNull();
+    }
+
+    [Test]
+    public void TryApproveReaction_UnpublishedEdit_RejectsApprovalOfUnseenChanges()
+    {
+        // Arrange
+        var ticket = TicketTests.Create(TicketAction.Ban);
+        ticket.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 20, Current = true, Revision = ticket.Version });
+        ticket.SetComment("new reason", 3);
+        var reviewer = new TicketActor(1, 4, true, false);
+
+        // Act
+        void Act() => ticket.TryApproveReaction(reviewer, 10, 20);
+
+        // Assert
+        Should.Throw<BotCommandException>(Act);
+        ticket.ApprovedByUserId.ShouldBeNull();
+    }
+
     [Test]
     public void ReviewLineLinksOnlyTheNumberAndRetainsTheActionAndBothMentions()
     {
@@ -22,7 +113,7 @@ public sealed class TicketApprovalTests
     {
         var live = new Ticket { GuildId = 1, Action = TicketAction.Timeout, PinnedPublicationChannelId = 10 };
         var archive = new Ticket { GuildId = 1, Action = TicketAction.Ban, ImportedFromLegacy = true, PinnedPublicationChannelId = 20 };
-        var pending = new[]
+        IQueryable<Ticket> pending = new[]
         {
             archive, live,
             new Ticket { GuildId = 1, Action = TicketAction.Note },

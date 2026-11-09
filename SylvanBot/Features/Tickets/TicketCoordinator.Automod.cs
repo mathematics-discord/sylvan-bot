@@ -35,8 +35,6 @@ public sealed partial class TicketCoordinator
 
         foreach (var id in due)
         {
-            await WaitForGateAsync(token);
-
             try
             {
                 await using var work = await contexts.CreateDbContextAsync(token);
@@ -45,10 +43,6 @@ public sealed partial class TicketCoordinator
             catch (Exception e) when (e is not OperationCanceledException)
             {
                 logger.Warning("Automod ban {OperationId} awaits ticket reconciliation ({FailureType})", id, e.GetType().Name);
-            }
-            finally
-            {
-                _gate.Release();
             }
         }
     }
@@ -66,6 +60,13 @@ public sealed partial class TicketCoordinator
         if (now - from >= TimeSpan.FromDays(45))
         {
             op.Status = "Suspended";
+
+            var uncertainId = await db.Tickets
+                .Where(ticket => ticket.GuildId == op.GuildId && ticket.SourceAuditId == op.AuditId && ticket.Action == TicketAction.Ban)
+                .Select(ticket => (long?)ticket.Id)
+                .SingleOrDefaultAsync(token);
+
+            using var gate = uncertainId is { } ticketId ? await locks.TicketAsync(ticketId, token) : null;
 
             var uncertain = await db.Tickets.SingleOrDefaultAsync(
                 t => t.GuildId == op.GuildId && t.SourceAuditId == op.AuditId && t.Action == TicketAction.Ban,
@@ -110,11 +111,27 @@ public sealed partial class TicketCoordinator
             op.AuditId = matches[0].AuditId;
         }
 
+        IQueryable<long> priorId = db.Tickets
+            .Where(ticket => ticket.GuildId == op.GuildId && ticket.SubjectUserId == op.UserId
+                && ticket.Action == TicketAction.Ban && ticket.Status == TicketStatus.Active && ticket.SourceAuditId != null)
+            .OrderByDescending(ticket => ticket.SourceAuditId)
+            .Select(ticket => ticket.Id)
+            .Take(1);
+
+        List<long> existing = await db.Tickets
+            .Where(ticket => ticket.GuildId == op.GuildId && ticket.Action == TicketAction.Ban
+                && (ticket.SourceAuditId == op.AuditId || priorId.Contains(ticket.Id)))
+            .Select(ticket => ticket.Id)
+            .ToListAsync(token);
+
+        using var ticketGates = await locks.TicketsAsync(existing, token);
+
         var ticket = await db.Tickets.SingleOrDefaultAsync(
             t => t.GuildId == op.GuildId && t.Action == TicketAction.Ban && t.SourceAuditId == op.AuditId,
             token);
 
         var firstTransfer = op.Status != "TicketOwned";
+        var created = ticket is null;
 
         if (ticket is null)
         {
@@ -189,6 +206,13 @@ public sealed partial class TicketCoordinator
         await db.SaveChangesAsync(token);
 
         if (config?.Enabled != true && ticket.Status == TicketStatus.Active && !ticket.ExpirySuspended && ticket.ExpiresAtUtc <= now)
-            await bans.ReconcileAsync(db, ticket, true, token, from);
+        {
+            using var newTicketGate = created ? await locks.TicketAsync(ticket.Id, token) : null;
+            await using var recovery = await contexts.CreateDbContextAsync(token);
+            var current = await recovery.Tickets
+                .SingleAsync(value => value.Id == ticket.Id, token);
+
+            await bans.ReconcileAsync(recovery, current, true, token, from);
+        }
     }
 }

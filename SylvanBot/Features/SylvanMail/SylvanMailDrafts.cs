@@ -16,17 +16,20 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         {
             CancelToken = ct,
             RetryMode = RetryMode.RetryRatelimit,
+            // Prefer Discord's precise relative reset over the SDK's HTTP-Date lag estimate.
+            UseSystemClock = false,
             RatelimitCallback = info =>
             {
                 if (info.Remaining == 0 || info.IsGlobal)
                     logger.Debug(
-                        "SylvanMail reaction request exhausted rate bucket {Bucket}: limit {Limit}, remaining {Remaining}, reset after {ResetAfterMs} ms, retry after {RetryAfter}, global {Global}",
+                        "SylvanMail reaction request exhausted rate bucket {Bucket}: limit {Limit}, remaining {Remaining}, reset after {ResetAfterMs} ms, retry after {RetryAfter}, global {Global}, estimated lag {LagMs} ms",
                         info.Bucket,
                         info.Limit,
                         info.Remaining,
                         info.ResetAfter?.TotalMilliseconds,
                         info.RetryAfter,
-                        info.IsGlobal);
+                        info.IsGlobal,
+                        info.Lag?.TotalMilliseconds);
 
                 return Task.CompletedTask;
             },
@@ -142,10 +145,11 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
                 return;
 
             var oldSend = new Emoji("\U0001F4E4");
-            timing.Next("legacy_control");
+            timing.Next("reactions");
+            List<Task> changes = [];
 
             if (message.Reactions.TryGetValue(oldSend, out var oldReaction) && oldReaction.IsMe)
-                await message.RemoveReactionAsync(oldSend, client.CurrentUser.Id, ReactionOptions(ct));
+                changes.Add(ChangeReactionAsync(oldSend, add: false));
 
             foreach (var control in new[] { AnonymousEmoji, SignedEmoji, CancelEmoji })
             {
@@ -155,9 +159,18 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
                 if (ready == marked)
                     continue;
 
-                timing.Next($"{(ready ? "add" : "remove")}:{control}");
+                changes.Add(ChangeReactionAsync(emoji, ready));
+            }
 
-                if (ready)
+            await Task.WhenAll(changes);
+
+            async Task ChangeReactionAsync(Emoji emoji, bool add)
+            {
+                using var reactionTiming = new OperationTiming(logger
+                    .ForContext("SourceId", messageId)
+                    .ForContext("Control", emoji.Name), "sylvanmail.draft_reaction", add ? "add" : "remove");
+
+                if (add)
                     await message.AddReactionAsync(emote: emoji, ReactionOptions(ct));
                 else
                     await message.RemoveReactionAsync(emote: emoji, userId: client.CurrentUser.Id, ReactionOptions(ct));

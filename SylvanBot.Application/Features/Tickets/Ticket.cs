@@ -214,6 +214,21 @@ public sealed class Ticket
         Record(TicketHistoryAction.Approved, actor.UserId);
     }
 
+    public bool TryApproveReaction(TicketActor actor, ulong channelId, ulong messageId)
+    {
+        if (ApprovedByUserId is not null || ReviewExempt || Hidden)
+            return false;
+
+        var publication = Publications
+            .SingleOrDefault(reference => reference.Current && !reference.Removed);
+
+        if (publication is null || publication.ChannelId != channelId || publication.MessageId != messageId)
+            return false;
+
+        Approve(actor, publication.Revision);
+        return true;
+    }
+
     public void CompleteStaffReversal(ulong moderatorId, DateTimeOffset timestamp)
     {
         ArgumentOutOfRangeException.ThrowIfZero(moderatorId);

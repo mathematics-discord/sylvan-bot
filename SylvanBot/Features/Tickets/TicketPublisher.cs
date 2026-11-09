@@ -13,9 +13,10 @@ public sealed class TicketPublisher(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contexts,
     TicketBoundary boundary,
+    TicketLocks locks,
     ILogger logger)
 {
-    // The coordinator holds the single mutation/publication gate for every entry here.
+    // The coordinator holds this ticket's lock while synchronising its publications.
     internal async Task<string> EnsureAsync(ulong guildId, long id, CancellationToken token, bool orderedPublication = false)
     {
         using var timing = new OperationTiming(logger.ForContext("GuildId", guildId).ForContext("TicketId", id), "ticket.publish", "database");
@@ -222,13 +223,14 @@ public sealed class TicketPublisher(
 
     internal async Task RemindAsync(ulong userId, bool force, CancellationToken token, ulong? requestedGuild = null)
     {
+        using var moderatorGate = await locks.ModeratorAsync(userId, token);
         await using var db = await contexts.CreateDbContextAsync(token);
 
         IQueryable<ulong> enabled = db.TicketConfigurations
            .Where(config => config.Enabled && config.DestinationChannelId != null)
            .Select(config => config.GuildId);
 
-        var ticket = await db.Tickets
+        IQueryable<Ticket> outstanding = db.Tickets
            .Where(value => value.ModeratorUserId == userId
                       && !value.Hidden
                       && !value.ReminderExempt
@@ -236,13 +238,35 @@ public sealed class TicketPublisher(
                       && (value.InitialPromptPending
                           || string.IsNullOrWhiteSpace(value.Comment)
                           || (value.Action == TicketAction.Timeout && value.DurationSeconds == null))
-                      && enabled.Contains(value.GuildId))
+                      && enabled.Contains(value.GuildId));
+
+        var ticket = await outstanding
            .OrderByDescending(value => value.CreatedAtUtc)
            .ThenByDescending(value => value.Id)
            .FirstOrDefaultAsync(token);
 
         var moderator = await db.TicketModerators
            .SingleOrDefaultAsync(value => value.UserId == userId, token);
+
+        List<long> ticketIds = [];
+
+        if (ticket is not null)
+            ticketIds.Add(ticket.Id);
+
+        if (moderator?.ActiveTicketId is { } activeId)
+            ticketIds.Add(activeId);
+
+        using var ticketGates = await locks.TicketsAsync(ticketIds, token);
+        var selectedId = ticket?.Id;
+        db.ChangeTracker.Clear();
+
+        // The queue may have changed while we waited for an edit. Never refresh a prompt
+        // or save its delivery state using a ticket snapshot read before its lock.
+        ticket = await outstanding
+            .SingleOrDefaultAsync(value => value.Id == selectedId, token);
+
+        moderator = await db.TicketModerators
+            .SingleOrDefaultAsync(value => value.UserId == userId, token);
 
         if (requestedGuild is { } guildId && ticket is not null && ticket.GuildId != guildId)
             throw new BotCommandException("Your newest outstanding ticket is in another server. Request redelivery there.");

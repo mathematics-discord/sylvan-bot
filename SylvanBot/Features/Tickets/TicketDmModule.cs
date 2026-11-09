@@ -4,7 +4,7 @@ using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 
 [RequireContext(ContextType.DM)]
-public sealed class TicketDmModule(TicketCoordinator coordinator, TicketBoundary boundary, TicketWorker worker,
+public sealed class TicketDmModule(TicketCoordinator coordinator, TicketBoundary boundary, TicketWorker worker, TicketLocks locks,
     IHostApplicationLifetime lifetime) : InteractionModuleBase<IInteractionContext>
 {
     internal static MessageComponent Buttons(Ticket ticket) => new ComponentBuilder()
@@ -70,14 +70,19 @@ public sealed class TicketDmModule(TicketCoordinator coordinator, TicketBoundary
 
         var details = TicketDetails.ParseFields(string.IsNullOrWhiteSpace(modal.Duration) ? null : modal.Duration, modal.Comment);
         var result = await coordinator.EditAsync(actor, number, version, details, null, cancellationToken);
-        ticket = await coordinator.ShowAsync(actor, number, false, cancellationToken) ?? throw new BotCommandException("The ticket is no longer visible.");
-        await interaction.Message.ModifyAsync(properties =>
+
+        using (await locks.TicketAsync(ticket.Id, cancellationToken))
         {
-            properties.Content = "Ticket details saved.";
-            properties.Embed = TicketPresentation.Describe(ticket);
-            properties.Components = Buttons(ticket);
-            properties.AllowedMentions = AllowedMentions.None;
-        });
+            ticket = await coordinator.ShowAsync(actor, number, false, cancellationToken) ?? throw new BotCommandException("The ticket is no longer visible.");
+            await interaction.Message.ModifyAsync(properties =>
+            {
+                properties.Content = "Ticket details saved.";
+                properties.Embed = TicketPresentation.Describe(ticket);
+                properties.Components = Buttons(ticket);
+                properties.AllowedMentions = AllowedMentions.None;
+            });
+        }
+
         await ModifyOriginalResponseAsync(properties => properties.Content = result.Outcome);
         worker.Wake();
     }

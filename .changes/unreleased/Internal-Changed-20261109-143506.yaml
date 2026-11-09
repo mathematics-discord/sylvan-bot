@@ -1,0 +1,4 @@
+component: Internal
+kind: Changed
+body: Submit independent SylvanMail draft-reaction changes concurrently and use Discord's precise relative rate-limit reset instead of the SDK's timestamp-based estimate. Keep per-reaction timings and log the SDK's estimated lag.
+time: 2026-11-09T14:35:06.8494915Z
