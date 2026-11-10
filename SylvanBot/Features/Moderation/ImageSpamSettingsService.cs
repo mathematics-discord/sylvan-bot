@@ -5,6 +5,8 @@ using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Features.Moderation;
 
+using DotNext;
+
 public sealed class ImageSpamSettingsService(IDbContextFactory<BotDbContext> contexts) : IDisposable
 {
     private readonly SemaphoreSlim _gate = new SemaphoreSlim(initialCount: 1, maxCount: 1);
@@ -14,10 +16,10 @@ public sealed class ImageSpamSettingsService(IDbContextFactory<BotDbContext> con
 
     public void Dispose() => _gate.Dispose();
 
-    public DotNext.Optional<ImageBurstSpamDetectorOptions> Current(ulong guildId) =>
-        _settings.TryGetValue(key: guildId, out var settings) ? new DotNext.Optional<ImageBurstSpamDetectorOptions>(settings) : default;
+    public Optional<ImageBurstSpamDetectorOptions> Current(ulong guildId) =>
+        _settings.TryGetValue(key: guildId, out var settings) ? new Optional<ImageBurstSpamDetectorOptions>(settings) : default;
 
-    public async Task<DotNext.Optional<ImageBurstSpamDetectorOptions>> GetCurrentAsync(ulong guildId, CancellationToken ct)
+    public async Task<Optional<ImageBurstSpamDetectorOptions>> GetCurrentAsync(ulong guildId, CancellationToken ct)
     {
         await _gate.WaitAsync(ct);
 
@@ -39,7 +41,7 @@ public sealed class ImageSpamSettingsService(IDbContextFactory<BotDbContext> con
             var options = ToOptions(settings);
             _settings[guildId] = options;
 
-            return new DotNext.Optional<ImageBurstSpamDetectorOptions>(options);
+            return new Optional<ImageBurstSpamDetectorOptions>(options);
         }
         finally
         {

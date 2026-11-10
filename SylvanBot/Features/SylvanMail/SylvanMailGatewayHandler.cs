@@ -7,6 +7,8 @@ using static SylvanBot.Features.SylvanMail.SylvanMailDrafts;
 
 namespace SylvanBot.Features.SylvanMail;
 
+using DotNext;
+
 public sealed class SylvanMailGatewayHandler(
     DiscordSocketClient client,
     SylvanMailClient mail,
@@ -71,8 +73,8 @@ public sealed class SylvanMailGatewayHandler(
                     using var routingTimeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
                     routingTimeout.CancelAfter(TimeSpan.FromSeconds(10));
 
-                    DotNext.Optional<ulong> recipient = message is InboundMail inbound
-                        ? new DotNext.Optional<ulong>(inbound.AuthorId)
+                    Optional<ulong> recipient = message is InboundMail inbound
+                        ? new Optional<ulong>(inbound.AuthorId)
                         : await drafts.ConversationUserAsync(message.ChannelId, routingTimeout.Token);
 
                     if (recipient is not { HasValue: true, Value: var userId })

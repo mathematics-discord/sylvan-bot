@@ -8,6 +8,8 @@ using static SylvanBot.Features.RoleReactions.RoleReactionPolicy;
 
 namespace SylvanBot.Features.RoleReactions;
 
+using DotNext;
+
 public sealed class RoleReactionConfiguration(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contextFactory,
@@ -23,12 +25,12 @@ public sealed class RoleReactionConfiguration(
         string emoji,
         CancellationToken ct)
     {
-        DotNext.Optional<MessageLink> parsedLink = ParseMessageLink(text: messageLink, guildId: guild.Id);
+        Optional<MessageLink> parsedLink = ParseMessageLink(text: messageLink, guildId: guild.Id);
 
         if (parsedLink is not { HasValue: true, Value: var link })
             return "Provide a Discord message link from this server, not a message ID.";
 
-        DotNext.Optional<IEmote> parsedEmoji = ParseEmoji(emoji);
+        Optional<IEmote> parsedEmoji = ParseEmoji(emoji);
 
         if (parsedEmoji is not { HasValue: true, Value: var emote })
             return "Provide one Unicode emoji or a custom emoji mention.";
@@ -43,7 +45,7 @@ public sealed class RoleReactionConfiguration(
             if (role is null)
                 return "The target must be an existing, ordinary role other than @everyone.";
 
-            DotNext.Optional<string> roleError = ValidateRole(guild: guild, role: role);
+            Optional<string> roleError = ValidateRole(guild: guild, role: role);
 
             if (roleError is { HasValue: true, Value: var reason })
                 return reason;
@@ -57,7 +59,7 @@ public sealed class RoleReactionConfiguration(
             if (channel is not IGuildChannel guildChannel)
                 return "The linked channel is unavailable or does not belong to this server.";
 
-            DotNext.Optional<string> channelError = ValidateChannelAccess(guild: guild, moderator: moderator, channel: guildChannel);
+            Optional<string> channelError = ValidateChannelAccess(guild: guild, moderator: moderator, channel: guildChannel);
 
             if (channelError is { HasValue: true, Value: var channelReason })
                 return channelReason;
@@ -87,12 +89,12 @@ public sealed class RoleReactionConfiguration(
 
     public async Task<string> RemoveAsync(SocketGuild guild, string messageLink, string emoji, CancellationToken ct)
     {
-        DotNext.Optional<MessageLink> parsedLink = ParseMessageLink(text: messageLink, guildId: guild.Id);
+        Optional<MessageLink> parsedLink = ParseMessageLink(text: messageLink, guildId: guild.Id);
 
         if (parsedLink is not { HasValue: true, Value: var link })
             return "Provide a Discord message link from this server, not a message ID.";
 
-        DotNext.Optional<IEmote> parsedEmoji = ParseEmoji(emoji);
+        Optional<IEmote> parsedEmoji = ParseEmoji(emoji);
 
         if (parsedEmoji is not { HasValue: true, Value: var emote })
             return "Provide one Unicode emoji or a custom emoji mention.";

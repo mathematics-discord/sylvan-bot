@@ -4,17 +4,19 @@ using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Features.Automod;
 
+using DotNext;
+
 public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, AutomodRuntime runtime)
 {
     public async Task<(ImmutableArray<AutomodRule> Rules, bool RuntimeRefreshed)> AddAsync(
         ulong guildId,
         string input,
         AutomodAction action,
-        DotNext.Optional<string> duration,
+        Optional<string> duration,
         CancellationToken ct)
     {
         ImmutableArray<AutomodPattern> patterns = AutomodInputParser.Parse(input);
-        DotNext.Optional<long> seconds = AutomodDuration.ResolveSeconds(action, duration);
+        Optional<long> seconds = AutomodDuration.ResolveSeconds(action, duration);
 
         ImmutableArray<AutomodRule> rules = patterns
             .Select(pattern => new AutomodRule
@@ -81,7 +83,7 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
         return actions.ToImmutableArray();
     }
 
-    public async Task<bool> SetEnabledAsync(ulong guildId, DotNext.Optional<AutomodAction> action, bool enabled, CancellationToken ct)
+    public async Task<bool> SetEnabledAsync(ulong guildId, Optional<AutomodAction> action, bool enabled, CancellationToken ct)
     {
         if (action.HasValue && !Enum.IsDefined(action.Value))
             throw new ArgumentOutOfRangeException(nameof(action));

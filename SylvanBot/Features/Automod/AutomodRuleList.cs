@@ -4,6 +4,8 @@ using SylvanBot.Application.Features.Automod;
 
 namespace SylvanBot.Features.Automod;
 
+using DotNext;
+
 internal static class AutomodRuleList
 {
     public const string Heading = "### Automod rules\n";
@@ -93,7 +95,7 @@ internal static class AutomodRuleList
         if (rule.Action is AutomodAction.Delete or AutomodAction.Note)
             return rule.Action.ToString();
 
-        DotNext.Optional<long> duration = rule.DurationSeconds is { } seconds ? new DotNext.Optional<long>(seconds) : default;
+        Optional<long> duration = rule.DurationSeconds is { } seconds ? new Optional<long>(seconds) : default;
 
         if (!duration.HasValue)
             return rule.Action == AutomodAction.Ban ? "Ban, permanent" : "Mute, unspecified duration";

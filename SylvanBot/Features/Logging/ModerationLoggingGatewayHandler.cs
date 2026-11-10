@@ -5,6 +5,8 @@ using SylvanBot.Gateway;
 
 namespace SylvanBot.Features.Logging;
 
+using DotNext;
+
 public sealed class ModerationLoggingGatewayHandler(
     DiscordSocketClient discordClient,
     LoggingScopeResolver scope,
@@ -150,7 +152,7 @@ public sealed class ModerationLoggingGatewayHandler(
             return Task.CompletedTask;
 
         // Never infer absence from Discord.NET's detached defaults (notably the empty attachment array).
-        DotNext.Optional<MessageEdited> observation = updatePayload.Current;
+        Optional<MessageEdited> observation = updatePayload.Current;
 
         if (observation is not { HasValue: true, Value: var payload })
             return Task.CompletedTask;
@@ -169,8 +171,8 @@ public sealed class ModerationLoggingGatewayHandler(
         {
             GuildId = guildChannel.GuildId,
             ChannelId = channel.Id,
-            AuthorId = after.Author.Id == 0 ? default : new DotNext.Optional<ulong>(after.Author.Id),
-            Eligible = after.Author.Id == 0 ? default : new DotNext.Optional<bool>(IsQualifyingUserMessage(after)),
+            AuthorId = after.Author.Id == 0 ? default : new Optional<ulong>(after.Author.Id),
+            Eligible = after.Author.Id == 0 ? default : new Optional<bool>(IsQualifyingUserMessage(after)),
         };
 
         return QueueAsync(new EditedWork(edited));
@@ -248,7 +250,7 @@ public sealed class ModerationLoggingGatewayHandler(
 
     private async Task ProcessEditAsync(MessageEdited edited, IMessageChannel sourceChannel, CancellationToken ct)
     {
-        DotNext.Optional<MessageEdit> result = await cache.EditAsync(message: edited, ct: ct);
+        Optional<MessageEdit> result = await cache.EditAsync(message: edited, ct: ct);
 
         if (result is not { HasValue: true, Value: var change })
             return;

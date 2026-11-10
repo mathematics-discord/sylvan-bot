@@ -6,6 +6,8 @@ using static SylvanBot.Application.Features.Automod.AutomodAction;
 
 namespace SylvanBot.Features.Automod;
 
+using DotNext;
+
 public sealed class AutomodGatewayHandler(
     DiscordSocketClient client,
     AutomodRuntime runtime,
@@ -65,7 +67,7 @@ public sealed class AutomodGatewayHandler(
         return ProcessAsync(after, content);
     }
 
-    private async Task<DotNext.Optional<bool>> IsExemptAsync(
+    private async Task<Optional<bool>> IsExemptAsync(
         ulong guildId,
         SocketMessage message,
         AutomodConfiguration configuration,
@@ -79,10 +81,10 @@ public sealed class AutomodGatewayHandler(
         }
 
         if (configuration.ExemptRoleIds.Contains(guildId))
-            return new DotNext.Optional<bool>(true);
+            return new Optional<bool>(true);
 
         if (configuration.ExemptRoleIds.IsEmpty)
-            return new DotNext.Optional<bool>(false);
+            return new Optional<bool>(false);
 
         try
         {
@@ -90,7 +92,7 @@ public sealed class AutomodGatewayHandler(
                          ?? (IGuildUser?)await client.Rest.GetGuildUserAsync(guildId, message.Author.Id, new RequestOptions { CancelToken = ct });
 
             if (member?.RoleIds != null)
-                return new DotNext.Optional<bool>(configuration.ExemptRoleIds.Overlaps(member.RoleIds));
+                return new Optional<bool>(configuration.ExemptRoleIds.Overlaps(member.RoleIds));
 
             _logger.Warning(
                 "Automod exemption resolution failed for guild {GuildId}, message {MessageId}, user {UserId}: member roles unavailable",
@@ -147,7 +149,7 @@ public sealed class AutomodGatewayHandler(
                 return;
             }
 
-            DotNext.Optional<bool> exemption = await IsExemptAsync(guildId, message, configuration, ct);
+            Optional<bool> exemption = await IsExemptAsync(guildId, message, configuration, ct);
 
             if (!exemption.HasValue || exemption.Value)
                 return;
@@ -249,7 +251,7 @@ public sealed class AutomodGatewayHandler(
 
         try
         {
-            DotNext.Optional<long> duration = rule.DurationSeconds is { } seconds ? new DotNext.Optional<long>(seconds) : default;
+            Optional<long> duration = rule.DurationSeconds is { } seconds ? new Optional<long>(seconds) : default;
             var requestedExpiry = AutomodDuration.MuteExpiry(duration, DateTimeOffset.UtcNow);
             var request = new RequestOptions { CancelToken = ct, RetryMode = RetryMode.AlwaysFail, AuditLogReason = reason };
             var member = await client.Rest.GetGuildUserAsync(guildId, message.Author.Id, request);
@@ -265,8 +267,8 @@ public sealed class AutomodGatewayHandler(
                 return;
             }
 
-            DotNext.Optional<DateTimeOffset> existingExpiry = member.TimedOutUntil is { } until
-                ? new DotNext.Optional<DateTimeOffset>(until)
+            Optional<DateTimeOffset> existingExpiry = member.TimedOutUntil is { } until
+                ? new Optional<DateTimeOffset>(until)
                 : default;
 
             if (AutomodDuration.CoversExpiry(existingExpiry, requestedExpiry))

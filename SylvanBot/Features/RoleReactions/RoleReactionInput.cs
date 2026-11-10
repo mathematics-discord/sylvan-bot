@@ -2,6 +2,8 @@
 
 namespace SylvanBot.Features.RoleReactions;
 
+using DotNext;
+
 internal static class RoleReactionInput
 {
     public static string GetEmojiKey(IEmote emote)
@@ -15,7 +17,7 @@ internal static class RoleReactionInput
         return "unicode:" + unicode;
     }
 
-    public static DotNext.Optional<IEmote> ParseEmoji(string text)
+    public static Optional<IEmote> ParseEmoji(string text)
     {
         var input = text.Trim();
 
@@ -26,16 +28,16 @@ internal static class RoleReactionInput
         {
             var validCustomEmoji = custom.Id != 0 && string.Equals(a: input, custom.ToString(), comparisonType: StringComparison.Ordinal);
 
-            return validCustomEmoji ? new DotNext.Optional<IEmote>(custom) : default;
+            return validCustomEmoji ? new Optional<IEmote>(custom) : default;
         }
 
         if (StringInfo.ParseCombiningCharacters(input).Length != 1)
             return default;
 
-        return Emoji.TryParse(text: input, out var unicode) ? new DotNext.Optional<IEmote>(unicode) : default;
+        return Emoji.TryParse(text: input, out var unicode) ? new Optional<IEmote>(unicode) : default;
     }
 
-    public static DotNext.Optional<MessageLink> ParseMessageLink(string text, ulong guildId)
+    public static Optional<MessageLink> ParseMessageLink(string text, ulong guildId)
     {
         if (!Uri.TryCreate(text.Trim(), uriKind: UriKind.Absolute, out var uri))
             return default;
@@ -68,7 +70,7 @@ internal static class RoleReactionInput
         if (linkedGuildId != guildId || channelId == 0 || messageId == 0)
             return default;
 
-        return new DotNext.Optional<MessageLink>(new MessageLink(ChannelId: channelId, MessageId: messageId));
+        return new Optional<MessageLink>(new MessageLink(ChannelId: channelId, MessageId: messageId));
     }
 
     public sealed record MessageLink(ulong ChannelId, ulong MessageId);

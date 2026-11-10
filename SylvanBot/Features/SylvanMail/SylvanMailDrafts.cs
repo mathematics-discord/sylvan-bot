@@ -3,6 +3,8 @@ using static SylvanBot.Features.SylvanMail.SylvanMailRequests;
 
 namespace SylvanBot.Features.SylvanMail;
 
+using DotNext;
+
 public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger) : ISylvanMailDrafts
 {
     public const string AnonymousEmoji = "\U0001F574";
@@ -62,7 +64,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
             UnsupportedContent: unsupported);
     }
 
-    public async Task<DotNext.Optional<SylvanMailMessage>> ReadDraftAsync(
+    public async Task<Optional<SylvanMailMessage>> ReadDraftAsync(
         ulong threadId,
         ulong messageId,
         ulong authorId,
@@ -119,12 +121,12 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         {
             await SetDraftReadyAsync(threadId: threadId, messageId: messageId, ready: false, ct: ct);
 
-            return new DotNext.Optional<SylvanMailMessage>(ReadMessage(source: source, guildId: thread.GuildId));
+            return new Optional<SylvanMailMessage>(ReadMessage(source: source, guildId: thread.GuildId));
         }
 
         var prefix = action != SylvanMailDraftAction.SendSigned ? "From staff: " : $"From {Format.Sanitize(source.Author.Username)}: ";
 
-        return new DotNext.Optional<SylvanMailMessage>(
+        return new Optional<SylvanMailMessage>(
             ReadMessage(source: source, guildId: thread.GuildId) with
             {
                 Content = reply.Content,

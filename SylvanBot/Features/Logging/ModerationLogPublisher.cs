@@ -2,6 +2,7 @@
 
 namespace SylvanBot.Features.Logging;
 
+using DotNext;
 using DownloadedAttachment = ModerationLogComponents.DownloadedAttachment;
 
 public sealed class ModerationLogPublisher(
@@ -258,7 +259,7 @@ public sealed class ModerationLogPublisher(
 
             try
             {
-                DotNext.Optional<byte[]> downloadResult = await AttachmentEvidenceDownloader.TryDownloadAsync(
+                Optional<byte[]> downloadResult = await AttachmentEvidenceDownloader.TryDownloadAsync(
                     httpClient: httpClient,
                     url: url,
                     maxBytes: maxBytes,

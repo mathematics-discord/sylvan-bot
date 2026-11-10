@@ -1,0 +1,4 @@
+component: Internal
+kind: Changed
+body: Use namespace-scoped DotNext imports to write Optional<T> without qualification in Discord-facing code, retaining the existing optional type and behaviour.
+time: 2026-11-10T17:02:00Z

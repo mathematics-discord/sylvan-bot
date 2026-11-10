@@ -5,6 +5,8 @@ using SylvanBot.Interactions;
 
 namespace SylvanBot.Features.Automod;
 
+using DotNext;
+
 [Group("automod", "Manage and view this guild's automod rules")]
 [CommandContextType(InteractionContextType.Guild)]
 [RequireContext(ContextType.Guild)]
@@ -31,7 +33,7 @@ public sealed class AutomodModule(AutomodManagement management, IHostApplication
                 Context.Guild.Id,
                 input,
                 action,
-                duration is null ? default : new DotNext.Optional<string>(duration),
+                duration is null ? default : new Optional<string>(duration),
                 lifetime.ApplicationStopping);
 
             IEnumerable<long> ids = result.Rules

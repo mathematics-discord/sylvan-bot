@@ -1,5 +1,6 @@
 namespace SylvanBot.Features.Tickets;
 
+using DotNext;
 using System.Globalization;
 using SylvanBot.Application.Common;
 using System.Net;
@@ -40,7 +41,7 @@ public sealed class TicketBoundary(
         CancellationToken cancellationToken)
     {
         List<TicketObservation> observations = [];
-        DotNext.Optional<ulong> lastAuditId = DotNext.Optional<ulong>.None;
+        Optional<ulong> lastAuditId = Optional<ulong>.None;
         var cursor = string.Empty;
 
         while (true)

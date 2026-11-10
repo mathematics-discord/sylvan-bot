@@ -4,6 +4,8 @@ using SylvanBot.Interactions;
 
 namespace SylvanBot.Features.Configuration;
 
+using DotNext;
+
 public sealed partial class ConfigModule
 {
     [Group("automod", "Configure automod actions and role exemptions")]
@@ -21,8 +23,8 @@ public sealed partial class ConfigModule
         {
             RequireAdministrator();
             await DeferAsync(ephemeral: false);
-            DotNext.Optional<AutomodAction> selectedAction = action is { } selected
-                ? new DotNext.Optional<AutomodAction>(selected)
+            Optional<AutomodAction> selectedAction = action is { } selected
+                ? new Optional<AutomodAction>(selected)
                 : default;
 
             if (!selectedAction.HasValue)

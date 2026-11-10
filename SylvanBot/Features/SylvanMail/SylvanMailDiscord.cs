@@ -10,6 +10,8 @@ using static SylvanBot.Features.SylvanMail.SylvanMailRequests;
 
 namespace SylvanBot.Features.SylvanMail;
 
+using DotNext;
+
 public sealed class SylvanMailDiscord(
     DiscordSocketClient client,
     SylvanMailClient mail,
@@ -178,7 +180,7 @@ public sealed class SylvanMailDiscord(
                 continue;
             }
 
-            DotNext.Optional<TicketMessage> publication = await FindTicketMessageAsync(guild, ticket, ct);
+            Optional<TicketMessage> publication = await FindTicketMessageAsync(guild, ticket, ct);
 
             text.Append(
                 CultureInfo.InvariantCulture,
@@ -203,7 +205,7 @@ public sealed class SylvanMailDiscord(
         await AcceptedAsync(() => channel.SendMessageAsync(embed: embed, options: Options(ct), allowedMentions: AllowedMentions.None));
     }
 
-    private static async Task<DotNext.Optional<TicketMessage>> FindTicketMessageAsync(IGuild guild, Ticket ticket, CancellationToken ct)
+    private static async Task<Optional<TicketMessage>> FindTicketMessageAsync(IGuild guild, Ticket ticket, CancellationToken ct)
     {
         IOrderedEnumerable<TicketPublication> publications = ticket.Publications
            .Where(publication => !publication.Removed)
@@ -216,7 +218,7 @@ public sealed class SylvanMailDiscord(
                 var channel = await guild.GetTextChannelAsync(publication.ChannelId, options: Options(ct));
 
                 if (channel is not null && await channel.GetMessageAsync(publication.MessageId, options: Options(ct)) is not null)
-                    return new DotNext.Optional<TicketMessage>(publication.Message());
+                    return new Optional<TicketMessage>(publication.Message());
             }
             catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Forbidden)
             {
@@ -224,7 +226,7 @@ public sealed class SylvanMailDiscord(
             }
         }
 
-        return DotNext.Optional<TicketMessage>.None;
+        return Optional<TicketMessage>.None;
     }
 
     public async Task<ulong> SendAttachmentAsync(
@@ -295,10 +297,10 @@ public sealed class SylvanMailDiscord(
         }
     }
 
-    public async Task<DotNext.Optional<ulong>> ReportAsync(
+    public async Task<Optional<ulong>> ReportAsync(
         SylvanMailMessage source,
-        DotNext.Optional<ulong> threadId,
-        DotNext.Optional<ulong> receiptId,
+        Optional<ulong> threadId,
+        Optional<ulong> receiptId,
         string detail,
         CancellationToken ct)
     {
@@ -360,7 +362,7 @@ public sealed class SylvanMailDiscord(
                                                        allowedMentions: AllowedMentions.None,
                                                        messageReference: reference));
 
-                receiptId = new DotNext.Optional<ulong>(sent.Id);
+                receiptId = new Optional<ulong>(sent.Id);
             }
         }
         catch (Exception exception)
@@ -371,7 +373,7 @@ public sealed class SylvanMailDiscord(
         return receiptId;
     }
 
-    public async Task<DotNext.Optional<ulong>> AcknowledgeAsync(SylvanMailMessage source, bool first, CancellationToken ct)
+    public async Task<Optional<ulong>> AcknowledgeAsync(SylvanMailMessage source, bool first, CancellationToken ct)
     {
         try
         {
@@ -393,7 +395,7 @@ public sealed class SylvanMailDiscord(
                                                    allowedMentions: AllowedMentions.None,
                                                    messageReference: reference));
 
-            return new DotNext.Optional<ulong>(sent.Id);
+            return new Optional<ulong>(sent.Id);
         }
         catch (Exception exception)
         {

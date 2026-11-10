@@ -2,6 +2,7 @@
 
 namespace SylvanBot.Features.Tickets;
 
+using DotNext;
 using Discord.Net;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Common;
@@ -19,7 +20,7 @@ public sealed class TicketTimeoutEnforcement(DiscordSocketClient client, TicketB
     private async Task<TicketResult> HandleAsync(
         BotDbContext db,
         Ticket ticket,
-        DotNext.Optional<EditDetails> edit,
+        Optional<EditDetails> edit,
         bool auditCurrent,
         CancellationToken cancellationToken)
     {

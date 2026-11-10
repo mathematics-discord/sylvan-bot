@@ -5,6 +5,8 @@ using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Infrastructure.Data;
 
+using DotNext;
+
 /// <summary>
 ///     Creates <see cref="BotDbContext"/> instances for design-time tooling such as EF Core migrations.
 /// </summary>
@@ -39,7 +41,7 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
         return new BotDbContext(options);
     }
 
-    private static DotNext.Optional<string> BuildFromDiscrete(IConfiguration c)
+    private static Optional<string> BuildFromDiscrete(IConfiguration c)
     {
         var host = c["DB:Host"] ?? c["Database:Host"] ?? Environment.GetEnvironmentVariable("DB__HOST");
         var port = c["DB:Port"] ?? c["Database:Port"] ?? Environment.GetEnvironmentVariable("DB__PORT");
@@ -52,6 +54,6 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
 
         var resolvedPort = string.IsNullOrWhiteSpace(port) ? "5432" : port;
 
-        return new DotNext.Optional<string>($"Host={host};Port={resolvedPort};Database={db};Username={user};Password={pwd};SSL Mode=Prefer");
+        return new Optional<string>($"Host={host};Port={resolvedPort};Database={db};Username={user};Password={pwd};SSL Mode=Prefer");
     }
 }

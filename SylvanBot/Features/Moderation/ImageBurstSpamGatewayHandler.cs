@@ -2,6 +2,8 @@
 
 namespace SylvanBot.Features.Moderation;
 
+using DotNext;
+
 public sealed class ImageBurstSpamGatewayHandler(
     DiscordSocketClient discordClient,
     ImageBurstSpamDetector detector,
@@ -62,12 +64,12 @@ public sealed class ImageBurstSpamGatewayHandler(
     {
         try
         {
-            DotNext.Optional<ImageBurstMessage> qualifyingResult = TryCreateQualifyingMessage(message);
+            Optional<ImageBurstMessage> qualifyingResult = TryCreateQualifyingMessage(message);
 
             if (qualifyingResult is not { HasValue: true, Value: var qualifyingMessage })
                 return;
 
-            DotNext.Optional<ImageBurstDetection> detectionResult = detector.Observe(
+            Optional<ImageBurstDetection> detectionResult = detector.Observe(
                 message: qualifyingMessage,
                 settings.Current(qualifyingMessage.GuildId));
 
@@ -95,7 +97,7 @@ public sealed class ImageBurstSpamGatewayHandler(
         discordClient.MessageReceived += HandleMessageReceivedAsync;
     }
 
-    private DotNext.Optional<ImageBurstMessage> TryCreateQualifyingMessage(SocketMessage message)
+    private Optional<ImageBurstMessage> TryCreateQualifyingMessage(SocketMessage message)
     {
         if (message is not SocketUserMessage userMessage)
             return default;
@@ -125,7 +127,7 @@ public sealed class ImageBurstSpamGatewayHandler(
            .Select(x => new ImageBurstAttachment(x.Url))
            .ToArray();
 
-        return new DotNext.Optional<ImageBurstMessage>(
+        return new Optional<ImageBurstMessage>(
             new ImageBurstMessage(
                 GuildId: channel.Guild.Id,
                 UserId: guildUser.Id,

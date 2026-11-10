@@ -1,5 +1,7 @@
 ﻿namespace SylvanBot.Features.WorkingHours;
 
+using DotNext;
+
 internal static class WorkingHoursPresentation
 {
     public static string FormatRoles(IEnumerable<string> roles)
@@ -9,7 +11,7 @@ internal static class WorkingHoursPresentation
         return text.Length == 0 ? "none" : text;
     }
 
-    public static string CompletionMessage(string action, DotNext.Optional<int> pending) =>
+    public static string CompletionMessage(string action, Optional<int> pending) =>
         pending switch
         {
             { IsUndefined: true } => $"{action} pending: configuration or member data is unavailable. Reconciliation will retry.",

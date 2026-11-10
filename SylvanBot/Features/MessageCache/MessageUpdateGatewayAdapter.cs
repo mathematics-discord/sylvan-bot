@@ -5,13 +5,15 @@ using SylvanBot.Application.Features.MessageCache;
 
 namespace SylvanBot.Features.MessageCache;
 
+using DotNext;
+
 /// <summary>Preserves update field presence while Discord.NET dispatches its detached message.</summary>
 public sealed class MessageUpdateGatewayAdapter(ILogger logger)
 {
     private readonly AsyncLocal<MessageEdited?> _current = new AsyncLocal<MessageEdited?>();
     private readonly ILogger _logger = logger.ForContext<MessageUpdateGatewayAdapter>();
 
-    public DotNext.Optional<MessageEdited> Current => _current.Value is { } update ? new DotNext.Optional<MessageEdited>(update) : default;
+    public Optional<MessageEdited> Current => _current.Value is { } update ? new Optional<MessageEdited>(update) : default;
 
     public IWebSocketClient CreateWebSocket() => new UpdateWebSocket(this, DefaultWebSocketProvider.Create()());
 
@@ -65,18 +67,18 @@ public sealed class MessageUpdateGatewayAdapter(ILogger logger)
             var messageId = ReadId(data.GetProperty("id"));
             var channelId = ReadId(data.GetProperty("channel_id"));
             var guildId = data.TryGetProperty("guild_id", out var guild) ? ReadId(guild) : 0;
-            DotNext.Optional<DateTimeOffset?> editedAtUtc = default;
-            DotNext.Optional<string> content = default;
-            DotNext.Optional<ImmutableArray<MessageAttachment>> attachments = default;
+            Optional<DateTimeOffset?> editedAtUtc = default;
+            Optional<string> content = default;
+            Optional<ImmutableArray<MessageAttachment>> attachments = default;
 
             if (data.TryGetProperty("edited_timestamp", out var editedAt))
             {
                 DateTimeOffset? timestamp = editedAt.ValueKind == JsonValueKind.Null ? null : editedAt.GetDateTimeOffset().ToUniversalTime();
-                editedAtUtc = new DotNext.Optional<DateTimeOffset?>(timestamp);
+                editedAtUtc = new Optional<DateTimeOffset?>(timestamp);
             }
 
             if (data.TryGetProperty("content", out var body))
-                content = new DotNext.Optional<string>(body.GetString() ?? throw new JsonException("Content must be a string."));
+                content = new Optional<string>(body.GetString() ?? throw new JsonException("Content must be a string."));
 
             if (data.TryGetProperty("attachments", out var attachmentData))
             {
@@ -93,7 +95,7 @@ public sealed class MessageUpdateGatewayAdapter(ILogger logger)
                 if (suppliedAttachments.Any(attachment => string.IsNullOrWhiteSpace(attachment.Url) || attachment.Size < 0))
                     throw new JsonException("Invalid attachment metadata.");
 
-                attachments = new DotNext.Optional<ImmutableArray<MessageAttachment>>(suppliedAttachments);
+                attachments = new Optional<ImmutableArray<MessageAttachment>>(suppliedAttachments);
             }
 
             return new MessageEdited

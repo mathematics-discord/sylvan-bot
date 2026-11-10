@@ -2,4 +2,4 @@
 
 namespace SylvanBot.Application.Features.Tickets;
 
-public sealed record TicketAuditScan(DotNext.Optional<ulong> LastAuditId, ImmutableArray<TicketObservation> Observations);
+public sealed record TicketAuditScan(Optional<ulong> LastAuditId, ImmutableArray<TicketObservation> Observations);

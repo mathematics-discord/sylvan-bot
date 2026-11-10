@@ -6,6 +6,8 @@ using static SylvanBot.Features.SylvanMail.SylvanMailRequests;
 
 namespace SylvanBot.Features.SylvanMail;
 
+using DotNext;
+
 public sealed class SylvanMailForum(DiscordSocketClient client) : ISylvanMailForum
 {
     public async Task ValidateForumAsync(ulong guildId, ulong forumId, ulong roleId, CancellationToken ct, bool validatePing = true)
@@ -62,14 +64,14 @@ public sealed class SylvanMailForum(DiscordSocketClient client) : ISylvanMailFor
             throw new BotCommandException("The forum requires a tag but has no available tags. No settings changed.");
     }
 
-    public async Task<DotNext.Optional<ulong>> FindPostAsync(ulong guildId, ulong forumId, long number, CancellationToken ct)
+    public async Task<Optional<ulong>> FindPostAsync(ulong guildId, ulong forumId, long number, CancellationToken ct)
     {
         var forum = await GetForumAsync(guildId: guildId, forumId: forumId, ct: ct);
         IReadOnlyCollection<IThreadChannel> active = await forum.GetActiveThreadsAsync(Options(ct));
         var found = await FindMatchingPostAsync(posts: active, number: number, ct: ct);
 
         if (found.HasValue)
-            return new DotNext.Optional<ulong>(found.Value);
+            return new Optional<ulong>(found.Value);
 
         DateTimeOffset? before = null;
 
@@ -81,7 +83,7 @@ public sealed class SylvanMailForum(DiscordSocketClient client) : ISylvanMailFor
             found = await FindMatchingPostAsync(posts: archived, number: number, ct: ct);
 
             if (found.HasValue)
-                return new DotNext.Optional<ulong>(found.Value);
+                return new Optional<ulong>(found.Value);
 
             if (archived.Count < 100)
                 break;

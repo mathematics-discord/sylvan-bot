@@ -3,6 +3,8 @@ using SylvanBot.Features.RoleColours;
 
 namespace SylvanBot.Features.Configuration;
 
+using DotNext;
+
 public sealed partial class ConfigModule
 {
     [Group("colour", "Administrative role colour commands.")]
@@ -63,7 +65,7 @@ public sealed partial class ConfigModule
             var incomplete = await reconciler.ReconcileGuildAsync(
                 guild: Context.Guild,
                 ct: lifetime.ApplicationStopping,
-                new DotNext.Optional<ImmutableArray<RoleColourOption>>(previous));
+                new Optional<ImmutableArray<RoleColourOption>>(previous));
             var action = created ? "Registered" : "Updated";
 
             await FollowupAsync(
@@ -103,7 +105,7 @@ public sealed partial class ConfigModule
             var incomplete = await reconciler.ReconcileGuildAsync(
                 guild: Context.Guild,
                 ct: lifetime.ApplicationStopping,
-                new DotNext.Optional<ImmutableArray<RoleColourOption>>(previous));
+                new Optional<ImmutableArray<RoleColourOption>>(previous));
             await FollowupAsync($"Deleted colour mapping `{result.Value.OptionId}`.{CheckSummary(incomplete)}", ephemeral: true);
         }
 

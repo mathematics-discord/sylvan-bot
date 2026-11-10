@@ -1,5 +1,6 @@
 namespace SylvanBot.Features.Tickets;
 
+using DotNext;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
@@ -204,8 +205,8 @@ public sealed class TicketReviewSummary(
         await foreach (var ticket in pending.OrderBy(ticket => ticket.Number).AsAsyncEnumerable().WithCancellation(token))
         {
             var publication = ticket.Publications.FirstOrDefault(copy => copy.Current && !copy.Removed);
-            DotNext.Optional<TicketMessage> published = publication is null
-                ? DotNext.Optional<TicketMessage>.None
+            Optional<TicketMessage> published = publication is null
+                ? Optional<TicketMessage>.None
                 : publication.Message();
             var line = ReviewLine(ticket, published);
             if (text.Length + line.Length + 1 > 3950)
@@ -221,7 +222,7 @@ public sealed class TicketReviewSummary(
         return text.ToString().TrimEnd();
     }
 
-    internal static string ReviewLine(Ticket ticket, DotNext.Optional<TicketMessage> published)
+    internal static string ReviewLine(Ticket ticket, Optional<TicketMessage> published)
     {
         var label = $"#{ticket.Number}";
         if (published.TryGet(out var target))

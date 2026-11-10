@@ -7,6 +7,8 @@ using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Features.Automod;
 
+using DotNext;
+
 public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILogger logger) : IHostedService, IDisposable
 {
     private readonly SemaphoreSlim _gate = new SemaphoreSlim(1, 1);
@@ -23,13 +25,13 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
     public void OpenGuild(ulong guildId) => _closedGuilds.TryRemove(guildId, out _);
 
 
-    public DotNext.Optional<AutomodConfiguration> Current(ulong guildId)
+    public Optional<AutomodConfiguration> Current(ulong guildId)
     {
         if (!Volatile.Read(ref _loaded))
             return default;
 
         ImmutableDictionary<ulong, AutomodConfiguration> configurations = Volatile.Read(ref _configurations);
-        return new DotNext.Optional<AutomodConfiguration>(configurations.GetValueOrDefault(guildId, AutomodConfiguration.Empty));
+        return new Optional<AutomodConfiguration>(configurations.GetValueOrDefault(guildId, AutomodConfiguration.Empty));
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -79,7 +81,7 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
                 if (!_loaded)
                     throw new InvalidOperationException("Automod startup loading has not completed.");
 
-                (AutomodRule[] rules, AutomodExemptRole[] roles, AutomodSettings[] settings, TicketConfiguration[] tickets) = await ReadAsync(new DotNext.Optional<ulong>(guildId), ct);
+                (AutomodRule[] rules, AutomodExemptRole[] roles, AutomodSettings[] settings, TicketConfiguration[] tickets) = await ReadAsync(new Optional<ulong>(guildId), ct);
                 IEnumerable<ulong> roleIds = roles
                     .Select(role => role.RoleId);
 
@@ -111,7 +113,7 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
 
     public void Dispose() => _gate.Dispose();
 
-    private async Task<(AutomodRule[] Rules, AutomodExemptRole[] Roles, AutomodSettings[] Settings, TicketConfiguration[] Tickets)> ReadAsync(DotNext.Optional<ulong> guildId, CancellationToken ct)
+    private async Task<(AutomodRule[] Rules, AutomodExemptRole[] Roles, AutomodSettings[] Settings, TicketConfiguration[] Tickets)> ReadAsync(Optional<ulong> guildId, CancellationToken ct)
     {
         await using var db = await contexts.CreateDbContextAsync(ct);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);

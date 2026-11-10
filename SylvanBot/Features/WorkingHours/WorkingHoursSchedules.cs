@@ -4,6 +4,8 @@ using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Features.WorkingHours;
 
+using DotNext;
+
 public sealed class WorkingHoursSchedules(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contexts,
@@ -37,7 +39,7 @@ public sealed class WorkingHoursSchedules(
                         description: "Working Hours scheduling is disabled for this guild. No preference or role was changed."));
             }
 
-            Result<DotNext.Optional<WorkingHoursWindow>> validation = ValidateSubmission(
+            Result<Optional<WorkingHoursWindow>> validation = ValidateSubmission(
                 username: username,
                 enable: enable,
                 start: start,
@@ -47,7 +49,7 @@ public sealed class WorkingHoursSchedules(
             if (!validation.IsSuccessful)
                 return new Result<string>(validation.Error!);
 
-            DotNext.Optional<WorkingHoursWindow> window = validation.Value;
+            Optional<WorkingHoursWindow> window = validation.Value;
             var guild = client.GetGuild(guildId);
 
             if (!rules.IsReady(guild))
@@ -78,7 +80,7 @@ public sealed class WorkingHoursSchedules(
 
             await SaveScheduleAsync(db: db, state: state, guildId: guildId, memberId: memberId, window: window, ct: ct);
 
-            DotNext.Optional<int> pending = await reconciler.ReconcileSavedAsync(
+            Optional<int> pending = await reconciler.ReconcileSavedAsync(
                 db: db,
                 settings: settings,
                 state: state,
@@ -97,37 +99,37 @@ public sealed class WorkingHoursSchedules(
         }
     }
 
-    private static Result<DotNext.Optional<WorkingHoursWindow>> ValidateSubmission(
+    private static Result<Optional<WorkingHoursWindow>> ValidateSubmission(
         string username,
         bool enable,
         string? start,
         string? end,
         string? timezone)
     {
-        DotNext.Optional<WorkingHoursWindow> window = default;
+        Optional<WorkingHoursWindow> window = default;
 
         if (enable)
         {
             if (start is null || end is null)
             {
-                return new Result<DotNext.Optional<WorkingHoursWindow>>(
+                return new Result<Optional<WorkingHoursWindow>>(
                     OperationFailureException.Validation(description: "Enabling requires both start and end on every submission."));
             }
 
             Result<WorkingHoursWindow> parsed = WorkingHoursTimeParser.Parse(start: start, end: end, timezone: timezone);
 
             if (!parsed.IsSuccessful)
-                return new Result<DotNext.Optional<WorkingHoursWindow>>(parsed.Error!);
+                return new Result<Optional<WorkingHoursWindow>>(parsed.Error!);
 
-            window = new DotNext.Optional<WorkingHoursWindow>(parsed.Value);
+            window = new Optional<WorkingHoursWindow>(parsed.Value);
             var rejection = WorkingHoursResponses.Rejection(window: parsed.Value, username: username);
 
             if (rejection is not null)
-                return new Result<DotNext.Optional<WorkingHoursWindow>>(OperationFailureException.Validation(description: rejection));
+                return new Result<Optional<WorkingHoursWindow>>(OperationFailureException.Validation(description: rejection));
         }
         else if (start is not null || end is not null || timezone is not null)
         {
-            return new Result<DotNext.Optional<WorkingHoursWindow>>(
+            return new Result<Optional<WorkingHoursWindow>>(
                 OperationFailureException.Validation(description: "Disabling accepts no start, end or timezone options."));
         }
 
@@ -139,7 +141,7 @@ public sealed class WorkingHoursSchedules(
         WorkingHoursGuildState state,
         ulong guildId,
         ulong memberId,
-        DotNext.Optional<WorkingHoursWindow> window,
+        Optional<WorkingHoursWindow> window,
         CancellationToken ct)
     {
         var preference = await db.WorkingHours

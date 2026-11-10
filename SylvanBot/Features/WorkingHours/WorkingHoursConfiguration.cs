@@ -4,6 +4,8 @@ using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Features.WorkingHours;
 
+using DotNext;
+
 public sealed class WorkingHoursConfiguration(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contexts,
@@ -12,7 +14,7 @@ public sealed class WorkingHoursConfiguration(
     WorkingHoursReconciler reconciler
 )
 {
-    public async Task<Result<string>> UpdateAsync(ulong guildId, WorkingConditionsChange change, DotNext.Optional<ulong> roleId, CancellationToken ct)
+    public async Task<Result<string>> UpdateAsync(ulong guildId, WorkingConditionsChange change, Optional<ulong> roleId, CancellationToken ct)
     {
         var state = runtime.ForGuild(guildId);
         await state.Gate.WaitAsync(ct);
@@ -32,7 +34,7 @@ public sealed class WorkingHoursConfiguration(
                 db.WorkingHoursSettings.Add(settings);
 
             await db.SaveChangesAsync(ct);
-            DotNext.Optional<int> pending = await reconciler.ReconcileSavedAsync(db: db, settings: settings, state: state, ct: ct);
+            Optional<int> pending = await reconciler.ReconcileSavedAsync(db: db, settings: settings, state: state, ct: ct);
 
             var message = change switch
             {
@@ -58,7 +60,7 @@ public sealed class WorkingHoursConfiguration(
            .Include(settings => settings.EligibleRoles)
            .SingleOrDefaultAsync(settings => settings.GuildId == guildId, cancellationToken: ct);
 
-    private Result<ValueTuple> ApplyConfigurationChange(WorkingHoursSettings settings, WorkingConditionsChange change, DotNext.Optional<ulong> roleId)
+    private Result<ValueTuple> ApplyConfigurationChange(WorkingHoursSettings settings, WorkingConditionsChange change, Optional<ulong> roleId)
     {
         var guild = client.GetGuild(settings.GuildId);
 

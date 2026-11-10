@@ -7,6 +7,8 @@ using static System.Net.HttpStatusCode;
 
 namespace SylvanBot.Features.Automod;
 
+using DotNext;
+
 public sealed class AutomodBanEnforcement(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contexts,
@@ -18,8 +20,8 @@ public sealed class AutomodBanEnforcement(
 
     public async Task BanAsync(ulong guildId, ulong userId, ulong messageId, AutomodRule rule, string reason, CancellationToken ct)
     {
-        DotNext.Optional<long> seconds = rule.DurationSeconds is { } duration ? new DotNext.Optional<long>(duration) : default;
-        DotNext.Optional<DateTimeOffset> expiry = AutomodDuration.BanExpiry(seconds, clock.GetUtcNow());
+        Optional<long> seconds = rule.DurationSeconds is { } duration ? new Optional<long>(duration) : default;
+        Optional<DateTimeOffset> expiry = AutomodDuration.BanExpiry(seconds, clock.GetUtcNow());
 
         await _gate.WaitAsync(ct);
 

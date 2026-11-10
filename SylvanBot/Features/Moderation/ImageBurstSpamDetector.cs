@@ -2,6 +2,8 @@
 
 namespace SylvanBot.Features.Moderation;
 
+using DotNext;
+
 public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
 {
     private readonly Dictionary<ImageBurstBufferKey, Queue<ImageBurstMessage>> _buffers =
@@ -11,7 +13,7 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
 
     private readonly Dictionary<ImageBurstBufferKey, DateTimeOffset> _handlingLocks = [];
 
-    public DotNext.Optional<ImageBurstDetection> Observe(ImageBurstMessage message, DotNext.Optional<ImageBurstSpamDetectorOptions> settings)
+    public Optional<ImageBurstDetection> Observe(ImageBurstMessage message, Optional<ImageBurstSpamDetectorOptions> settings)
     {
         var key = new ImageBurstBufferKey(GuildId: message.GuildId, UserId: message.UserId);
         var now = timeProvider.GetUtcNow();
@@ -44,7 +46,7 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
 
             _handlingLocks[key] = now + options.HandlingLockDuration;
 
-            return new DotNext.Optional<ImageBurstDetection>(
+            return new Optional<ImageBurstDetection>(
                 new ImageBurstDetection(
                     GuildId: message.GuildId,
                     UserId: message.UserId,

@@ -6,6 +6,8 @@ using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Features.WorkingHours;
 
+using DotNext;
+
 public sealed class WorkingHoursReconciler(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contexts,
@@ -56,7 +58,7 @@ public sealed class WorkingHoursReconciler(
         }
     }
 
-    public async Task<DotNext.Optional<int>> ReconcileSavedAsync(
+    public async Task<Optional<int>> ReconcileSavedAsync(
         BotDbContext db,
         WorkingHoursSettings settings,
         WorkingHoursGuildState state,
@@ -108,7 +110,7 @@ public sealed class WorkingHoursReconciler(
                 preferences: preferences,
                 ct: ct);
 
-            return new DotNext.Optional<int>(pending);
+            return new Optional<int>(pending);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -247,7 +249,7 @@ public sealed class WorkingHoursReconciler(
         var exempt = settings.EligibleRoles
            .Where(role => role.IsExempt)
            .Any(role => member.RoleIds.Contains(role.RoleId));
-        DotNext.Optional<bool> desired = settings.DesiredPingRole(eligible: eligible, exempt: exempt, preference?.Enabled == true, active: active);
+        Optional<bool> desired = settings.DesiredPingRole(eligible: eligible, exempt: exempt, preference?.Enabled == true, active: active);
 
         if (settings.PingRoleId is not { } target)
             return false;
