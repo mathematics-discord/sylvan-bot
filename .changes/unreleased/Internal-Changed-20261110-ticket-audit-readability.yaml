@@ -1,4 +1,0 @@
-component: Internal
-kind: Changed
-body: Split ticket audit parsing and recording into focused methods on the reader and coordinator, replace compound control-flow conditions with named predicates, initialise observations through required named properties, and use Discord.NET's snowflake timestamp helper.
-time: 2026-11-10T17:01:00Z

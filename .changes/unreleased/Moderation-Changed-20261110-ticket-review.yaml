@@ -1,5 +1,0 @@
-component: Moderation
-kind: Changed
-body: >-
-  <@&1328097118644338779> and above can edit and approve anyone's tickets; their own actions are accepted automatically through View Audit Log, with no exemption role list. Sylvan's Automod bans and timeouts require approval, including extensions of accepted timeouts. Image-detector bans remain automatically accepted, and notes never require approval. Duration changes by other moderators return tickets to review; comment edits and automatic renewals preserve approval. The review summary stays at the bottom of the tickets channel.
-time: 2026-11-10T00:00:00Z

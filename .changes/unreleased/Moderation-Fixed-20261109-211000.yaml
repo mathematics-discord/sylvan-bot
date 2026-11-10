@@ -1,4 +1,0 @@
-component: Moderation
-kind: Fixed
-body: <@&1522665207225127034> and above can change the duration of an active timeout even when its imported record is paused or differs from Discord. A successful edit resumes automatic enforcement. Paused tickets now explain how to resume them.
-time: 2026-11-09T21:10:00Z

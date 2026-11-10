@@ -1,4 +1,0 @@
-component: Internal
-kind: Changed
-body: Keep chained-call dots aligned with C# continuation indentation and put object initializer members on separate lines. Apply the readability cleanup to ticket tests.
-time: 2026-11-10T17:00:00Z

@@ -1,5 +1,0 @@
-component: Internal
-kind: Changed
-body: >-
-  Replace ticket strategy dispatch with direct capture and enforcement operations, separate enforcement from publication and DM delivery, and use typed pending operation kinds. Retire completed import flags, ordered publication, and legacy format parsing. Forward migrations preserve ticket records, raw history, existing publication references, prior review acceptance, and pending initial prompts.
-time: 2026-11-10T00:00:00Z

@@ -1,5 +1,0 @@
-component: Moderation
-kind: Changed
-body: >-
-  <@&1522665074571870419> and above must lift server voice mutes and deafens manually in Discord. Their tickets remain available for review, but durations are descriptive and no longer trigger automatic removal. Wait for the recorded reversal before hiding a voice ticket.
-time: 2026-11-10T00:00:00Z
