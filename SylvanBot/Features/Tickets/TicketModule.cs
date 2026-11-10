@@ -137,8 +137,12 @@ public sealed class TicketModule(
     });
 
     [SlashCommand("show", "Look up a user's tickets or one visible ticket number.")]
-    public Task ShowAsync(string? user = null, [MinValue(1)] long? id = null, string? message = null, int page = 1)
-        => ExecuteAsync((actor, token) => ShowAsync(actor, user, id, message, page, hidden: false, token), ephemeral: false);
+    public Task ShowAsync(
+        string? user = null,
+        [Summary("ticket_id", "Ticket ID, not a user ID.")] [MinValue(1)] long? ticketId = null,
+        string? message = null,
+        int page = 1)
+        => ExecuteAsync((actor, token) => ShowAsync(actor, user, ticketId, message, page, hidden: false, token), ephemeral: false);
 
     [SlashCommand("showhidden", "Look up hidden tickets for a user or one ticket number.")]
     public Task ShowHiddenAsync(string? user = null, [MinValue(1)] long? id = null, string? message = null, int page = 1)

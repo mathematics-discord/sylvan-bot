@@ -17,7 +17,7 @@ Posts the result in the channel. Choose exactly one lookup field.
 | Field | What to enter |
 | --- | --- |
 | `user` | A member mention or Discord user ID, including someone who has left. Lists their history. |
-| `id` | A positive ticket number. Opens one visible ticket. |
+| `ticket_id` | A positive ticket number. Opens one visible ticket. |
 | `message` | A link to a Sylvan ticket message in this server. Opens the associated visible ticket. |
 
 ```text
@@ -32,8 +32,8 @@ For a private member lookup, choose [Apps → List Tickets](#list-tickets).
 ### `/ticket showhidden`
 
 Posts matching hidden records in the channel. Requires **View Audit Log**
-or **Administrator**. Use the same lookup fields and pagination as
-`/ticket show`.
+or **Administrator**. Use `user`, `id`, or `message`, with the same
+pagination as `/ticket show`.
 
 ```text
 /ticket showhidden id:1234

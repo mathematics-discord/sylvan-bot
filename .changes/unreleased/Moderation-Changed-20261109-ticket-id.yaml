@@ -1,0 +1,4 @@
+component: Moderation
+kind: Changed
+body: For <@&1522665207225127034> and above, `/ticket show` now names its ticket lookup option `ticket_id` and clarifies that it accepts a ticket ID, not a user ID.
+time: 2026-11-09T21:20:00Z
