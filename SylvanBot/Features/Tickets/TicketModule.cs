@@ -148,6 +148,15 @@ public sealed class TicketModule(
     public Task ShowHiddenAsync(string? user = null, [MinValue(1)] long? id = null, string? message = null, int page = 1)
         => ExecuteAsync((actor, token) => ShowAsync(actor, user, id, message, page, hidden: true, token), ephemeral: false);
 
+    [SlashCommand("repair", "Inspect or repair a ticket publication after checking the channel.")]
+    [RequireUserPermission(GuildPermission.Administrator)]
+    public Task RepairAsync(
+        [MinValue(1)] long id,
+        [Summary("message", "Adopt this existing Sylvan ticket message link.")] string? message = null,
+        [Summary("resend", "Retry publication after checking that no unrecorded copy exists.")] bool resend = false)
+        => ExecuteAsync(async (actor, token) =>
+            await ChangedAsync(await coordinator.RepairAsync(actor, id, message, resend, token)));
+
     [SlashCommand("set", "Replace supplied ticket fields.")]
     public Task SetAsync(
         [MinValue(1)] long id,

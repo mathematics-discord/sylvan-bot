@@ -1,0 +1,5 @@
+component: Moderation
+kind: Changed
+body: >-
+  Administrators control new ticket capture and Automod with the same enabled switch. Disabling it pauses normal ticket management and delivery while existing bans, tracked roles, and long timeouts continue to be checked and lifted or renewed. `/ticket repair` can inspect an uncertain publication, adopt an existing Sylvan message, or explicitly retry sending, including while the system is disabled.
+time: 2026-11-10T00:00:00Z
