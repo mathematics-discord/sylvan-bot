@@ -25,7 +25,7 @@ ij_visual_guides =
 ij_wrap_on_typing = false
 
 # Microsoft .NET properties
-csharp_new_line_before_members_in_object_initializers = false
+csharp_new_line_before_members_in_object_initializers = true
 csharp_preferred_modifier_order = public, private, protected, internal, file, new, static, abstract, virtual, closed, sealed, readonly, override, safe, unsafe, extern, volatile, async, required:suggestion
 csharp_style_prefer_utf8_string_literals = true:suggestion
 csharp_style_var_for_built_in_types = true:error
@@ -987,22 +987,22 @@ dotnet_diagnostic.sa1313.severity = none
 dotnet_diagnostic.sa1008.severity = none
 
 
-dotnet_diagnostic.SA1118.severity = none
+dotnet_diagnostic.sa1118.severity = none
 
 
-dotnet_diagnostic.SA1008.severity = none
+dotnet_diagnostic.sa1008.severity = none
 
 
-dotnet_diagnostic.SA1111.severity = error
+dotnet_diagnostic.sa1111.severity = error
 
 
-dotnet_diagnostic.SA1313.severity = none
+dotnet_diagnostic.sa1313.severity = none
 
 
-dotnet_diagnostic.MA0076.severity = none
+dotnet_diagnostic.ma0076.severity = none
 
 
-dotnet_diagnostic.MA0015.severity = none
+dotnet_diagnostic.ma0015.severity = none
 
 [*.cs]
 dotnet_diagnostic.rcs1001.severity = none
@@ -1023,6 +1023,7 @@ dotnet_diagnostic.sa1009.severity = none
 
 [*.cs]
 resharper_csharp_int_align = false
+resharper_csharp_outdent_dots = false
 csharp_style_implicit_object_creation_when_type_is_apparent = false
 resharper_csharp_object_creation_when_type_evident = explicitly_typed
 resharper_csharp_object_creation_when_type_not_evident = explicitly_typed

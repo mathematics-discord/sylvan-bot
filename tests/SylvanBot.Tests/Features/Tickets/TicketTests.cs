@@ -1,7 +1,6 @@
-namespace SylvanBot.Tests.Features.Tickets;
-
-using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
+
+namespace SylvanBot.Tests.Features.Tickets;
 
 public sealed class TicketTests
 {
@@ -13,9 +12,9 @@ public sealed class TicketTests
         var timestamp = DateTimeOffset.UtcNow;
 
         // Act
-        ticket.CompleteStaffReversal(42, timestamp);
-        ticket.CompleteStaffReversal(99, timestamp.AddMinutes(1));
-        ticket.End(TicketStatus.Reverted, 99);
+        ticket.CompleteStaffReversal(moderatorId: 42, timestamp);
+        ticket.CompleteStaffReversal(moderatorId: 99, timestamp.AddMinutes(1));
+        ticket.End(TicketStatus.Reverted, moderatorId: 99);
 
         // Assert
         ticket.Status.ShouldBe(TicketStatus.Reverted);
@@ -29,7 +28,7 @@ public sealed class TicketTests
     {
         // Arrange
         var ticket = Create(TicketAction.Note);
-        var comment = new string('a', Ticket.CommentLimit);
+        var comment = new string(c: 'a', Ticket.CommentLimit);
 
         // Act
         ticket.Initialise(comment, seconds: null);
@@ -48,17 +47,25 @@ public sealed class TicketTests
     {
         // Arrange
         var ticket = Create(action);
+
         var pending = pendingOperation
-            ? new TicketOperation { Kind = action == TicketAction.Ban ? TicketOperationKind.RemoveBan : TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = DateTimeOffset.UtcNow }
+            ? new TicketOperation
+            {
+                Kind = action == TicketAction.Ban ? TicketOperationKind.RemoveBan : TicketOperationKind.SetTimeoutExpiry,
+                ExpiryUtc = DateTimeOffset.UtcNow,
+            }
             : null;
 
         ticket.Pending = pending;
         DateTimeOffset? expiry = ticket.ExpiresAtUtc;
         var version = ticket.Version;
-        var actor = new TicketActor(1, 3, IsAdministrator: true, CanTimeoutMembers: false);
+        var actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: false);
 
         // Act
-        void Act() => ticket.SetHidden(actor, ticket.Version, hidden: true);
+        void Act()
+        {
+            ticket.SetHidden(actor, ticket.Version, hidden: true);
+        }
 
         // Assert
         Should.Throw<BotCommandException>(Act);
@@ -79,7 +86,7 @@ public sealed class TicketTests
     {
         // Arrange
         var ticket = Create(action);
-        var actor = new TicketActor(1, 3, IsAdministrator: true, CanTimeoutMembers: false);
+        var actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: false);
         ticket.End(TicketStatus.Reverted, actor.UserId);
 
         // Act
@@ -100,7 +107,7 @@ public sealed class TicketTests
     {
         // Arrange
         var ticket = Create(action);
-        var actor = new TicketActor(1, 3, IsAdministrator: true, CanTimeoutMembers: false);
+        var actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: false);
         ticket.End(TicketStatus.Reverted);
         ticket.SetHidden(actor, ticket.Version, hidden: true);
 
@@ -123,7 +130,10 @@ public sealed class TicketTests
         var version = ticket.Version;
 
         // Act
-        void Act() => ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
+        void Act()
+        {
+            ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
+        }
 
         // Assert
         Should.Throw<BotCommandException>(Act);
@@ -156,11 +166,14 @@ public sealed class TicketTests
     {
         // Arrange
         var ticket = Create(TicketAction.Note);
-        ticket.Initialise(new string('a', Ticket.CommentLimit - 1), seconds: null);
+        ticket.Initialise(new string(c: 'a', Ticket.CommentLimit - 1), seconds: null);
         var details = new TicketDetails(new TicketDurationEdit.Keep(), new TicketCommentEdit.Append("b"));
 
         // Act
-        void Act() => ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
+        void Act()
+        {
+            ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
+        }
 
         // Assert
         Should.Throw<BotCommandException>(Act);
@@ -173,8 +186,13 @@ public sealed class TicketTests
         // Arrange
         var ticket = new Ticket
         {
-            GuildId = 1, Number = 1, SubjectUserId = 2, ModeratorUserId = 3,
-            CreatedAtUtc = DateTimeOffset.UtcNow, Action = TicketAction.Ban, ReminderExempt = true
+            GuildId = 1,
+            Number = 1,
+            SubjectUserId = 2,
+            ModeratorUserId = 3,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            Action = TicketAction.Ban,
+            ReminderExempt = true,
         };
 
         // Act
@@ -191,7 +209,7 @@ public sealed class TicketTests
     {
         // Arrange
         var ticket = Create(TicketAction.Timeout);
-        ticket.Initialise("", 3600);
+        ticket.Initialise("", seconds: 3600);
 
         // Act
         ticket.End(status);
@@ -209,11 +227,14 @@ public sealed class TicketTests
         var details = TicketDetails.ParseFields(duration: null, comment: null) with { Duration = default };
 
         // Act
-        void Act() => ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
+        void Act()
+        {
+            ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
+        }
 
         // Assert
         Should.Throw<BotCommandException>(Act);
-        Should.Throw<BotCommandException>(() => new TicketDetails(default, new TicketCommentEdit.Keep()));
+        Should.Throw<BotCommandException>(() => new TicketDetails(duration: default, new TicketCommentEdit.Keep()));
     }
 
     [TestCase(TicketStatus.Expired)]
@@ -250,16 +271,16 @@ public sealed class TicketTests
         ticket.ModificationHistory.ShouldBeEmpty();
     }
 
-    [TestCase(60, "0.00:01:00")]
-    [TestCase(90061, "1.01:01:01")]
-    [TestCase(172800, "2.00:00:00")]
+    [TestCase(arg1: 60, "0.00:01:00")]
+    [TestCase(arg1: 90061, "1.01:01:01")]
+    [TestCase(arg1: 172800, "2.00:00:00")]
     public void SetDuration_FiniteDuration_FormatsHistoryAsDaysAndTime(long seconds, string expected)
     {
         // Arrange
         var ticket = Create(TicketAction.Ban);
 
         // Act
-        ticket.SetDuration(seconds, 4);
+        ticket.SetDuration(seconds, moderatorId: 4);
 
         // Assert
         ticket.ModificationHistory[^1].Format().ShouldContain($"set duration to {expected} at ");
@@ -270,13 +291,13 @@ public sealed class TicketTests
     {
         // Arrange
         var ticket = Create(TicketAction.Timeout);
-        ticket.SetDuration(600, 4);
+        ticket.SetDuration(seconds: 600, moderatorId: 4);
         var version = ticket.Version;
         var history = ticket.ModificationHistory.ShouldHaveSingleItem();
         var originalDescription = history.Format();
 
         // Act
-        ticket.SetDuration(300, moderatorId: null);
+        ticket.SetDuration(seconds: 300, moderatorId: null);
 
         // Assert
         ticket.DurationSeconds.ShouldBe(300);
@@ -285,34 +306,24 @@ public sealed class TicketTests
         history.Format().ShouldBe(originalDescription);
     }
 
-    internal static Ticket Create(TicketAction action, bool canReview = false)
-    {
-        var ticket = new Ticket
-        {
-            GuildId = 1, Number = 1, SubjectUserId = 2, ModeratorUserId = 3,
-            CreatedAtUtc = DateTimeOffset.UtcNow, Action = action
-        };
-
-        ticket.Initialise("reason", action == TicketAction.Timeout ? 3600 : null);
-
-        ticket.AcceptCreation(canReview);
-        return ticket;
-    }
-
-    [TestCase(0UL, 2UL, 3UL)]
-    [TestCase(1UL, 0UL, 3UL)]
-    [TestCase(1UL, 2UL, 0UL)]
+    [TestCase(arg1: 0UL, arg2: 2UL, arg3: 3UL)]
+    [TestCase(arg1: 1UL, arg2: 0UL, arg3: 3UL)]
+    [TestCase(arg1: 1UL, arg2: 2UL, arg3: 0UL)]
     public void Initialise_MissingIdentity_RejectsCreation(ulong guild, ulong subject, ulong moderator)
     {
         // Arrange
         var ticket = new Ticket { GuildId = guild, Number = 1, SubjectUserId = subject, ModeratorUserId = moderator };
 
         // Act
-        void Act() => ticket.Initialise("reason", seconds: null);
+        void Act()
+        {
+            ticket.Initialise("reason", seconds: null);
+        }
 
         // Assert
         Should.Throw<ArgumentOutOfRangeException>(Act);
     }
+
     [TestCase(TicketAction.VoiceMute)]
     [TestCase(TicketAction.VoiceDeafen)]
     [TestCase(TicketAction.Role)]
@@ -322,8 +333,8 @@ public sealed class TicketTests
         var ticket = Create(action);
 
         // Act
-        var finite = ticket.ValidateEdit(TicketDetails.ParseFields("1 hour", null), DateTimeOffset.UtcNow);
-        var permanent = ticket.ValidateEdit(TicketDetails.ParseFields("permanent", null), DateTimeOffset.UtcNow);
+        var finite = ticket.ValidateEdit(TicketDetails.ParseFields("1 hour", comment: null), DateTimeOffset.UtcNow);
+        var permanent = ticket.ValidateEdit(TicketDetails.ParseFields("permanent", comment: null), DateTimeOffset.UtcNow);
 
         // Assert
         finite.ShouldBe("reason");
@@ -337,26 +348,34 @@ public sealed class TicketTests
         var ticket = Create(TicketAction.Kick);
 
         // Act
-        void Act() => ticket.ValidateEdit(TicketDetails.ParseFields("1 hour", null), DateTimeOffset.UtcNow);
+        void Act()
+        {
+            ticket.ValidateEdit(TicketDetails.ParseFields("1 hour", comment: null), DateTimeOffset.UtcNow);
+        }
 
         // Assert
         Should.Throw<BotCommandException>(Act);
         ticket.Status.ShouldBe(TicketStatus.Applied);
     }
 
-    [TestCase(TicketAction.Ban, true)]
-    [TestCase(TicketAction.Timeout, true)]
-    [TestCase(TicketAction.Kick, true)]
-    [TestCase(TicketAction.VoiceMute, true)]
-    [TestCase(TicketAction.VoiceDeafen, true)]
-    [TestCase(TicketAction.Role, true)]
+    [TestCase(TicketAction.Ban, arg2: true)]
+    [TestCase(TicketAction.Timeout, arg2: true)]
+    [TestCase(TicketAction.Kick, arg2: true)]
+    [TestCase(TicketAction.VoiceMute, arg2: true)]
+    [TestCase(TicketAction.VoiceDeafen, arg2: true)]
+    [TestCase(TicketAction.Role, arg2: true)]
     public void Initialise_CompleteAuditTicket_QueuesInitialPromptForHumanActions(TicketAction action, bool expected)
     {
         // Arrange
         var ticket = new Ticket
         {
-            GuildId = 1, Number = 1, SubjectUserId = 2, ModeratorUserId = 3,
-            CreatedAtUtc = DateTimeOffset.UtcNow, Action = action, SourceAuditId = 10,
+            GuildId = 1,
+            Number = 1,
+            SubjectUserId = 2,
+            ModeratorUserId = 3,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            Action = action,
+            SourceAuditId = 10,
         };
 
         // Act
@@ -374,8 +393,14 @@ public sealed class TicketTests
         // Arrange
         var ticket = new Ticket
         {
-            GuildId = 1, Number = 1, SubjectUserId = 2, ModeratorUserId = 3,
-            CreatedAtUtc = DateTimeOffset.UtcNow, Action = action, SourceAuditId = 10, ReminderExempt = true,
+            GuildId = 1,
+            Number = 1,
+            SubjectUserId = 2,
+            ModeratorUserId = 3,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            Action = action,
+            SourceAuditId = 10,
+            ReminderExempt = true,
         };
 
         // Act
@@ -385,4 +410,21 @@ public sealed class TicketTests
         ticket.InitialPromptPending.ShouldBeFalse();
     }
 
+    internal static Ticket Create(TicketAction action, bool canReview = false)
+    {
+        var ticket = new Ticket
+        {
+            GuildId = 1,
+            Number = 1,
+            SubjectUserId = 2,
+            ModeratorUserId = 3,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            Action = action,
+        };
+
+        ticket.Initialise("reason", action == TicketAction.Timeout ? 3600 : null);
+
+        ticket.AcceptCreation(canReview);
+        return ticket;
+    }
 }

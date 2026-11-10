@@ -1,10 +1,10 @@
-namespace SylvanBot.Tests.Features.Tickets;
-
 using SylvanBot.Application.Features.Tickets;
+
+namespace SylvanBot.Tests.Features.Tickets;
 
 public sealed class TicketTimeoutTests
 {
-    private static readonly DateTimeOffset Started = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset Started = new DateTimeOffset(year: 2026, month: 1, day: 1, hour: 12, minute: 0, second: 0, TimeSpan.Zero);
 
     [TestCase(1)]
     [TestCase(28)]
@@ -23,10 +23,10 @@ public sealed class TicketTimeoutTests
         applied.ShouldBe(expected);
     }
 
-    [TestCase(20, false)]
-    [TestCase(21, true)]
-    [TestCase(29, true)]
-    [TestCase(90, false)]
+    [TestCase(arg1: 20, arg2: false)]
+    [TestCase(arg1: 21, arg2: true)]
+    [TestCase(arg1: 29, arg2: true)]
+    [TestCase(arg1: 90, arg2: false)]
     public void NeedsTimeoutRenewal_LongTimeout_RenewsBeforeWindowExpires(int elapsedDays, bool expected)
     {
         // Arrange
@@ -90,7 +90,7 @@ public sealed class TicketTimeoutTests
     {
         // Arrange
         var ticket = Create();
-        var actor = new TicketActor(1, 3, IsAdministrator: true, CanTimeoutMembers: true);
+        var actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: true);
         ticket.Approve(actor, ticket.Version);
 
         // Act
@@ -102,6 +102,7 @@ public sealed class TicketTimeoutTests
         ticket.AppliedTimeoutUntilUtc.ShouldBe(Started.AddDays(28));
         ticket.ApprovedByUserId.ShouldBeNull();
         ticket.Pending.ShouldBeNull();
+
         var lastChange = ticket.ModificationHistory
             .Last();
 
@@ -135,13 +136,17 @@ public sealed class TicketTimeoutTests
         // Arrange
         var ticket = new Ticket
         {
-            GuildId = 1, Number = 1, SubjectUserId = 2, ModeratorUserId = 3,
-            CreatedAtUtc = Started, Action = TicketAction.Timeout,
+            GuildId = 1,
+            Number = 1,
+            SubjectUserId = 2,
+            ModeratorUserId = 3,
+            CreatedAtUtc = Started,
+            Action = TicketAction.Timeout,
             ExpirySuspended = true,
         };
 
         ticket.Initialise("reason", 7L * 86400);
-        ticket.ObserveTimeoutWindow(null, Started);
+        ticket.ObserveTimeoutWindow(expiry: null, Started);
         var expiry = Started.AddDays(days);
         var nativeExpiry = Ticket.NativeTimeoutExpiry(expiry, Started);
 
@@ -162,7 +167,9 @@ public sealed class TicketTimeoutTests
     {
         // Arrange
         var ticket = Create();
-        ticket.BeginTimeoutChange(new TicketOperation { Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = Started.AddDays(10), RequestedBy = 3 });
+
+        ticket.BeginTimeoutChange(
+            new TicketOperation { Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = Started.AddDays(10), RequestedBy = 3 });
 
         // Act
         ticket.ConfirmTimeoutChange(Started);
@@ -177,10 +184,12 @@ public sealed class TicketTimeoutTests
     {
         // Arrange
         var ticket = Create();
-        ticket.BeginTimeoutChange(new TicketOperation
-        {
-            Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = Started.AddHours(1), NativeExpiryUtc = Started.AddHours(1), RequestedBy = 3,
-        });
+
+        ticket.BeginTimeoutChange(
+            new TicketOperation
+            {
+                Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = Started.AddHours(1), NativeExpiryUtc = Started.AddHours(1), RequestedBy = 3,
+            });
 
         // Act
         ticket.ConfirmTimeoutChange(Started.AddDays(1));
@@ -195,8 +204,12 @@ public sealed class TicketTimeoutTests
     {
         var ticket = new Ticket
         {
-            GuildId = 1, Number = 1, SubjectUserId = 2, ModeratorUserId = 3,
-            CreatedAtUtc = Started, Action = TicketAction.Timeout,
+            GuildId = 1,
+            Number = 1,
+            SubjectUserId = 2,
+            ModeratorUserId = 3,
+            CreatedAtUtc = Started,
+            Action = TicketAction.Timeout,
         };
 
         ticket.Initialise("reason", 7L * 86400);
@@ -205,10 +218,11 @@ public sealed class TicketTimeoutTests
 
     private static void Extend(Ticket ticket, DateTimeOffset expiry, DateTimeOffset applied, ulong? requester = null)
     {
-        ticket.BeginTimeoutChange(new TicketOperation
-        {
-            Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = expiry, NativeExpiryUtc = applied, RequestedBy = requester,
-        });
+        ticket.BeginTimeoutChange(
+            new TicketOperation
+            {
+                Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = expiry, NativeExpiryUtc = applied, RequestedBy = requester,
+            });
 
         ticket.ConfirmTimeoutChange(Started);
     }

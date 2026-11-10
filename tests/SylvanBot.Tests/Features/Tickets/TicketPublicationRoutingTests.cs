@@ -1,6 +1,6 @@
-namespace SylvanBot.Tests.Features.Tickets;
-
 using SylvanBot.Application.Features.Tickets;
+
+namespace SylvanBot.Tests.Features.Tickets;
 
 public sealed class TicketPublicationRoutingTests
 {

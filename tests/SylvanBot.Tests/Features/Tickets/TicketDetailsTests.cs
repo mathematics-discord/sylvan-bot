@@ -1,20 +1,19 @@
-﻿namespace SylvanBot.Tests.Features.Tickets;
+﻿using SylvanBot.Application.Features.Tickets;
 
-using SylvanBot.Application.Common;
-using SylvanBot.Application.Features.Tickets;
+namespace SylvanBot.Tests.Features.Tickets;
 
 public sealed class TicketDetailsTests
 {
-    [TestCase("604802 seconds", 604802L, false)]
-    [TestCase("1 hour", 3600L, false)]
-    [TestCase("60 minutes", 3600L, false)]
-    [TestCase("2 hours", 3600L, true)]
-    [TestCase("1 hour", 7200L, true)]
-    [TestCase("permanent", null, false)]
-    [TestCase("permanent", 3600L, true)]
-    [TestCase("1 hour", null, true)]
-    [TestCase(null, 3600L, false)]
-    [TestCase(null, null, false)]
+    [TestCase("604802 seconds", arg2: 604802L, arg3: false)]
+    [TestCase("1 hour", arg2: 3600L, arg3: false)]
+    [TestCase("60 minutes", arg2: 3600L, arg3: false)]
+    [TestCase("2 hours", arg2: 3600L, arg3: true)]
+    [TestCase("1 hour", arg2: 7200L, arg3: true)]
+    [TestCase("permanent", arg2: null, arg3: false)]
+    [TestCase("permanent", arg2: 3600L, arg3: true)]
+    [TestCase("1 hour", arg2: null, arg3: true)]
+    [TestCase(arg1: null, arg2: 3600L, arg3: false)]
+    [TestCase(arg1: null, arg2: null, arg3: false)]
     public void ChangesDuration_CommentEdit_RequiresDifferentDuration(string? duration, long? currentSeconds, bool expected)
     {
         // Arrange
@@ -42,7 +41,6 @@ public sealed class TicketDetailsTests
         details.DurationSeconds.ShouldBe(long.MaxValue);
         expiry.ShouldBe(DateTimeOffset.MaxValue);
         Should.Throw<BotCommandException>(() => details.TimeoutExpiry(actionTime, actionTime));
-
     }
 
     [Test]
@@ -119,10 +117,10 @@ public sealed class TicketDetailsTests
         (details.Comment is TicketCommentEdit.Keep).ShouldBeTrue();
     }
 
-    [TestCase("1 m, reason", 60L)]
-    [TestCase("1 M, reason", 2592000L)]
-    [TestCase("1 month, reason", 2592000L)]
-    [TestCase("1 year, reason", 31536000L)]
+    [TestCase("1 m, reason", arg2: 60L)]
+    [TestCase("1 M, reason", arg2: 2592000L)]
+    [TestCase("1 month, reason", arg2: 2592000L)]
+    [TestCase("1 year, reason", arg2: 31536000L)]
     public void ParseReply_DurationUnits_PreservesDurationMeaning(string reply, long seconds)
     {
         // Arrange
@@ -138,7 +136,7 @@ public sealed class TicketDetailsTests
     public void ParseReply_OversizedComment_RejectsReply()
     {
         // Arrange
-        var reply = "1 hour, " + new string('a', Ticket.CommentLimit + 1);
+        var reply = "1 hour, " + new string(c: 'a', Ticket.CommentLimit + 1);
 
         // Act
         // Assert
@@ -151,14 +149,14 @@ public sealed class TicketDetailsTests
         // Arrange
         // Act
         // Assert
-        Should.Throw<BotCommandException>(() => TicketDetails.ParseFields("1 day, comment", null));
+        Should.Throw<BotCommandException>(() => TicketDetails.ParseFields("1 day, comment", comment: null));
     }
 
     [Test]
     public void Expiry_FiniteDuration_UsesActionTime()
     {
         // Arrange
-        var actionTime = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var actionTime = new DateTimeOffset(year: 2026, month: 1, day: 1, hour: 12, minute: 0, second: 0, TimeSpan.Zero);
         var details = TicketDetails.ParseReply("2 days");
 
         // Act

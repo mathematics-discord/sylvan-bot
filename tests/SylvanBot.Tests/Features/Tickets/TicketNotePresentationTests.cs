@@ -1,7 +1,7 @@
-namespace SylvanBot.Tests.Features.Tickets;
-
 using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Features.Tickets;
+
+namespace SylvanBot.Tests.Features.Tickets;
 
 public sealed class TicketNotePresentationTests
 {
@@ -10,7 +10,10 @@ public sealed class TicketNotePresentationTests
     {
         var ticket = new Ticket
         {
-            Action = TicketAction.Note, Number = 1415, SubjectUserId = 123, ModeratorUserId = 456,
+            Action = TicketAction.Note,
+            Number = 1415,
+            SubjectUserId = 123,
+            ModeratorUserId = 456,
             CreatedAtUtc = DateTimeOffset.FromUnixTimeSeconds(1500000000),
         };
 

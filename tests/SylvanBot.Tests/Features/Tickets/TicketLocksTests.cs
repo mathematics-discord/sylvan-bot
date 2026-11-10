@@ -1,7 +1,7 @@
-namespace SylvanBot.Tests.Features.Tickets;
-
 using Serilog;
 using SylvanBot.Features.Tickets;
+
+namespace SylvanBot.Tests.Features.Tickets;
 
 public sealed class TicketLocksTests
 {
@@ -11,11 +11,11 @@ public sealed class TicketLocksTests
         // Arrange
         await using var logger = new LoggerConfiguration().CreateLogger();
         var locks = new TicketLocks(logger);
-        using var first = await locks.TicketAsync(1, CancellationToken.None);
+        using var first = await locks.TicketAsync(id: 1, CancellationToken.None);
 
         // Act
-        Task<IDisposable> waiting = locks.TicketAsync(1, CancellationToken.None);
-        using var unrelated = await locks.TicketAsync(2, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        Task<IDisposable> waiting = locks.TicketAsync(id: 1, CancellationToken.None);
+        using var unrelated = await locks.TicketAsync(id: 2, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
 
         // Assert
         waiting.IsCompleted.ShouldBeFalse();
@@ -29,16 +29,16 @@ public sealed class TicketLocksTests
         // Arrange
         await using var logger = new LoggerConfiguration().CreateLogger();
         var locks = new TicketLocks(logger);
-        using var first = await locks.TicketAsync(1, CancellationToken.None);
+        using var first = await locks.TicketAsync(id: 1, CancellationToken.None);
         using var cancellation = new CancellationTokenSource();
 
         // Act
-        Task<IDisposable> cancelled = locks.TicketAsync(1, cancellation.Token);
+        Task<IDisposable> cancelled = locks.TicketAsync(id: 1, cancellation.Token);
         await cancellation.CancelAsync();
 
         // Assert
         await Should.ThrowAsync<OperationCanceledException>(async () => await cancelled);
-        Task<IDisposable> waiting = locks.TicketAsync(1, CancellationToken.None);
+        Task<IDisposable> waiting = locks.TicketAsync(id: 1, CancellationToken.None);
         waiting.IsCompleted.ShouldBeFalse();
         first.Dispose();
         using var next = await waiting.WaitAsync(TimeSpan.FromSeconds(5));
@@ -67,7 +67,7 @@ public sealed class TicketLocksTests
         // Arrange
         await using var logger = new LoggerConfiguration().CreateLogger();
         var locks = new TicketLocks(logger);
-        using var second = await locks.TicketAsync(2, CancellationToken.None);
+        using var second = await locks.TicketAsync(id: 2, CancellationToken.None);
         using var cancellation = new CancellationTokenSource();
 
         // Act
@@ -76,8 +76,8 @@ public sealed class TicketLocksTests
 
         // Assert
         await Should.ThrowAsync<OperationCanceledException>(async () => await waiting);
-        using var first = await locks.TicketAsync(1, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
-        Task<IDisposable> stillWaiting = locks.TicketAsync(2, CancellationToken.None);
+        using var first = await locks.TicketAsync(id: 1, CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        Task<IDisposable> stillWaiting = locks.TicketAsync(id: 2, CancellationToken.None);
         stillWaiting.IsCompleted.ShouldBeFalse();
         second.Dispose();
         using var next = await stillWaiting.WaitAsync(TimeSpan.FromSeconds(5));
@@ -89,13 +89,13 @@ public sealed class TicketLocksTests
         // Arrange
         await using var logger = new LoggerConfiguration().CreateLogger();
         var locks = new TicketLocks(logger);
-        using var first = await locks.TicketAsync(1, CancellationToken.None);
+        using var first = await locks.TicketAsync(id: 1, CancellationToken.None);
         first.Dispose();
-        using var second = await locks.TicketAsync(1, CancellationToken.None);
+        using var second = await locks.TicketAsync(id: 1, CancellationToken.None);
 
         // Act
         first.Dispose();
-        Task<IDisposable> waiting = locks.TicketAsync(1, CancellationToken.None);
+        Task<IDisposable> waiting = locks.TicketAsync(id: 1, CancellationToken.None);
 
         // Assert
         waiting.IsCompleted.ShouldBeFalse();
