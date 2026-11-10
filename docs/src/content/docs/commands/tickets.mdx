@@ -69,7 +69,7 @@ private, and saved changes update the ticket.
 | --- | --- |
 | `comment` | Replaces the comment with 1–3,000 characters of nonblank text. |
 | `duration` | Sets the **total** duration from the original action. Accepts positive whole units, including combinations such as `2 days 6 hours`. See [which actions accept a duration or `permanent`](../../staff/tickets/change-a-restriction/#change-the-duration). |
-| `hidden` | `True` hides the record and first lifts any active restriction. `False` restores the record without reapplying the restriction. |
+| `hidden` | `True` hides the record and first lifts an active ban, timeout, or tracked role. Voice restrictions must be lifted manually. `False` restores the record without reapplying the restriction. |
 
 ```text
 /ticket set id:1234 duration:7 days
@@ -140,6 +140,26 @@ reverting, or hiding still changes the shared record.
 | Ticket message | <span id="approve-ticket"></span>**Approve Ticket** | Records approval on one eligible ticket. |
 | Ticket message | <span id="revert-ticket"></span>**Revert Ticket** | Lifts the restriction and keeps the ticket visible. |
 | Ticket message | <span id="hide-ticket"></span>**Hide Ticket** | Hides the record, lifting an active restriction first. |
+
+## Repair a publication
+
+### `/ticket repair`
+
+Requires **Administrator** and a ticket `id`. With no other options, shows
+publication status and recorded message links privately. This command works
+while the system is disabled.
+
+After checking the channel, choose one repair option:
+
+- `message`: a link to an existing Sylvan message for this ticket in this
+  server. Sylvan adopts and updates it, removing other recorded copies.
+- `resend:True`: clear an uncertain send and retry publication. Existing
+  recorded copies are reconciled first. Check for an unrecorded copy before
+  retrying to avoid a duplicate.
+
+Hidden records cannot be adopted or resent. Repair retains the ticket's
+history and message references. Read the result for any remaining delivery
+failure.
 
 ## Administrator configuration
 

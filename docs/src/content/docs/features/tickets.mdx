@@ -21,13 +21,14 @@ incident that involved no restriction.
 
 An audit reason such as `2 days, repeated invite spam after a warning` can
 supply a duration and comment. A timeout starts with the expiry chosen in
-Discord. Extending a timeout directly in Discord can create a new ticket.
-Shortening or removing it updates the existing action.
+Discord. Extensions and reductions update the current ticket. A new timeout
+after the previous restriction ends creates a new ticket.
 
 Actions taken by bots can also have tickets. For example, once Sylvan
 matches an [Automod ban](../automod/#timed-bans-and-failures) to its audit
 entry, use its ticket to change the restriction. Bot actions do not send
-a moderator a reminder.
+a moderator a reminder. Every captured human action gets an initial DM to
+complete or adjust its details, even when already complete or accepted.
 
 ## Read a ticket
 
@@ -37,8 +38,7 @@ a moderator a reminder.
 - **Duration** runs from the original action. **Expires** shows the deadline
   in your local time and how long remains. **Superseded** means a later
   action took over. Use the newer ticket to check the current restriction.
-- **Unapproved**, **Approved**, and **Review exempt** describe the review
-  decision. A restriction can be active before approval or expire while its
+- **Unapproved** and **Approved** describe the review decision. A restriction can be active before approval or expire while its
   ticket still awaits review.
 - **Hidden** describes record visibility. Restoring a hidden ticket makes
   it visible again. The restriction stays lifted.
@@ -58,11 +58,11 @@ Sylvan uses your current Discord permissions. On Mathematics,
 | --- | --- |
 | Look up visible tickets by slash command | Any of Timeout Members, Ban Members, Kick Members, Mute Members, Deafen Members, Manage Roles, or View Audit Log. |
 | Use **Apps → List Tickets** or **Apps → Add Moderation Note** on a member | Timeout Members. |
-| Create, edit, or hide a visible note | Timeout Members or View Audit Log. You can correct another moderator’s note. |
+| Create, edit, or hide a visible note | Timeout Members or View Audit Log. Without View Audit Log, you can only correct or hide your own notes. |
 | Correct your own action ticket | The permission for the original action, or View Audit Log. For example, Ban Members for a ban or Manage Roles for a tracked role. |
 | Correct someone else’s action, review tickets, read hidden records, hide an action ticket, or restore a record | View Audit Log. |
-| Revert an active restriction | Permission to correct its ticket and the matching action permission. [Role hierarchy and Discord’s current state also matter](../../staff/tickets/change-a-restriction/#lift-a-restriction-now). |
-| Configure tickets | Administrator. |
+| Revert an active ban, timeout, or tracked role | Permission to correct its ticket and the matching action permission. [Role hierarchy and Discord’s current state also matter](../../staff/tickets/change-a-restriction/#lift-a-restriction-now). |
+| Configure tickets or repair a publication | Administrator. |
 
 ## Ticket guides
 

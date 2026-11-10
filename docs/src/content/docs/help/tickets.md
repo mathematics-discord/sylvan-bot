@@ -11,8 +11,8 @@ can succeed in one place before Sylvan confirms it in the other.
 
 - **No DM arrived.** Run `/ticket top` for your newest outstanding prompt,
   or [find the ticket](../../staff/tickets/find-a-ticket/) and use
-  `/ticket edit` in the server. A completed ban or timeout may have no
-  reminder left to resend.
+  `/ticket edit` in the server. Failed initial DMs retry even for completed
+  tickets; check that you allow server DMs.
 - **A lookup found nothing.** Check which member, ticket number, or ticket
   message you supplied. `/ticket show` opens visible tickets by number.
   Senior staff can use `/ticket showhidden` for a hidden record. Both slash
@@ -21,7 +21,11 @@ can succeed in one place before Sylvan confirms it in the other.
   saved number and check the configured destination. Creating the same note
   again can produce a duplicate. Sylvan retries updates to known posts.
   If it cannot confirm the first post, it won’t automatically send another.
-  Ask an administrator to investigate if the post never appears.
+  An administrator can use `/ticket repair id:1234` to inspect the saved
+  references. After checking the channel, use `message:` with an existing
+  Sylvan ticket message link to adopt it, or `resend:True` to retry sending.
+  Choose one option. Repair works while capture is disabled, but hidden
+  tickets cannot be adopted or resent.
 - **Some channel copies could not be synchronised.** The saved record
   remains. Check which posts still show the old details. Sylvan retries
   their update or removal.
@@ -43,9 +47,10 @@ then reopen the record.
 ## The restriction is still active after expiry
 
 Check **Expires** on the ticket. Durations run from the original action.
-Ban, voice, and tracked-role expiry depend on Sylvan confirming which action
-is current. A voice restriction may have to wait for the member to reconnect
-to voice.
+Ban and tracked-role expiry depend on Sylvan confirming which action is
+current. Voice restrictions must be lifted manually in Discord; their
+durations are descriptive. Disabling new capture does not stop existing ban,
+role, or timeout enforcement.
 
 **Enforcement paused** on a timeout or **Expiry paused** on another
 restriction means Sylvan needs confirmation before continuing. Check the

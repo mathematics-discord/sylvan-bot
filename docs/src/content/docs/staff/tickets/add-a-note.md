@@ -32,5 +32,6 @@ reverse, and it stays out of the review queue.
 
 Use [`/ticket append`](../../../commands/tickets/#ticket-append) to add context
 or **Edit** to correct the original text. Staff who can edit a visible note
-can also [hide it](../hide-or-restore/), including a note written by another
-moderator. Restoring a hidden note requires senior staff.
+can also [hide it](../hide-or-restore/). Timeout Members permits editing your
+own notes; View Audit Log permits editing anyone’s. Restoring a hidden note
+requires senior staff.

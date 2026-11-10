@@ -22,7 +22,7 @@ A selected Note rule can therefore prevent another matching rule from taking act
 
 Members holding any configured exempt role are skipped. Staff are not automatically exempt: configure their roles if they should be excluded. If required member-role information cannot be obtained, Automod skips enforcement rather than guessing whether an exemption applies.
 
-Use [/automod](../../commands/automod/) to add, remove and list rules. Use [/config automod](../../commands/automod-admin/) to switch actions on or off and manage exemptions. Saved changes normally take effect immediately. If a reply reports an unsuccessful refresh, the previous active configuration remains in use.
+Use [/automod](../../commands/automod/) to add, remove and list rules. Use [/config automod](../../commands/automod-admin/) to switch actions on or off and manage exemptions. Omitting `action` changes the shared ticket-capture and Automod switch; existing restrictions continue to expire and renew when it is disabled. Saved changes normally take effect immediately. If a reply reports an unsuccessful refresh, the previous active configuration remains in use.
 
 ## Timed bans and failures
 

@@ -1,14 +1,14 @@
 ---
 title: Set up moderation tickets
-description: Choose where Sylvan publishes tickets, enable capture, and configure reminders, review exemptions, and tracked roles.
+description: Choose where Sylvan publishes tickets, enable capture, and configure reminders and tracked roles.
 ---
 
 You need **Administrator** to configure tickets. Start by running
 `/config tickets` with no options. Only you see the reply. It lists the
-destination, enabled state, reminder interval, review-exempt roles, and
+destination, enabled state, reminder interval, and
 tracked roles.
 
-## Enable ticket capture
+## Enable ticket capture and Automod
 
 1. Choose a server text channel for ticket posts and the review summary.
    Give Sylvan **View Audit Log** so it can capture moderation actions.
@@ -38,13 +38,11 @@ By default, Sylvan reminds moderators about outstanding tickets every
 The setting is in whole minutes. A moderator can request their newest prompt
 immediately with [`/ticket top`](../../commands/tickets/#ticket-top).
 
-## Choose which actions need review
+## Approval
 
-To exempt actions taken by members of a particular role, supply that role
-in `exempt-role-add`. Use `exempt-role-remove` to end the exemption.
-Sylvan checks the **acting moderator’s roles** when it captures the action.
-New settings apply to future captures. Existing tickets keep their review
-status, and the exemption grants no review permissions.
+Actions by staff with View Audit Log, including administrators, do not require
+another moderator's approval. Other action tickets require approval by staff
+with View Audit Log. There is no configurable review-exemption role list.
 
 ## Track grants of a role
 
@@ -62,11 +60,18 @@ separate setting for restoring selected roles when a member rejoins.
 
 ## Pause or resume tickets
 
-Run `/config tickets enabled:False` to pause ticket capture and management,
-including lookups, edits, automatic expiry, and timeout renewals. Pausing
-does not lift existing restrictions. To resume with the saved destination, run
-`/config tickets enabled:True`. Capture resumes from that point. Review any
-outstanding restrictions and actions that happened during the pause.
+Run `/config tickets enabled:False` to disable new ticket capture and Automod.
+This is the same switch as `/config automod set enabled:false` without an
+`action`. Saved Automod rules, action switches, and exemptions are retained.
+
+Normal ticket lookups, edits, publication, and DMs pause. Existing restrictions
+continue to be checked, expired, and renewed, including long timeouts. Voice
+restrictions always need manual reversal in Discord. Administrator publication
+repair remains available while disabled.
+
+To resume with the saved destination, run `/config tickets enabled:True`.
+New capture resumes from that point. Actions during the pause can still end
+or update an existing restriction, but do not create ordinary new tickets.
 
 See the [configuration command](../../commands/config-tickets/) for all
 accepted options and limits.

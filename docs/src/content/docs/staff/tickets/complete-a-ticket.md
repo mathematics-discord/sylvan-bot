@@ -40,7 +40,9 @@ characters. An append must fit together with the existing comment and the
 separating newline. If an existing comment exceeds the editor limit, use
 `/ticket set` to supply its replacement.
 
-Comment and duration edits keep any existing approval. **Modification
+Comment edits keep existing approval. A duration change by a moderator without
+View Audit Log returns the ticket to review. Changes by staff with View Audit
+Log preserve approval; editing an unapproved ticket does not approve it. **Modification
 history** shows recent staff changes and indicates when earlier entries have
 been omitted.
 
@@ -50,7 +52,15 @@ Run [`/ticket top`](../../../commands/tickets/#ticket-top) in the server to
 request your newest outstanding prompt. Open **Edit** in the DM to complete
 it. Typing an ordinary DM reply leaves the ticket unchanged.
 
-A ban or timeout can prompt you even when its audit reason supplied all the
-details. If that first DM fails, a completed ticket may have no reminder to
-resend. [Find it by member or number](../find-a-ticket/) and open its editor
-in the server.
+Every captured human moderation action gets an initial DM, even when the
+audit reason supplied all the details or the action was automatically accepted.
+Notes created in the note editor do not send an extra DM, and bots are not
+prompted. Failed initial sends retry, including for completed tickets. Check
+that you allow DMs from server members; you can always [find the ticket](../find-a-ticket/)
+and edit it in the server.
+
+Initial prompts take priority over periodic reminders. Sylvan sends pending
+initial prompts newest first. Failed sends wait up to five minutes before
+retrying, allowing other tickets to prompt in the meantime; `/ticket top` explicitly
+requests your newest outstanding ticket. Only the active prompt is refreshed
+automatically. An uncertain send can produce a duplicate DM when retried.

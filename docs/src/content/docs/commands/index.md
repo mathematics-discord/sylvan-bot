@@ -35,7 +35,7 @@ See the [feature guides](../features/) for automatic behaviour and staff workflo
 
 ## Administrator commands
 
-- [/config tickets](./config-tickets/) — Configure capture, reminders, review exemptions and role tracking.
+- [/config tickets](./config-tickets/) — Configure capture, reminders, shared Automod enablement, and role tracking.
 
 - [/config persistence](./persistence/) — Remember selected safe roles across departures and rejoins.
 

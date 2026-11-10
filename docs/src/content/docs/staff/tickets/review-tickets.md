@@ -25,15 +25,16 @@ details or a pending change in Discord.
 
 On a ticket message, choose **Apps → Approve Ticket**, or choose **Approve**
 in the ticket controls. The recorded approval identifies the reviewer and
-survives later edits to the comment or duration. The member’s restriction
-continues according to its own expiry.
+survives comment edits. A duration change by a moderator without **View Audit
+Log** returns the ticket to review. A reviewer’s duration edit preserves any
+existing approval, but does not approve a ticket that is still awaiting review.
+The member’s restriction continues according to its own expiry.
 
 ## Why a ticket is missing
 
-Notes, hidden records, approved tickets, and review-exempt actions stay out
-of the queue. An action can be exempt because of a role the **acting moderator**
-held when Sylvan captured it. [Changing the exemption list](../../../setup/tickets/#choose-which-actions-need-review)
-applies to future captures.
+Notes, hidden records, and accepted tickets stay out of the queue. Actions
+created by staff with **View Audit Log**, including administrators, are
+accepted automatically. There is no separate exemption category or role list.
 
 A ticket still needing a comment, a timeout without a finite duration, or an
 action with a pending Discord change counts as waiting. Complete the details

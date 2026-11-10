@@ -21,13 +21,16 @@ message. If you have the ticket number, use `/ticket hide`.
 /ticket hide id:1234
 ```
 
-Staff who can edit a visible **note** can hide it, whoever wrote it. The note
+You can hide your own visible **notes** with Timeout Members. Editing or
+hiding someone else’s note requires View Audit Log. The note
 editor also has a **Hidden ticket** checkbox. Hiding an **action ticket**
 requires **View Audit Log** or **Administrator**, including for your own
 action or a kick. If the restriction is active, the
 [requirements for lifting it](../change-a-restriction/#lift-a-restriction-now)
 also apply. If the reversal is blocked or unconfirmed, the record stays
-visible. Check the member’s state before issuing another action.
+visible. Voice restrictions must first be lifted manually in Discord; wait
+for Sylvan to observe the reversal. Check the member’s state before issuing
+another action.
 
 A hidden ticket remains stored. Senior staff can
 [look it up by number](../find-a-ticket/#find-a-hidden-ticket).
