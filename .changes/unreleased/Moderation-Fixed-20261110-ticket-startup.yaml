@@ -1,4 +1,0 @@
-component: Moderation
-kind: Fixed
-body: Restore Sylvan's availability after the ticket update, including `/ticket show` for <@&1522665207225127034> and above.
-time: 2026-11-10T17:16:00Z

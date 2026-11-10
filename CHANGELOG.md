@@ -2,6 +2,13 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.0.5 - 2026-11-10
+## Moderation
+### Fixed
+- Restore Sylvan's availability after the ticket update, including `/ticket show` for <@&1522665207225127034> and above.
+## Internal
+### Fixed
+- Give startup migrations a ten-minute command timeout so large historical ticket backfills can finish. Ordinary application queries retain their existing timeout.
 # v1.0.4 - 2026-11-10
 ## Moderation
 ### Changed
