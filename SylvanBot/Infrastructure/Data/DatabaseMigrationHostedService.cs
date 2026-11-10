@@ -17,6 +17,9 @@ public sealed class DatabaseMigrationHostedService(IServiceScopeFactory scopeFac
         if (pendingMigrations.Count == 0)
             return;
 
+        // Historical ticket backfills can exceed the timeout used for ordinary queries.
+        dbContext.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));
+
         _logger.Information("Applying {PendingMigrationCount} pending database migration(s)", propertyValue: pendingMigrations.Count);
         await dbContext.Database.MigrateAsync(cancellationToken);
         _logger.Information("Database migrations applied successfully");
