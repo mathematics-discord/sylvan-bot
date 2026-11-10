@@ -19,6 +19,8 @@ export default defineConfig({
         pagination: false,
         sidebar: [
             {slug: 'index', label: 'Introduction'},
+            {slug: 'terms-of-service', label: 'Terms of Service'},
+            {slug: 'privacy-policy', label: 'Privacy Policy'},
             {label: 'Staff handbook', collapsed: true, items: [
                 {slug: 'staff/working-hours'},
                 {slug: 'staff/tickets', label: 'Ticket overview'},

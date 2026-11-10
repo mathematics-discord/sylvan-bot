@@ -11,6 +11,9 @@ These guides are for members of Mathematics.
 Read the [feature guides](./features/) for what Sylvan does, or browse the
 [command reference](./commands/) for syntax and examples.
 
+Read the [Terms of Service](./terms-of-service/) and [Privacy Policy](./privacy-policy/)
+for the terms of use and how Sylvan handles your information.
+
 ## Staff handbook
 
 - [Set the hours when you receive `@Moderators` pings](./staff/working-hours/)
