@@ -16,15 +16,15 @@ public sealed partial class TicketCoordinator
         var now = DateTimeOffset.UtcNow;
 
         List<Guid> due = await db.AutomodBans
-           .AsNoTracking()
-           .Where(op => op.NextCheckAt <= now
-                      && (op.Status == "Active"
-                          || op.Status == "Pending"
-                          || op.Status == "Removing"))
-           .OrderBy(op => op.NextCheckAt)
-           .Select(op => op.Id)
-           .Take(100)
-           .ToListAsync(token);
+            .AsNoTracking()
+            .Where(op => op.NextCheckAt <= now
+                       && (op.Status == "Active"
+                           || op.Status == "Pending"
+                           || op.Status == "Removing"))
+            .OrderBy(op => op.NextCheckAt)
+            .Select(op => op.Id)
+            .Take(100)
+            .ToListAsync(token);
 
         foreach (var id in due)
         {
@@ -71,19 +71,20 @@ public sealed partial class TicketCoordinator
         }
 
         var scan = await boundary.ReadAuditAsync(op.GuildId, from.AddMinutes(-10), token);
+
         TicketObservation[] changes = scan.Observations
-           .Where(o => o.Action == TicketAction.Ban && o.SubjectUserId == op.UserId)
-           .ToArray();
+            .Where(o => o.Action == TicketAction.Ban && o.SubjectUserId == op.UserId)
+            .ToArray();
 
         if (op.AuditId == 0)
         {
             TicketObservation[] matches = changes
-               .Where(o => !o.Removed
-                                            && o.ModeratorUserId == client.CurrentUser.Id
-                                            && o.CreatedAtUtc >= op.RequestedAt.AddSeconds(-1)
-                                            && o.CreatedAtUtc <= op.RequestedAt.AddMinutes(5)
-                                            && string.Equals(o.Reason, op.Reason, Ordinal))
-               .ToArray();
+                .Where(o => !o.Removed
+                           && o.ModeratorUserId == client.CurrentUser.Id
+                           && o.CreatedAtUtc >= op.RequestedAt.AddSeconds(-1)
+                           && o.CreatedAtUtc <= op.RequestedAt.AddMinutes(5)
+                           && string.Equals(o.Reason, op.Reason, Ordinal))
+                .ToArray();
 
             if (matches.Length != 1)
             {
@@ -102,15 +103,19 @@ public sealed partial class TicketCoordinator
         }
 
         IQueryable<long> priorId = db.Tickets
-            .Where(ticket => ticket.GuildId == op.GuildId && ticket.SubjectUserId == op.UserId
-                && ticket.Action == TicketAction.Ban && ticket.Status == TicketStatus.Active && ticket.SourceAuditId != null)
+            .Where(ticket => ticket.GuildId == op.GuildId
+                       && ticket.SubjectUserId == op.UserId
+                       && ticket.Action == TicketAction.Ban
+                       && ticket.Status == TicketStatus.Active
+                       && ticket.SourceAuditId != null)
             .OrderByDescending(ticket => ticket.SourceAuditId)
             .Select(ticket => ticket.Id)
             .Take(1);
 
         List<long> existing = await db.Tickets
-            .Where(ticket => ticket.GuildId == op.GuildId && ticket.Action == TicketAction.Ban
-                && (ticket.SourceAuditId == op.AuditId || priorId.Contains(ticket.Id)))
+            .Where(ticket => ticket.GuildId == op.GuildId
+                       && ticket.Action == TicketAction.Ban
+                       && (ticket.SourceAuditId == op.AuditId || priorId.Contains(ticket.Id)))
             .Select(ticket => ticket.Id)
             .ToListAsync(token);
 
@@ -132,38 +137,43 @@ public sealed partial class TicketCoordinator
 
         if (ticket is null)
         {
-            var guild = client.GetGuild(op.GuildId) ?? throw new InvalidOperationException("Guild unavailable.");
             var number = await db.Database.SqlQuery<long>($"SELECT nextval('ticket_numbers') AS \"Value\"").SingleAsync(token);
 
             ticket = new Ticket
             {
-                GuildId = op.GuildId, SubjectUserId = op.UserId, ModeratorUserId = client.CurrentUser.Id,
-                Number = number, Action = TicketAction.Ban, CreatedAtUtc = SnowflakeUtils.FromSnowflake(op.AuditId),
-                ReminderExempt = true, SourceAuditId = op.AuditId, LastAuditId = op.AuditId,
+                GuildId = op.GuildId,
+                SubjectUserId = op.UserId,
+                ModeratorUserId = client.CurrentUser.Id,
+                Number = number,
+                Action = TicketAction.Ban,
+                CreatedAtUtc = SnowflakeUtils.FromSnowflake(op.AuditId),
+                ReminderExempt = true,
+                SourceAuditId = op.AuditId,
+                LastAuditId = op.AuditId,
                 AuditReason = op.Reason,
             };
 
-            ticket.Initialise(op.Reason, null);
-            ticket.AcceptCreation(guild.CurrentUser.GuildPermissions.Administrator || guild.CurrentUser.GuildPermissions.ViewAuditLog);
+            ticket.Initialise(op.Reason, seconds: null);
+            // Automod action tickets require staff approval, regardless of Sylvan's permissions.
 
             var prior = await db.Tickets.Where(t => t.GuildId == op.GuildId
                                                    && t.SubjectUserId == op.UserId
                                                    && t.Action == TicketAction.Ban
                                                    && t.Status == TicketStatus.Active
                                                    && t.SourceAuditId != null)
-               .OrderByDescending(t => t.SourceAuditId)
-               .FirstOrDefaultAsync(token);
+                .OrderByDescending(t => t.SourceAuditId)
+                .FirstOrDefaultAsync(token);
 
             if (prior is not null)
-            {
                 if (prior.LastAuditId >= op.AuditId)
+                {
                     ticket.End(TicketStatus.Superseded, successor: prior.Number);
+                }
                 else
                 {
                     prior.End(TicketStatus.Superseded, successor: ticket.Number);
                     prior.Pending = null;
                 }
-            }
 
             db.Tickets.Add(ticket);
         }
@@ -171,9 +181,8 @@ public sealed partial class TicketCoordinator
         if (ticket.SubjectUserId != op.UserId)
             throw new InvalidOperationException("The correlated audit belongs to another subject.");
 
-        if (ticket.Status == TicketStatus.Active
-            && ticket.DurationSeconds is null
-            && !ticket.ModificationHistory.Any(h => h.Action == TicketHistoryAction.SetDuration)
+        if (ticket is { Status: TicketStatus.Active, DurationSeconds: null }
+            && ticket.ModificationHistory.All(h => h.Action != TicketHistoryAction.SetDuration)
             && op.ExpiresAtUtc is { } deadline)
         {
             ticket.SetDuration(Math.Max(1, (long)Math.Ceiling((deadline - ticket.CreatedAtUtc).TotalSeconds)), null, deadline);

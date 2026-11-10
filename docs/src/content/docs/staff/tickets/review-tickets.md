@@ -34,7 +34,9 @@ The member’s restriction continues according to its own expiry.
 
 Notes, hidden records, and accepted tickets stay out of the queue. Actions
 created by staff with **View Audit Log**, including administrators, are
-accepted automatically. There is no separate exemption category or role list.
+accepted automatically. Sylvan's Automod action tickets still require staff
+approval; image-detector bans keep automatic acceptance. Notes never require
+approval. There is no separate exemption category or role list.
 
 A ticket still needing a comment, a timeout without a finite duration, or an
 action with a pending Discord change counts as waiting. Complete the details

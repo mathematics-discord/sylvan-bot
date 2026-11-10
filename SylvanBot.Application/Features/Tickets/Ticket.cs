@@ -151,14 +151,16 @@ public sealed class Ticket
         Record(append ? TicketHistoryAction.AppendedComment : TicketHistoryAction.SetComment, moderatorId);
     }
 
-    public void SetDuration(long? seconds, ulong? moderatorId, DateTimeOffset? observedExpiry = null, bool canReview = false)
+    public void SetDuration(long? seconds, ulong? moderatorId, DateTimeOffset? observedExpiry = null, bool canReview = false, bool requiresApproval = false)
     {
         DateTimeOffset? expiry = observedExpiry ?? (seconds is { } finite ? CreatedAtUtc.AddSeconds(finite) : null);
 
         if (DurationSeconds == seconds && ExpiresAtUtc == expiry && !ExpirySuspended)
             return;
 
-        if (moderatorId is not null && !canReview && (DurationSeconds != seconds || ExpiresAtUtc != expiry))
+        var durationChanged = DurationSeconds != seconds || ExpiresAtUtc != expiry;
+
+        if (durationChanged && (requiresApproval || (moderatorId is not null && !canReview)))
         {
             ApprovedAtUtc = null;
             ApprovedByUserId = null;
@@ -197,9 +199,9 @@ public sealed class Ticket
         Record(hidden ? TicketHistoryAction.Hidden : TicketHistoryAction.Unhidden, actor.UserId);
     }
 
-    public void AcceptCreation(bool canReview)
+    public void AcceptCreation(bool canReview, bool requiresApproval = false)
     {
-        if (!canReview || Action == TicketAction.Note)
+        if (!canReview || requiresApproval || Action == TicketAction.Note)
             return;
 
         ApprovedAtUtc = CreatedAtUtc;

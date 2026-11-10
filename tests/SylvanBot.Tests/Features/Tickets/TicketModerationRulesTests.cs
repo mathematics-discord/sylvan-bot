@@ -1,7 +1,6 @@
-namespace SylvanBot.Tests.Features.Tickets;
-
-using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
+
+namespace SylvanBot.Tests.Features.Tickets;
 
 public sealed class TicketModerationRulesTests
 {
@@ -14,7 +13,7 @@ public sealed class TicketModerationRulesTests
     {
         // Arrange
         var ticket = CreateTicket(action);
-        var actor = new TicketActor(1, 2, false, timeout, ban);
+        var actor = new TicketActor(GuildId: 1, UserId: 2, IsAdministrator: false, timeout, ban);
 
         // Act
         var result = ticket.CanCorrect(actor);
@@ -30,7 +29,7 @@ public sealed class TicketModerationRulesTests
     {
         // Arrange
         var ticket = CreateTicket(TicketAction.Timeout);
-        var actor = new TicketActor(guild, user, false, true, true, CanViewAuditLog: senior);
+        var actor = new TicketActor(guild, user, IsAdministrator: false, CanTimeoutMembers: true, CanBanMembers: true, CanViewAuditLog: senior);
 
         // Act
         var allowed = ticket.CanCorrect(actor);
@@ -49,13 +48,31 @@ public sealed class TicketModerationRulesTests
     {
         // Arrange
         var now = DateTimeOffset.UtcNow;
-        var ticket = new Ticket { GuildId = 1, SubjectUserId = 2, ModeratorUserId = 3,
-            Action = TicketAction.Timeout, CreatedAtUtc = now.AddDays(-1) };
+
+        var ticket = new Ticket
+        {
+            GuildId = 1,
+            SubjectUserId = 2,
+            ModeratorUserId = 3,
+            Action = TicketAction.Timeout,
+            CreatedAtUtc = now.AddDays(-1),
+        };
+
         ticket.Initialise("reason", 86400 + remaining);
+
         if (reverted)
             ticket.End(TicketStatus.Reverted);
-        var observation = new TicketObservation(1, 1, TicketAction.Timeout, 2, 3, false, "", now)
+
+        var observation = new TicketObservation
         {
+            GuildId = 1,
+            AuditId = 1,
+            Action = TicketAction.Timeout,
+            SubjectUserId = 2,
+            ModeratorUserId = 3,
+            ModeratorIsBot = false,
+            Reason = "",
+            CreatedAtUtc = now,
             Timeout = new TicketTimeout.Until(now.AddSeconds(newRemaining)),
         };
 
@@ -103,11 +120,11 @@ public sealed class TicketModerationRulesTests
 
         // Act
         moderator.Version++;
-        var due = moderator.IsDeliveryDue(1, now.AddSeconds(30));
+        var due = moderator.IsDeliveryDue(ticketId: 1, now.AddSeconds(30));
 
         // Assert
         due.ShouldBeFalse();
-        moderator.IsDeliveryDue(1, now.AddMinutes(5)).ShouldBeTrue();
+        moderator.IsDeliveryDue(ticketId: 1, now.AddMinutes(5)).ShouldBeTrue();
     }
 
     [Test]
@@ -118,9 +135,9 @@ public sealed class TicketModerationRulesTests
         var moderator = new TicketModerator { ActiveTicketId = 1, NextDeliveryUtc = now.AddDays(1) };
 
         // Act
-        var newTicketDue = moderator.IsDeliveryDue(2, now);
+        var newTicketDue = moderator.IsDeliveryDue(ticketId: 2, now);
         moderator.NextDeliveryUtc = null;
-        var requestedDue = moderator.IsDeliveryDue(1, now);
+        var requestedDue = moderator.IsDeliveryDue(ticketId: 1, now);
 
         // Assert
         newTicketDue.ShouldBeTrue();
@@ -135,7 +152,12 @@ public sealed class TicketModerationRulesTests
     {
         // Arrange
         var ticket = CreateTicket(action);
-        var owner = new TicketActor(1, 2, false, false,
+
+        var owner = new TicketActor(
+            GuildId: 1,
+            UserId: 2,
+            IsAdministrator: false,
+            CanTimeoutMembers: false,
             CanKickMembers: action == TicketAction.Kick,
             CanMuteMembers: action == TicketAction.VoiceMute,
             CanDeafenMembers: action == TicketAction.VoiceDeafen,
@@ -144,7 +166,7 @@ public sealed class TicketModerationRulesTests
         // Act
         var allowed = ticket.CanCorrect(owner);
         var other = ticket.CanCorrect(owner with { UserId = 9 });
-        var unprivileged = ticket.CanCorrect(new TicketActor(1, 2, false, false));
+        var unprivileged = ticket.CanCorrect(new TicketActor(GuildId: 1, UserId: 2, IsAdministrator: false, CanTimeoutMembers: false));
 
         // Assert
         allowed.ShouldBeTrue();
@@ -152,13 +174,13 @@ public sealed class TicketModerationRulesTests
         unprivileged.ShouldBeFalse();
     }
 
-    [TestCase(false, false)]
-    [TestCase(true, true)]
+    [TestCase(arg1: false, arg2: false)]
+    [TestCase(arg1: true, arg2: true)]
     public void CanCorrect_AnotherModeratorsNote_RequiresReviewer(bool canReview, bool expected)
     {
         // Arrange
         var ticket = CreateTicket(TicketAction.Note);
-        var actor = new TicketActor(1, 9, false, true, CanViewAuditLog: canReview);
+        var actor = new TicketActor(GuildId: 1, UserId: 9, IsAdministrator: false, CanTimeoutMembers: true, CanViewAuditLog: canReview);
 
         // Act
         var allowed = ticket.CanCorrect(actor);
@@ -169,8 +191,16 @@ public sealed class TicketModerationRulesTests
 
     private static Ticket CreateTicket(TicketAction action)
     {
-        var ticket = new Ticket { GuildId = 1, Number = 1, SubjectUserId = 3, ModeratorUserId = 2,
-            Action = action, CreatedAtUtc = DateTimeOffset.UtcNow };
+        var ticket = new Ticket
+        {
+            GuildId = 1,
+            Number = 1,
+            SubjectUserId = 3,
+            ModeratorUserId = 2,
+            Action = action,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+        };
+
         ticket.Initialise("reason", action == TicketAction.Timeout ? 3600 : null);
         return ticket;
     }

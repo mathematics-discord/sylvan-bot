@@ -1,13 +1,42 @@
 using System.Collections.Immutable;
-
-namespace SylvanBot.Tests.Features.Tickets;
-
+using System.Globalization;
 using System.Text.Json;
 using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Features.Tickets;
 
+namespace SylvanBot.Tests.Features.Tickets;
+
 public sealed class TicketAuditReaderTests
 {
+    [TestCase(999UL, 22, "Automatic action: message matches pattern 240", true)]
+    [TestCase(999UL, 24, "Automatic action: message matches pattern 240", true)]
+    [TestCase(999UL, 22, "Automod ban rule 240; automod operation 123", true)]
+    [TestCase(999UL, 22, "Permanent, Automatic image-burst spam detection: 4 channels", false)]
+    [TestCase(456UL, 22, "Automatic action: message matches pattern 240", false)]
+    [TestCase(999UL, 24, "Sylvan ticket 42; operation 70560841-61c9-40d8-abbb-2cbd50bdc819", false)]
+    public void Read_ApprovalRequirement_DistinguishesSylvanAutomodFromOtherActions(ulong moderator, int action, string reason, bool expected)
+    {
+        // Arrange
+        using var document = JsonDocument.Parse(
+            JsonSerializer.Serialize(
+                new
+                {
+                    id = "1430000000000000000",
+                    action_type = action,
+                    target_id = "123",
+                    user_id = moderator.ToString(CultureInfo.InvariantCulture),
+                    reason,
+                    changes = new[] { new { key = "communication_disabled_until", new_value = "2026-11-11T00:00:00Z" } },
+                }));
+
+        // Act
+        var observation = TicketAuditReader.Read(guildId: 1, document.RootElement, new HashSet<ulong> { 456 }, ownBotId: 999)
+            .Single();
+
+        // Assert
+        observation.RequiresApproval.ShouldBe(expected);
+    }
+
     [Test]
     public void Read_UncachedUsers_PreservesRawIdentities()
     {
@@ -18,7 +47,7 @@ public sealed class TicketAuditReaderTests
             """);
 
         // Act
-        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(1, document.RootElement, new HashSet<ulong>(), 999);
+        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(guildId: 1, document.RootElement, new HashSet<ulong>(), ownBotId: 999);
 
         // Assert
         result.Length.ShouldBe(1);
@@ -34,17 +63,17 @@ public sealed class TicketAuditReaderTests
         // Arrange
         Dictionary<string, object> values = new Dictionary<string, object>(StringComparer.Ordinal)
         {
-            ["id"] = "1430000000000000000",
-            ["action_type"] = 22,
-            ["target_id"] = "123",
-            ["user_id"] = "456",
+            ["id"] = "1430000000000000000", ["action_type"] = 22, ["target_id"] = "123", ["user_id"] = "456",
         };
 
         values.Remove(field);
         using var document = JsonDocument.Parse(JsonSerializer.Serialize(values));
 
         // Act
-        void Act() => TicketAuditReader.Read(1, document.RootElement, new HashSet<ulong>(), 999);
+        void Act()
+        {
+            TicketAuditReader.Read(guildId: 1, document.RootElement, new HashSet<ulong>(), ownBotId: 999);
+        }
 
         // Assert
         Should.Throw<InvalidDataException>(Act).Message.ShouldContain(field);
@@ -61,7 +90,7 @@ public sealed class TicketAuditReaderTests
             """);
 
         // Act
-        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(1, document.RootElement, new HashSet<ulong>(), 999);
+        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(guildId: 1, document.RootElement, new HashSet<ulong>(), ownBotId: 999);
 
         // Assert
         result[0].Removed.ShouldBeTrue();
@@ -82,7 +111,7 @@ public sealed class TicketAuditReaderTests
             """);
 
         // Act
-        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(1, document.RootElement, new HashSet<ulong>(), 999);
+        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(guildId: 1, document.RootElement, new HashSet<ulong>(), ownBotId: 999);
 
         // Assert
         result.Length.ShouldBe(2);
@@ -104,7 +133,7 @@ public sealed class TicketAuditReaderTests
             """);
 
         // Act
-        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(1, document.RootElement, new HashSet<ulong>(), 999);
+        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(guildId: 1, document.RootElement, new HashSet<ulong>(), ownBotId: 999);
 
         // Assert
         result.Length.ShouldBe(3);
@@ -114,21 +143,21 @@ public sealed class TicketAuditReaderTests
         result[2].CreatesTicket.ShouldBeFalse();
     }
 
-    [TestCase(999UL, 42L)]
-    [TestCase(456UL, null)]
+    [TestCase(arg1: 999UL, arg2: 42L)]
+    [TestCase(arg1: 456UL, arg2: null)]
     public void Read_RestorationReason_TrustsOnlyOwnBot(ulong moderator, long? expected)
     {
         // Arrange
         using var document = JsonDocument.Parse(
             $$"""
               {"id":"1430000000000000000","action_type":25,"target_id":"123","user_id":"{{
-                moderator
-            }}",
+                  moderator
+              }}",
                "reason":"Role persistence; ticket 42","changes":[{"key":"$add","new_value":[{"id":"10"}]}]}
               """);
 
         // Act
-        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(1, document.RootElement, new HashSet<ulong>(), 999);
+        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(guildId: 1, document.RootElement, new HashSet<ulong>(), ownBotId: 999);
 
         // Assert
         result[0].RestoredTicketNumber.ShouldBe(expected);
@@ -145,7 +174,7 @@ public sealed class TicketAuditReaderTests
             """);
 
         // Act
-        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(1, document.RootElement, new HashSet<ulong>(), 999);
+        ImmutableArray<TicketObservation> result = TicketAuditReader.Read(guildId: 1, document.RootElement, new HashSet<ulong>(), ownBotId: 999);
 
         // Assert
         result.ShouldBeEmpty();
