@@ -14,14 +14,15 @@ public sealed record TicketObservation(
     public long? RestoredTicketNumber { get; init; }
 
     public bool Removed { get; init; }
-    public TicketTimeout PreviousTimeout { get; init; } = new TicketTimeout.None();
     public TicketTimeout Timeout { get; init; } = new TicketTimeout.None();
     public DotNext.Optional<Guid> OperationId { get; init; }
 
     public bool CreatesTicket => !Removed
         && (Action != TicketAction.Timeout
-            || PreviousTimeout.Value is TicketTimeout.None
-            || (PreviousTimeout.Value is TicketTimeout.Until previous
-                && (previous.ExpiresAtUtc <= CreatedAtUtc
-                    || (Timeout.Value is TicketTimeout.Until current && current.ExpiresAtUtc > previous.ExpiresAtUtc))));
+            || (Timeout.Value is TicketTimeout.Until current && current.ExpiresAtUtc > CreatedAtUtc));
+
+    public bool ContinuesTimeout(Ticket ticket) => Action == TicketAction.Timeout
+        && ticket.Action == TicketAction.Timeout && ticket.GuildId == GuildId
+        && ticket.SubjectUserId == SubjectUserId && ticket.Status == TicketStatus.Active
+        && ticket.ExpiresAtUtc > CreatedAtUtc;
 }

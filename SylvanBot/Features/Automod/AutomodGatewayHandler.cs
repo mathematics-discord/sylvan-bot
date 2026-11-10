@@ -133,6 +133,9 @@ public sealed class AutomodGatewayHandler(
             return;
 
         var guildId = channel.GuildId;
+
+        if (!runtime.IsEnabled(guildId))
+            return;
         var ct = lifetime.ApplicationStopping;
 
         try
@@ -168,6 +171,9 @@ public sealed class AutomodGatewayHandler(
 
                 return;
             }
+
+            if (!runtime.IsEnabled(guildId))
+                return;
 
             await DeleteAsync(message, guildId, rule.Id, ct);
 
@@ -273,6 +279,9 @@ public sealed class AutomodGatewayHandler(
 
                 return;
             }
+
+            if (!runtime.IsEnabled(guildId))
+                return;
 
             await member.ModifyAsync(properties => properties.TimedOutUntil = requestedExpiry, request);
 

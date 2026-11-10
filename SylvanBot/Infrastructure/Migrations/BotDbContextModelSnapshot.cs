@@ -547,11 +547,8 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<bool>("Hidden")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("ImportedFromLegacy")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("InitialPromptPending")
-                        .HasColumnType("boolean");
+                    b.Property<DateTimeOffset?>("InitialPromptAfterUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<long?>("LastAuditId")
                         .HasColumnType("bigint");
@@ -562,13 +559,7 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<long>("Number")
                         .HasColumnType("bigint");
 
-                    b.Property<long?>("PinnedPublicationChannelId")
-                        .HasColumnType("bigint");
-
                     b.Property<bool>("ReminderExempt")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("ReviewExempt")
                         .HasColumnType("boolean");
 
                     b.Property<long?>("RoleId")
@@ -592,11 +583,6 @@ namespace SylvanBot.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("TimeoutCheckAtUtc")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("UseOriginalEmbedFormat")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
@@ -623,7 +609,7 @@ namespace SylvanBot.Infrastructure.Migrations
 
                     b.ToTable("tickets", null, t =>
                         {
-                            t.HasCheckConstraint("CK_tickets_approval", "(\"ApprovedByUserId\" IS NULL) = (\"ApprovedAtUtc\" IS NULL)");
+                            t.HasCheckConstraint("CK_tickets_approval", "\"ApprovedByUserId\" IS NULL OR \"ApprovedAtUtc\" IS NOT NULL");
 
                             t.HasCheckConstraint("CK_tickets_audit", "\"SourceAuditId\" IS NULL OR (\"SourceAuditId\" > 0 AND \"LastAuditId\" IS NOT NULL AND \"LastAuditId\" >= \"SourceAuditId\")");
 
@@ -661,23 +647,10 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("LastAuditScanAtUtc")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long?>("LegacyChannelId")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("OrderedPublicationPaused")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("OrderedPublicationPending")
-                        .HasColumnType("boolean");
-
                     b.Property<int>("ReminderIntervalSeconds")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(86400);
-
-                    b.PrimitiveCollection<long[]>("ReviewExemptRoleIds")
-                        .IsRequired()
-                        .HasColumnType("bigint[]");
 
                     b.Property<long?>("ReviewSummaryChannelId")
                         .HasColumnType("bigint");
@@ -710,17 +683,11 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<long?>("ChannelId")
                         .HasColumnType("bigint");
 
-                    b.Property<int?>("LastAttemptedVersion")
-                        .HasColumnType("integer");
-
                     b.Property<DateTimeOffset?>("NextDeliveryUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<long?>("PromptMessageId")
                         .HasColumnType("bigint");
-
-                    b.Property<int?>("PromptVersion")
-                        .HasColumnType("integer");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
@@ -848,6 +815,9 @@ namespace SylvanBot.Infrastructure.Migrations
                                 .IsRequired()
                                 .HasColumnType("text");
 
+                            b1.Property<string>("Description")
+                                .HasColumnType("text");
+
                             b1.Property<string>("HistoricalText")
                                 .HasColumnType("text");
 
@@ -906,7 +876,7 @@ namespace SylvanBot.Infrastructure.Migrations
 
                             b1.ToTable("ticket_operations", null, t =>
                                 {
-                                    t.HasCheckConstraint("CK_ticket_operations_command", "(\"Kind\" IN ('RemoveBan', 'RemoveVoiceMute', 'RemoveVoiceDeafen', 'RemoveRole') OR (\"Kind\" = 'SetTimeoutExpiry' AND \"ExpiryUtc\" IS NOT NULL)) AND \"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid");
+                                    t.HasCheckConstraint("CK_ticket_operations_command", "(\"Kind\" IN ('RemoveBan', 'RemoveRole') OR (\"Kind\" = 'SetTimeoutExpiry' AND \"ExpiryUtc\" IS NOT NULL)) AND \"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid");
                                 });
 
                             b1.WithOwner()

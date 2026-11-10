@@ -10,10 +10,6 @@ public sealed class TicketModerator
 
     public ulong? PromptMessageId { get; set; }
 
-    public int? PromptVersion { get; set; }
-
-    public int? LastAttemptedVersion { get; set; }
-
     public DateTimeOffset? NextDeliveryUtc { get; set; }
 
     public int Version { get; set; }
@@ -23,16 +19,14 @@ public sealed class TicketModerator
 
     public void ClearDelivery()
     {
-        var hasDelivery = ActiveTicketId is not null || PromptMessageId is not null || PromptVersion is not null
-                          || LastAttemptedVersion is not null || NextDeliveryUtc is not null;
+        var hasDelivery = ActiveTicketId is not null || PromptMessageId is not null
+                          || NextDeliveryUtc is not null;
 
         if (!hasDelivery)
             return;
 
         ActiveTicketId = null;
         PromptMessageId = null;
-        PromptVersion = null;
-        LastAttemptedVersion = null;
         NextDeliveryUtc = null;
         Version++;
     }

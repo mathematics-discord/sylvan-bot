@@ -10,8 +10,8 @@ public sealed partial class TicketCoordinator
     {
         await using var db = await contexts.CreateDbContextAsync(token);
         var id = await db.Tickets
-            .Where(ticket => ticket.GuildId == guildId && !ticket.Hidden && !ticket.ReviewExempt
-                && ticket.ApprovedByUserId == null
+            .Where(ticket => ticket.GuildId == guildId && !ticket.Hidden
+                && ticket.ApprovedAtUtc == null
                 && ticket.Publications.Any(reference => reference.ChannelId == channelId && reference.MessageId == messageId
                     && reference.Current && !reference.Removed))
             .Select(ticket => (long?)ticket.Id)
@@ -27,7 +27,7 @@ public sealed partial class TicketCoordinator
 
         // Recheck after taking the same lock used by commands and publication. A second
         // reaction must neither replace the approver nor clear reactions again.
-        if (ticket.ApprovedByUserId is not null)
+        if (ticket.ApprovedAtUtc is not null)
             return false;
 
         var actor = await boundary.GetActorAsync(guildId, userId, token);

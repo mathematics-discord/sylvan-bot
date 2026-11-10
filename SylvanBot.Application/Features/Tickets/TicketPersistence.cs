@@ -14,7 +14,7 @@ public sealed class TicketPersistence : IEntityTypeConfiguration<Ticket>,
             table.HasCheckConstraint("CK_tickets_identity", "\"GuildId\" > 0 AND \"SubjectUserId\" > 0 AND \"ModeratorUserId\" > 0");
             table.HasCheckConstraint("CK_tickets_duration", "(\"DurationSeconds\" IS NULL OR \"DurationSeconds\" > 0 OR \"Status\" <> 'Active') AND (\"Action\" <> 'Timeout' OR (\"DurationSeconds\" IS NOT NULL AND \"ExpiresAtUtc\" IS NOT NULL))");
             table.HasCheckConstraint("CK_tickets_note_duration", "\"Action\" <> 'Note' OR \"DurationSeconds\" IS NULL");
-            table.HasCheckConstraint("CK_tickets_approval", "(\"ApprovedByUserId\" IS NULL) = (\"ApprovedAtUtc\" IS NULL)");
+            table.HasCheckConstraint("CK_tickets_approval", "\"ApprovedByUserId\" IS NULL OR \"ApprovedAtUtc\" IS NOT NULL");
             table.HasCheckConstraint("CK_tickets_audit", "\"SourceAuditId\" IS NULL OR (\"SourceAuditId\" > 0 AND \"LastAuditId\" IS NOT NULL AND \"LastAuditId\" >= \"SourceAuditId\")");
             table.HasCheckConstraint("CK_tickets_role", "\"Action\" <> 'Role' OR (\"RoleId\" IS NOT NULL AND \"RoleId\" > 0)");
             table.HasCheckConstraint("CK_tickets_supersession", "\"Status\" <> 'Superseded' OR (\"SupersededByNumber\" IS NOT NULL AND \"SupersededByNumber\" > 0 AND \"SupersededByNumber\" <> \"Number\")");
@@ -24,8 +24,6 @@ public sealed class TicketPersistence : IEntityTypeConfiguration<Ticket>,
             .HasConversion<string>();
         builder.Property(ticket => ticket.Status)
             .HasConversion<string>();
-        builder.Property(ticket => ticket.UseOriginalEmbedFormat)
-            .HasDefaultValue(false);
         builder.Property(ticket => ticket.Version)
             .IsConcurrencyToken();
         builder.Property(ticket => ticket.Comment)
@@ -46,7 +44,9 @@ public sealed class TicketPersistence : IEntityTypeConfiguration<Ticket>,
         builder.OwnsOne(ticket => ticket.Pending, pending =>
         {
             pending.ToTable("ticket_operations", table => table.HasCheckConstraint("CK_ticket_operations_command",
-                "(\"Kind\" IN ('RemoveBan', 'RemoveVoiceMute', 'RemoveVoiceDeafen', 'RemoveRole') OR (\"Kind\" = 'SetTimeoutExpiry' AND \"ExpiryUtc\" IS NOT NULL)) AND \"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid"));
+                "(\"Kind\" IN ('RemoveBan', 'RemoveRole') OR (\"Kind\" = 'SetTimeoutExpiry' AND \"ExpiryUtc\" IS NOT NULL)) AND \"Id\" <> '00000000-0000-0000-0000-000000000000'::uuid"));
+            pending.Property(operation => operation.Kind)
+                .HasConversion<string>();
             pending.WithOwner()
                 .HasForeignKey("TicketId");
             pending.HasKey("TicketId");
@@ -70,6 +70,7 @@ public sealed class TicketPersistence : IEntityTypeConfiguration<Ticket>,
             history.Property(entry => entry.Action)
                 .HasConversion<string>();
             history.Property<string>("HistoricalText");
+            history.Property<string>("Description");
             history.Property<DateTimeOffset?>("_timestamp")
                 .HasColumnName("Timestamp");
             history.Property<ulong?>("_moderatorId")

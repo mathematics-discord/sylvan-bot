@@ -33,16 +33,13 @@ internal static class TicketPresentation
 
         if (!isNote && senior)
         {
-            var label = ticket.ApprovedByUserId is null ? "Approve" : "Approved";
-
-            if (ticket.ReviewExempt)
-                label = "Review exempt";
+            var label = ticket.ApprovedAtUtc is null ? "Approve" : "Approved";
 
             builder.WithButton(
                 label,
                 $"ticket:approve:{ticket.Number}:{ticket.Version}",
                 ButtonStyle.Success,
-                disabled: ticket.ReviewExempt || ticket.ApprovedByUserId is not null);
+                disabled: ticket.ApprovedAtUtc is not null);
         }
 
         return builder.Build();
@@ -68,14 +65,14 @@ internal static class TicketPresentation
     {
         var isNote = ticket.Action == TicketAction.Note;
         var description = ActionDescription(ticket);
-        var unapproved = !isNote && ticket.ApprovedByUserId is null && !ticket.ReviewExempt;
+        var unapproved = !isNote && ticket.ApprovedAtUtc is null;
         var embed = new EmbedBuilder()
             .WithAuthor($"Ticket #{ticket.Number}")
             .WithTitle(ActionName(ticket.Action) + (unapproved ? " (UNAPPROVED)" : string.Empty) + (isNote && ticket.Hidden ? " · Hidden" : string.Empty))
             .WithColor(ModerationColour(ticket))
             .WithTimestamp(ticket.CreatedAtUtc);
 
-        if (ticket.Action == TicketAction.Ban || (ticket.UseOriginalEmbedFormat && !isNote))
+        if (ticket.Action == TicketAction.Ban)
             embed.WithThumbnailUrl("https://media.tenor.com/PHREyAefRckAAAAM/packwatch.gif");
 
         if (ticket.Comment.Length > InlineCommentLimit)
@@ -83,7 +80,7 @@ internal static class TicketPresentation
         else if (ticket.Comment.Length > 0)
             description += $"\n\n{ticket.Comment}";
 
-        string FormatId(ulong id) => ticket.UseOriginalEmbedFormat ? $"`{id}`" : id.ToString(CultureInfo.InvariantCulture);
+        string FormatId(ulong id) => id.ToString(CultureInfo.InvariantCulture);
 
         embed.WithDescription(description);
         embed.AddField("User ID", FormatId(ticket.SubjectUserId), inline: true);
@@ -95,16 +92,20 @@ internal static class TicketPresentation
                 : "**Permanent**", inline: true);
 
         if (ticket.ExpiresAtUtc is { } expiry)
-            embed.AddField("Expires", FormatExpiry(expiry), inline: true);
+            embed.AddField(ticket.Action is TicketAction.VoiceMute or TicketAction.VoiceDeafen ? "Descriptive end" : "Expires", FormatExpiry(expiry), inline: true);
+
+        if (ticket.Action is TicketAction.VoiceMute or TicketAction.VoiceDeafen)
+            embed.AddField("Voice restriction", "Lift this restriction manually in Discord. Its duration is descriptive.");
 
         if (ticket.Action == TicketAction.Role)
             embed.AddField("Role", $"<@&{ticket.RoleId}> (`{ticket.RoleId}`)", inline: true);
 
         if (ticket.Pending is not null)
             embed.AddField("Pending", "Expiry or a Discord change is awaiting confirmation.");
-        if (ticket.ExpirySuspended && ticket.Status == TicketStatus.Active)
+        if (ticket.ExpirySuspended && ticket.Status == TicketStatus.Active
+            && ticket.Action is not (TicketAction.VoiceMute or TicketAction.VoiceDeafen))
             embed.AddField(ticket.Action == TicketAction.Timeout ? "Enforcement paused" : "Expiry paused",
-                "Confirm the duration after audit recovery.");
+                "Automatic changes are paused because the saved restriction could not be verified. Use Edit to set a new duration.");
 
         AddHistory(embed, ticket);
 
@@ -127,10 +128,10 @@ internal static class TicketPresentation
         if (ticket.Pending is not null)
             text += " A Discord change is awaiting reconciliation.";
 
-        if (ticket.ExpirySuspended)
+        if (ticket.ExpirySuspended && ticket.Action is not (TicketAction.VoiceMute or TicketAction.VoiceDeafen))
             text += ticket.Action == TicketAction.Timeout
-                ? " Timeout enforcement is paused until the duration is confirmed."
-                : " Automatic expiry is paused until the duration is confirmed.";
+                ? " Automatic timeout changes are paused. Use Edit to set a new duration."
+                : " Automatic expiry is paused. Use Edit to set a new duration.";
 
         if (ticket.Status == TicketStatus.Superseded)
             text += $" Superseded by ticket #{ticket.SupersededByNumber}.";

@@ -6,7 +6,7 @@ using SylvanBot.Features.Tickets;
 public sealed class TicketNotePresentationTests
 {
     [Test]
-    public void NoteUsesTheTicketEmbedAndPreservesItsLegacyDetails()
+    public void NoteUsesTheTicketEmbedAndPreservesItsDetails()
     {
         var ticket = new Ticket
         {

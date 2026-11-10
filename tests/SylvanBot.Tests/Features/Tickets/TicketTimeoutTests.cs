@@ -86,7 +86,7 @@ public sealed class TicketTimeoutTests
     }
 
     [Test]
-    public void ConfirmTimeoutChange_ModeratorExtension_PreservesFullDurationAndApproval()
+    public void ConfirmTimeoutChange_ModeratorExtension_PreservesDurationAndRequiresReview()
     {
         // Arrange
         var ticket = Create();
@@ -100,7 +100,7 @@ public sealed class TicketTimeoutTests
         ticket.ExpiresAtUtc.ShouldBe(Started.AddDays(90));
         ticket.DurationSeconds.ShouldBe(90L * 86400);
         ticket.AppliedTimeoutUntilUtc.ShouldBe(Started.AddDays(28));
-        ticket.ApprovedByUserId.ShouldBe(3UL);
+        ticket.ApprovedByUserId.ShouldBeNull();
         ticket.Pending.ShouldBeNull();
         var lastChange = ticket.ModificationHistory
             .Last();
@@ -127,12 +127,42 @@ public sealed class TicketTimeoutTests
         ticket.Status.ShouldBe(TicketStatus.Active);
     }
 
+    [TestCase(1)]
+    [TestCase(7)]
+    [TestCase(90)]
+    public void ConfirmTimeoutChange_SuspendedRestriction_ResumesWithConfirmedDuration(int days)
+    {
+        // Arrange
+        var ticket = new Ticket
+        {
+            GuildId = 1, Number = 1, SubjectUserId = 2, ModeratorUserId = 3,
+            CreatedAtUtc = Started, Action = TicketAction.Timeout,
+            ExpirySuspended = true,
+        };
+
+        ticket.Initialise("reason", 7L * 86400);
+        ticket.ObserveTimeoutWindow(null, Started);
+        var expiry = Started.AddDays(days);
+        var nativeExpiry = Ticket.NativeTimeoutExpiry(expiry, Started);
+
+        // Act
+        Extend(ticket, expiry, nativeExpiry, requester: 3);
+
+        // Assert
+        ticket.ExpirySuspended.ShouldBeFalse();
+        ticket.ExpiresAtUtc.ShouldBe(expiry);
+        ticket.DurationSeconds.ShouldBe(days * 86400L);
+        ticket.AppliedTimeoutUntilUtc.ShouldBe(nativeExpiry);
+        ticket.Pending.ShouldBeNull();
+        ticket.Status.ShouldBe(TicketStatus.Active);
+    }
+
     [Test]
-    public void ConfirmTimeoutChange_LegacyPendingOperation_UsesOriginalNativeExpiry()
+    public void ConfirmTimeoutChange_PendingOperationWithoutNativeWindow_UsesOriginalNativeExpiry()
     {
         // Arrange
         var ticket = Create();
-        ticket.BeginTimeoutChange(new TicketOperation { Kind = "SetTimeoutExpiry", ExpiryUtc = Started.AddDays(10), RequestedBy = 3 });
+        ticket.BeginTimeoutChange(new TicketOperation { Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = Started.AddDays(10), RequestedBy = 3 });
 
         // Act
         ticket.ConfirmTimeoutChange(Started);
@@ -149,7 +179,7 @@ public sealed class TicketTimeoutTests
         var ticket = Create();
         ticket.BeginTimeoutChange(new TicketOperation
         {
-            Kind = "SetTimeoutExpiry", ExpiryUtc = Started.AddHours(1), NativeExpiryUtc = Started.AddHours(1), RequestedBy = 3,
+            Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = Started.AddHours(1), NativeExpiryUtc = Started.AddHours(1), RequestedBy = 3,
         });
 
         // Act
@@ -177,7 +207,7 @@ public sealed class TicketTimeoutTests
     {
         ticket.BeginTimeoutChange(new TicketOperation
         {
-            Kind = "SetTimeoutExpiry", ExpiryUtc = expiry, NativeExpiryUtc = applied, RequestedBy = requester,
+            Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = expiry, NativeExpiryUtc = applied, RequestedBy = requester,
         });
 
         ticket.ConfirmTimeoutChange(Started);

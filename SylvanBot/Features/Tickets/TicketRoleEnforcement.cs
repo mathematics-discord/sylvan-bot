@@ -6,29 +6,10 @@ using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Features.RolePersistence;
 
-public sealed class RoleTicketStrategy(DiscordSocketClient client, TicketBoundary boundary, RolePersistenceWorker persistence, ILogger logger)
-    : ITicketStrategy
+public sealed class TicketRoleEnforcement(DiscordSocketClient client, TicketBoundary boundary, RolePersistenceWorker persistence, ILogger logger)
 {
-    public TicketAction Action => TicketAction.Role;
-
-    public async Task<TicketResult> HandleAsync(BotDbContext db, TicketRequest request, CancellationToken token)
+    public async Task<TicketResult> ReconcileAsync(BotDbContext db, Ticket ticket, bool auditCurrent, CancellationToken token)
     {
-        if (request.Value is ObserveModeration observed)
-            return await BanTicketStrategy.RecordObservedAsync(db, observed, token);
-
-        if (request.Value is EditDetails edit)
-        {
-            edit.Ticket.SetDuration(edit.Details.DurationSeconds == long.MaxValue ? null : edit.Details.DurationSeconds, edit.Actor.UserId);
-            await db.SaveChangesAsync(token);
-
-            return new TicketResult([edit.Ticket.Id], "Duration saved. Expiry will follow audit reconciliation.");
-        }
-
-        if (request.Value is not ReconcileTicket recovery)
-            throw new ArgumentException("Unsupported role request.", nameof(request));
-
-        var ticket = recovery.Ticket;
-
         if (ticket.SourceAuditId is null)
             ticket.ExpirySuspended = true;
 
@@ -39,7 +20,7 @@ public sealed class RoleTicketStrategy(DiscordSocketClient client, TicketBoundar
             return new TicketResult([], string.Empty);
         }
 
-        if (!recovery.AuditCurrent || ticket.ExpirySuspended || ticket.ExpiresAtUtc is null || ticket.ExpiresAtUtc > DateTimeOffset.UtcNow)
+        if (!auditCurrent || ticket.ExpirySuspended || ticket.ExpiresAtUtc is null || ticket.ExpiresAtUtc > DateTimeOffset.UtcNow)
             return new TicketResult([], string.Empty);
 
         var gate = persistence.Gate(ticket.GuildId);
@@ -53,7 +34,7 @@ public sealed class RoleTicketStrategy(DiscordSocketClient client, TicketBoundar
             var scan = await boundary.ReadAuditAsync(ticket.GuildId, config.LastAuditScanAtUtc!.Value.AddMinutes(-10), token);
 
             var newer = scan.Observations
-               .Any(value => value.Action == Action
+               .Any(value => value.Action == TicketAction.Role
                         && value.SubjectUserId == ticket.SubjectUserId
                         && value.RoleId == ticket.RoleId
                         && value.AuditId > ticket.LastAuditId
@@ -64,7 +45,7 @@ public sealed class RoleTicketStrategy(DiscordSocketClient client, TicketBoundar
 
             if (ticket.Pending is null)
             {
-                ticket.Pending = new TicketOperation { Kind = "RemoveRole" };
+                ticket.Pending = new TicketOperation { Kind = TicketOperationKind.RemoveRole };
                 ticket.Record(TicketHistoryAction.AuditObserved);
             }
 

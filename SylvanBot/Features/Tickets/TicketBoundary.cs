@@ -156,6 +156,20 @@ public sealed class TicketBoundary(
         }
     }
 
+    public async Task<bool> CanReviewAsync(ulong guildId, ulong userId, CancellationToken token)
+    {
+        try
+        {
+            var member = await socketClient.Rest.GetGuildUserAsync(guildId, userId, Options(token));
+            return member is not null && (member.GuildPermissions.Administrator || member.GuildPermissions.ViewAuditLog);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.Warning(exception, "Could not resolve ticket review permission for {UserId} in {GuildId}", userId, guildId);
+            return false;
+        }
+    }
+
     public async Task<TicketActor> GetActorAsync(ulong guildId, ulong userId, CancellationToken cancellationToken)
     {
         using var timing = new OperationTiming(logger.ForContext("GuildId", guildId).ForContext("UserId", userId), "ticket.actor", "guild");

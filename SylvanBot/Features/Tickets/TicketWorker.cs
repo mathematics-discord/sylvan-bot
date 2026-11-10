@@ -11,7 +11,7 @@ public sealed class TicketWorker(
     IDbContextFactory<BotDbContext> contextFactory,
     TicketCoordinator coordinator,
     TicketBoundary boundary,
-    TicketReviewSummary reviewSummary,
+    TicketDeliveryWorker delivery,
     ILogger logger) : BackgroundService, IDiscordGatewayHandler
 {
     private readonly SemaphoreSlim _wake = new SemaphoreSlim(0, 1);
@@ -23,11 +23,8 @@ public sealed class TicketWorker(
     {
         client.Ready += OnReadyAsync;
         client.AuditLogCreated += OnAuditAsync;
-        client.UserVoiceStateUpdated += OnVoiceAsync;
         client.UserJoined += OnJoinedAsync;
         client.Connected += OnConnectedAsync;
-        client.MessageReceived += OnMessageAsync;
-        client.MessageDeleted += OnMessageDeletedAsync;
 
         return Task.CompletedTask;
     }
@@ -36,15 +33,13 @@ public sealed class TicketWorker(
     {
         client.Ready -= OnReadyAsync;
         client.AuditLogCreated -= OnAuditAsync;
-        client.UserVoiceStateUpdated -= OnVoiceAsync;
         client.UserJoined -= OnJoinedAsync;
         client.Connected -= OnConnectedAsync;
-        client.MessageReceived -= OnMessageAsync;
-        client.MessageDeleted -= OnMessageDeletedAsync;
     }
 
     public void Wake()
     {
+        delivery.Wake();
         try
         {
             _wake.Release();
@@ -88,8 +83,7 @@ public sealed class TicketWorker(
 
                     await coordinator.RecoverAutomodBansAsync(stoppingToken);
                     await ProcessGuildsAsync(stoppingToken);
-                    await reviewSummary.RefreshAsync(stoppingToken);
-                    await ProcessModeratorsAsync(stoppingToken);
+                    delivery.Wake();
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                 {
@@ -108,28 +102,6 @@ public sealed class TicketWorker(
         {
             _logger.Information("Ticket worker stopped");
         }
-    }
-
-    private Task OnMessageAsync(SocketMessage message)
-    {
-        if (reviewSummary.IsChannel(message.Channel.Id))
-            Wake();
-
-        return Task.CompletedTask;
-    }
-
-    private Task OnMessageDeletedAsync(Cacheable<IMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel)
-    {
-        if (reviewSummary.IsChannel(channel.Id))
-            Wake();
-
-        return Task.CompletedTask;
-    }
-
-    private Task OnVoiceAsync(SocketUser user, SocketVoiceState before, SocketVoiceState after)
-    {
-        Wake();
-        return Task.CompletedTask;
     }
 
     private Task OnReadyAsync()
@@ -175,9 +147,9 @@ public sealed class TicketWorker(
             List<TicketConfiguration> configurations = await db.TicketConfigurations
                 .AsNoTracking()
                 .Where(config => config.GuildId > afterCursor
-                                 && config.Enabled
-                                 && config.DestinationChannelId != null
-                                 && config.CaptureFromUtc != null)
+                                 && config.CaptureFromUtc != null
+                                 && (config.Enabled || db.Tickets.Any(ticket => ticket.GuildId == config.GuildId
+                                     && (ticket.Status == TicketStatus.Active || ticket.Pending != null))))
                 .OrderBy(config => config.GuildId)
                 .Take(100)
                 .ToListAsync(token);
@@ -224,17 +196,11 @@ public sealed class TicketWorker(
                         .Where(ticket => ticket.GuildId == config.GuildId
                                          && ticket.Id > after
                                          && (ticket.Pending != null
-                                             || (ticket.Status == TicketStatus.Active && !ticket.ExpirySuspended && ticket.ExpiresAtUtc <= now)
+                                             || (ticket.Status == TicketStatus.Active && ticket.Action != TicketAction.VoiceMute
+                                                 && ticket.Action != TicketAction.VoiceDeafen && !ticket.ExpirySuspended && ticket.ExpiresAtUtc <= now)
                                              || (ticket.Action == TicketAction.Timeout
                                                  && ticket.Status == TicketStatus.Active && !ticket.ExpirySuspended
-                                                 && (ticket.TimeoutCheckAtUtc == null || ticket.TimeoutCheckAtUtc <= now))
-                                             || (!ticket.Hidden
-                                                 && (!config.OrderedPublicationPending
-                                                     || (config.LegacyChannelId != null && !ticket.ImportedFromLegacy)
-                                                     || ticket.Publications.Any(reference => reference.Current && !reference.Removed))
-                                                 && !ticket.SendUncertain
-                                                 && !ticket.Publications.Any(reference => reference.Current && !reference.Removed && reference.Revision == ticket.Version))
-                                             || ticket.Publications.Any(reference => !reference.Removed && (ticket.Hidden || !reference.Current))))
+                                                 && (ticket.TimeoutCheckAtUtc == null || ticket.TimeoutCheckAtUtc <= now))))
                         .OrderBy(ticket => ticket.Id)
                         .Select(ticket => ticket.Id)
                         .Take(100)
@@ -266,63 +232,10 @@ public sealed class TicketWorker(
                     after = ids[^1];
                 }
 
-                if (config.OrderedPublicationPending && !config.OrderedPublicationPaused
-                    && await coordinator.PublishOrderedBatchAsync(config, token))
-                    Wake();
             }
 
             cursor = configurations[^1].GuildId;
         }
     }
 
-    private async Task ProcessModeratorsAsync(CancellationToken token)
-    {
-        ulong after = 0;
-
-        while (true)
-        {
-            await using var db = await contextFactory.CreateDbContextAsync(token);
-
-            IQueryable<ulong> enabled = db.TicketConfigurations
-                .Where(config => config.Enabled && config.DestinationChannelId != null)
-                .Select(config => config.GuildId);
-
-            IQueryable<ulong> moderators = db.TicketModerators
-                .Where(moderator => moderator.ActiveTicketId != null)
-                .Select(moderator => moderator.UserId);
-
-            List<ulong> users = await db.Tickets
-                .Where(ticket => !ticket.Hidden
-                                 && !ticket.ReminderExempt
-                                 && (ticket.InitialPromptPending || string.IsNullOrWhiteSpace(ticket.Comment))
-                                 && enabled.Contains(ticket.GuildId))
-                .Select(ticket => ticket.ModeratorUserId)
-                .Union(moderators)
-                .Where(user => user > after)
-                .OrderBy(user => user)
-                .Take(100)
-                .ToListAsync(token);
-
-            if (users.Count == 0)
-                return;
-
-            foreach (var user in users)
-            {
-                try
-                {
-                    await coordinator.RemindAsync(user, force: false, token);
-                }
-                catch (OperationCanceledException) when (token.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception exception)
-                {
-                    _logger.Warning("Ticket reminder failed for moderator {ModeratorId} ({FailureType})", user, exception.GetType().Name);
-                }
-            }
-
-            after = users[^1];
-        }
-    }
 }

@@ -123,7 +123,7 @@ public sealed class TicketDetailsTests
     [TestCase("1 M, reason", 2592000L)]
     [TestCase("1 month, reason", 2592000L)]
     [TestCase("1 year, reason", 31536000L)]
-    public void ParseReply_LegacyUnits_PreservesDurationMeaning(string reply, long seconds)
+    public void ParseReply_DurationUnits_PreservesDurationMeaning(string reply, long seconds)
     {
         // Arrange
         // Act

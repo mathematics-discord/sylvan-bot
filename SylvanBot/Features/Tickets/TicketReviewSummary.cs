@@ -19,7 +19,7 @@ public sealed class TicketReviewSummary(
 
     public bool IsChannel(ulong channelId) => _channels.ContainsKey(channelId);
 
-    // Only the ticket worker runs refreshes; gateway callbacks wake it
+    // Only the publication loop runs refreshes; gateway callbacks wake it
     public async Task RefreshAsync(CancellationToken token)
     {
         ulong after = 0;
@@ -30,8 +30,7 @@ public sealed class TicketReviewSummary(
 
             List<TicketConfiguration> configurations = await db.TicketConfigurations
                .Where(config => config.GuildId > after
-                          && ((config.Enabled && config.DestinationChannelId != null
-                              && (!config.OrderedPublicationPending || config.LegacyChannelId != null))
+                          && ((config.Enabled && config.DestinationChannelId != null)
                               || config.ReviewSummaryMessageId != null))
                .OrderBy(config => config.GuildId)
                .Take(100)
@@ -225,23 +224,10 @@ public sealed class TicketReviewSummary(
     internal static string ReviewLine(Ticket ticket, DotNext.Optional<TicketMessage> published)
     {
         var label = $"#{ticket.Number}";
-        if (published.TryGet(out var target) || TryGetLegacyMessage(ticket, out target))
+        if (published.TryGet(out var target))
             label = $"[{label}]({TicketPresentation.Link(ticket.GuildId, target.ChannelId, target.MessageId)})";
 
         return $"- {label} - {TicketPresentation.ActionDescription(ticket)}";
-    }
-
-    private static bool TryGetLegacyMessage(Ticket ticket, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out TicketMessage? message)
-    {
-        if (ticket.ImportedFromLegacy)
-        {
-            foreach (var entry in ticket.ModificationHistory)
-                if (entry.TryGetLegacyListLink(out var link) && TicketReference.TryParseMessageLink(link, ticket.GuildId, out message))
-                    return true;
-        }
-
-        message = null;
-        return false;
     }
 
 }

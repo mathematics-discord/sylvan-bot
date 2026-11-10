@@ -1,0 +1,5 @@
+component: Moderation
+kind: Changed
+body: >-
+  <@&1328097118644338779> and above have their actions accepted automatically through View Audit Log permission, with no review-exemption role list. They can edit and approve anyone's tickets. Duration changes by other moderators return accepted tickets to review; comment edits and automatic timeout renewals preserve approval. The review summary remains at the bottom of the tickets channel.
+time: 2026-11-10T00:00:00Z

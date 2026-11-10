@@ -2,7 +2,6 @@ namespace SylvanBot.Application.Features.Tickets;
 
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Globalization;
-using System.Text.Json;
 
 public sealed class TicketHistoryEntry
 {
@@ -46,55 +45,12 @@ public sealed class TicketHistoryEntry
     // Persisted history from before structured entries.
     private string? HistoricalText { get; set; }
 
-    private const string ImportProvenancePrefix = "Legacy current record and import provenance:\n";
-
-    public bool TryGetLegacyListLink(out string link)
-    {
-        link = string.Empty;
-        if (Action != TicketHistoryAction.Historical || HistoricalText is not { } text
-            || !text.StartsWith(ImportProvenancePrefix, StringComparison.Ordinal))
-            return false;
-
-        try
-        {
-            using var json = JsonDocument.Parse(text.AsMemory(ImportProvenancePrefix.Length));
-            if (json.RootElement.ValueKind != JsonValueKind.Object
-                || !json.RootElement.TryGetProperty("legacy_list_link", out var property)
-                || property.ValueKind != JsonValueKind.String || property.GetString() is not { Length: > 0 } value)
-                return false;
-
-            link = value;
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-    }
+    private string? Description { get; set; }
 
     public string Format()
     {
         if (Action == TicketHistoryAction.Historical)
-        {
-            var text = HistoricalText ?? throw new InvalidOperationException("Historical entry has no text.");
-            if (text.StartsWith(ImportProvenancePrefix, StringComparison.Ordinal))
-                return "Imported from the legacy ticket register.";
-
-            const string marker = ", history version ";
-            var versionStart = text.IndexOf(marker, StringComparison.Ordinal);
-            var versionEnd = text.IndexOf(" (raw sparse row;", StringComparison.Ordinal);
-            if (text.StartsWith("Legacy ticket #", StringComparison.Ordinal) && versionStart > 0
-                && versionEnd > versionStart + marker.Length
-                && int.TryParse(text.AsSpan(versionStart + marker.Length, versionEnd - versionStart - marker.Length),
-                    NumberStyles.None, CultureInfo.InvariantCulture, out var version))
-            {
-                return _timestamp is { } time
-                    ? $"Legacy revision {version} · <t:{time.ToUnixTimeSeconds()}:f>"
-                    : $"Legacy revision {version}";
-            }
-
-            return text;
-        }
+            return Description ?? HistoricalText ?? throw new InvalidOperationException("Historical entry has no text.");
 
         var actor = _moderatorId is { } moderator ? $"<@{moderator}>" : "Sylvan";
         var action = Action switch

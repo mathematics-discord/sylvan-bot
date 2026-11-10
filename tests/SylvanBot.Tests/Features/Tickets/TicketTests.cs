@@ -49,7 +49,7 @@ public sealed class TicketTests
         // Arrange
         var ticket = Create(action);
         var pending = pendingOperation
-            ? new TicketOperation { Kind = action == TicketAction.Ban ? "RemoveBan" : "SetTimeoutExpiry", ExpiryUtc = DateTimeOffset.UtcNow }
+            ? new TicketOperation { Kind = action == TicketAction.Ban ? TicketOperationKind.RemoveBan : TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = DateTimeOffset.UtcNow }
             : null;
 
         ticket.Pending = pending;
@@ -285,16 +285,17 @@ public sealed class TicketTests
         history.Format().ShouldBe(originalDescription);
     }
 
-    internal static Ticket Create(TicketAction action, bool reviewExempt = false)
+    internal static Ticket Create(TicketAction action, bool canReview = false)
     {
         var ticket = new Ticket
         {
             GuildId = 1, Number = 1, SubjectUserId = 2, ModeratorUserId = 3,
-            CreatedAtUtc = DateTimeOffset.UtcNow, Action = action, ReviewExempt = reviewExempt
+            CreatedAtUtc = DateTimeOffset.UtcNow, Action = action
         };
 
         ticket.Initialise("reason", action == TicketAction.Timeout ? 3600 : null);
 
+        ticket.AcceptCreation(canReview);
         return ticket;
     }
 
@@ -345,9 +346,11 @@ public sealed class TicketTests
 
     [TestCase(TicketAction.Ban, true)]
     [TestCase(TicketAction.Timeout, true)]
-    [TestCase(TicketAction.Kick, false)]
-    [TestCase(TicketAction.VoiceMute, false)]
-    public void Initialise_CompleteAuditTicket_QueuesInitialPromptForBanAndTimeout(TicketAction action, bool expected)
+    [TestCase(TicketAction.Kick, true)]
+    [TestCase(TicketAction.VoiceMute, true)]
+    [TestCase(TicketAction.VoiceDeafen, true)]
+    [TestCase(TicketAction.Role, true)]
+    public void Initialise_CompleteAuditTicket_QueuesInitialPromptForHumanActions(TicketAction action, bool expected)
     {
         // Arrange
         var ticket = new Ticket

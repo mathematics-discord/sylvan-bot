@@ -1,5 +1,3 @@
-using static SylvanBot.Application.Features.Tickets.TicketOperationCommand;
-
 namespace SylvanBot.Application.Features.Tickets;
 
 using static System.StringComparison;
@@ -37,14 +35,6 @@ public sealed class Ticket
 
     public bool Hidden { get; private set; }
 
-    public ulong? PinnedPublicationChannelId { get; init; }
-
-    public bool UseOriginalEmbedFormat { get; init; }
-
-    public bool ImportedFromLegacy { get; init; }
-
-    public bool ReviewExempt { get; init; }
-
     public bool ReminderExempt { get; init; }
 
     public ulong? ApprovedByUserId { get; private set; }
@@ -69,7 +59,10 @@ public sealed class Ticket
 
     public bool SendUncertain { get; set; }
 
-    public bool InitialPromptPending { get; set; }
+    public DateTimeOffset? InitialPromptAfterUtc { get; set; }
+
+    [NotMapped]
+    public bool InitialPromptPending => InitialPromptAfterUtc is not null;
 
     public IList<TicketPublication> Publications { get; } = [];
 
@@ -99,10 +92,10 @@ public sealed class Ticket
         && actor.UserId != 0
         && (actor.IsAdministrator
             || actor.CanViewAuditLog
-            || (Action == TicketAction.Note && actor.CanTimeoutMembers)
             || (actor.UserId == ModeratorUserId
                 && Action switch
                 {
+                    TicketAction.Note => actor.CanTimeoutMembers,
                     TicketAction.Timeout => actor.CanTimeoutMembers,
                     TicketAction.Ban => actor.CanBanMembers,
                     TicketAction.VoiceMute => actor.CanMuteMembers,
@@ -158,12 +151,18 @@ public sealed class Ticket
         Record(append ? TicketHistoryAction.AppendedComment : TicketHistoryAction.SetComment, moderatorId);
     }
 
-    public void SetDuration(long? seconds, ulong? moderatorId, DateTimeOffset? observedExpiry = null)
+    public void SetDuration(long? seconds, ulong? moderatorId, DateTimeOffset? observedExpiry = null, bool canReview = false)
     {
         DateTimeOffset? expiry = observedExpiry ?? (seconds is { } finite ? CreatedAtUtc.AddSeconds(finite) : null);
 
         if (DurationSeconds == seconds && ExpiresAtUtc == expiry && !ExpirySuspended)
             return;
+
+        if (moderatorId is not null && !canReview && (DurationSeconds != seconds || ExpiresAtUtc != expiry))
+        {
+            ApprovedAtUtc = null;
+            ApprovedByUserId = null;
+        }
 
         DurationSeconds = seconds;
         ExpiresAtUtc = expiry;
@@ -198,6 +197,15 @@ public sealed class Ticket
         Record(hidden ? TicketHistoryAction.Hidden : TicketHistoryAction.Unhidden, actor.UserId);
     }
 
+    public void AcceptCreation(bool canReview)
+    {
+        if (!canReview || Action == TicketAction.Note)
+            return;
+
+        ApprovedAtUtc = CreatedAtUtc;
+        ApprovedByUserId = ModeratorUserId;
+    }
+
     public void Approve(TicketActor actor, int version)
     {
         if (actor.GuildId != GuildId || actor.UserId == 0 || actor is { IsAdministrator: false, CanViewAuditLog: false })
@@ -206,7 +214,7 @@ public sealed class Ticket
         if (version != Version || Hidden || !Complete || Pending is not null)
             throw new BotCommandException("Complete the details, resolve pending changes and refresh before approving.");
 
-        if (ApprovedByUserId is not null || ReviewExempt)
+        if (ApprovedAtUtc is not null)
             return;
 
         ApprovedByUserId = actor.UserId;
@@ -216,7 +224,7 @@ public sealed class Ticket
 
     public bool TryApproveReaction(TicketActor actor, ulong channelId, ulong messageId)
     {
-        if (ApprovedByUserId is not null || ReviewExempt || Hidden)
+        if (ApprovedAtUtc is not null || Hidden)
             return false;
 
         var publication = Publications
@@ -273,7 +281,7 @@ public sealed class Ticket
 
     public void BeginTimeoutChange(TicketOperation operation)
     {
-        if (Action != TicketAction.Timeout || Pending is not null || operation.Command.Value is not ChangeTimeout)
+        if (Action != TicketAction.Timeout || Pending is not null || operation.Kind != TicketOperationKind.SetTimeoutExpiry)
             throw new BotCommandException("This ticket cannot accept that pending change.");
 
         Pending = operation;
@@ -287,23 +295,23 @@ public sealed class Ticket
         && (AppliedTimeoutUntilUtc is null
             || (AppliedTimeoutUntilUtc < ExpiresAtUtc && AppliedTimeoutUntilUtc <= now.AddDays(7)));
 
-    public void ObserveTimeoutWindow(DateTimeOffset expiry, DateTimeOffset now)
+    public void ObserveTimeoutWindow(DateTimeOffset? expiry, DateTimeOffset now)
     {
         AppliedTimeoutUntilUtc = expiry;
         TimeoutCheckAtUtc = ExpiresAtUtc < now.AddDays(1) ? ExpiresAtUtc : now.AddDays(1);
     }
 
-    public void ConfirmTimeoutChange(DateTimeOffset now)
+    public void ConfirmTimeoutChange(DateTimeOffset now, bool canReview = false)
     {
         var pending = Pending ?? throw new InvalidOperationException("No timeout change is pending.");
 
-        if (pending.Command.Value is not ChangeTimeout change)
+        if (pending.Kind != TicketOperationKind.SetTimeoutExpiry || pending.ExpiryUtc is null)
             throw new InvalidOperationException("The pending operation is not a timeout change.");
 
-        SetDuration(Math.Max(1, (long)Math.Ceiling((change.ExpiryUtc - CreatedAtUtc).TotalSeconds)), pending.RequestedBy, change.ExpiryUtc);
-        ObserveTimeoutWindow(pending.NativeExpiryUtc ?? change.ExpiryUtc, now);
+        SetDuration(Math.Max(1, (long)Math.Ceiling((pending.ExpiryUtc.Value - CreatedAtUtc).TotalSeconds)), pending.RequestedBy, pending.ExpiryUtc.Value, canReview);
+        ObserveTimeoutWindow(pending.NativeExpiryUtc ?? pending.ExpiryUtc.Value, now);
 
-        if (change.ExpiryUtc <= now)
+        if (pending.ExpiryUtc.Value <= now)
             End(TicketStatus.Expired, pending.RequestedBy);
 
         Pending = null;
@@ -318,9 +326,7 @@ public sealed class Ticket
         if (comment.Length > CommentLimit)
             throw new BotCommandException("The comment is too long.");
 
-        InitialPromptPending = SourceAuditId is not null
-            && !ReminderExempt
-            && Action is TicketAction.Ban or TicketAction.Timeout;
+        InitialPromptAfterUtc = SourceAuditId is not null && !ReminderExempt ? CreatedAtUtc : null;
 
         Comment = comment;
         DurationSeconds = seconds;

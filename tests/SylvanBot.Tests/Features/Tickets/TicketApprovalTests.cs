@@ -6,6 +6,62 @@ using SylvanBot.Features.Tickets;
 
 public sealed class TicketApprovalTests
 {
+    [TestCase(true)]
+    [TestCase(false)]
+    public void AcceptCreation_ReviewerPermission_DeterminesAcceptance(bool canReview)
+    {
+        // Arrange
+        var ticket = TicketTests.Create(TicketAction.Ban);
+
+        // Act
+        ticket.AcceptCreation(canReview);
+
+        // Assert
+        ticket.ApprovedAtUtc.ShouldBe(canReview ? ticket.CreatedAtUtc : null);
+        ticket.ApprovedByUserId.ShouldBe(canReview ? ticket.ModeratorUserId : null);
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void ConfirmTimeoutChange_DurationEdit_UsesReviewerPermission(bool canReview)
+    {
+        // Arrange
+        var ticket = TicketTests.Create(TicketAction.Timeout);
+        ticket.Approve(new TicketActor(1, 4, false, false, CanViewAuditLog: true), ticket.Version);
+        var acceptedAt = ticket.ApprovedAtUtc;
+        ticket.BeginTimeoutChange(new TicketOperation { Kind = TicketOperationKind.SetTimeoutExpiry,
+            ExpiryUtc = ticket.CreatedAtUtc.AddDays(60), RequestedBy = 3 });
+
+        // Act
+        ticket.ConfirmTimeoutChange(ticket.CreatedAtUtc, canReview);
+
+        // Assert
+        ticket.ApprovedAtUtc.ShouldBe(canReview ? acceptedAt : null);
+        ticket.ExpiresAtUtc.ShouldBe(ticket.CreatedAtUtc.AddDays(60));
+        ticket.Pending.ShouldBeNull();
+    }
+
+    [Test]
+    public void ConfirmTimeoutChange_AutomaticNativeRenewal_PreservesApproval()
+    {
+        // Arrange
+        var ticket = TicketTests.Create(TicketAction.Timeout);
+        ticket.SetDuration(60 * 86400, 3);
+        ticket.Approve(new TicketActor(1, 4, true, false), ticket.Version);
+        var acceptedAt = ticket.ApprovedAtUtc;
+        var now = ticket.CreatedAtUtc.AddDays(21);
+        ticket.BeginTimeoutChange(new TicketOperation { Kind = TicketOperationKind.SetTimeoutExpiry,
+            ExpiryUtc = ticket.ExpiresAtUtc, NativeExpiryUtc = Ticket.NativeTimeoutExpiry(ticket.ExpiresAtUtc!.Value, now) });
+
+        // Act
+        ticket.ConfirmTimeoutChange(now);
+
+        // Assert
+        ticket.ApprovedAtUtc.ShouldBe(acceptedAt);
+        ticket.ExpiresAtUtc.ShouldBe(ticket.CreatedAtUtc.AddDays(60));
+        ticket.AppliedTimeoutUntilUtc!.Value.ShouldBeLessThan(ticket.ExpiresAtUtc!.Value);
+    }
+
     [TestCase("✅", false, true)]
     [TestCase("✅\uFE0F", false, true)]
     [TestCase("👍", false, true)]
@@ -109,15 +165,15 @@ public sealed class TicketApprovalTests
     }
 
     [Test]
-    public void AwaitingApprovalIncludesBothCutoverChannelsAndOmitsExemptTicketsAndNotes()
+    public void AwaitingApproval_InSameGuild_OmitsAcceptedTicketsAndNotes()
     {
-        var live = new Ticket { GuildId = 1, Action = TicketAction.Timeout, PinnedPublicationChannelId = 10 };
-        var archive = new Ticket { GuildId = 1, Action = TicketAction.Ban, ImportedFromLegacy = true, PinnedPublicationChannelId = 20 };
+        var live = new Ticket { GuildId = 1, Action = TicketAction.Timeout };
+        var archive = new Ticket { GuildId = 1, Action = TicketAction.Ban };
         IQueryable<Ticket> pending = new[]
         {
             archive, live,
             new Ticket { GuildId = 1, Action = TicketAction.Note },
-            new Ticket { GuildId = 1, Action = TicketAction.Ban, ReviewExempt = true },
+            TicketTests.Create(TicketAction.Ban, canReview: true),
             new Ticket { GuildId = 2, Action = TicketAction.Ban },
         }.AsQueryable();
 
@@ -176,7 +232,7 @@ public sealed class TicketApprovalTests
         // Arrange
         var ticket = TicketTests.Create(TicketAction.Ban);
         if (pending)
-            ticket.Pending = new TicketOperation { Kind = "RemoveBan" };
+            ticket.Pending = new TicketOperation { Kind = TicketOperationKind.RemoveBan };
         else ticket.Initialise("", null);
 
         // Act
@@ -209,11 +265,15 @@ public sealed class TicketApprovalTests
         ticket.ModificationHistory[^1].Action.ShouldBe(action);
     }
 
-    [TestCase(TicketAction.Ban)]
-    [TestCase(TicketAction.VoiceMute)]
-    [TestCase(TicketAction.VoiceDeafen)]
-    [TestCase(TicketAction.Role)]
-    public void SetDuration_ApprovedTicket_PreservesApproval(TicketAction action)
+    [TestCase(TicketAction.Ban, true)]
+    [TestCase(TicketAction.Ban, false)]
+    [TestCase(TicketAction.VoiceMute, true)]
+    [TestCase(TicketAction.VoiceMute, false)]
+    [TestCase(TicketAction.VoiceDeafen, true)]
+    [TestCase(TicketAction.VoiceDeafen, false)]
+    [TestCase(TicketAction.Role, true)]
+    [TestCase(TicketAction.Role, false)]
+    public void SetDuration_ApprovedTicket_UsesEditorPermission(TicketAction action, bool canReview)
     {
         // Arrange
         var ticket = TicketTests.Create(action);
@@ -222,13 +282,13 @@ public sealed class TicketApprovalTests
         var version = ticket.Version;
 
         // Act
-        ticket.SetDuration(60, 3);
+        ticket.SetDuration(60, 3, canReview: canReview);
 
         // Assert
         ticket.DurationSeconds.ShouldBe(60);
         ticket.ExpiresAtUtc.ShouldBe(ticket.CreatedAtUtc.AddSeconds(60));
-        ticket.ApprovedByUserId.ShouldBe(4UL);
-        ticket.ApprovedAtUtc.ShouldBe(approvedAt);
+        ticket.ApprovedByUserId.ShouldBe(canReview ? 4UL : (ulong?)null);
+        ticket.ApprovedAtUtc.ShouldBe(canReview ? approvedAt : null);
         ticket.Version.ShouldBe(version + 1);
         ticket.ModificationHistory.Count.ShouldBe(2);
         ticket.ModificationHistory[^1].Action.ShouldBe(TicketHistoryAction.SetDuration);
@@ -244,7 +304,7 @@ public sealed class TicketApprovalTests
         var version = ticket.Version;
         var operation = new TicketOperation
         {
-            Kind = "SetTimeoutExpiry",
+            Kind = TicketOperationKind.SetTimeoutExpiry,
             ExpiryUtc = ticket.CreatedAtUtc.AddHours(2),
             RequestedBy = 3,
         };
@@ -261,7 +321,7 @@ public sealed class TicketApprovalTests
     }
 
     [Test]
-    public void TimeoutChange_ConfirmedOrCleared_PreservesApproval([Values] bool confirmed)
+    public void TimeoutChange_ConfirmedOrdinaryEdit_RequiresApproval([Values] bool confirmed)
     {
         // Arrange
         var ticket = TicketTests.Create(TicketAction.Timeout);
@@ -270,7 +330,7 @@ public sealed class TicketApprovalTests
         var expiry = ticket.CreatedAtUtc.AddHours(2);
         ticket.BeginTimeoutChange(new TicketOperation
         {
-            Kind = "SetTimeoutExpiry",
+            Kind = TicketOperationKind.SetTimeoutExpiry,
             ExpiryUtc = expiry,
             RequestedBy = 3,
         });
@@ -284,8 +344,8 @@ public sealed class TicketApprovalTests
         // Assert
         ticket.Pending.ShouldBeNull();
         ticket.DurationSeconds.ShouldBe(confirmed ? 7200 : 3600);
-        ticket.ApprovedByUserId.ShouldBe(4UL);
-        ticket.ApprovedAtUtc.ShouldBe(approvedAt);
+        ticket.ApprovedByUserId.ShouldBe(confirmed ? null : (ulong?)4UL);
+        ticket.ApprovedAtUtc.ShouldBe(confirmed ? null : approvedAt);
     }
 
     [Test]
@@ -321,7 +381,7 @@ public sealed class TicketApprovalTests
 
         // Act
         if (duration)
-            ticket.SetDuration(60, 3);
+            ticket.SetDuration(60, 3, canReview: true);
         else
             ticket.SetComment("Changed", 3);
 
@@ -347,16 +407,16 @@ public sealed class TicketApprovalTests
     }
 
     [Test]
-    public void Content_ExemptTicketEdited_PreservesExemption()
+    public void Content_AutomaticallyAcceptedTicketEdited_PreservesAcceptance()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban, reviewExempt: true);
+        var ticket = TicketTests.Create(TicketAction.Ban, canReview: true);
 
         // Act
         ticket.SetComment("Changed", 4);
 
         // Assert
-        ticket.ReviewExempt.ShouldBeTrue();
+        ticket.ApprovedAtUtc.ShouldNotBeNull();
     }
 
     [Test]

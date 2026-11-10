@@ -64,7 +64,6 @@ public static class TicketAuditReader
                     {
                         Action = TicketAction.Timeout,
                         Removed = expiry is null || expiry <= createdAt,
-                        PreviousTimeout = previous is { } oldExpiry ? new TicketTimeout.Until(oldExpiry) : new TicketTimeout.None(),
                         Timeout = expiry is { } newExpiry ? new TicketTimeout.Until(newExpiry) : new TicketTimeout.None(),
                     });
             }

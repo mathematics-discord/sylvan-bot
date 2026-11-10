@@ -17,14 +17,16 @@ public sealed class TicketPublisher(
     ILogger logger)
 {
     // The coordinator holds this ticket's lock while synchronising its publications.
-    internal async Task<string> EnsureAsync(ulong guildId, long id, CancellationToken token, bool orderedPublication = false)
+    internal async Task<string> EnsureAsync(ulong guildId, long id, CancellationToken token, bool allowDisabled = false)
     {
         using var timing = new OperationTiming(logger.ForContext("GuildId", guildId).ForContext("TicketId", id), "ticket.publish", "database");
 
         try
         {
             await using var db = await contexts.CreateDbContextAsync(token);
-            var config = await TicketCoordinator.EnabledAsync(db, guildId, token);
+            var config = allowDisabled
+                ? await db.TicketConfigurations.SingleAsync(value => value.GuildId == guildId, token)
+                : await TicketCoordinator.EnabledAsync(db, guildId, token);
 
             var ticket = await db.Tickets
                .SingleAsync(value => value.GuildId == guildId && value.Id == id, token);
@@ -35,14 +37,6 @@ public sealed class TicketPublisher(
 
             timing.Next("discord_and_persistence");
 
-            // A paused import may still need to edit or remove a known channel message.
-            if (config.HoldsImportedPublication(ticket) && references.Count == 0)
-                return "\nSaved. Publication of imported tickets is paused.";
-
-            // While the imported queue drains, only its ordered reader may create a channel post.
-            if (!orderedPublication && config.AwaitsOrderedPublication(ticket) && !ticket.Hidden && references.Count == 0)
-                return "\nSaved for publication in ticket-number order.";
-
             var guild = (IGuild?)client.GetGuild(guildId) ?? await client.Rest.GetGuildAsync(guildId, TicketBoundary.Options(token));
             var incomplete = false;
 
@@ -50,9 +44,7 @@ public sealed class TicketPublisher(
             {
                 try
                 {
-                    var wrongChannel = ticket.PinnedPublicationChannelId is { } pinned && reference.ChannelId != pinned;
-
-                    if (!ticket.Hidden && reference.Current && !wrongChannel && reference.Revision == ticket.Version)
+                    if (!ticket.Hidden && reference.Current && reference.Revision == ticket.Version)
                         continue;
 
                     var channel = await guild.GetTextChannelAsync(reference.ChannelId, options: TicketBoundary.Options(token));
@@ -75,7 +67,7 @@ public sealed class TicketPublisher(
 
                     var incompatible = message.Flags?.HasFlag(MessageFlags.ComponentsV2) == true;
 
-                    if (ticket.Hidden || !reference.Current || incompatible || wrongChannel)
+                    if (ticket.Hidden || !reference.Current || incompatible)
                     {
                         await channel.DeleteMessageAsync(reference.MessageId, TicketBoundary.Options(token));
                         reference.Removed = true;
@@ -115,13 +107,6 @@ public sealed class TicketPublisher(
 
             if (current is not null)
                 return string.Empty;
-
-            // Also covers a stored copy removed above or an ordered batch selected before the pause.
-            if (config.HoldsImportedPublication(ticket))
-                return "\nSaved. Publication of imported tickets is paused.";
-
-            if (!orderedPublication && config.AwaitsOrderedPublication(ticket))
-                return "\nSaved for publication in ticket-number order.";
 
             var destination = await guild.GetTextChannelAsync(config.PublicationChannel(ticket), options: TicketBoundary.Options(token))
                 ?? throw new BotCommandException("The tickets channel is unavailable.");
@@ -235,13 +220,16 @@ public sealed class TicketPublisher(
                       && !value.Hidden
                       && !value.ReminderExempt
                       && value.Pending == null
-                      && (value.InitialPromptPending
+                      && (value.InitialPromptAfterUtc != null
                           || string.IsNullOrWhiteSpace(value.Comment)
                           || (value.Action == TicketAction.Timeout && value.DurationSeconds == null))
                       && enabled.Contains(value.GuildId));
 
+        var now = DateTimeOffset.UtcNow;
         var ticket = await outstanding
-           .OrderByDescending(value => value.CreatedAtUtc)
+           .Where(value => force || value.InitialPromptAfterUtc == null || value.InitialPromptAfterUtc <= now)
+           .OrderByDescending(value => value.InitialPromptAfterUtc != null && !force)
+           .ThenByDescending(value => value.CreatedAtUtc)
            .ThenByDescending(value => value.Id)
            .FirstOrDefaultAsync(token);
 
@@ -304,21 +292,26 @@ public sealed class TicketPublisher(
             return;
         }
 
-        if (!force && !moderator.IsDeliveryDue(ticket.Id, DateTimeOffset.UtcNow))
+        if (!force && !ticket.InitialPromptPending && !moderator.IsDeliveryDue(ticket.Id, DateTimeOffset.UtcNow))
         {
-            moderator.PromptVersion = ticket.Version;
             await db.SaveChangesAsync(token);
 
             return;
         }
 
         var config = await TicketCoordinator.EnabledAsync(db, ticket.GuildId, token);
+
         // Persist backoff before sending, including when the DM outcome is uncertain.
+        if (moderator.ActiveTicketId != ticket.Id)
+            moderator.PromptMessageId = null;
+
         moderator.ActiveTicketId = ticket.Id;
         moderator.NextDeliveryUtc = DateTimeOffset.UtcNow.AddSeconds(config.ReminderIntervalSeconds);
-        moderator.LastAttemptedVersion = ticket.Version;
+
+        if (ticket.InitialPromptPending)
+            ticket.InitialPromptAfterUtc = DateTimeOffset.UtcNow.AddSeconds(Math.Min(300, config.ReminderIntervalSeconds));
+
         moderator.Version++;
-        ticket.InitialPromptPending = false;
         await db.SaveChangesAsync(token);
         var actor = await boundary.GetActorAsync(ticket.GuildId, userId, token);
         var guild = await client.Rest.GetGuildAsync(ticket.GuildId, TicketBoundary.Options(token));
@@ -335,9 +328,10 @@ public sealed class TicketPublisher(
             options: TicketBoundary.Options(token),
             allowedMentions: AllowedMentions.None);
 
+        ticket.InitialPromptAfterUtc = null;
+        moderator.NextDeliveryUtc = DateTimeOffset.UtcNow.AddSeconds(config.ReminderIntervalSeconds);
         moderator.ChannelId = channel.Id;
         moderator.PromptMessageId = prompt.Id;
-        moderator.PromptVersion = ticket.Version;
         await db.SaveChangesAsync(token);
     }
 
@@ -369,6 +363,10 @@ public sealed class TicketPublisher(
         }
         catch (HttpException exception) when (exception.HttpCode is NotFound or Forbidden)
         {
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.Warning("Ticket prompt refresh failed for moderator {ModeratorId} ({FailureType})", moderator.UserId, exception.GetType().Name);
         }
     }
 }

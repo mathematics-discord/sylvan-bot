@@ -1,4 +1,6 @@
 ﻿using System.Data;
+using System.Collections.Concurrent;
+using SylvanBot.Application.Features.Tickets;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Automod;
 using SylvanBot.Application.Infrastructure.Data;
@@ -11,6 +13,15 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
     private readonly ILogger _logger = logger.ForContext<AutomodRuntime>();
     private ImmutableDictionary<ulong, AutomodConfiguration> _configurations = ImmutableDictionary<ulong, AutomodConfiguration>.Empty;
     private bool _loaded;
+    private readonly ConcurrentDictionary<ulong, byte> _closedGuilds = new ConcurrentDictionary<ulong, byte>();
+
+    public bool IsEnabled(ulong guildId) => !_closedGuilds.ContainsKey(guildId)
+        && Current(guildId).TryGet(out var configuration) && configuration.Enabled;
+
+    public void CloseGuild(ulong guildId) => _closedGuilds.TryAdd(guildId, 0);
+
+    public void OpenGuild(ulong guildId) => _closedGuilds.TryRemove(guildId, out _);
+
 
     public DotNext.Optional<AutomodConfiguration> Current(ulong guildId)
     {
@@ -27,7 +38,7 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
 
         try
         {
-            (AutomodRule[] rules, AutomodExemptRole[] roles, AutomodSettings[] settings) = await ReadAsync(default, cancellationToken);
+            (AutomodRule[] rules, AutomodExemptRole[] roles, AutomodSettings[] settings, TicketConfiguration[] tickets) = await ReadAsync(default, cancellationToken);
             ILookup<ulong, AutomodRule> rulesByGuild = rules.ToLookup(rule => rule.GuildId);
             ILookup<ulong, ulong> rolesByGuild = roles.ToLookup(role => role.GuildId, role => role.RoleId);
             ILookup<ulong, AutomodAction> disabledByGuild = settings
@@ -37,10 +48,11 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
             IEnumerable<ulong> guildIds = rulesByGuild
                 .Select(group => group.Key)
                 .Union(rolesByGuild.Select(group => group.Key))
-                .Union(disabledByGuild.Select(group => group.Key));
+                .Union(disabledByGuild.Select(group => group.Key))
+                .Union(tickets.Select(configuration => configuration.GuildId));
 
             ImmutableDictionary<ulong, AutomodConfiguration> configurations = guildIds
-                .ToImmutableDictionary(id => id, id => new AutomodConfiguration(rulesByGuild[id], rolesByGuild[id], disabledByGuild[id]));
+                .ToImmutableDictionary(id => id, id => new AutomodConfiguration(rulesByGuild[id], rolesByGuild[id], disabledByGuild[id], tickets.Any(configuration => configuration.GuildId == id && configuration.Enabled)));
 
             Volatile.Write(ref _configurations, configurations);
             Volatile.Write(ref _loaded, true);
@@ -67,7 +79,7 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
                 if (!_loaded)
                     throw new InvalidOperationException("Automod startup loading has not completed.");
 
-                (AutomodRule[] rules, AutomodExemptRole[] roles, AutomodSettings[] settings) = await ReadAsync(new DotNext.Optional<ulong>(guildId), ct);
+                (AutomodRule[] rules, AutomodExemptRole[] roles, AutomodSettings[] settings, TicketConfiguration[] tickets) = await ReadAsync(new DotNext.Optional<ulong>(guildId), ct);
                 IEnumerable<ulong> roleIds = roles
                     .Select(role => role.RoleId);
 
@@ -75,8 +87,8 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
                     .Where(setting => !setting.Enabled)
                     .Select(setting => setting.Action);
 
-                var configuration = new AutomodConfiguration(rules, roleIds, disabledActions);
-                ImmutableDictionary<ulong, AutomodConfiguration> configurations = rules.Length == 0 && roles.Length == 0 && settings.Length == 0
+                var configuration = new AutomodConfiguration(rules, roleIds, disabledActions, tickets.Any(configuration => configuration.Enabled));
+                ImmutableDictionary<ulong, AutomodConfiguration> configurations = rules.Length == 0 && roles.Length == 0 && settings.Length == 0 && tickets.Length == 0
                     ? _configurations.Remove(guildId)
                     : _configurations.SetItem(guildId, configuration);
 
@@ -99,7 +111,7 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
 
     public void Dispose() => _gate.Dispose();
 
-    private async Task<(AutomodRule[] Rules, AutomodExemptRole[] Roles, AutomodSettings[] Settings)> ReadAsync(DotNext.Optional<ulong> guildId, CancellationToken ct)
+    private async Task<(AutomodRule[] Rules, AutomodExemptRole[] Roles, AutomodSettings[] Settings, TicketConfiguration[] Tickets)> ReadAsync(DotNext.Optional<ulong> guildId, CancellationToken ct)
     {
         await using var db = await contexts.CreateDbContextAsync(ct);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
@@ -112,9 +124,15 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
         IQueryable<AutomodSettings> settingsQuery = db.AutomodSettings
             .AsNoTracking();
 
+        IQueryable<TicketConfiguration> ticketsQuery = db.TicketConfigurations
+            .AsNoTracking();
+
         if (guildId.HasValue)
         {
             var id = guildId.Value;
+            ticketsQuery = ticketsQuery
+                .Where(configuration => configuration.GuildId == id);
+
             rulesQuery = rulesQuery
                 .Where(rule => rule.GuildId == id);
 
@@ -134,7 +152,10 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
         AutomodSettings[] settings = await settingsQuery
             .ToArrayAsync(ct);
 
+        TicketConfiguration[] tickets = await ticketsQuery
+            .ToArrayAsync(ct);
+
         await transaction.CommitAsync(ct);
-        return (rules, roles, settings);
+        return (rules, roles, settings, tickets);
     }
 }

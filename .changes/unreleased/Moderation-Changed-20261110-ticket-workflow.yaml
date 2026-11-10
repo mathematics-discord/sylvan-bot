@@ -1,0 +1,5 @@
+component: Moderation
+kind: Changed
+body: >-
+  <@&1522665207225127034> and above receive an Edit DM for every captured human action, even when its details are complete. Failed initial DMs retry without holding up other tickets. Timeout extensions and reductions keep the same active ticket, including timeouts longer than 28 days. Moderators can edit their own notes; editing another moderator's note requires View Audit Log.
+time: 2026-11-10T00:00:00Z

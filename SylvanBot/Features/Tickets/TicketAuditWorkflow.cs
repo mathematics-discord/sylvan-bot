@@ -1,39 +1,13 @@
-using static SylvanBot.Application.Features.Tickets.TicketOperationCommand;
-
-namespace SylvanBot.Features.Tickets;
-
-using Discord.Net;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Application.Infrastructure.Data;
 
-public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary boundary, ILogger logger) : ITicketStrategy
+namespace SylvanBot.Features.Tickets;
+
+internal static class TicketAuditWorkflow
 {
-    public TicketAction Action => TicketAction.Ban;
-
-    public async Task<TicketResult> HandleAsync(BotDbContext db, TicketRequest request, CancellationToken cancellationToken)
-    {
-        switch (request.Value)
-        {
-            case ObserveModeration observed:
-                return await RecordObservedAsync(db, observed, cancellationToken);
-            case EditDetails edit:
-                if (edit.Details.HasDuration)
-                    edit.Ticket.SetDuration(edit.Details.DurationSeconds == long.MaxValue ? null : edit.Details.DurationSeconds, edit.Actor.UserId);
-
-                await db.SaveChangesAsync(cancellationToken);
-
-                return new TicketResult([edit.Ticket.Id], "Ticket details saved. Due bans will expire after audit reconciliation.");
-            case ReconcileTicket reconcile:
-                return await ReconcileAsync(db, reconcile.Ticket, reconcile.AuditCurrent, cancellationToken);
-            default:
-                throw new ArgumentException("Unsupported ban request.", nameof(request));
-        }
-    }
-
-    // Strategies share audit identity, attribution and supersession rules.
-    internal static async Task<TicketResult> RecordObservedAsync(BotDbContext db, ObserveModeration request, CancellationToken token)
+    internal static async Task RecordAsync(BotDbContext db, ObserveModeration request, CancellationToken token, TicketBoundary boundary)
     {
         var observation = request.Observation;
 
@@ -46,7 +20,7 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
                 token);
 
         if (alreadyRecorded)
-            return new TicketResult([], string.Empty);
+            return;
 
         var latest = await db.Tickets
            .Where(ticket => ticket.GuildId == observation.GuildId
@@ -69,34 +43,40 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
                     token)
             : null;
 
-        List<Ticket> affected = [];
         var older = observation.Action != TicketAction.Kick && latest is not null && latest.LastAuditId >= observation.AuditId;
+
+        // A continuation has no source row of its own. Replaying it must not create a
+        // historical ticket after the logical restriction subsequently ended.
+        if (observation.Action == TicketAction.Timeout && older && operation is null)
+            return;
 
         if (observation is { Action: TicketAction.Timeout, OperationId.HasValue: true } && operation is null)
         {
             if (latest is null || older)
-                return new TicketResult([], string.Empty);
+                return;
 
             latest.LastAuditId = observation.AuditId;
             await db.SaveChangesAsync(token);
 
-            return new TicketResult([], string.Empty);
+            return;
         }
 
         if (operation is not null && operation.LastAuditId < observation.AuditId)
         {
-            if (operation.Pending!.Command.Value is ChangeTimeout timeout)
+            if (operation.Pending!.Kind == TicketOperationKind.SetTimeoutExpiry && operation.Pending.ExpiryUtc is { } timeoutExpiry)
             {
-                var nativeExpiry = operation.Pending.NativeExpiryUtc ?? timeout.ExpiryUtc;
+                var nativeExpiry = operation.Pending.NativeExpiryUtc ?? timeoutExpiry;
 
-                var matches = timeout.ExpiryUtc <= observation.CreatedAtUtc
+                var matches = timeoutExpiry <= observation.CreatedAtUtc
                     ? observation.Removed
                     : observation.Timeout.Value is TicketTimeout.Until applied && applied.ExpiresAtUtc == nativeExpiry;
 
-                if (!matches || operation.Status != TicketStatus.Active || operation.ExpirySuspended)
-                    return new TicketResult([], string.Empty);
+                if (!matches || operation.Status != TicketStatus.Active
+                    || (operation.ExpirySuspended && operation.Pending.RequestedBy is null))
+                    return;
 
-                operation.ConfirmTimeoutChange(observation.CreatedAtUtc);
+                operation.ConfirmTimeoutChange(observation.CreatedAtUtc, operation.Pending.RequestedBy is { } requester
+                    && await boundary.CanReviewAsync(operation.GuildId, requester, token));
             }
 
             if (observation.Removed && operation.Status != TicketStatus.Superseded)
@@ -105,7 +85,6 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
             operation.Pending = null;
             operation.LastAuditId = observation.AuditId;
             operation.Record(TicketHistoryAction.AuditObserved, observation.ModeratorUserId, observation.CreatedAtUtc);
-            affected.Add(operation);
         }
 
         var config = await db.TicketConfigurations
@@ -128,7 +107,7 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
                 await db.SaveChangesAsync(token);
             }
 
-            return new TicketResult([], string.Empty);
+            return;
         }
 
         var tracked = observation.Action != TicketAction.Role
@@ -136,7 +115,9 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
 
         Ticket? created = null;
 
-        if (observation is { CreatesTicket: true, OperationId.HasValue: false } && tracked && config.CaptureFromUtc <= observation.CreatedAtUtc)
+        var continuesTimeout = latest is not null && observation.ContinuesTimeout(latest);
+
+        if (observation is { CreatesTicket: true, OperationId.HasValue: false } && !continuesTimeout && tracked && config.Enabled && request.CaptureEnabled && config.CaptureFromUtc <= observation.CreatedAtUtc)
         {
             var number = await db.Database
                .SqlQuery<long>($"SELECT nextval('ticket_numbers') AS \"Value\"")
@@ -163,23 +144,24 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
                 GuildId = observation.GuildId, Number = number, Action = observation.Action, RoleId = observation.RoleId,
                 SubjectUserId = observation.SubjectUserId, ModeratorUserId = observation.ModeratorUserId,
                 CreatedAtUtc = observation.CreatedAtUtc, SourceAuditId = observation.AuditId, LastAuditId = observation.AuditId,
-                AuditReason = observation.Reason, ReviewExempt = request.ReviewExempt, ReminderExempt = observation.ModeratorIsBot,
+                AuditReason = observation.Reason, ReminderExempt = observation.ModeratorIsBot,
             };
 
             created.Initialise(details.Comment.Apply(string.Empty), duration, expiry);
+            created.AcceptCreation(request.CanReview);
 
             if (older)
                 created.End(TicketStatus.Superseded, observation.ModeratorUserId, latest!.Number);
 
             db.Tickets.Add(created);
-            affected.Add(created);
         }
 
         var updateLatest = observation.Action != TicketAction.Kick
             && latest is not null
             && !older
             && latest != operation
-            && (!observation.OperationId.HasValue || operation is not null);
+            && (!observation.OperationId.HasValue || operation is not null
+                || observation.Action is TicketAction.VoiceMute or TicketAction.VoiceDeafen);
 
         if (updateLatest)
         {
@@ -187,15 +169,16 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
             {
                 latest!.End(TicketStatus.Superseded, observation.ModeratorUserId, created.Number);
             }
-            else if (!tracked && observation.CreatesTicket)
+            else if (observation.CreatesTicket && (!tracked || !continuesTimeout))
             {
-                // An untracked new grant belongs to the moderator, not the old restriction.
+                // A replacement that was not captured must still end our ownership.
                 latest!.End(TicketStatus.Reverted);
             }
             else if (observation.Removed)
             {
                 latest!.End(
-                    latest.ExpiresAtUtc <= observation.CreatedAtUtc ? TicketStatus.Expired : TicketStatus.Reverted,
+                    latest.Action is not (TicketAction.VoiceMute or TicketAction.VoiceDeafen)
+                        && latest.ExpiresAtUtc <= observation.CreatedAtUtc ? TicketStatus.Expired : TicketStatus.Reverted,
                     observation.ModeratorUserId);
             }
             else if (observation.Timeout.Value is TicketTimeout.Until timeout && latest!.Status == TicketStatus.Active)
@@ -203,7 +186,7 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
                 latest.SetDuration(
                     Math.Max(1, (long)Math.Ceiling((timeout.ExpiresAtUtc - latest.CreatedAtUtc).TotalSeconds)),
                     observation.ModeratorIsBot ? null : observation.ModeratorUserId,
-                    timeout.ExpiresAtUtc);
+                    timeout.ExpiresAtUtc, request.CanReview);
 
                 latest.ObserveTimeoutWindow(timeout.ExpiresAtUtc, observation.CreatedAtUtc);
             }
@@ -217,16 +200,11 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
 
             latest.LastAuditId = observation.AuditId;
             latest.Record(TicketHistoryAction.AuditObserved, observation.ModeratorUserId, observation.CreatedAtUtc);
-            affected.Add(latest);
         }
 
         await db.SaveChangesAsync(token);
 
-        ImmutableArray<long> ids = affected
-           .Select(ticket => ticket.Id)
-           .ToImmutableArray();
 
-        return new TicketResult(ids, string.Empty);
     }
 
     private static TicketDetails ReadDetails(TicketObservation observation)
@@ -248,86 +226,4 @@ public sealed class BanTicketStrategy(DiscordSocketClient client, TicketBoundary
         }
     }
 
-    internal async Task<TicketResult> ReconcileAsync(BotDbContext db, Ticket ticket, bool auditCurrent, CancellationToken token, DotNext.Optional<DateTimeOffset> auditFrom = default)
-    {
-        var version = ticket.Version;
-        var now = DateTimeOffset.UtcNow;
-
-        if (ticket.SourceAuditId is null)
-            ticket.ExpirySuspended = true;
-
-        if (ticket.Status != TicketStatus.Active)
-            ticket.Pending = null;
-
-        if (!auditCurrent
-            || ticket.ExpirySuspended
-            || ticket.Status != TicketStatus.Active
-            || ticket.ExpiresAtUtc is null
-            || ticket.ExpiresAtUtc > now)
-            return new TicketResult([], string.Empty);
-
-        // Recheck immediately before unban. A new audit entry must be ingested first.
-        var from = auditFrom.TryGet(out var checkpoint) ? checkpoint
-            : (await db.TicketConfigurations.SingleAsync(value => value.GuildId == ticket.GuildId, token)).LastAuditScanAtUtc!.Value;
-        var scan = await boundary.ReadAuditAsync(ticket.GuildId, from.AddMinutes(-10), token);
-
-        var changed = scan.Observations
-           .Any(value => value.Action == Action
-                    && value.SubjectUserId == ticket.SubjectUserId
-                    && value.AuditId > ticket.LastAuditId
-                    && (!value.OperationId.HasValue || ticket.Pending is null || value.OperationId.Value != ticket.Pending.Id));
-
-        if (changed)
-            return new TicketResult([], "A newer ban change is awaiting audit reconciliation.");
-
-        var guild = await client.Rest.GetGuildAsync(ticket.GuildId, TicketBoundary.Options(token));
-        var ban = await guild.GetBanAsync(ticket.SubjectUserId, TicketBoundary.Options(token));
-
-        if (ban is null)
-        {
-            ticket.End(ticket.Pending is null ? TicketStatus.Reverted : TicketStatus.Expired);
-            ticket.Pending = null;
-        }
-        else
-        {
-            if (ticket.Pending is { Attempted: true } pending && pending.RequestedAtUtc > now.AddSeconds(-30))
-                return new TicketResult([], "The scheduled unban is awaiting confirmation.");
-
-            ticket.Pending ??= new TicketOperation { Kind = "RemoveBan" };
-            await db.SaveChangesAsync(token);
-            ticket.Pending.Attempted = true;
-            await db.SaveChangesAsync(token);
-            var options = TicketBoundary.Options(token);
-            options.AuditLogReason = $"Sylvan ticket {ticket.Number}; operation {ticket.Pending.Id:D}";
-
-            try
-            {
-                await guild.RemoveBanAsync(ticket.SubjectUserId, options);
-                ticket.End(TicketStatus.Expired);
-                ticket.Pending = null;
-            }
-            catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden)
-            {
-                // A definitive rejection leaves the restriction intact and the expiry retryable.
-                ticket.Pending = null;
-                await db.SaveChangesAsync(token);
-
-                return new TicketResult([ticket.Id], "Discord rejected the scheduled unban. Check Sylvan's Ban Members permission.");
-            }
-            catch (Exception exception) when (exception is not OperationCanceledException)
-            {
-                logger.Warning(
-                    "Ticket {TicketId} in guild {GuildId}: moderation outcome is uncertain ({FailureType})",
-                    ticket.Id,
-                    ticket.GuildId,
-                    exception.GetType().Name);
-
-                return new TicketResult([ticket.Id], "The unban could not be confirmed. Recovery will reconcile it; do not repeat it blindly.");
-            }
-        }
-
-        await db.SaveChangesAsync(token);
-
-        return new TicketResult(ticket.Version == version ? [] : [ticket.Id], "Ban expiry reconciled.");
-    }
 }

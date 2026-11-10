@@ -15,19 +15,12 @@ public sealed partial class TicketCoordinator
         await using var db = await contexts.CreateDbContextAsync(token);
         var now = DateTimeOffset.UtcNow;
 
-        List<Guid> due = await db.AutomodBans.AsNoTracking()
+        List<Guid> due = await db.AutomodBans
+           .AsNoTracking()
            .Where(op => op.NextCheckAt <= now
-                      && !db.TicketConfigurations.Any(c => c.GuildId == op.GuildId && c.OrderedPublicationPending && !c.Enabled)
                       && (op.Status == "Active"
                           || op.Status == "Pending"
-                          || op.Status == "Removing"
-                          || (op.Status == "TicketOwned"
-                              && !db.TicketConfigurations.Any(c => c.GuildId == op.GuildId && c.Enabled)
-                              && db.Tickets.Any(t => t.GuildId == op.GuildId
-                                                    && t.SourceAuditId == op.AuditId
-                                                    && t.Action == TicketAction.Ban
-                                                    && t.Status == TicketStatus.Active
-                                                    && !t.ExpirySuspended))))
+                          || op.Status == "Removing"))
            .OrderBy(op => op.NextCheckAt)
            .Select(op => op.Id)
            .Take(100)
@@ -53,9 +46,6 @@ public sealed partial class TicketCoordinator
         var config = await db.TicketConfigurations.SingleOrDefaultAsync(value => value.GuildId == op.GuildId, token);
         var now = DateTimeOffset.UtcNow;
         var from = op.CheckedAt;
-
-        if (string.Equals(op.Status, "TicketOwned", Ordinal) && config?.LastAuditScanAtUtc is { } scanned && scanned > from)
-            from = scanned;
 
         if (now - from >= TimeSpan.FromDays(45))
         {
@@ -130,30 +120,31 @@ public sealed partial class TicketCoordinator
             t => t.GuildId == op.GuildId && t.Action == TicketAction.Ban && t.SourceAuditId == op.AuditId,
             token);
 
-        var firstTransfer = op.Status != "TicketOwned";
-        var created = ticket is null;
+        if (config is null)
+        {
+            config = new TicketConfiguration { GuildId = op.GuildId, CaptureFromUtc = op.RequestedAt };
+            db.TicketConfigurations.Add(config);
+        }
+        else
+        {
+            config.CaptureFromUtc ??= op.RequestedAt;
+        }
 
         if (ticket is null)
         {
-            if (!firstTransfer)
-                throw new InvalidOperationException("The correlated ban ticket is missing.");
-
             var guild = client.GetGuild(op.GuildId) ?? throw new InvalidOperationException("Guild unavailable.");
             var number = await db.Database.SqlQuery<long>($"SELECT nextval('ticket_numbers') AS \"Value\"").SingleAsync(token);
-
-            var exempt = config is not null
-                && (config.ReviewExemptRoleIds.Contains((long)guild.Id)
-                    || guild.CurrentUser.Roles.Any(r => config.ReviewExemptRoleIds.Contains((long)r.Id)));
 
             ticket = new Ticket
             {
                 GuildId = op.GuildId, SubjectUserId = op.UserId, ModeratorUserId = client.CurrentUser.Id,
                 Number = number, Action = TicketAction.Ban, CreatedAtUtc = SnowflakeUtils.FromSnowflake(op.AuditId),
-                ReviewExempt = exempt, ReminderExempt = true, SourceAuditId = op.AuditId, LastAuditId = op.AuditId,
+                ReminderExempt = true, SourceAuditId = op.AuditId, LastAuditId = op.AuditId,
                 AuditReason = op.Reason,
             };
 
             ticket.Initialise(op.Reason, null);
+            ticket.AcceptCreation(guild.CurrentUser.GuildPermissions.Administrator || guild.CurrentUser.GuildPermissions.ViewAuditLog);
 
             var prior = await db.Tickets.Where(t => t.GuildId == op.GuildId
                                                    && t.SubjectUserId == op.UserId
@@ -180,8 +171,7 @@ public sealed partial class TicketCoordinator
         if (ticket.SubjectUserId != op.UserId)
             throw new InvalidOperationException("The correlated audit belongs to another subject.");
 
-        if (firstTransfer
-            && ticket.Status == TicketStatus.Active
+        if (ticket.Status == TicketStatus.Active
             && ticket.DurationSeconds is null
             && !ticket.ModificationHistory.Any(h => h.Action == TicketHistoryAction.SetDuration)
             && op.ExpiresAtUtc is { } deadline)
@@ -204,15 +194,5 @@ public sealed partial class TicketCoordinator
         op.NextCheckAt = now.AddSeconds(30);
         op.CheckedAt = now;
         await db.SaveChangesAsync(token);
-
-        if (config?.Enabled != true && ticket.Status == TicketStatus.Active && !ticket.ExpirySuspended && ticket.ExpiresAtUtc <= now)
-        {
-            using var newTicketGate = created ? await locks.TicketAsync(ticket.Id, token) : null;
-            await using var recovery = await contexts.CreateDbContextAsync(token);
-            var current = await recovery.Tickets
-                .SingleAsync(value => value.Id == ticket.Id, token);
-
-            await bans.ReconcileAsync(recovery, current, true, token, from);
-        }
     }
 }

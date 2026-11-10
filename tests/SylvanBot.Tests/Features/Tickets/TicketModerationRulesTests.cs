@@ -5,6 +5,7 @@ using SylvanBot.Application.Features.Tickets;
 
 public sealed class TicketModerationRulesTests
 {
+    [TestCase(TicketAction.Note, true, false, true)]
     [TestCase(TicketAction.Timeout, true, false, true)]
     [TestCase(TicketAction.Timeout, false, true, false)]
     [TestCase(TicketAction.Ban, false, true, true)]
@@ -39,27 +40,31 @@ public sealed class TicketModerationRulesTests
         ticket.ModeratorUserId.ShouldBe(2UL);
     }
 
-    [TestCase(0, 60, true)]
-    [TestCase(60, 120, true)]
-    [TestCase(120, 60, false)]
-    [TestCase(60, 0, false)]
-    [TestCase(-60, 60, true)]
-    public void CreatesTicket_TimeoutTransition_DistinguishesCreationAndCorrection(int previousSeconds, int newSeconds, bool creates)
+    [TestCase(120, 180, false, true)]
+    [TestCase(120, 60, false, true)]
+    [TestCase(0, 180, false, false)]
+    [TestCase(-60, 180, false, false)]
+    [TestCase(120, 180, true, false)]
+    public void ContinuesTimeout_LogicalRestriction_KeepsIdentityUntilEnded(int remaining, int newRemaining, bool reverted, bool expected)
     {
         // Arrange
         var now = DateTimeOffset.UtcNow;
+        var ticket = new Ticket { GuildId = 1, SubjectUserId = 2, ModeratorUserId = 3,
+            Action = TicketAction.Timeout, CreatedAtUtc = now.AddDays(-1) };
+        ticket.Initialise("reason", 86400 + remaining);
+        if (reverted)
+            ticket.End(TicketStatus.Reverted);
         var observation = new TicketObservation(1, 1, TicketAction.Timeout, 2, 3, false, "", now)
         {
-            Removed = newSeconds == 0,
-            PreviousTimeout = previousSeconds == 0 ? new TicketTimeout.None() : new TicketTimeout.Until(now.AddSeconds(previousSeconds)),
-            Timeout = newSeconds == 0 ? new TicketTimeout.None() : new TicketTimeout.Until(now.AddSeconds(newSeconds)),
+            Timeout = new TicketTimeout.Until(now.AddSeconds(newRemaining)),
         };
 
         // Act
-        var result = observation.CreatesTicket;
+        var continues = observation.ContinuesTimeout(ticket);
 
         // Assert
-        result.ShouldBe(creates);
+        continues.ShouldBe(expected);
+        observation.CreatesTicket.ShouldBeTrue();
     }
 
     [Test]
@@ -72,8 +77,6 @@ public sealed class TicketModerationRulesTests
             ActiveTicketId = 2,
             ChannelId = 3,
             PromptMessageId = 4,
-            PromptVersion = 5,
-            LastAttemptedVersion = 5,
             NextDeliveryUtc = DateTimeOffset.UtcNow,
             Version = 7,
         };
@@ -85,8 +88,6 @@ public sealed class TicketModerationRulesTests
         // Assert
         moderator.ActiveTicketId.ShouldBeNull();
         moderator.PromptMessageId.ShouldBeNull();
-        moderator.PromptVersion.ShouldBeNull();
-        moderator.LastAttemptedVersion.ShouldBeNull();
         moderator.NextDeliveryUtc.ShouldBeNull();
         moderator.ChannelId.ShouldBe((ulong)3);
         moderator.Version.ShouldBe(8);
@@ -97,10 +98,10 @@ public sealed class TicketModerationRulesTests
     {
         // Arrange
         var now = DateTimeOffset.UtcNow;
-        var moderator = new TicketModerator { ActiveTicketId = 1, NextDeliveryUtc = now.AddMinutes(5), LastAttemptedVersion = 1 };
+
+        var moderator = new TicketModerator { ActiveTicketId = 1, NextDeliveryUtc = now.AddMinutes(5) };
 
         // Act
-        moderator.PromptVersion = 2;
         moderator.Version++;
         var due = moderator.IsDeliveryDue(1, now.AddSeconds(30));
 
@@ -149,6 +150,21 @@ public sealed class TicketModerationRulesTests
         allowed.ShouldBeTrue();
         other.ShouldBeFalse();
         unprivileged.ShouldBeFalse();
+    }
+
+    [TestCase(false, false)]
+    [TestCase(true, true)]
+    public void CanCorrect_AnotherModeratorsNote_RequiresReviewer(bool canReview, bool expected)
+    {
+        // Arrange
+        var ticket = CreateTicket(TicketAction.Note);
+        var actor = new TicketActor(1, 9, false, true, CanViewAuditLog: canReview);
+
+        // Act
+        var allowed = ticket.CanCorrect(actor);
+
+        // Assert
+        allowed.ShouldBe(expected);
     }
 
     private static Ticket CreateTicket(TicketAction action)

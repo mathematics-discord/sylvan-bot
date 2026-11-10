@@ -10,6 +10,7 @@ namespace SylvanBot.Features.Automod;
 public sealed class AutomodBanEnforcement(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contexts,
+    AutomodRuntime runtime,
     TimeProvider clock,
     ILogger logger) : IDisposable
 {
@@ -35,6 +36,9 @@ public sealed class AutomodBanEnforcement(
             var guild = await client.Rest.GetGuildAsync(guildId, Options(ct));
 
             if (await guild.GetBanAsync(userId, Options(ct)) is not null)
+                return;
+
+            if (!runtime.IsEnabled(guildId))
                 return;
 
             var now = clock.GetUtcNow();
