@@ -43,7 +43,37 @@ internal static class ActivityConfigurationView
                     .Select(rows => heading + "\n" + string.Join('\n', rows)));
         }
 
+        AddThreadWeights(guild, weights, entries);
         return BuildPages(guild, settings, entries, page, ownerId);
+    }
+
+    private static void AddThreadWeights(SocketGuild guild, Dictionary<ulong, decimal> weights, List<string> entries)
+    {
+        IEnumerable<IGrouping<ulong, SocketThreadChannel>> configuredThreads = guild.ThreadChannels
+            .Where(thread => weights.ContainsKey(thread.Id))
+            .OrderBy(thread => thread.ParentChannel.Id)
+            .ThenBy(thread => thread.Id)
+            .GroupBy(thread => thread.ParentChannel.Id);
+
+        entries.AddRange(
+            from @group in configuredThreads
+            from threads in @group.Chunk(20)
+            let rows = threads.Select(thread => "  " + Format(thread.Id, weights[thread.Id]))
+            select $"Threads in <#{@group.Key}>\n" + string.Join('\n', rows));
+
+        IEnumerable<ulong> threadIds = guild.ThreadChannels
+            .Select(thread => thread.Id);
+
+        HashSet<ulong> knownIds = guild.Channels
+            .Select(channel => channel.Id)
+            .Concat(threadIds)
+            .ToHashSet();
+
+        IOrderedEnumerable<KeyValuePair<ulong, decimal>> uncachedWeights = weights
+            .Where(pair => !knownIds.Contains(pair.Key))
+            .OrderBy(pair => pair.Key);
+
+        entries.AddRange(uncachedWeights.Select(pair => Format(pair.Key, pair.Value)));
     }
 
     private static MessageComponent BuildPages(SocketGuild guild, ActivitySettings settings, List<string> entries, int requestedPage, ulong ownerId)
@@ -66,7 +96,7 @@ internal static class ActivityConfigurationView
             pages.Add(text);
 
         if (pages.Count == 0)
-            pages.Add("All channels use their inherited or default weight of 1.0x.");
+            pages.Add("All channels and threads use their inherited or default weight of 1.0x.");
 
         var index = Math.Clamp(requestedPage, 0, pages.Count - 1);
 
@@ -94,6 +124,7 @@ internal static class ActivityConfigurationView
 
     private static ulong? CategoryId(SocketGuildChannel channel) => channel switch
     {
+        SocketForumChannel forum => forum.CategoryId,
         SocketTextChannel text => text.CategoryId,
         _ => null,
     };

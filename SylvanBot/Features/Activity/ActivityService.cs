@@ -28,6 +28,20 @@ public sealed class ActivityService(IDbContextFactory<BotDbContext> contexts)
 
     public static decimal Award(decimal weight, decimal recent, long cap) => cap == 0 ? weight : Math.Min(weight, Math.Max(0, cap - recent));
 
+    public static decimal ResolveWeight(IReadOnlyDictionary<ulong, decimal> weights, ulong channelId, ulong parentId, ulong? categoryId)
+    {
+        if (weights.TryGetValue(channelId, out var weight))
+            return weight;
+
+        if (weights.TryGetValue(parentId, out weight))
+            return weight;
+
+        if (categoryId.HasValue && weights.TryGetValue(categoryId.Value, out weight))
+            return weight;
+
+        return 1m;
+    }
+
     public async Task ObserveAsync(SocketUserMessage message, CancellationToken ct)
     {
         if (message.Channel is not SocketGuildChannel channel)
@@ -64,7 +78,7 @@ public sealed class ActivityService(IDbContextFactory<BotDbContext> contexts)
                     .Where(row => row.GuildId == channel.Guild.Id)
                     .ToDictionaryAsync(row => row.ChannelId, row => row.Weight, ct);
 
-                var weight = weights.GetValueOrDefault(parent.Id, categoryId.HasValue ? weights.GetValueOrDefault(categoryId.Value, 1m) : 1m);
+                var weight = ResolveWeight(weights, channel.Id, parent.Id, categoryId);
                 var now = DateTimeOffset.UtcNow;
                 var cutoff = now.AddHours(-24);
 

@@ -15,16 +15,16 @@ public sealed partial class ConfigModule
     [RequireUserPermission(GuildPermission.Administrator)]
     public sealed class ActivityConfigModule(ActivityService activity, IHostApplicationLifetime lifetime) : SlashCommandBase
     {
-        [SlashCommand("weight", "Set a channel or category XP weight, or restore its default.")]
+        [SlashCommand("weight", "Set a thread, channel, or category XP weight, or restore inheritance.")]
         public async Task WeightAsync(
-            [Summary("channel", "Channel or category to configure; threads inherit their parent channel.")]
+            [Summary("channel", "Thread, channel, or category to configure.")]
             IChannel channel,
             [Summary("weight", "XP multiplier from 0.0 to 100.0. Omit to restore inheritance.")]
             [MinValue(0), MaxValue(100)] double? weight = null)
         {
             RequireAdministrator();
-            if (channel is not SocketGuildChannel target || target.Guild.Id != Context.Guild.Id || target is SocketThreadChannel)
-                throw new BotCommandException("Choose a channel or category from this server, not a thread.");
+            if (channel is not IGuildChannel target || target.GuildId != Context.Guild.Id)
+                throw new BotCommandException("Choose a thread, channel, or category from this server.");
 
             if (weight.HasValue && (!double.IsFinite(weight.Value) || weight.Value is < 0 or > 100))
                 throw new BotCommandException("Weight must be between 0 and 100.");
