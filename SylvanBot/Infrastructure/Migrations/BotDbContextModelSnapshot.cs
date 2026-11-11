@@ -24,6 +24,112 @@ namespace SylvanBot.Infrastructure.Migrations
 
             modelBuilder.HasSequence("ticket_numbers");
 
+            modelBuilder.Entity("SylvanBot.Application.Features.Activity.ActivityAward", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("MessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("AwardedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("Xp")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("GuildId", "MessageId");
+
+                    b.HasIndex("AwardedAt");
+
+                    b.HasIndex("GuildId", "UserId", "AwardedAt");
+
+                    b.ToTable("activity_awards", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_activity_award", "\"Xp\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.Activity.ActivityMember", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("AssignedRoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("OptedOut")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("ResetAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Xp")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("GuildId", "UserId");
+
+                    b.ToTable("activity_members", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_activity_xp", "\"Xp\" >= 0 AND (NOT \"OptedOut\" OR \"Xp\" = 0)");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.Activity.ActivitySettings", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("MaxDaily")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Role1Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Role1Score")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Role2Id")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Role2Score")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("activity_settings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_activity_cap", "\"MaxDaily\" >= 0");
+
+                            t.HasCheckConstraint("CK_activity_scores", "(\"Role1Id\" = 0 AND \"Role2Id\" = 0 AND \"Role1Score\" = 0 AND \"Role2Score\" = 0) OR (\"Role1Id\" <> 0 AND \"Role2Id\" <> 0 AND \"Role1Id\" <> \"Role2Id\" AND \"Role1Score\" > \"Role2Score\" AND \"Role2Score\" > 1000)");
+                        });
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.Activity.ActivityWeight", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("Weight")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("GuildId", "ChannelId");
+
+                    b.ToTable("activity_weights", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_activity_weight", "\"Weight\" >= 0 AND \"Weight\" <= 100");
+                        });
+                });
+
             modelBuilder.Entity("SylvanBot.Application.Features.Automod.AutomodBan", b =>
                 {
                     b.Property<Guid>("Id")

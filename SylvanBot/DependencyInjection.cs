@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SylvanBot.Features.Activity;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.Automod;
 using SylvanBot.Application.Features.SylvanMail;
@@ -40,6 +41,10 @@ public static class DependencyInjection
 
         private void AddFeatures(IConfiguration configuration)
         {
+            services.AddSingleton<ActivityService>();
+            services.AddSingleton<ActivityWorker>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ActivityWorker>());
+            services.AddHostedService(sp => sp.GetRequiredService<ActivityWorker>());
             services.AddSingleton<AutomodBanEnforcement>();
             services.AddSingleton<AutomodManagement>();
             services.AddSingleton<AutomodRuntime>();
