@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.1.2 - 2026-11-11
+## Administration
+### Added
+- Administrators can set XP weights for individual threads with `/config activity weight`. Thread weights override their channel and category weights; omit the weight to restore inheritance. `/config activity show` includes saved thread weights.
 # v1.1.1 - 2026-11-11
 ## Moderation
 ### Changed
