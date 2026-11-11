@@ -9,7 +9,7 @@ using SylvanBot.Application.Infrastructure.Data;
 public sealed class TicketWorker(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contextFactory,
-    TicketCoordinator coordinator,
+    IServiceScopeFactory scopes,
     TicketBoundary boundary,
     TicketDeliveryWorker delivery,
     ILogger logger) : BackgroundService, IDiscordGatewayHandler
@@ -77,11 +77,18 @@ public sealed class TicketWorker(
                 {
                     foreach (var check in _timeoutChecks.Keys)
                     {
+                        await using var scope = scopes.CreateAsyncScope();
+                        var coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
                         await coordinator.ScheduleTimeoutChecksAsync(check.Guild, check.User, stoppingToken);
                         _timeoutChecks.TryRemove(check, out _);
                     }
 
-                    await coordinator.RecoverAutomodBansAsync(stoppingToken);
+                    await using (var scope = scopes.CreateAsyncScope())
+                    {
+                        var coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
+                        await coordinator.RecoverAutomodBansAsync(stoppingToken);
+                    }
+
                     await ProcessGuildsAsync(stoppingToken);
                     delivery.Wake();
                 }
@@ -163,6 +170,8 @@ public sealed class TicketWorker(
 
                 try
                 {
+                    await using var scope = scopes.CreateAsyncScope();
+                    var coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
                     var started = DateTimeOffset.UtcNow;
                     var from = config.LastAuditScanAtUtc ?? config.CaptureFromUtc!.Value;
 
@@ -213,6 +222,8 @@ public sealed class TicketWorker(
                     {
                         try
                         {
+                            await using var scope = scopes.CreateAsyncScope();
+                            var coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
                             await coordinator.RecoverAsync(config.GuildId, id, auditCurrent, token);
                         }
                         catch (OperationCanceledException) when (token.IsCancellationRequested)

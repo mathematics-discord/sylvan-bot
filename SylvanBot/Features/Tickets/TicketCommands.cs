@@ -2,6 +2,8 @@ namespace SylvanBot.Features.Tickets;
 
 using static System.Globalization.CultureInfo;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 
@@ -10,7 +12,8 @@ using SylvanBot.Application.Features.Tickets;
 [RequireContext(ContextType.Guild)]
 public sealed class TicketModule(
     TicketCoordinator coordinator,
-    TicketWorker worker,
+    IDbContextFactory<BotDbContext> contexts,
+    TicketDeliveryWorker worker,
     IHostApplicationLifetime lifetime,
     ILogger logger) : InteractionModuleBase<IInteractionContext>
 {
@@ -34,7 +37,7 @@ public sealed class TicketModule(
     public Task ManageAsync(IMessage message) => ExecuteAsync(async (actor, token) =>
                                                                   await DisplayAsync(
                                                                       actor,
-                                                                      await coordinator.ShowMessageAsync(
+                                                                      await ShowMessageAsync(
                                                                           actor,
                                                                           new TicketMessage(message.Channel.Id, message.Id),
                                                                           hidden: false,
@@ -46,7 +49,7 @@ public sealed class TicketModule(
     [CommandContextType(InteractionContextType.Guild)]
     public Task ApproveMessageAsync(IMessage message) => ExecuteAsync(async (actor, token) =>
     {
-        var ticket = await coordinator.ShowMessageAsync(
+        var ticket = await ShowMessageAsync(
             actor,
             new TicketMessage(message.Channel.Id, message.Id),
             hidden: false,
@@ -63,7 +66,7 @@ public sealed class TicketModule(
     [CommandContextType(InteractionContextType.Guild)]
     public Task RevertMessageAsync(IMessage message) => ExecuteAsync(async (actor, token) =>
     {
-        var ticket = await coordinator.ShowMessageAsync(
+        var ticket = await ShowMessageAsync(
             actor,
             new TicketMessage(message.Channel.Id, message.Id),
             hidden: false,
@@ -78,7 +81,7 @@ public sealed class TicketModule(
         }
         finally
         {
-            worker.Wake();
+            worker.Wake(Context.Guild!.Id);
         }
     });
 
@@ -87,7 +90,7 @@ public sealed class TicketModule(
     [CommandContextType(InteractionContextType.Guild)]
     public Task HideMessageAsync(IMessage message) => ExecuteAsync(async (actor, token) =>
     {
-        var ticket = await coordinator.ShowMessageAsync(
+        var ticket = await ShowMessageAsync(
             actor,
             new TicketMessage(message.Channel.Id, message.Id),
             hidden: false,
@@ -296,16 +299,16 @@ public sealed class TicketModule(
                 hidden: null,
                 token);
 
-            worker.Wake();
-            await DisplayAsync(actor, await coordinator.ShowAsync(actor, number, hidden: false, token), result.Outcome);
+            worker.Wake(Context.Guild!.Id);
+            await DisplayAsync(actor, await coordinator.ShowAsync(actor, number, hidden: false, token), result);
         });
 
     [ComponentInteraction("ticket:approve:*:*", true)]
     public Task ApproveAsync(long number, int version) => ExecuteAsync(async (actor, token) =>
     {
         var result = await coordinator.ApproveAsync(actor, number, version, token);
-        worker.Wake();
-        await DisplayAsync(actor, await coordinator.ShowAsync(actor, number, hidden: false, token), result.Outcome);
+        worker.Wake(Context.Guild!.Id);
+        await DisplayAsync(actor, await coordinator.ShowAsync(actor, number, hidden: false, token), result);
     });
 
     [SlashCommand("review", "Work through tickets awaiting approval.")]
@@ -333,14 +336,14 @@ public sealed class TicketModule(
         try
         {
             var result = await coordinator.ApproveAsync(actor, number, version, token);
-            await QueueAsync(actor, number, token, result.Outcome);
+            await QueueAsync(actor, number, token, result);
         }
         catch (BotCommandException exception)
         {
             await QueueAsync(actor, number - 1, token, exception.Message);
         }
 
-        worker.Wake();
+        worker.Wake(Context.Guild!.Id);
     });
 
     [ComponentInteraction("ticket:review-open:*:*", true)]
@@ -363,8 +366,8 @@ public sealed class TicketModule(
                 hidden: null,
                 token);
 
-            worker.Wake();
-            await QueueAsync(actor, number - 1, token, result.Outcome);
+            worker.Wake(Context.Guild!.Id);
+            await QueueAsync(actor, number - 1, token, result);
         });
 
     private async Task QueueAsync(TicketActor actor, long after, CancellationToken token, string? outcome = null)
@@ -405,7 +408,7 @@ public sealed class TicketModule(
         {
             var ticket = number is { } id
                 ? await coordinator.ShowAsync(actor, id, hidden, token)
-                : await coordinator.ShowMessageAsync(actor, TicketReference.ParseMessageLink(message!, actor.GuildId), hidden, token);
+                : await ShowMessageAsync(actor, TicketReference.ParseMessageLink(message!, actor.GuildId), hidden, token);
 
             await DisplayAsync(actor, ticket, ephemeral: false);
 
@@ -413,7 +416,7 @@ public sealed class TicketModule(
         }
 
         var subject = TicketReference.ParseUser(user);
-        var result = await coordinator.ListAsync(actor, subject, page, hidden, token);
+        var result = await ListAsync(actor, subject, page, hidden, token);
         var text = new StringBuilder();
 
         foreach (var ticket in result.Items)
@@ -513,19 +516,7 @@ public sealed class TicketModule(
         if (Context.User is not IGuildUser member || Context.Guild is null)
             throw new BotCommandException("Use this command in a server.");
 
-        var permissions = member.GuildPermissions;
-
-        var actor = new TicketActor(
-            Context.Guild.Id,
-            member.Id,
-            permissions.Administrator,
-            permissions.ModerateMembers,
-            permissions.BanMembers,
-            permissions.KickMembers,
-            permissions.MuteMembers,
-            permissions.DeafenMembers,
-            permissions.ManageRoles,
-            permissions.ViewAuditLog);
+        var actor = TicketBoundary.Actor(member);
 
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(lifetime.ApplicationStopping);
 
@@ -535,10 +526,10 @@ public sealed class TicketModule(
         await operation(actor, deadline.Token);
     }
 
-    private async Task ChangedAsync(TicketResult result)
+    private async Task ChangedAsync(string result)
     {
-        worker.Wake();
-        await ReplyAsync(result.Outcome);
+        worker.Wake(Context.Guild!.Id);
+        await ReplyAsync(result);
     }
 
     private Task ReplyAsync(string text) => ModifyOriginalResponseAsync(properties =>
@@ -554,4 +545,52 @@ public sealed class TicketModule(
         if (actor.GuildId != guild || actor.UserId != owner)
             throw new BotCommandException("This editor belongs to another moderator or server.");
     }
+
+    private async Task<Ticket?> ShowMessageAsync(TicketActor actor, TicketMessage message, bool hidden, CancellationToken ct)
+    {
+        TicketCoordinator.RequireStaff(actor, hidden);
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        await TicketCoordinator.EnabledAsync(db, actor.GuildId, ct);
+
+        var ticket = await db.Tickets
+            .AsNoTracking()
+            .Where(value => value.GuildId == actor.GuildId
+                       && value.Hidden == hidden
+                       && value.Publications.Any(reference
+                                                     => reference.ChannelId == message.ChannelId && reference.MessageId == message.MessageId))
+            .SingleOrDefaultAsync(ct);
+
+        return ticket;
+    }
+
+    private async Task<TicketPage> ListAsync(TicketActor actor, ulong subject, int page, bool hidden, CancellationToken ct)
+    {
+        if (subject == 0 || page is < 1 or > 1_000_000)
+            throw new BotCommandException("Supply a valid user and a page between 1 and 1,000,000.");
+
+        await using var db = await contexts.CreateDbContextAsync(ct);
+        await TicketCoordinator.EnabledAsync(db, actor.GuildId, ct);
+        TicketCoordinator.RequireStaff(actor, hidden);
+        var senior = actor.IsAdministrator || actor.CanViewAuditLog;
+
+        List<Ticket> tickets = await db.Tickets
+            .AsNoTracking()
+            .Where(ticket => ticket.GuildId == actor.GuildId
+                       && ticket.SubjectUserId == subject
+                       && (!hidden || ticket.Hidden)
+                       && (senior || !ticket.Hidden))
+            .OrderByDescending(ticket => ticket.CreatedAtUtc)
+            .ThenByDescending(ticket => ticket.Id)
+            .Skip((page - 1) * 10)
+            .Take(11)
+            .ToListAsync(ct);
+
+        ImmutableArray<Ticket> items = tickets
+            .Take(10)
+            .ToImmutableArray();
+
+        return new TicketPage(items, page, tickets.Count > 10);
+    }
+
+    private sealed record TicketPage(ImmutableArray<Ticket> Items, int Page, bool HasMore);
 }

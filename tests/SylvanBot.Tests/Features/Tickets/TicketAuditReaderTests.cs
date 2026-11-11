@@ -94,7 +94,7 @@ public sealed class TicketAuditReaderTests
 
         // Assert
         result[0].Removed.ShouldBeTrue();
-        (result[0].Timeout is TicketTimeout.None).ShouldBeTrue();
+        result[0].Timeout.HasValue.ShouldBeFalse();
         result[0].CreatesTicket.ShouldBeFalse();
     }
 

@@ -135,7 +135,7 @@ public sealed record TicketDetails
         }
     }
 
-    public DateTimeOffset TimeoutExpiry(DateTimeOffset actionTime, DateTimeOffset now)
+    public DateTimeOffset TimeoutExpiry(DateTimeOffset actionTime)
     {
         var expiry = Expiry(actionTime);
 

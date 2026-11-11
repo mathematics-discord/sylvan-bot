@@ -1,11 +1,13 @@
 namespace SylvanBot.Features.Tickets;
 
+using Microsoft.EntityFrameworkCore;
+using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 
 [RequireContext(ContextType.DM)]
-public sealed class TicketDmModule(TicketCoordinator coordinator, TicketBoundary boundary, TicketWorker worker, TicketLocks locks,
-    IHostApplicationLifetime lifetime) : InteractionModuleBase<IInteractionContext>
+public sealed class TicketDmModule(TicketCoordinator coordinator, TicketBoundary boundary, TicketDeliveryWorker worker, TicketLocks locks,
+    IDbContextFactory<BotDbContext> contexts, IHostApplicationLifetime lifetime, ILogger logger) : InteractionModuleBase<IInteractionContext>
 {
     internal static MessageComponent Buttons(Ticket ticket) => new ComponentBuilder()
         .WithButton("Edit", $"ticket-dm-edit:{ticket.GuildId}:{ticket.ModeratorUserId}:{ticket.Number}", disabled: ticket.Hidden)
@@ -60,7 +62,9 @@ public sealed class TicketDmModule(TicketCoordinator coordinator, TicketBoundary
             || interaction.Message?.Author.Id != Context.Client.CurrentUser.Id)
             throw new BotCommandException("This ticket editor belongs to another moderator.");
 
-        await interaction.DeferLoadingAsync(ephemeral: true);
+        using var timing = new OperationTiming(logger.ForContext("GuildId", guildId).ForContext("UserId", ownerId), "ticket.dm_save", "acknowledge");
+        await interaction.DeferAsync();
+        timing.Next("actor");
         var cancellationToken = lifetime.ApplicationStopping;
         var actor = await boundary.GetActorAsync(guildId, ownerId, cancellationToken);
         var ticket = await coordinator.ShowAsync(actor, number, false, cancellationToken);
@@ -69,21 +73,29 @@ public sealed class TicketDmModule(TicketCoordinator coordinator, TicketBoundary
             throw new BotCommandException("This ticket is no longer available to edit.");
 
         var details = TicketDetails.ParseFields(string.IsNullOrWhiteSpace(modal.Duration) ? null : modal.Duration, modal.Comment);
+        using var moderatorGate = await locks.ModeratorAsync(ownerId, cancellationToken);
+        timing.Next("save");
         var result = await coordinator.EditAsync(actor, number, version, details, null, cancellationToken);
 
         using (await locks.TicketAsync(ticket.Id, cancellationToken))
         {
             ticket = await coordinator.ShowAsync(actor, number, false, cancellationToken) ?? throw new BotCommandException("The ticket is no longer visible.");
-            await interaction.Message.ModifyAsync(properties =>
+            timing.Next("response");
+            await interaction.ModifyOriginalResponseAsync(properties =>
             {
-                properties.Content = "Ticket details saved.";
+                properties.Content = result;
                 properties.Embed = TicketPresentation.Describe(ticket);
                 properties.Components = Buttons(ticket);
                 properties.AllowedMentions = AllowedMentions.None;
             });
+
+            await using var db = await contexts.CreateDbContextAsync(cancellationToken);
+            await db.TicketModerators
+                .Where(moderator => moderator.UserId == ownerId && moderator.ActiveTicketId == ticket.Id
+                    && moderator.PromptMessageId == interaction.Message.Id)
+                .ExecuteUpdateAsync(update => update.SetProperty(moderator => moderator.PromptRevision, ticket.Version), cancellationToken);
         }
 
-        await ModifyOriginalResponseAsync(properties => properties.Content = result.Outcome);
-        worker.Wake();
+        worker.Wake(guildId);
     }
 }

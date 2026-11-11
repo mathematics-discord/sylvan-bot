@@ -161,7 +161,7 @@ public sealed class TicketBoundary(
     {
         try
         {
-            var member = await socketClient.Rest.GetGuildUserAsync(guildId, userId, Options(token));
+            var member = await GetMemberAsync(guildId, userId, token);
             return member is not null && (member.GuildPermissions.Administrator || member.GuildPermissions.ViewAuditLog);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -174,18 +174,31 @@ public sealed class TicketBoundary(
     public async Task<TicketActor> GetActorAsync(ulong guildId, ulong userId, CancellationToken cancellationToken)
     {
         using var timing = new OperationTiming(logger.ForContext("GuildId", guildId).ForContext("UserId", userId), "ticket.actor", "guild");
-        var guild = await socketClient.Rest.GetGuildAsync(guildId, Options(cancellationToken));
-        timing.Next("member");
-        var member = await guild.GetUserAsync(userId, Options(cancellationToken));
+        var member = await GetMemberAsync(guildId, userId, cancellationToken);
 
         if (member?.IsBot != false)
             throw new BotCommandException("The responsible moderator is not an available human member of this server.");
 
+        return Actor(member);
+    }
+
+    internal async Task<IGuildUser?> GetMemberAsync(ulong guildId, ulong userId, CancellationToken token)
+    {
+        var guild = socketClient.GetGuild(guildId);
+
+        if (guild is not { IsConnected: true, IsSynced: true })
+            throw new BotCommandException("Server data is not ready. Try again shortly.");
+
+        return await ((IGuild)guild).GetUserAsync(userId, options: Options(token));
+    }
+
+    internal static TicketActor Actor(IGuildUser member)
+    {
         var permissions = member.GuildPermissions;
 
         return new TicketActor(
-            guildId,
-            userId,
+            member.GuildId,
+            member.Id,
             permissions.Administrator,
             permissions.ModerateMembers,
             permissions.BanMembers,
@@ -198,8 +211,8 @@ public sealed class TicketBoundary(
 
     public async Task CheckCaptureAsync(ulong guildId, CancellationToken cancellationToken)
     {
-        var guild = await socketClient.Rest.GetGuildAsync(guildId, Options(cancellationToken));
-        var bot = await guild.GetCurrentUserAsync(Options(cancellationToken));
+        var bot = await GetMemberAsync(guildId, socketClient.CurrentUser.Id, cancellationToken)
+            ?? throw new BotCommandException("Sylvan is not available in this server.");
 
         if (!bot.GuildPermissions.ViewAuditLog)
             throw new BotCommandException("Sylvan needs View Audit Log to capture and reconcile moderation actions.");

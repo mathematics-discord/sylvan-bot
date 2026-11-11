@@ -117,7 +117,7 @@ public sealed class Ticket
             throw new BotCommandException("Resolve the pending Discord operation before editing details.");
     }
 
-    public string ValidateEdit(TicketDetails details, DateTimeOffset now)
+    public string ValidateEdit(TicketDetails details)
     {
         if (details.Duration.Value is null || details.Comment.Value is null)
             throw new BotCommandException("Duration and comment edit choices are required.");
@@ -134,7 +134,7 @@ public sealed class Ticket
             throw new BotCommandException("This ticket type does not accept a duration.");
 
         _ = Action == TicketAction.Timeout
-            ? details.TimeoutExpiry(CreatedAtUtc, now)
+            ? details.TimeoutExpiry(CreatedAtUtc)
             : details.Expiry(CreatedAtUtc);
 
         return comment;
@@ -344,4 +344,27 @@ public sealed class Ticket
         if (Action == TicketAction.Timeout && ExpiresAtUtc is { } timeoutExpiry)
             ObserveTimeoutWindow(timeoutExpiry, CreatedAtUtc);
     }
+}
+
+
+public enum TicketAction
+{
+    Note,
+    Kick,
+    Ban,
+    VoiceMute,
+    VoiceDeafen,
+    Role,
+    Timeout,
+}
+
+
+public enum TicketStatus
+{
+    NotApplicable = -1,
+    Active = 0,
+    Expired = 1,
+    Reverted = 3,
+    Applied = 4,
+    Superseded = 5,
 }

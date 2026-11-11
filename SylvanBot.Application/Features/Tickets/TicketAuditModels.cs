@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace SylvanBot.Application.Features.Tickets;
 
 public sealed record TicketObservation
@@ -16,12 +18,12 @@ public sealed record TicketObservation
 
     public bool Removed { get; init; }
     public bool RequiresApproval { get; init; }
-    public TicketTimeout Timeout { get; init; } = new TicketTimeout.None();
+    public Optional<DateTimeOffset> Timeout { get; init; } = Optional<DateTimeOffset>.None;
     public Optional<Guid> OperationId { get; init; } = Optional<Guid>.None;
 
     public bool CreatesTicket => !Removed
         && (Action != TicketAction.Timeout
-            || (Timeout.Value is TicketTimeout.Until current && current.ExpiresAtUtc > CreatedAtUtc));
+            || (Timeout.TryGet(out var current) && current > CreatedAtUtc));
 
     public bool ContinuesTimeout(Ticket ticket) => Action == TicketAction.Timeout
         && ticket.Action == TicketAction.Timeout
@@ -30,3 +32,6 @@ public sealed record TicketObservation
         && ticket.Status == TicketStatus.Active
         && ticket.ExpiresAtUtc > CreatedAtUtc;
 }
+
+
+public sealed record TicketAuditScan(Optional<ulong> LastAuditId, ImmutableArray<TicketObservation> Observations);

@@ -61,12 +61,13 @@ public static class DependencyInjection
             services.AddSingleton<SylvanMailClient>();
 
             services.AddSingleton<TicketBoundary>();
-            services.AddSingleton<TicketBanEnforcement>();
-            services.AddSingleton<TicketTimeoutEnforcement>();
-            services.AddSingleton<TicketRoleEnforcement>();
+            services.AddScoped<TicketExpiry>();
+            services.AddScoped<TicketTimeoutEnforcement>();
             services.AddSingleton<TicketLocks>();
-            services.AddSingleton<TicketPublisher>();
-            services.AddSingleton<TicketCoordinator>();
+            services.AddScoped<TicketPublisher>();
+            services.AddScoped<TicketReminders>();
+            services.AddSingleton<TicketDeliveryBackoff>();
+            services.AddScoped<TicketCoordinator>();
             services.AddSingleton<TicketReviewSummary>();
             services.AddSingleton<TicketDeliveryWorker>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<TicketDeliveryWorker>());

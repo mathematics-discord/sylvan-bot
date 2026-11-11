@@ -6,6 +6,10 @@ public sealed class TicketPublication
 
     public ulong MessageId { get; init; }
 
+    public TicketPublicationFormat Format { get; set; }
+
+    public bool ApprovalReactionCleanupPending { get; set; }
+
     public int Revision { get; set; }
 
     public bool Current { get; set; }
@@ -14,3 +18,12 @@ public sealed class TicketPublication
 
     public TicketMessage Message() => new TicketMessage(ChannelId, MessageId);
 }
+public enum TicketPublicationFormat
+{
+    Unknown,
+    Embed,
+    ComponentsV2,
+}
+
+
+public sealed record TicketMessage(ulong ChannelId, ulong MessageId);

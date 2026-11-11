@@ -1,4 +1,4 @@
-﻿namespace SylvanBot.Features.Tickets;
+namespace SylvanBot.Features.Tickets;
 
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Common;
@@ -9,17 +9,18 @@ using SylvanBot.Features.RolePersistence;
 public sealed partial class TicketCoordinator(
     IDbContextFactory<BotDbContext> contexts,
     DiscordSocketClient client,
-    TicketBanEnforcement bans,
+    TicketExpiry expiry,
     TicketTimeoutEnforcement timeouts,
-    TicketRoleEnforcement roles,
     RolePersistenceWorker persistence,
     TicketBoundary boundary,
     TicketPublisher publisher,
+    TicketReminders reminders,
+    TicketReviewSummary reviewSummary,
     TicketLocks locks,
     SylvanBot.Features.Automod.AutomodRuntime automod,
     ILogger logger)
 {
-    public async Task<TicketResult> CreateAsync(TicketActor actor, ulong subject, string comment, CancellationToken token)
+    public async Task<string> CreateAsync(TicketActor actor, ulong subject, string comment, CancellationToken token)
     {
         await using var db = await contexts.CreateDbContextAsync(token);
         await PrepareNoteAsync(db, actor, subject, token);
@@ -53,10 +54,7 @@ public sealed partial class TicketCoordinator(
                 exception);
         }
 
-        var result = new TicketResult([ticket.Id], $"Saved ticket #{number}.");
-        using var gate = await locks.TicketAsync(result.TicketIds[0], token);
-
-        return await PublishAsync(actor.GuildId, result, token);
+        return Queued($"Saved ticket #{number}.", changed: true);
     }
 
     public async Task PrepareNoteAsync(TicketActor actor, ulong subject, CancellationToken token)
@@ -65,7 +63,7 @@ public sealed partial class TicketCoordinator(
         await PrepareNoteAsync(db, actor, subject, token);
     }
 
-    public async Task<TicketResult> EditAsync(
+    public async Task<string> EditAsync(
         TicketActor actor,
         long number,
         int? version,
@@ -73,7 +71,7 @@ public sealed partial class TicketCoordinator(
         bool? hidden,
         CancellationToken ct)
     {
-        actor = await boundary.GetActorAsync(actor.GuildId, actor.UserId, ct);
+        using var timing = new OperationTiming(logger.ForContext("TicketNumber", number), "ticket.edit", "gate");
         var gate = await LockTicketAsync(actor.GuildId, number, ct);
 
         try
@@ -81,6 +79,7 @@ public sealed partial class TicketCoordinator(
             await using var db = await contexts.CreateDbContextAsync(ct);
 
             var ticket = await FindAsync(db, actor, number, ct);
+            timing.Next("edit");
             var originalVersion = ticket.Version;
             var outcome = string.Empty;
             var hasDetails = details.HasDuration || details.Comment.Value is not TicketCommentEdit.Keep;
@@ -91,7 +90,7 @@ public sealed partial class TicketCoordinator(
             if (hasDetails)
             {
                 ticket.RequireEdit(actor, version ?? ticket.Version);
-                ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
+                ticket.ValidateEdit(details);
             }
 
             if (hidden is { } visibility)
@@ -109,14 +108,14 @@ public sealed partial class TicketCoordinator(
                 if (hidden is null)
                     ticket.RequireEdit(actor, version ?? ticket.Version);
 
-                var comment = ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
+                var comment = ticket.ValidateEdit(details);
 
                 // Editors submit their pre-filled duration even when only the comment changed.
                 if (details.ChangesDuration(ticket.DurationSeconds))
                 {
                     if (ticket.Action == TicketAction.Timeout)
                     {
-                        outcome = (await timeouts.EditAsync(db, new EditDetails(ticket, actor, details), ct)).Outcome;
+                        outcome = await timeouts.EditAsync(db, ticket, actor, details, ct);
                     }
                     else
                     {
@@ -131,13 +130,14 @@ public sealed partial class TicketCoordinator(
                     ticket.SetComment(comment, actor.UserId, details.Comment.Value is TicketCommentEdit.Append);
             }
 
+            timing.Next("save");
             await SaveAsync(db, ct);
 
-            ImmutableArray<long> ids = ticket.Version == originalVersion ? ImmutableArray<long>.Empty : [ticket.Id];
+            var changed = ticket.Version != originalVersion;
 
-            var text = ids.IsEmpty ? $"Ticket #{number}: nothing changed." : $"Saved ticket #{number}.";
+            var text = !changed ? $"Ticket #{number}: nothing changed." : $"Saved ticket #{number}.";
 
-            return await PublishAsync(actor.GuildId, new TicketResult(ids, text + (outcome.Length > 0 ? "\n" + outcome : string.Empty)), ct);
+            return Queued(text + (outcome.Length > 0 ? "\n" + outcome : string.Empty), changed);
         }
         finally
         {
@@ -145,9 +145,8 @@ public sealed partial class TicketCoordinator(
         }
     }
 
-    public async Task<TicketResult> RevertAsync(TicketActor actor, long number, int? version, CancellationToken ct)
+    public async Task<string> RevertAsync(TicketActor actor, long number, int? version, CancellationToken ct)
     {
-        actor = await boundary.GetActorAsync(actor.GuildId, actor.UserId, ct);
         var gate = await LockTicketAsync(actor.GuildId, number, ct);
 
         try
@@ -156,7 +155,7 @@ public sealed partial class TicketCoordinator(
             var ticket = await FindAsync(db, actor, number, ct);
             await RevertAsync(db, actor, ticket, version ?? ticket.Version, ct);
 
-            return await PublishAsync(actor.GuildId, new TicketResult([ticket.Id], $"Reverted ticket #{number}. The record is retained."), ct);
+            return Queued($"Reverted ticket #{number}. The record is retained.", changed: true);
         }
         finally
         {
@@ -239,9 +238,11 @@ public sealed partial class TicketCoordinator(
         var options = TicketBoundary.Options(ct);
         options.AuditLogReason = $"Revert Sylvan ticket {ticket.Number}; moderator {actor.UserId}";
         var guild = await client.Rest.GetGuildAsync(actor.GuildId, options);
-        var moderator = await guild.GetUserAsync(actor.UserId, options);
+        var moderator = await boundary.GetMemberAsync(actor.GuildId, actor.UserId, ct)
+            ?? throw new BotCommandException("The responsible moderator is no longer available.");
         var member = await guild.GetUserAsync(ticket.SubjectUserId, options);
-        var bot = await guild.GetCurrentUserAsync(options);
+        var bot = (IGuildUser?)client.GetGuild(actor.GuildId)?.CurrentUser
+            ?? await guild.GetCurrentUserAsync(options);
 
         var moderatorPosition = moderator.RoleIds
             .Select(id => guild.GetRole(id)?.Position ?? 0)
@@ -320,7 +321,7 @@ public sealed partial class TicketCoordinator(
         }
     }
 
-    public async Task<TicketResult> ApproveAsync(TicketActor actor, long number, int version, CancellationToken ct)
+    public async Task<string> ApproveAsync(TicketActor actor, long number, int version, CancellationToken ct)
     {
         RequireStaff(actor, hidden: true);
         using var timing = new OperationTiming(logger.ForContext("TicketNumber", number), "ticket.approve", "gate");
@@ -368,48 +369,6 @@ public sealed partial class TicketCoordinator(
         return ticket;
     }
 
-    public async Task<Ticket?> ShowMessageAsync(TicketActor actor, TicketMessage message, bool hidden, CancellationToken ct)
-    {
-        RequireStaff(actor, hidden);
-        await using var db = await contexts.CreateDbContextAsync(ct);
-        await EnabledAsync(db, actor.GuildId, ct);
-
-        var ticket = await db.Tickets
-            .AsNoTracking()
-            .Where(value => value.GuildId == actor.GuildId
-                       && value.Hidden == hidden
-                       && value.Publications.Any(reference
-                                                     => reference.ChannelId == message.ChannelId && reference.MessageId == message.MessageId))
-            .SingleOrDefaultAsync(ct);
-
-        return ticket;
-    }
-
-    public async Task<TicketPage> ListAsync(TicketActor actor, ulong subject, int page, bool hidden, CancellationToken ct)
-    {
-        if (subject == 0 || page is < 1 or > 1_000_000)
-            throw new BotCommandException("Supply a valid user and a page between 1 and 1,000,000.");
-
-        await using var db = await contexts.CreateDbContextAsync(ct);
-        await EnabledAsync(db, actor.GuildId, ct);
-        RequireStaff(actor, hidden);
-        var senior = actor.IsAdministrator || actor.CanViewAuditLog;
-
-        List<Ticket> tickets = await db.Tickets
-            .AsNoTracking()
-            .Where(ticket => ticket.GuildId == actor.GuildId
-                       && ticket.SubjectUserId == subject
-                       && (!hidden || ticket.Hidden)
-                       && (senior || !ticket.Hidden))
-            .OrderByDescending(ticket => ticket.CreatedAtUtc)
-            .ThenByDescending(ticket => ticket.Id)
-            .Skip((page - 1) * 10)
-            .Take(11)
-            .ToListAsync(ct);
-
-        return new TicketPage(tickets.Take(10).ToImmutableArray(), page, tickets.Count > 10);
-    }
-
     internal static IQueryable<Ticket> AwaitingApproval(IQueryable<Ticket> tickets, ulong guildId) =>
         tickets
             .Where(ticket => ticket.GuildId == guildId
@@ -426,45 +385,38 @@ public sealed partial class TicketCoordinator(
 
         IQueryable<Ticket> pending = AwaitingApproval(db.Tickets, actor.GuildId);
 
-        long cursor = 0;
-        var ready = 0;
-        var waiting = 0;
-        Ticket? next = null;
-
-        while (true)
-        {
-            var cursorAfter = cursor;
-            timing.Next("database_batch");
-
-            List<Ticket> batch = await pending
-                .AsNoTracking()
-                .Where(ticket => ticket.Number > cursorAfter)
-                .OrderBy(ticket => ticket.Number)
-                .Take(100)
-                .ToListAsync(ct);
-
-            if (batch.Count == 0)
-                break;
-
-            timing.Next("counting");
-
-            foreach (var ticket in batch)
+        // Match Complete's Unicode whitespace semantics; the provider's
+        // IsNullOrWhiteSpace translation recognises only a subset of these characters.
+        const string whitespace = "\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000";
+        var eligibility = pending
+            .Select(ticket => new
             {
-                if (ticket is { Complete: true, Pending: null })
-                {
-                    ready++;
+                Ticket = ticket,
+                Ready = ticket.Comment != null && ticket.Comment.Trim(whitespace.ToCharArray()) != string.Empty
+                    && (ticket.Action != TicketAction.Timeout
+                        || (ticket.DurationSeconds > 0 && ticket.ExpiresAtUtc != null))
+                    && ticket.Pending == null,
+            });
 
-                    if (next is null && ticket.Number > after)
-                        next = ticket;
-                }
-                else
-                {
-                    waiting++;
-                }
-            }
+        timing.Next("counting");
+        var counts = await eligibility
+            .GroupBy(ticket => ticket.Ready)
+            .Select(group => new { Ready = group.Key, Count = group.Count() })
+            .ToListAsync(ct);
+        var ready = counts
+            .Where(group => group.Ready)
+            .Sum(group => group.Count);
+        var waiting = counts
+            .Where(group => !group.Ready)
+            .Sum(group => group.Count);
 
-            cursor = batch[^1].Number;
-        }
+        timing.Next("next_ticket");
+        var next = await eligibility
+            .Where(ticket => ticket.Ready && ticket.Ticket.Number > after)
+            .Select(ticket => ticket.Ticket)
+            .AsNoTracking()
+            .OrderBy(ticket => ticket.Number)
+            .FirstOrDefaultAsync(ct);
 
         logger.Debug("Ticket review queue in guild {GuildId}: {ReadyCount} ready, {WaitingCount} waiting", actor.GuildId, ready, waiting);
 
@@ -525,6 +477,7 @@ public sealed partial class TicketCoordinator(
                 automod.CloseGuild(actor.GuildId);
 
             await SaveAsync(db, ct);
+            reviewSummary.MarkDirty(actor.GuildId);
 
             if (!await automod.RefreshAsync(actor.GuildId, ct))
                 throw new BotCommandException(
@@ -564,17 +517,14 @@ public sealed partial class TicketCoordinator(
         }
     }
 
-    public Task RemindAsync(ulong userId, bool force, CancellationToken token) => publisher.RemindAsync(userId, force, token);
-
     public async Task RedeliverAsync(TicketActor actor, CancellationToken token)
     {
-        actor = await boundary.GetActorAsync(actor.GuildId, actor.UserId, token);
         await using var db = await contexts.CreateDbContextAsync(token);
 
         await EnabledAsync(db, actor.GuildId, token);
         RequireStaff(actor, hidden: false);
 
-        await publisher.RemindAsync(actor.UserId, force: true, token, actor.GuildId);
+        await reminders.RemindAsync(actor.UserId, force: true, token, actor.GuildId, actor);
     }
 
     internal static async Task<TicketConfiguration> EnabledAsync(BotDbContext db, ulong guildId, CancellationToken token)
@@ -594,6 +544,18 @@ public sealed partial class TicketCoordinator(
 
         if (config.CaptureFromUtc != scannedConfig.CaptureFromUtc)
             return;
+
+        Dictionary<ulong, bool> reviewPermissions = [];
+
+        async Task<bool> ResolveReviewPermissionAsync(ulong userId)
+        {
+            if (reviewPermissions.TryGetValue(userId, out var cached))
+                return cached;
+
+            var allowed = await boundary.CanReviewAsync(config.GuildId, userId, token);
+            reviewPermissions.Add(userId, allowed);
+            return allowed;
+        }
 
         Dictionary<Guid, ulong> correlations = [];
 
@@ -616,10 +578,7 @@ public sealed partial class TicketCoordinator(
             {
                 foreach (var observation in group)
                 {
-                    var canReview = await boundary.CanReviewAsync(config.GuildId, observation.ModeratorUserId, token);
-
-                    var request = new ObserveModeration(observation, canReview, correlations, automod.IsEnabled(config.GuildId));
-                    await RecordAuditAsync(db, request, token);
+                    await RecordAuditAsync(db, observation, correlations, automod.IsEnabled(config.GuildId), ResolveReviewPermissionAsync, token);
                 }
 
                 config.LastAuditId = Math.Max(config.LastAuditId ?? 0, group.Key);
@@ -676,13 +635,13 @@ public sealed partial class TicketCoordinator(
             switch (ticket.Action)
             {
                 case TicketAction.Ban:
-                    await bans.ReconcileAsync(db, ticket, auditCurrent, token);
+                    await expiry.ReconcileBanAsync(db, ticket, auditCurrent, token);
                     break;
                 case TicketAction.Timeout:
                     await timeouts.ReconcileAsync(db, ticket, auditCurrent, token);
                     break;
                 case TicketAction.Role:
-                    await roles.ReconcileAsync(db, ticket, auditCurrent, token);
+                    await expiry.ReconcileRoleAsync(db, ticket, auditCurrent, token);
                     break;
             }
 
@@ -692,12 +651,6 @@ public sealed partial class TicketCoordinator(
         {
             gate.Dispose();
         }
-    }
-
-    internal async Task PublishPendingAsync(ulong guildId, long id, CancellationToken token)
-    {
-        using var gate = await locks.TicketAsync(id, token);
-        await publisher.EnsureAsync(guildId, id, token);
     }
 
     internal async Task ScheduleTimeoutChecksAsync(ulong guildId, ulong userId, CancellationToken token)
@@ -754,7 +707,7 @@ public sealed partial class TicketCoordinator(
         }
     }
 
-    private static void RequireStaff(TicketActor actor, bool hidden)
+    internal static void RequireStaff(TicketActor actor, bool hidden)
     {
         var staff = actor.IsAdministrator
             || actor.CanViewAuditLog
@@ -777,17 +730,9 @@ public sealed partial class TicketCoordinator(
         await EnabledAsync(db, actor.GuildId, token);
     }
 
-    private async Task<TicketResult> PublishAsync(ulong guildId, TicketResult result, CancellationToken token)
-    {
-        var outcome = result.Outcome;
-
-        // ReSharper disable once ForeachCanBeConvertedToQueryUsingAnotherGetEnumerator
-        // this doesnt WORK for async methods u fuckin DOLT
-        foreach (var id in result.TicketIds)
-            outcome += await publisher.EnsureAsync(guildId, id, token);
-
-        return result with { Outcome = outcome };
-    }
+    private static string Queued(string response, bool changed) => changed
+        ? response + "\nChannel updates are queued."
+        : response;
 
     private async Task<IDisposable> LockTicketAsync(
         ulong guildId,

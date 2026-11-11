@@ -12,17 +12,35 @@ using SylvanBot.Application.Infrastructure.Data;
 public sealed class TicketReviewSummary(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contexts,
-    ILogger logger)
+    ILogger logger,
+    TicketDeliveryBackoff backoff)
 {
     internal const string ReviewButtonId = "ticket:review-start";
     private const string Heading = "## Tickets awaiting approval";
-    private readonly ConcurrentDictionary<ulong, byte> _channels = new ConcurrentDictionary<ulong, byte>();
+    private readonly ConcurrentDictionary<ulong, ulong> _channels = new ConcurrentDictionary<ulong, ulong>();
 
-    public bool IsChannel(ulong channelId) => _channels.ContainsKey(channelId);
+    private readonly ConcurrentDictionary<ulong, byte> _dirty = new ConcurrentDictionary<ulong, byte>();
+    private DateTimeOffset _reconcileAfter;
+
+    public void MarkDirty(ulong guildId) => _dirty[guildId] = 0;
+
+    public bool MarkChannelDirty(ulong channelId)
+    {
+        if (!_channels.TryGetValue(channelId, out var guildId))
+            return false;
+
+        MarkDirty(guildId);
+        return true;
+    }
 
     // Only the publication loop runs refreshes; gateway callbacks wake it
     public async Task RefreshAsync(CancellationToken token)
     {
+        var reconcile = DateTimeOffset.UtcNow >= _reconcileAfter;
+
+        if (reconcile)
+            _reconcileAfter = DateTimeOffset.UtcNow.AddMinutes(5);
+
         ulong after = 0;
 
         while (true)
@@ -42,6 +60,17 @@ public sealed class TicketReviewSummary(
 
             foreach (var config in configurations)
             {
+                var dirty = _dirty.TryRemove(config.GuildId, out _);
+
+                if (!reconcile && !dirty)
+                    continue;
+
+                if (backoff.IsDeferred(config.DestinationChannelId ?? config.ReviewSummaryChannelId ?? 0))
+                {
+                    MarkDirty(config.GuildId);
+                    continue;
+                }
+
                 try
                 {
                     await RefreshGuildAsync(db, config, token);
@@ -52,6 +81,11 @@ public sealed class TicketReviewSummary(
                 }
                 catch (Exception exception)
                 {
+                    MarkDirty(config.GuildId);
+
+                    if (exception is RateLimitedException || exception is HttpException { HttpCode: System.Net.HttpStatusCode.TooManyRequests })
+                        backoff.Failed(config.DestinationChannelId ?? config.ReviewSummaryChannelId ?? 0);
+
                     logger.Warning(exception, "Ticket review summary could not be updated in guild {GuildId}", config.GuildId);
                     db.Entry(config).State = EntityState.Detached;
                 }
@@ -64,8 +98,8 @@ public sealed class TicketReviewSummary(
     private async Task RefreshGuildAsync(BotDbContext db, TicketConfiguration config, CancellationToken token)
     {
         var destination = config.Enabled ? config.DestinationChannelId : null;
-        var options = TicketBoundary.Options(token);
-        var guild = await client.Rest.GetGuildAsync(config.GuildId, options);
+        var options = backoff.Options(config.DestinationChannelId ?? config.ReviewSummaryChannelId ?? 0, token);
+        var guild = (IGuild?)client.GetGuild(config.GuildId) ?? await client.Rest.GetGuildAsync(config.GuildId, options);
 
         if (config.ReviewSummaryChannelId is { } previous && previous != destination)
         {
@@ -83,7 +117,7 @@ public sealed class TicketReviewSummary(
         if (destination is not { } channelId)
             return;
 
-        _channels.TryAdd(channelId, 0);
+        _channels.TryAdd(channelId, config.GuildId);
 
         var channel = await guild.GetTextChannelAsync(channelId, options: options)
             ?? throw new InvalidOperationException("The tickets channel is unavailable.");
@@ -126,7 +160,7 @@ public sealed class TicketReviewSummary(
 
     private async Task<IUserMessage?> FindSummaryAtBottomAsync(IMessageChannel channel, ulong? storedId, CancellationToken token)
     {
-        var options = TicketBoundary.Options(token);
+        var options = backoff.Options(channel.Id, token);
 
         IEnumerable<IMessage> recent = await channel.GetMessagesAsync(options: options)
            .FlattenAsync();
@@ -180,11 +214,11 @@ public sealed class TicketReviewSummary(
        .FirstOrDefault()
       ?.Content;
 
-    private static async Task DeleteAsync(IMessageChannel channel, ulong messageId, CancellationToken token)
+    private async Task DeleteAsync(IMessageChannel channel, ulong messageId, CancellationToken token)
     {
         try
         {
-            await channel.DeleteMessageAsync(messageId, TicketBoundary.Options(token));
+            await channel.DeleteMessageAsync(messageId, backoff.Options(channel.Id, token));
         }
         catch (HttpException exception) when (exception.DiscordCode == DiscordErrorCode.UnknownMessage)
         {

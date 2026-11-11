@@ -73,7 +73,7 @@ public sealed class TicketModerationRulesTests
             ModeratorIsBot = false,
             Reason = "",
             CreatedAtUtc = now,
-            Timeout = new TicketTimeout.Until(now.AddSeconds(newRemaining)),
+            Timeout = now.AddSeconds(newRemaining),
         };
 
         // Act

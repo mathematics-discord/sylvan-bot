@@ -40,7 +40,7 @@ public sealed class TicketDetailsTests
         // Assert
         details.DurationSeconds.ShouldBe(long.MaxValue);
         expiry.ShouldBe(DateTimeOffset.MaxValue);
-        Should.Throw<BotCommandException>(() => details.TimeoutExpiry(actionTime, actionTime));
+        Should.Throw<BotCommandException>(() => details.TimeoutExpiry(actionTime));
     }
 
     [Test]
@@ -175,7 +175,7 @@ public sealed class TicketDetailsTests
 
         // Act
         // Assert
-        Should.Throw<BotCommandException>(() => details.TimeoutExpiry(now, now));
+        Should.Throw<BotCommandException>(() => details.TimeoutExpiry(now));
     }
 
     [Test]
@@ -186,7 +186,7 @@ public sealed class TicketDetailsTests
         var details = TicketDetails.ParseReply("29 days");
 
         // Act
-        var expiry = details.TimeoutExpiry(now, now);
+        var expiry = details.TimeoutExpiry(now);
 
         // Assert
         expiry.ShouldBe(now.AddDays(29));
@@ -200,7 +200,7 @@ public sealed class TicketDetailsTests
         var details = TicketDetails.ParseReply("1 day");
 
         // Act
-        var expiry = details.TimeoutExpiry(now.AddDays(-2), now);
+        var expiry = details.TimeoutExpiry(now.AddDays(-2));
 
         // Assert
         expiry.ShouldBe(now.AddDays(-1));
@@ -214,7 +214,7 @@ public sealed class TicketDetailsTests
         var details = TicketDetails.ParseReply("50 days");
 
         // Act
-        var expiry = details.TimeoutExpiry(now.AddDays(-30), now);
+        var expiry = details.TimeoutExpiry(now.AddDays(-30));
 
         // Assert
         expiry.ShouldBe(now.AddDays(20));

@@ -41,50 +41,17 @@ public sealed partial class TicketCoordinator
         return true;
     }
 
-    private async Task<TicketResult> PersistApprovalAsync(BotDbContext db, Ticket ticket, int previousVersion, CancellationToken token)
+    private async Task<string> PersistApprovalAsync(BotDbContext db, Ticket ticket, int previousVersion, CancellationToken token)
     {
         using var timing = new OperationTiming(logger.ForContext("TicketId", ticket.Id), "ticket.approval_save", "database");
-        await SaveAsync(db, token);
-
-        if (ticket.Version == previousVersion)
-            return new TicketResult([], $"Approved ticket #{ticket.Number}.");
-
-        // Approval is durable before cleanup. Neither duplicate reactions nor recovery
-        // retries this deletion, even if Discord cannot confirm the one attempt.
-        timing.Next("clear_reactions");
-        await ClearApprovalReactionsAsync(ticket, token);
-        timing.Next("publication");
-
-        return await PublishAsync(ticket.GuildId, new TicketResult([ticket.Id], $"Approved ticket #{ticket.Number}."), token);
-    }
-
-    private async Task ClearApprovalReactionsAsync(Ticket ticket, CancellationToken token)
-    {
+        var changed = ticket.Version != previousVersion;
         var publication = ticket.Publications
             .SingleOrDefault(reference => reference.Current && !reference.Removed);
 
-        if (publication is null)
-            return;
+        if (changed && publication is not null)
+            publication.ApprovalReactionCleanupPending = true;
 
-        try
-        {
-            var channel = await ((IDiscordClient)client.Rest).GetChannelAsync(publication.ChannelId, options: TicketBoundary.Options(token));
-
-            if (channel is not ITextChannel textChannel || textChannel.GuildId != ticket.GuildId)
-                return;
-
-            if (await textChannel.GetMessageAsync(publication.MessageId, options: TicketBoundary.Options(token)) is IUserMessage message
-                && message.Author.Id == client.CurrentUser.Id)
-                await message.RemoveAllReactionsAsync(TicketBoundary.Options(token));
-        }
-        catch (OperationCanceledException) when (token.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception exception)
-        {
-            logger.Warning(exception, "Ticket {TicketId} was approved, but its one reaction cleanup attempt failed on message {MessageId}",
-                ticket.Id, publication.MessageId);
-        }
+        await SaveAsync(db, token);
+        return Queued($"Approved ticket #{ticket.Number}.", changed);
     }
 }

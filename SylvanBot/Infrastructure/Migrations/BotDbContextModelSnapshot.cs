@@ -795,6 +795,9 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<long?>("PromptMessageId")
                         .HasColumnType("bigint");
 
+                    b.Property<int?>("PromptRevision")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
                         .HasColumnType("integer");
@@ -1000,8 +1003,14 @@ namespace SylvanBot.Infrastructure.Migrations
                             b1.Property<long>("MessageId")
                                 .HasColumnType("bigint");
 
+                            b1.Property<bool>("ApprovalReactionCleanupPending")
+                                .HasColumnType("boolean");
+
                             b1.Property<bool>("Current")
                                 .HasColumnType("boolean");
+
+                            b1.Property<int>("Format")
+                                .HasColumnType("integer");
 
                             b1.Property<bool>("Removed")
                                 .HasColumnType("boolean");

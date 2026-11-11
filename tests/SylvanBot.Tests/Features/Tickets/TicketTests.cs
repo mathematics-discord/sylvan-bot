@@ -132,7 +132,7 @@ public sealed class TicketTests
         // Act
         void Act()
         {
-            ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
+            ticket.ValidateEdit(details);
         }
 
         // Assert
@@ -154,11 +154,11 @@ public sealed class TicketTests
         var details = new TicketDetails(new TicketDurationEdit.Set(seconds), new TicketCommentEdit.Keep());
 
         // Act
-        var comment = ticket.ValidateEdit(details, ticket.CreatedAtUtc);
+        var comment = ticket.ValidateEdit(details);
 
         // Assert
         comment.ShouldBe("reason");
-        details.TimeoutExpiry(ticket.CreatedAtUtc, ticket.CreatedAtUtc).ShouldBe(ticket.CreatedAtUtc.AddSeconds(seconds));
+        details.TimeoutExpiry(ticket.CreatedAtUtc).ShouldBe(ticket.CreatedAtUtc.AddSeconds(seconds));
     }
 
     [Test]
@@ -172,7 +172,7 @@ public sealed class TicketTests
         // Act
         void Act()
         {
-            ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
+            ticket.ValidateEdit(details);
         }
 
         // Assert
@@ -229,7 +229,7 @@ public sealed class TicketTests
         // Act
         void Act()
         {
-            ticket.ValidateEdit(details, DateTimeOffset.UtcNow);
+            ticket.ValidateEdit(details);
         }
 
         // Assert
@@ -333,8 +333,8 @@ public sealed class TicketTests
         var ticket = Create(action);
 
         // Act
-        var finite = ticket.ValidateEdit(TicketDetails.ParseFields("1 hour", comment: null), DateTimeOffset.UtcNow);
-        var permanent = ticket.ValidateEdit(TicketDetails.ParseFields("permanent", comment: null), DateTimeOffset.UtcNow);
+        var finite = ticket.ValidateEdit(TicketDetails.ParseFields("1 hour", comment: null));
+        var permanent = ticket.ValidateEdit(TicketDetails.ParseFields("permanent", comment: null));
 
         // Assert
         finite.ShouldBe("reason");
@@ -350,7 +350,7 @@ public sealed class TicketTests
         // Act
         void Act()
         {
-            ticket.ValidateEdit(TicketDetails.ParseFields("1 hour", comment: null), DateTimeOffset.UtcNow);
+            ticket.ValidateEdit(TicketDetails.ParseFields("1 hour", comment: null));
         }
 
         // Assert

@@ -8,7 +8,7 @@ using SylvanBot.Gateway;
 public sealed class TicketDeliveryWorker(
     DiscordSocketClient client,
     IDbContextFactory<BotDbContext> contextFactory,
-    TicketCoordinator coordinator,
+    IServiceScopeFactory scopes,
     TicketReviewSummary reviewSummary,
     ILogger logger) : BackgroundService, IDiscordGatewayHandler
 {
@@ -32,8 +32,11 @@ public sealed class TicketDeliveryWorker(
         client.MessageDeleted -= OnMessageDeletedAsync;
     }
 
-    public void Wake()
+    public void Wake(ulong guildId = 0)
     {
+        if (guildId != 0)
+            reviewSummary.MarkDirty(guildId);
+
         Signal(_publications);
         Signal(_prompts);
     }
@@ -108,14 +111,14 @@ public sealed class TicketDeliveryWorker(
 
     private Task OnMessageAsync(SocketMessage message)
     {
-        if (reviewSummary.IsChannel(message.Channel.Id))
+        if (reviewSummary.MarkChannelDirty(message.Channel.Id))
             Signal(_publications);
         return Task.CompletedTask;
     }
 
     private Task OnMessageDeletedAsync(Cacheable<IMessage, ulong> message, Cacheable<IMessageChannel, ulong> channel)
     {
-        if (reviewSummary.IsChannel(channel.Id))
+        if (reviewSummary.MarkChannelDirty(channel.Id))
             Signal(_publications);
         return Task.CompletedTask;
     }
@@ -133,7 +136,7 @@ public sealed class TicketDeliveryWorker(
                     && ((!ticket.Hidden && !ticket.SendUncertain
                          && !ticket.Publications.Any(reference => reference.Current && !reference.Removed && reference.Revision == ticket.Version))
                         || ticket.Publications.Any(reference => !reference.Removed
-                            && (ticket.Hidden || !reference.Current || reference.Revision != ticket.Version))))
+                            && (reference.ApprovalReactionCleanupPending || ticket.Hidden || !reference.Current || reference.Revision != ticket.Version))))
                 .OrderBy(ticket => ticket.Id)
                 .Select(ticket => new { ticket.GuildId, ticket.Id })
                 .Take(100)
@@ -143,7 +146,17 @@ public sealed class TicketDeliveryWorker(
                 break;
 
             foreach (var ticket in pending)
-                await coordinator.PublishPendingAsync(ticket.GuildId, ticket.Id, token);
+            {
+                await using var scope = scopes.CreateAsyncScope();
+                var publisher = scope.ServiceProvider.GetRequiredService<TicketPublisher>();
+                var result = await publisher.SynchronizeAsync(ticket.GuildId, ticket.Id, token);
+
+                if (result.Changed)
+                    reviewSummary.MarkDirty(ticket.GuildId);
+
+                if (result.Outcome == TicketPublicationOutcome.Pending)
+                    Signal(_publications);
+            }
 
             after = pending[^1].Id;
         }
@@ -186,7 +199,9 @@ public sealed class TicketDeliveryWorker(
             {
                 try
                 {
-                    await coordinator.RemindAsync(user, force: false, token);
+                    await using var scope = scopes.CreateAsyncScope();
+                    var reminders = scope.ServiceProvider.GetRequiredService<TicketReminders>();
+                    await reminders.RemindAsync(user, force: false, token);
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)
                 {

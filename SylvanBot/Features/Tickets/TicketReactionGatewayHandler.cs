@@ -4,7 +4,7 @@ using System.Threading.Channels;
 using System.Diagnostics;
 using SylvanBot.Gateway;
 
-public sealed class TicketReactionGatewayHandler(DiscordSocketClient client, TicketCoordinator coordinator, TicketWorker worker, ILogger logger)
+public sealed class TicketReactionGatewayHandler(DiscordSocketClient client, IServiceScopeFactory scopes, TicketDeliveryWorker worker, ILogger logger)
     : BackgroundService, IDiscordGatewayHandler
 {
     private readonly Channel<ApprovalReaction> _reactions = Channel.CreateBounded<ApprovalReaction>(
@@ -44,10 +44,12 @@ public sealed class TicketReactionGatewayHandler(DiscordSocketClient client, Tic
 
                     try
                     {
+                        await using var scope = scopes.CreateAsyncScope();
+                        var coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
                         var approved = await coordinator.ApproveReactionAsync(reaction.GuildId, reaction.ChannelId, reaction.MessageId, reaction.UserId, token);
 
                         if (approved)
-                            worker.Wake();
+                            worker.Wake(reaction.GuildId);
                     }
                     catch (OperationCanceledException) when (token.IsCancellationRequested)
                     {

@@ -123,7 +123,7 @@ public static class TicketAuditReader
             {
                 Action = TicketAction.Timeout,
                 Removed = expiry is null || expiry <= observation.CreatedAtUtc,
-                Timeout = expiry is { } newExpiry ? new TicketTimeout.Until(newExpiry) : new TicketTimeout.None(),
+                Timeout = expiry is { } newExpiry ? newExpiry : Optional<DateTimeOffset>.None,
             });
     }
 

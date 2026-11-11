@@ -12,6 +12,10 @@ public sealed class TicketModerator
 
     public DateTimeOffset? NextDeliveryUtc { get; set; }
 
+    public int? PromptRevision { get; set; }
+
+    public bool NeedsPromptRefresh(int revision) => PromptRevision != revision;
+
     public int Version { get; set; }
 
     public bool IsDeliveryDue(long ticketId, DateTimeOffset now) =>
@@ -20,11 +24,12 @@ public sealed class TicketModerator
     public void ClearDelivery()
     {
         var hasDelivery = ActiveTicketId is not null || PromptMessageId is not null
-                          || NextDeliveryUtc is not null;
+                          || NextDeliveryUtc is not null || PromptRevision is not null;
 
         if (!hasDelivery)
             return;
 
+        PromptRevision = null;
         ActiveTicketId = null;
         PromptMessageId = null;
         NextDeliveryUtc = null;
