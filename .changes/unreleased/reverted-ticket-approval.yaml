@@ -1,5 +1,0 @@
-component: Moderation
-kind: Fixed
-body: >-
-  <@&1522665207225127034> and above: Reverted tickets now show (REVERTED) instead of (UNAPPROVED) and leave the approval queue automatically. When you revert a timeout, Sylvan confirms that the timeout has been removed before reporting success.
-time: 2026-11-13T00:00:00Z

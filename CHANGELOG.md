@@ -2,6 +2,12 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.1.3 - 2026-11-13
+## Moderation
+### Fixed
+- <@&1522665074571870419> and above: When you revert a ban, Sylvan confirms that the user has been unbanned before reporting success.
+- <@&1328097118644338779> and above: When you hide a ticket, the reply now tells you whether its restriction was lifted or only an old record was hidden. Hiding an old ticket does not remove a newer timeout or ban.
+- <@&1522665207225127034> and above: Reverted tickets now show (REVERTED) instead of (UNAPPROVED) and leave the approval queue automatically. When you revert a timeout, Sylvan confirms that the timeout has been removed before reporting success.
 # v1.1.2 - 2026-11-11
 ## Administration
 ### Added

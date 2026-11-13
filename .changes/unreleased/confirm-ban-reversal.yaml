@@ -1,5 +1,0 @@
-component: Moderation
-kind: Fixed
-body: >-
-  <@&1522665074571870419> and above: When you revert a ban, Sylvan confirms that the user has been unbanned before reporting success.
-time: 2026-11-13T00:00:00Z
