@@ -33,13 +33,13 @@ internal static class TicketPresentation
 
         if (!isNote && senior)
         {
-            var label = ticket.ApprovedAtUtc is null ? "Approve" : "Approved";
+            var label = ticket.IsApproved ? "Approved" : "Approve";
 
             builder.WithButton(
                 label,
                 $"ticket:approve:{ticket.Number}:{ticket.Version}",
                 ButtonStyle.Success,
-                disabled: ticket.ApprovedAtUtc is not null);
+                disabled: ticket.IsApproved);
         }
 
         return builder.Build();
@@ -65,10 +65,16 @@ internal static class TicketPresentation
     {
         var isNote = ticket.Action == TicketAction.Note;
         var description = ActionDescription(ticket);
-        var unapproved = !isNote && ticket.ApprovedAtUtc is null;
+        var status = string.Empty;
+
+        if (ticket.Status == TicketStatus.Reverted)
+            status = " (REVERTED)";
+        else if (!isNote && !ticket.IsApproved)
+            status = " (UNAPPROVED)";
+
         var embed = new EmbedBuilder()
             .WithAuthor($"Ticket #{ticket.Number}")
-            .WithTitle(ActionName(ticket.Action) + (unapproved ? " (UNAPPROVED)" : string.Empty) + (isNote && ticket.Hidden ? " · Hidden" : string.Empty))
+            .WithTitle(ActionName(ticket.Action) + status + (isNote && ticket.Hidden ? " · Hidden" : string.Empty))
             .WithColor(ModerationColour(ticket))
             .WithTimestamp(ticket.CreatedAtUtc);
 

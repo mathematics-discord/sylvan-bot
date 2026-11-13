@@ -98,7 +98,14 @@ public sealed partial class TicketCoordinator(
                 ticket.RequireVisibilityChange(actor, version ?? ticket.Version);
 
                 if (visibility && ticket.Status == TicketStatus.Active)
+                {
                     await RevertAsync(db, actor, ticket, ticket.Version, ct);
+                    outcome = "The active restriction was lifted and the ticket is hidden.";
+                }
+                else if (visibility && ticket.Action is not (TicketAction.Note or TicketAction.Kick))
+                {
+                    outcome = "The historical ticket is hidden. No live restriction was changed.";
+                }
 
                 ticket.SetHidden(actor, ticket.Version, visibility);
             }
@@ -298,10 +305,22 @@ public sealed partial class TicketCoordinator(
             {
                 case TicketAction.Ban:
                     await guild.RemoveBanAsync(ticket.SubjectUserId, options);
+
+                    var remainingBan = await guild.GetBanAsync(ticket.SubjectUserId, options);
+
+                    if (remainingBan is not null)
+                        throw new BotCommandException("Discord still reports an active ban.");
+
                     break;
                 case TicketAction.Timeout:
                     if (member is not null)
                         await member.RemoveTimeOutAsync(options);
+
+                    var refreshedMember = await guild.GetUserAsync(ticket.SubjectUserId, options);
+                    var timeoutStillActive = refreshedMember?.TimedOutUntil > DateTimeOffset.UtcNow;
+
+                    if (timeoutStillActive)
+                        throw new BotCommandException("Discord still reports an active timeout.");
 
                     break;
                 case TicketAction.Role:
@@ -313,10 +332,11 @@ public sealed partial class TicketCoordinator(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.Warning("Revert could not be confirmed for ticket {TicketId}: {Failure}", ticket.Id, exception.GetType().Name);
+            logger.Warning(exception, "Revert could not be confirmed for ticket {TicketId} in guild {GuildId}, action {Action}",
+                ticket.Id, ticket.GuildId, ticket.Action);
 
             throw new BotCommandException(
-                "Discord could not confirm the reversal. Check permissions, hierarchy and member state, then refresh after audit reconciliation before retrying.",
+                "Discord could not confirm the reversal. Check permissions, hierarchy, and member state, then refresh after audit reconciliation before retrying.",
                 exception);
         }
     }
@@ -374,6 +394,7 @@ public sealed partial class TicketCoordinator(
             .Where(ticket => ticket.GuildId == guildId
                        && !ticket.Hidden
                        && ticket.ApprovedAtUtc == null
+                       && ticket.Status != TicketStatus.Reverted
                        && ticket.Action != TicketAction.Note);
 
     public async Task<(Ticket? Ticket, int Ready, int Waiting)> ReviewQueueAsync(TicketActor actor, long after, CancellationToken ct)

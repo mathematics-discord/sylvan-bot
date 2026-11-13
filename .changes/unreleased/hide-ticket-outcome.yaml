@@ -1,0 +1,5 @@
+component: Moderation
+kind: Fixed
+body: >-
+  <@&1328097118644338779> and above: When you hide a ticket, the reply now tells you whether its restriction was lifted or only an old record was hidden. Hiding an old ticket does not remove a newer timeout or ban.
+time: 2026-11-13T00:00:00Z

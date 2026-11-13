@@ -41,6 +41,9 @@ public sealed class Ticket
 
     public DateTimeOffset? ApprovedAtUtc { get; private set; }
 
+    [NotMapped]
+    public bool IsApproved => Status == TicketStatus.Reverted || ApprovedAtUtc is not null;
+
     public ulong? SourceAuditId { get; init; }
 
     public ulong? LastAuditId { get; set; }
@@ -160,7 +163,10 @@ public sealed class Ticket
 
         var durationChanged = DurationSeconds != seconds || ExpiresAtUtc != expiry;
 
-        if (durationChanged && (requiresApproval || (moderatorId is not null && !canReview)))
+        var needsReview = Status != TicketStatus.Reverted && durationChanged
+            && (requiresApproval || (moderatorId is not null && !canReview));
+
+        if (needsReview)
         {
             ApprovedAtUtc = null;
             ApprovedByUserId = null;
@@ -213,10 +219,16 @@ public sealed class Ticket
         if (actor.GuildId != GuildId || actor.UserId == 0 || actor is { IsAdministrator: false, CanViewAuditLog: false })
             throw new BotCommandException("Approval requires Administrator or View Audit Log.");
 
-        if (version != Version || Hidden || !Complete || Pending is not null)
+        if (version != Version || Hidden)
             throw new BotCommandException("Complete the details, resolve pending changes and refresh before approving.");
 
-        if (ApprovedAtUtc is not null)
+        if (Status == TicketStatus.Reverted)
+            return;
+
+        if (!Complete || Pending is not null)
+            throw new BotCommandException("Complete the details, resolve pending changes and refresh before approving.");
+
+        if (IsApproved)
             return;
 
         ApprovedByUserId = actor.UserId;
@@ -226,7 +238,7 @@ public sealed class Ticket
 
     public bool TryApproveReaction(TicketActor actor, ulong channelId, ulong messageId)
     {
-        if (ApprovedAtUtc is not null || Hidden)
+        if (IsApproved || Hidden)
             return false;
 
         var publication = Publications

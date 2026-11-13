@@ -47,7 +47,9 @@ in Discord, then wait for the ticket to reflect that change.
    `/ticket revert id:1234`.
 2. Check the reply and the member’s actual state. A confirmed reversal
    unbans the user, clears the timeout, or
-   removes the tracked role. The visible ticket records who lifted it.
+   removes the tracked role. Sylvan checks Discord again to confirm a ban or
+   timeout has been lifted before reporting success. The visible ticket records
+   who lifted it and shows **(REVERTED)**. It no longer needs approval.
 3. If Sylvan reports an unconfirmed or newer action, reopen the ticket
    before trying again. Discord may already have accepted the change.
 

@@ -5,6 +5,98 @@ namespace SylvanBot.Tests.Features.Tickets;
 
 public sealed class TicketApprovalTests
 {
+    [TestCase(TicketStatus.Active, false)]
+    [TestCase(TicketStatus.Expired, false)]
+    [TestCase(TicketStatus.Superseded, false)]
+    [TestCase(TicketStatus.Reverted, true)]
+    public void IsApproved_UnreviewedTicket_OnlyReversalAcceptsIt(TicketStatus status, bool expected)
+    {
+        // Arrange
+        var ticket = TicketTests.Create(TicketAction.Timeout);
+
+        // Act
+        ticket.End(status);
+
+        // Assert
+        ticket.IsApproved.ShouldBe(expected);
+        ticket.ApprovedByUserId.ShouldBeNull();
+        ticket.ApprovedAtUtc.ShouldBeNull();
+    }
+
+    [TestCase(true)]
+    [TestCase(false)]
+    public void CompleteStaffReversal_HistoricalEdits_PreservesAcceptanceAndReviewer(bool previouslyApproved)
+    {
+        // Arrange
+        var ticket = TicketTests.Create(TicketAction.Timeout, canReview: previouslyApproved);
+        var approvedAt = ticket.ApprovedAtUtc;
+        var approvedBy = ticket.ApprovedByUserId;
+        var timestamp = ticket.CreatedAtUtc.AddMinutes(1);
+
+        // Act
+        ticket.CompleteStaffReversal(moderatorId: 42, timestamp);
+        var reversalVersion = ticket.Version;
+        ticket.CompleteStaffReversal(moderatorId: 99, timestamp.AddMinutes(1));
+        var repeatedVersion = ticket.Version;
+
+        ticket.SetDuration(seconds: 60, moderatorId: 3);
+        ticket.SetComment("Corrected reason", moderatorId: 3);
+
+        // Assert
+        ticket.IsApproved.ShouldBeTrue();
+        repeatedVersion.ShouldBe(reversalVersion);
+        ticket.ApprovedAtUtc.ShouldBe(approvedAt);
+        ticket.ApprovedByUserId.ShouldBe(approvedBy);
+        var reversalCount = ticket.ModificationHistory
+            .Count(entry => entry.Action == TicketHistoryAction.StaffReverted);
+
+        reversalCount.ShouldBe(1);
+        ticket.ModificationHistory.ShouldNotContain(entry => entry.Action == TicketHistoryAction.Approved);
+    }
+
+    [Test]
+    public void Approve_RevertedIncompleteTicket_DoesNotRecordReviewer()
+    {
+        // Arrange
+        var ticket = new Ticket { GuildId = 1, Action = TicketAction.Ban };
+        ticket.End(TicketStatus.Reverted);
+        var version = ticket.Version;
+        var reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
+
+        // Act
+        ticket.Approve(reviewer, version);
+
+        // Assert
+        ticket.IsApproved.ShouldBeTrue();
+        ticket.Complete.ShouldBeFalse();
+        ticket.Version.ShouldBe(version);
+        ticket.ApprovedAtUtc.ShouldBeNull();
+        ticket.ApprovedByUserId.ShouldBeNull();
+        ticket.ModificationHistory.ShouldBeEmpty();
+    }
+
+    [Test]
+    public void TryApproveReaction_RevertedTicket_DoesNotRecordReviewer()
+    {
+        // Arrange
+        var ticket = TicketTests.Create(TicketAction.Ban);
+        ticket.End(TicketStatus.Reverted);
+        ticket.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 20, Current = true, Revision = ticket.Version });
+        var version = ticket.Version;
+        var reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
+
+        // Act
+        var approved = ticket.TryApproveReaction(reviewer, channelId: 10, messageId: 20);
+
+        // Assert
+        approved.ShouldBeFalse();
+        ticket.IsApproved.ShouldBeTrue();
+        ticket.Version.ShouldBe(version);
+        ticket.ApprovedAtUtc.ShouldBeNull();
+        ticket.ApprovedByUserId.ShouldBeNull();
+        ticket.ModificationHistory.ShouldBeEmpty();
+    }
+
     [TestCase(true)]
     [TestCase(false)]
     public void AcceptCreation_ReviewerPermission_DeterminesAcceptance(bool canReview)

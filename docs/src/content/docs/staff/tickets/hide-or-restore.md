@@ -28,7 +28,9 @@ requires **View Audit Log** or **Administrator**, including for your own
 action or a kick. If the restriction is active, the
 [requirements for lifting it](../change-a-restriction/#lift-a-restriction-now)
 also apply. If the reversal is blocked or unconfirmed, the record stays
-visible. Voice restrictions must first be lifted manually in Discord; wait
+visible. The reply says whether an active restriction was lifted or only a
+historical record was hidden. Hiding an older ticket leaves any newer timeout
+or ban in place. Voice restrictions must first be lifted manually in Discord; wait
 for Sylvan to observe the reversal. Check the member’s state before issuing
 another action.
 
