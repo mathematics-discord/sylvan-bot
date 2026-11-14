@@ -130,6 +130,25 @@ namespace SylvanBot.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SylvanBot.Application.Features.Announcements.AnnouncementSettings", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ChannelId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("MessageId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("GuildId");
+
+                    b.ToTable("AnnouncementSettings");
+                });
+
             modelBuilder.Entity("SylvanBot.Application.Features.Automod.AutomodBan", b =>
                 {
                     b.Property<Guid>("Id")

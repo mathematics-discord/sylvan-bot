@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Activity;
+using SylvanBot.Application.Features.Announcements;
 using SylvanBot.Application.Features.Automod;
 using SylvanBot.Application.Features.Logging;
 using SylvanBot.Application.Features.MessageCache;
@@ -18,6 +19,8 @@ namespace SylvanBot.Application.Infrastructure.Data;
 /// </summary>
 public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbContext(options)
 {
+    public DbSet<AnnouncementSettings> AnnouncementSettings => Set<AnnouncementSettings>();
+
     public DbSet<ActivitySettings> ActivitySettings => Set<ActivitySettings>();
     public DbSet<ActivityWeight> ActivityWeights => Set<ActivityWeight>();
     public DbSet<ActivityMember> ActivityMembers => Set<ActivityMember>();

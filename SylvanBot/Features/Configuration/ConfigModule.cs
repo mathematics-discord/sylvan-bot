@@ -1,4 +1,5 @@
 using SylvanBot.Application.Features.SylvanMail;
+using SylvanBot.Features.Announcements;
 using SylvanBot.Features.Moderation;
 using SylvanBot.Features.RoleReactions;
 using SylvanBot.Interactions;
@@ -14,6 +15,7 @@ public sealed partial class ConfigModule(
     SylvanMailConfiguration workflow,
     RoleReactionConfiguration roleReactions,
     ImageSpamSettingsService settingsService,
+    AnnouncementRuntime announcements,
     IHostApplicationLifetime lifetime,
     SylvanBot.Features.Tickets.TicketCoordinator ticketCoordinator,
     SylvanBot.Features.Tickets.TicketWorker ticketWorker

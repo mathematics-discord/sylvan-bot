@@ -1,0 +1,29 @@
+---
+title: /config announcements
+description: Choose the announcements channel and offer subscriptions.
+---
+
+import RoleMention from '../../../components/RoleMention.astro';
+
+Available to <RoleMention id="administrators" />.
+
+Run `/config announcements channel:#announcements`, selecting a text or
+announcement channel in this server. Sylvan creates a role named `📯` and
+places **Subscribe** and **Unsubscribe** buttons at the bottom of the channel.
+
+The bot needs **View Channel**, **Send Messages**, and **Read Message History**
+in the channel, plus **Mention @everyone, @here, and All Roles** to notify
+subscribers. It also needs **Manage Roles**, with its highest role above `📯`.
+The subscription role has no server permissions and is not publicly mentionable.
+
+## Change or repair the setup
+
+Run the command again to choose another channel. Existing subscribers keep
+their role, and the subscription buttons move to the new channel. Previously
+published announcements remain where they were sent.
+
+Running the command again also recreates the subscription role if it was
+deleted. In that case, members must subscribe again, and an administrator
+must update the role choice in Onboarding.
+
+See [/announce](../announce/) for writing announcements and subscribing.

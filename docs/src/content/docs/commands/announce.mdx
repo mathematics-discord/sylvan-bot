@@ -1,0 +1,35 @@
+---
+title: /announce
+description: Send an announcement to members who have subscribed.
+---
+
+import RoleMention from '../../../components/RoleMention.astro';
+
+Available to <RoleMention id="1328097118644338779" /> and above.
+
+Run `/announce` to open the announcement form. Enter a **Title** of up to
+100 characters and a **Body** of up to 3,850 characters, then submit it.
+Sylvan posts the announcement in the configured channel and privately confirms
+that it was sent, with a link to the message.
+
+The announcement starts with a heading containing the `📯` role mention,
+an em dash, and your title, followed by the body on the next line.
+Markdown in both fields is preserved. Leading heading hashes in the title
+are removed; a title such as `C# updates` stays unchanged.
+
+Role, user, and channel mentions display normally. Only the `📯` subscription
+role receives a notification; other mentions, including `@everyone` and
+`@here`, do not notify anyone.
+
+## Subscribe to announcements
+
+Use **Subscribe** at the bottom of the announcements channel to receive the
+`📯` role, or **Unsubscribe** to remove it. Sylvan confirms your choice privately.
+The buttons move below new posts, including messages sent directly by staff
+or other bots.
+
+If administrators have added the role to Channels & Roles, you can also
+change your subscription there. Both methods change the same role.
+
+An administrator must [configure announcements](../config-announcements/)
+before `/announce` can be used.

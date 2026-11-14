@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Features.Activity;
+using SylvanBot.Features.Announcements;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Features.Automod;
 using SylvanBot.Application.Features.SylvanMail;
@@ -41,6 +42,10 @@ public static class DependencyInjection
 
         private void AddFeatures(IConfiguration configuration)
         {
+            services.AddSingleton<AnnouncementRuntime>();
+            services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<AnnouncementRuntime>());
+            services.AddHostedService(sp => sp.GetRequiredService<AnnouncementRuntime>());
+
             services.AddSingleton<ActivityService>();
             services.AddSingleton<ActivityWorker>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<ActivityWorker>());

@@ -28,12 +28,16 @@ See the [feature guides](../features/) for automatic behaviour and staff workflo
 
 ## Senior moderator commands
 
+- [/announce](./announce/) — Write an announcement and notify subscribers.
+
 - [/yoink and Yoink emoji](./yoink/) — Copy a custom emoji into the server
   using a slash command or a message's Apps menu.
 
 - [/automod](./automod/) ? Add, remove and browse message-matching rules.
 
 ## Administrator commands
+
+- [/config announcements](./config-announcements/) — Choose the announcements channel and create its subscription role.
 
 - [/config tickets](./config-tickets/) — Configure capture, reminders, shared Automod enablement, and role tracking.
 

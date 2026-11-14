@@ -65,11 +65,12 @@ export default defineConfig({
             },
             {
                 label: 'Senior moderator commands',
-                items: [{slug: 'commands/yoink'}, {slug: 'commands/automod'}],
+                items: [{slug: 'commands/announce'}, {slug: 'commands/yoink'}, {slug: 'commands/automod'}],
             },
             {
                 label: 'Administrator commands',
                 items: [
+                    {slug: 'commands/config-announcements'},
                     {slug: 'commands/config-tickets'},
                     {slug: 'commands/persistence'},
                     {slug: 'commands/color-admin'},
