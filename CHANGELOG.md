@@ -2,6 +2,11 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.2.1 - 2026-11-15
+## Moderation
+### Fixed
+- <@&1522665207225127034> and above can complete timeout details after a member leaves, so reminders can stop. Ticket records can be created, edited, approved, reverted, or hidden after departure, subject to the usual permissions. Reverting cancels future timeout enforcement and saved role restoration. Staff with Mute Members or Deafen Members can also use Revert Ticket to lift voice restrictions.
+- <@&1328097118644338779> and above can hide active voice tickets, lifting the restriction at the same time. They now receive a specific explanation when ticket approval is blocked by missing details, a pending Discord change, a hidden ticket, or an outdated view.
 # v1.2.0 - 2026-11-14
 ## General
 ### Added

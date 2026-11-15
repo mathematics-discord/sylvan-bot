@@ -30,9 +30,10 @@ action or a kick. If the restriction is active, the
 also apply. If the reversal is blocked or unconfirmed, the record stays
 visible. The reply says whether an active restriction was lifted or only a
 historical record was hidden. Hiding an older ticket leaves any newer timeout
-or ban in place. Voice restrictions must first be lifted manually in Discord; wait
-for Sylvan to observe the reversal. Check the member’s state before issuing
-another action.
+or ban in place. Hiding an active voice ticket lifts its mute or deafen too.
+If the member has left, Sylvan can still hide the ticket and cancel any future
+timeout enforcement or saved role restoration. Check the member's state before
+issuing another action.
 
 A hidden ticket remains stored. Senior staff can
 [look it up by number](../find-a-ticket/#find-a-hidden-ticket).

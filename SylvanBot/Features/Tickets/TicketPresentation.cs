@@ -101,7 +101,7 @@ internal static class TicketPresentation
             embed.AddField(ticket.Action is TicketAction.VoiceMute or TicketAction.VoiceDeafen ? "Descriptive end" : "Expires", FormatExpiry(expiry), inline: true);
 
         if (ticket.Action is TicketAction.VoiceMute or TicketAction.VoiceDeafen)
-            embed.AddField("Voice restriction", "Lift this restriction manually in Discord. Its duration is descriptive.");
+            embed.AddField("Voice restriction", "Use Revert Ticket to lift this restriction. Its duration is descriptive.");
 
         if (ticket.Action == TicketAction.Role)
             embed.AddField("Role", $"<@&{ticket.RoleId}> (`{ticket.RoleId}`)", inline: true);

@@ -69,7 +69,7 @@ private, and saved changes update the ticket.
 | --- | --- |
 | `comment` | Replaces the comment with 1–3,000 characters of nonblank text. |
 | `duration` | Sets the **total** duration from the original action. Accepts positive whole units, including combinations such as `2 days 6 hours`. See [which actions accept a duration or `permanent`](../../staff/tickets/change-a-restriction/#change-the-duration). |
-| `hidden` | `True` hides the record and first lifts an active ban, timeout, or tracked role. Voice restrictions must be lifted manually. `False` restores the record without reapplying the restriction. |
+| `hidden` | `True` hides the record and first lifts an active ban, timeout, tracked role, voice mute, or voice deafen. `False` restores the record without reapplying the restriction. |
 
 ```text
 /ticket set id:1234 duration:7 days
