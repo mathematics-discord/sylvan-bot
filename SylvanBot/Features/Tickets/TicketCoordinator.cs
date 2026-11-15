@@ -100,7 +100,7 @@ public sealed partial class TicketCoordinator(
                 if (visibility && ticket.Status == TicketStatus.Active)
                 {
                     await RevertAsync(db, actor, ticket, ticket.Version, ct);
-                    outcome = "The active restriction was lifted and the ticket is hidden.";
+                    outcome = "The restriction was reverted and the ticket is hidden.";
                 }
                 else if (visibility && ticket.Action is not (TicketAction.Note or TicketAction.Kick))
                 {
@@ -176,8 +176,6 @@ public sealed partial class TicketCoordinator(
 
         switch (ticket.Action)
         {
-            case TicketAction.VoiceMute or TicketAction.VoiceDeafen:
-                throw new BotCommandException("Lift this voice restriction in Discord, then wait for audit reconciliation before hiding its ticket.");
             case TicketAction.Note or TicketAction.Kick:
                 throw new BotCommandException("Notes and kicks have no active restriction to revert.");
         }
@@ -191,27 +189,13 @@ public sealed partial class TicketCoordinator(
                 TicketAction.Ban => actor.CanBanMembers,
                 TicketAction.Timeout => actor.CanTimeoutMembers,
                 TicketAction.Role => actor.CanManageRoles,
+                TicketAction.VoiceMute => actor.CanMuteMembers,
+                TicketAction.VoiceDeafen => actor.CanDeafenMembers,
                 _ => false,
             };
 
         if (!permitted)
             throw new BotCommandException("You need the Discord permission for this restriction to revert it.");
-
-        var config = await EnabledAsync(db, actor.GuildId, ct);
-        DateTimeOffset? from = config.LastAuditScanAtUtc;
-
-        if (ticket.SourceAuditId is null || from is null || from < DateTimeOffset.UtcNow.AddDays(-45))
-            throw new BotCommandException("Refresh after audit reconciliation before reverting this restriction.");
-
-        var scan = await boundary.ReadAuditAsync(actor.GuildId, from.Value.AddMinutes(-10), ct);
-
-        var newer = scan.Observations.Any(value => value.Action == ticket.Action
-                                              && value.SubjectUserId == ticket.SubjectUserId
-                                              && value.RoleId == ticket.RoleId
-                                              && value.AuditId > ticket.LastAuditId);
-
-        if (newer)
-            throw new BotCommandException("A newer change awaits audit reconciliation. Refresh before reverting.");
 
         var roleGate = ticket.Action == TicketAction.Role ? persistence.Gate(actor.GuildId) : null;
 
@@ -220,7 +204,7 @@ public sealed partial class TicketCoordinator(
 
         try
         {
-            await RevertRestrictionAsync(actor, ticket, ct);
+            await RevertRestrictionAsync(db, actor, ticket, ct);
             ticket.CompleteStaffReversal(actor.UserId, DateTimeOffset.UtcNow);
 
             if (ticket.Action == TicketAction.Role)
@@ -240,32 +224,45 @@ public sealed partial class TicketCoordinator(
         }
     }
 
-    private async Task RevertRestrictionAsync(TicketActor actor, Ticket ticket, CancellationToken ct)
+    private async Task RevertRestrictionAsync(BotDbContext db, TicketActor actor, Ticket ticket, CancellationToken ct)
     {
         var options = TicketBoundary.Options(ct);
         options.AuditLogReason = $"Revert Sylvan ticket {ticket.Number}; moderator {actor.UserId}";
         var guild = await client.Rest.GetGuildAsync(actor.GuildId, options);
-        var moderator = await boundary.GetMemberAsync(actor.GuildId, actor.UserId, ct)
-            ?? throw new BotCommandException("The responsible moderator is no longer available.");
-        var member = await guild.GetUserAsync(ticket.SubjectUserId, options);
-        var bot = (IGuildUser?)client.GetGuild(actor.GuildId)?.CurrentUser
-            ?? await guild.GetCurrentUserAsync(options);
 
-        var moderatorPosition = moderator.RoleIds
-            .Select(id => guild.GetRole(id)?.Position ?? 0)
-            .DefaultIfEmpty(0)
-            .Max();
+        // Bans belong to a user ID; all other restrictions here belong to a member.
+        IGuildUser? member = null;
 
-        var botPosition = bot.RoleIds
-            .Select(id => guild.GetRole(id)?.Position ?? 0)
-            .DefaultIfEmpty(0)
-            .Max();
+        if (ticket.Action != TicketAction.Ban)
+        {
+            member = await guild.GetUserAsync(ticket.SubjectUserId, options);
+
+            if (member is null)
+                return;
+        }
 
         if (ticket.SubjectUserId == actor.UserId || ticket.SubjectUserId == guild.OwnerId)
             throw new BotCommandException("You cannot revert a restriction on yourself or the server owner.");
 
+        await RequireCurrentRestrictionAsync(db, actor, ticket, ct);
+
         if (member is not null)
         {
+            var moderator = await boundary.GetMemberAsync(actor.GuildId, actor.UserId, ct)
+                ?? throw new BotCommandException("The responsible moderator is no longer available.");
+            var bot = (IGuildUser?)client.GetGuild(actor.GuildId)?.CurrentUser
+                ?? await guild.GetCurrentUserAsync(options);
+
+            var moderatorPosition = moderator.RoleIds
+                .Select(id => guild.GetRole(id)?.Position ?? 0)
+                .DefaultIfEmpty(0)
+                .Max();
+
+            var botPosition = bot.RoleIds
+                .Select(id => guild.GetRole(id)?.Position ?? 0)
+                .DefaultIfEmpty(0)
+                .Max();
+
             var targetPosition = member.RoleIds
                 .Select(id => guild.GetRole(id)?.Position ?? 0)
                 .DefaultIfEmpty(0)
@@ -276,27 +273,26 @@ public sealed partial class TicketCoordinator(
 
             if (hierarchyBlocked)
                 throw new BotCommandException("The member must be below both you and Sylvan in the role hierarchy.");
-        }
 
-        var timeoutChanged = ticket.Action == TicketAction.Timeout
-            && member is not null
-            && member.TimedOutUntil != ticket.AppliedTimeoutUntilUtc;
+            var timeoutChanged = ticket.Action == TicketAction.Timeout
+                && member.TimedOutUntil != ticket.AppliedTimeoutUntilUtc;
 
-        if (timeoutChanged)
-            throw new BotCommandException("The live timeout changed. Refresh after audit reconciliation.");
+            if (timeoutChanged)
+                throw new BotCommandException("The live timeout changed. Refresh after audit reconciliation.");
 
-        if (ticket.Action == TicketAction.Role)
-        {
-            var role = guild.GetRole(ticket.RoleId!.Value);
+            if (ticket.Action == TicketAction.Role)
+            {
+                var role = guild.GetRole(ticket.RoleId!.Value);
 
-            var cannotManageRole = role is null
-                || role.IsManaged
-                || role.Id == guild.Id
-                || role.Position >= botPosition
-                || (actor.UserId != guild.OwnerId && role.Position >= moderatorPosition);
+                var cannotManageRole = role is null
+                    || role.IsManaged
+                    || role.Id == guild.Id
+                    || role.Position >= botPosition
+                    || (actor.UserId != guild.OwnerId && role.Position >= moderatorPosition);
 
-            if (cannotManageRole)
-                throw new BotCommandException("You cannot manage this ticket's role.");
+                if (cannotManageRole)
+                    throw new BotCommandException("You cannot manage this ticket's role.");
+            }
         }
 
         try
@@ -313,21 +309,33 @@ public sealed partial class TicketCoordinator(
 
                     break;
                 case TicketAction.Timeout:
-                    if (member is not null)
-                        await member.RemoveTimeOutAsync(options);
-
-                    var refreshedMember = await guild.GetUserAsync(ticket.SubjectUserId, options);
-                    var timeoutStillActive = refreshedMember?.TimedOutUntil > DateTimeOffset.UtcNow;
-
-                    if (timeoutStillActive)
-                        throw new BotCommandException("Discord still reports an active timeout.");
-
+                    await member!.RemoveTimeOutAsync(options);
                     break;
                 case TicketAction.Role:
-                    if (member is not null)
-                        await member.RemoveRoleAsync(ticket.RoleId!.Value, options);
-
+                    await member!.RemoveRoleAsync(ticket.RoleId!.Value, options);
                     break;
+                case TicketAction.VoiceMute:
+                    await member!.ModifyAsync(properties => properties.Mute = false, options);
+                    break;
+                case TicketAction.VoiceDeafen:
+                    await member!.ModifyAsync(properties => properties.Deaf = false, options);
+                    break;
+            }
+
+            if (member is not null)
+            {
+                var refreshedMember = await guild.GetUserAsync(ticket.SubjectUserId, options);
+                var restrictionRemains = refreshedMember is not null && ticket.Action switch
+                {
+                    TicketAction.Timeout => refreshedMember.TimedOutUntil > DateTimeOffset.UtcNow,
+                    TicketAction.Role => refreshedMember.RoleIds.Contains(ticket.RoleId!.Value),
+                    TicketAction.VoiceMute => refreshedMember.IsMuted,
+                    TicketAction.VoiceDeafen => refreshedMember.IsDeafened,
+                    _ => false,
+                };
+
+                if (restrictionRemains)
+                    throw new BotCommandException("Discord still reports an active restriction.");
             }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -339,6 +347,25 @@ public sealed partial class TicketCoordinator(
                 "Discord could not confirm the reversal. Check permissions, hierarchy, and member state, then refresh after audit reconciliation before retrying.",
                 exception);
         }
+    }
+
+    private async Task RequireCurrentRestrictionAsync(BotDbContext db, TicketActor actor, Ticket ticket, CancellationToken ct)
+    {
+        var config = await EnabledAsync(db, actor.GuildId, ct);
+        DateTimeOffset? from = config.LastAuditScanAtUtc;
+
+        if (ticket.SourceAuditId is null || from is null || from < DateTimeOffset.UtcNow.AddDays(-45))
+            throw new BotCommandException("Refresh after audit reconciliation before reverting this restriction.");
+
+        var scan = await boundary.ReadAuditAsync(actor.GuildId, from.Value.AddMinutes(-10), ct);
+
+        var newer = scan.Observations.Any(value => value.Action == ticket.Action
+                                              && value.SubjectUserId == ticket.SubjectUserId
+                                              && value.RoleId == ticket.RoleId
+                                              && value.AuditId > ticket.LastAuditId);
+
+        if (newer)
+            throw new BotCommandException("A newer change awaits audit reconciliation. Refresh before reverting.");
     }
 
     public async Task<string> ApproveAsync(TicketActor actor, long number, int version, CancellationToken ct)

@@ -66,8 +66,9 @@ This is the same switch as `/config automod set enabled:false` without an
 
 Normal ticket lookups, edits, publication, and DMs pause. Existing restrictions
 continue to be checked, expired, and renewed, including long timeouts. Voice
-restrictions always need manual reversal in Discord. Administrator publication
-repair remains available while disabled.
+restrictions do not expire automatically. While capture is enabled, use
+Revert Ticket or Hide Ticket to lift them. Administrator publication repair
+remains available while disabled.
 
 To resume with the saved destination, run `/config tickets enabled:True`.
 New capture resumes from that point. Actions during the pause can still end

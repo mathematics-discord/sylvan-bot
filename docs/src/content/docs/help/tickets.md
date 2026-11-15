@@ -48,7 +48,7 @@ then reopen the record.
 
 Check **Expires** on the ticket. Durations run from the original action.
 Ban and tracked-role expiry depend on Sylvan confirming which action is
-current. Voice restrictions must be lifted manually in Discord; their
+current. Use Revert Ticket or Hide Ticket to lift voice restrictions; their
 durations are descriptive. Disabling new capture does not stop existing ban,
 role, or timeout enforcement.
 

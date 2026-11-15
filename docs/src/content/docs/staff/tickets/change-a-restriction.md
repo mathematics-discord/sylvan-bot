@@ -25,7 +25,7 @@ has already elapsed can end an active restriction.
 | --- | --- |
 | Timeout | A finite duration. For a timeout longer than 28 days, enter the full duration. Sylvan renews Discord’s timeout as needed and checks the remaining time when the member rejoins. |
 | Ban or tracked role | A finite duration or `permanent`. |
-| Server voice mute or deafen | A descriptive duration or `permanent`. Sylvan does not lift voice restrictions automatically. |
+| Server voice mute or deafen | A descriptive duration or `permanent`. Expiry does not lift the restriction; use Revert Ticket or Hide Ticket. |
 | Kick or note | No duration to set. |
 
 Use positive whole units such as `90 minutes`, `2 days 6 hours`, or `3 weeks`.
@@ -38,17 +38,16 @@ ended gets a new ticket.
 
 Ban and role expiry can wait for Sylvan to check Discord's audit log. If the
 expiry has passed but the restriction is still active, [check the ticket status](../../../help/tickets/).
-Voice durations describe the record only: remove the mute or deafen manually
-in Discord, then wait for the ticket to reflect that change.
+Voice durations describe the record only. Use **Revert Ticket** or **Hide Ticket**
+to lift the mute or deafen before its descriptive end.
 
 ## Lift a restriction now
 
 1. On the ticket message choose **Apps → Revert Ticket**, or run
    `/ticket revert id:1234`.
 2. Check the reply and the member’s actual state. A confirmed reversal
-   unbans the user, clears the timeout, or
-   removes the tracked role. Sylvan checks Discord again to confirm a ban or
-   timeout has been lifted before reporting success. The visible ticket records
+   unbans the user, clears the timeout, removes the tracked role, or lifts the
+   voice mute or deafen. Sylvan checks Discord again before reporting success. The visible ticket records
    who lifted it and shows **(REVERTED)**. It no longer needs approval.
 3. If Sylvan reports an unconfirmed or newer action, reopen the ticket
    before trying again. Discord may already have accepted the change.
@@ -64,6 +63,24 @@ reverse a restriction on themselves or the server owner.
 
 Sylvan also needs the corresponding action permission. A tracked role must
 be an ordinary role below Sylvan and below the moderator, subject to the same
-owner exception. Voice restrictions must be reversed manually in Discord.
-Wait for Sylvan to observe that reversal before hiding their tickets.
+owner exception. Lifting voice restrictions requires Mute Members or Deafen
+Members, respectively; Discord may reject the change if the member is not
+connected to voice.
 See [who can correct each action](../../../features/tickets/#who-can-do-what).
+
+
+## Members who have left
+
+You can create notes and edit, approve, revert, or hide tickets using the saved
+user ID after the member leaves. Creating a note, editing comments or historical
+details, approving, and changing historical visibility do not check membership.
+
+Changing an active timeout duration checks whether there is a live timeout to
+change. If the member has left, Sylvan saves the details; the remaining timeout
+can still be enforced if they rejoin. Reverting or hiding the ticket ends that
+future enforcement. Reverting or hiding a role ticket also cancels its saved
+role restoration. Unbanning works by user ID, without requiring membership.
+
+A failed Discord request does not count as confirmation that someone left.
+If a live change cannot be confirmed, Sylvan reports the failure rather than
+marking the ticket reverted or hidden.

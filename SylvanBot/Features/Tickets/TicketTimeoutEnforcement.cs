@@ -27,19 +27,33 @@ public sealed class TicketTimeoutEnforcement(DiscordSocketClient client, TicketB
             return "Historical timeout details saved.";
         }
 
+        var expiry = details.TimeoutExpiry(ticket.CreatedAtUtc);
+
+        if (expiry == ticket.ExpiresAtUtc && !ticket.ExpirySuspended)
+            return string.Empty;
+
         var now = DateTimeOffset.UtcNow;
         DateTimeOffset? recordedExpiry = ticket.AppliedTimeoutUntilUtc;
         var guild = await client.Rest.GetGuildAsync(ticket.GuildId, TicketBoundary.Options(cancellationToken));
         var member = await guild.GetUserAsync(ticket.SubjectUserId, TicketBoundary.Options(cancellationToken));
         DateTimeOffset? liveExpiry = member?.TimedOutUntil;
 
-        var expiry = details.TimeoutExpiry(ticket.CreatedAtUtc);
-
         if (member is null)
-            throw new BotCommandException("This member is no longer in the server. The timeout was not changed.");
+        {
+            // A departed member has no live timeout to edit. Save the durable record
+            // so its details can be completed and enforcement can resume on rejoin.
+            ticket.SetDuration(
+                details.DurationSeconds,
+                actor.UserId,
+                canReview: actor.IsAdministrator || actor.CanViewAuditLog);
 
-        if (expiry == ticket.ExpiresAtUtc && !ticket.ExpirySuspended)
-            return string.Empty;
+            ticket.ObserveTimeoutWindow(expiry: null, now);
+
+            if (expiry <= now)
+                ticket.End(TicketStatus.Expired);
+
+            return "Timeout details saved. The member is no longer in the server; no Discord timeout was changed.";
+        }
 
         // An authorised edit sets the current timeout, including restrictions
         // without a recorded native window. Retain this observation for uncertain retries.
