@@ -2,6 +2,10 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.2.2 - 2026-11-19
+## Internal
+### Added
+- Added seals
 # v1.2.1 - 2026-11-15
 ## Moderation
 ### Fixed
