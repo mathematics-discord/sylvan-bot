@@ -11,6 +11,7 @@ using SylvanBot.Features.Automod;
 using SylvanBot.Features.Logging;
 using SylvanBot.Features.MessageCache;
 using SylvanBot.Features.Moderation;
+using SylvanBot.Features.SealHunts;
 using SylvanBot.Features.RoleColours;
 using SylvanBot.Features.RolePersistence;
 using SylvanBot.Features.RoleReactions;
@@ -42,6 +43,9 @@ public static class DependencyInjection
 
         private void AddFeatures(IConfiguration configuration)
         {
+            services.AddSingleton<SealHuntWorker>();
+            services.AddHostedService(sp => sp.GetRequiredService<SealHuntWorker>());
+
             services.AddSingleton<AnnouncementRuntime>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<AnnouncementRuntime>());
             services.AddHostedService(sp => sp.GetRequiredService<AnnouncementRuntime>());
