@@ -15,14 +15,14 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
 
     public Optional<ImageBurstDetection> Observe(ImageBurstMessage message, Optional<ImageBurstSpamDetectorOptions> settings)
     {
-        var key = new ImageBurstBufferKey(GuildId: message.GuildId, UserId: message.UserId);
-        var now = timeProvider.GetUtcNow();
+        ImageBurstBufferKey key = new ImageBurstBufferKey(GuildId: message.GuildId, UserId: message.UserId);
+        DateTimeOffset now = timeProvider.GetUtcNow();
 
         lock (_gate)
         {
             PruneExpiredLocks(now);
 
-            var isLocked = _handlingLocks.TryGetValue(key: key, out var lockedUntil) && lockedUntil > now;
+            var isLocked = _handlingLocks.TryGetValue(key: key, out DateTimeOffset lockedUntil) && lockedUntil > now;
 
             if (isLocked)
                 return default;
@@ -36,10 +36,10 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
             PruneOldMessages(buffer: buffer, message.Timestamp - TimeSpan.FromSeconds(options.Window));
 
             var channelIds = buffer
-               .Select(x => x.ChannelId)
-               .Distinct()
-               .Order()
-               .ToArray();
+                .Select(x => x.ChannelId)
+                .Distinct()
+                .Order()
+                .ToArray();
 
             if (channelIds.Length < options.DistinctChannelThreshold)
                 return default;
@@ -51,7 +51,7 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
                     GuildId: message.GuildId,
                     UserId: message.UserId,
                     buffer
-                       .ToArray(),
+                        .ToArray(),
                     ChannelIds: channelIds));
         }
     }
@@ -76,11 +76,11 @@ public sealed class ImageBurstSpamDetector(TimeProvider timeProvider)
     private void PruneExpiredLocks(DateTimeOffset now)
     {
         ImageBurstBufferKey[] expiredKeys = _handlingLocks
-           .Where(x => x.Value <= now)
-           .Select(x => x.Key)
-           .ToArray();
+            .Where(x => x.Value <= now)
+            .Select(x => x.Key)
+            .ToArray();
 
-        foreach (var key in expiredKeys)
+        foreach (ImageBurstBufferKey key in expiredKeys)
             _handlingLocks.Remove(key);
     }
 

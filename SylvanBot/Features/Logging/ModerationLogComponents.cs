@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace SylvanBot.Features.Logging;
 
@@ -27,11 +27,11 @@ internal static class ModerationLogComponents
         var content =
             $"{CodeBlock(value: before, maxLength: blockLength, ansi: true)}\n{CodeBlock(value: after, maxLength: blockLength, ansi: true)}";
 
-        var components = new ComponentBuilderV2(
+        MessageComponent components = new ComponentBuilderV2(
             new ContainerBuilder()
-               .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
-               .WithSeparator(new SeparatorBuilder())
-               .WithTextDisplay(new TextDisplayBuilder().WithContent(content))
+                .WithTextDisplay(new TextDisplayBuilder().WithContent(header))
+                .WithSeparator(new SeparatorBuilder())
+                .WithTextDisplay(new TextDisplayBuilder().WithContent(content))
         ).Build();
 
         return new ModerationLogMessage(Components: components, Attachments: ImmutableArray<DownloadedAttachment>.Empty);
@@ -59,14 +59,14 @@ internal static class ModerationLogComponents
         var contentBlock = string.IsNullOrWhiteSpace(content) ? string.Empty : CodeBlock(value: content, maxLength: contentLength, ansi: false);
         var body = (contentBlock + attachmentNotice).TrimStart('\n');
 
-        var container = new ContainerBuilder()
-           .WithTextDisplay(new TextDisplayBuilder().WithContent(header));
+        ContainerBuilder container = new ContainerBuilder()
+            .WithTextDisplay(new TextDisplayBuilder().WithContent(header));
 
         if (body.Length > 0)
-        {
+
             container.WithSeparator(new SeparatorBuilder())
-               .WithTextDisplay(new TextDisplayBuilder().WithContent(body));
-        }
+                .WithTextDisplay(new TextDisplayBuilder().WithContent(body));
+
 
         if (attachments.Count > 0)
             AddAttachmentComponents(container: container, attachments: attachments);
@@ -103,9 +103,9 @@ internal static class ModerationLogComponents
 
         if (mediaAttachments.Length > 0)
         {
-            var gallery = new MediaGalleryBuilder();
+            MediaGalleryBuilder gallery = new MediaGalleryBuilder();
 
-            foreach (var attachment in mediaAttachments)
+            foreach (DownloadedAttachment attachment in mediaAttachments)
                 gallery.AddItem(new MediaGalleryItemProperties { Media = new UnfurledMediaItemProperties(attachment.Url) });
 
             container.WithMediaGallery(gallery);
@@ -113,7 +113,7 @@ internal static class ModerationLogComponents
 
         IEnumerable<DownloadedAttachment> fileAttachments = attachments.Where(attachment => !IsMediaAttachment(attachment));
 
-        foreach (var attachment in fileAttachments)
+        foreach (DownloadedAttachment attachment in fileAttachments)
             container.WithFile(new FileComponentBuilder().WithFile(new UnfurledMediaItemProperties(attachment.Url)));
     }
 

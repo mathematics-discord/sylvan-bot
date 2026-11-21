@@ -8,8 +8,8 @@ public sealed class AutomodBanTests
     public void Reason_ExistingOperation_PreservesLegacyOwnershipMarker()
     {
         // Arrange
-        var id = Guid.Parse("a4bf2a08-ae49-4d9c-8b3a-ce6fa19febe3");
-        var operation = new AutomodBan { Id = id, RuleId = 107 };
+        Guid id = Guid.Parse("a4bf2a08-ae49-4d9c-8b3a-ce6fa19febe3");
+        AutomodBan operation = new AutomodBan { Id = id, RuleId = 107 };
 
         // Act / Assert
         operation.Reason.ShouldBe("Automod ban rule 107; automod operation a4bf2a08-ae49-4d9c-8b3a-ce6fa19febe3");
@@ -20,7 +20,7 @@ public sealed class AutomodBanTests
     {
         // Arrange
         const string reason = "Automatic action: message matches pattern 240\n`discord.gg/MC57wTZPaN`";
-        var operation = new AutomodBan { ActionReason = reason, RuleId = 240 };
+        AutomodBan operation = new AutomodBan { ActionReason = reason, RuleId = 240 };
 
         // Act / Assert
         operation.Reason.ShouldBe(reason);
@@ -34,12 +34,11 @@ public sealed class AutomodBanTests
     public void CanExpire_DueOperation_RequiresConfirmedOwnership(string status, ulong auditId, bool expected)
     {
         // Arrange
-        var now = DateTimeOffset.UnixEpoch.AddDays(1);
+        DateTimeOffset now = DateTimeOffset.UnixEpoch.AddDays(1);
 
-        var operation = new AutomodBan
+        AutomodBan operation = new AutomodBan
         {
-            Status = status, AuditId = auditId, LastAttemptAt = now.AddMinutes(-1),
-            ExpiresAt = new Optional<DateTimeOffset>(now),
+            Status = status, AuditId = auditId, LastAttemptAt = now.AddMinutes(-1), ExpiresAt = new Optional<DateTimeOffset>(now),
         };
 
         // Act / Assert
@@ -55,7 +54,7 @@ public sealed class AutomodBanTests
     public void AuditCoverageLost_RetentionBoundary_SuspendsExpiry(int days, bool expected)
     {
         // Arrange
-        var operation = new AutomodBan { CheckedAt = DateTimeOffset.UnixEpoch };
+        AutomodBan operation = new AutomodBan { CheckedAt = DateTimeOffset.UnixEpoch };
 
         // Act / Assert
         operation.AuditCoverageLost(DateTimeOffset.UnixEpoch.AddDays(days)).ShouldBe(expected);
@@ -91,7 +90,7 @@ public sealed class AutomodBanTests
     public void Observe_OriginalBanThenNewBan_PreservesReplacement()
     {
         // Arrange
-        var operation = new AutomodBan();
+        AutomodBan operation = new AutomodBan();
 
         // Act
         operation.Observe(100, ownBan: true, ownRemoval: false);
@@ -106,7 +105,7 @@ public sealed class AutomodBanTests
     public void Observe_RepeatedConfirmation_DoesNotChangeOwnership()
     {
         // Arrange
-        var operation = new AutomodBan();
+        AutomodBan operation = new AutomodBan();
         operation.Observe(100, ownBan: true, ownRemoval: false);
 
         // Act
@@ -120,7 +119,7 @@ public sealed class AutomodBanTests
     public void Observe_UncertainUnbanConfirmed_EndsOperation()
     {
         // Arrange
-        var operation = new AutomodBan { AuditId = 100, Status = "Removing" };
+        AutomodBan operation = new AutomodBan { AuditId = 100, Status = "Removing" };
 
         // Act
         operation.Observe(101, ownBan: false, ownRemoval: true);

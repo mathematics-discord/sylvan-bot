@@ -24,20 +24,20 @@ public sealed class WorkingHoursSchedules(
         string? timezone,
         CancellationToken ct)
     {
-        var state = runtime.ForGuild(guildId);
+        WorkingHoursGuildState state = runtime.ForGuild(guildId);
         await state.Gate.WaitAsync(ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
-            var settings = await LoadSettingsAsync(db: db, guildId: guildId, ct: ct);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+            WorkingHoursSettings? settings = await LoadSettingsAsync(db: db, guildId: guildId, ct: ct);
 
             if (settings is not { Enabled: true })
-            {
+
                 return new Result<string>(
                     OperationFailureException.Validation(
                         description: "Working Hours scheduling is disabled for this guild. No preference or role was changed."));
-            }
+
 
             Result<Optional<WorkingHoursWindow>> validation = ValidateSubmission(
                 username: username,
@@ -50,33 +50,33 @@ public sealed class WorkingHoursSchedules(
                 return new Result<string>(validation.Error!);
 
             Optional<WorkingHoursWindow> window = validation.Value;
-            var guild = client.GetGuild(guildId);
+            SocketGuild guild = client.GetGuild(guildId);
 
             if (!rules.IsReady(guild))
-            {
+
                 return new Result<string>(
                     OperationFailureException.Failure(description: "Current guild/member data is unavailable. No preference was changed."));
-            }
+
 
             if (!settings.IsComplete)
-            {
+
                 return new Result<string>(
                     OperationFailureException.Validation(description: "Working Hours configuration is incomplete. No preference was changed."));
-            }
 
-            var member = guild.GetUser(memberId);
+
+            SocketGuildUser? member = guild.GetUser(memberId);
 
             if (member is null)
-            {
+
                 return new Result<string>(
                     OperationFailureException.Failure(description: "Current member data is unavailable. No preference was changed."));
-            }
+
 
             if (!WorkingHoursGuildRules.IsEligible(settings: settings, member: member))
-            {
+
                 return new Result<string>(
                     OperationFailureException.Unauthorized(description: "Only members with a configured eligible staff role may set working hours."));
-            }
+
 
             await SaveScheduleAsync(db: db, state: state, guildId: guildId, memberId: memberId, window: window, ct: ct);
 
@@ -111,10 +111,10 @@ public sealed class WorkingHoursSchedules(
         if (enable)
         {
             if (start is null || end is null)
-            {
+
                 return new Result<Optional<WorkingHoursWindow>>(
                     OperationFailureException.Validation(description: "Enabling requires both start and end on every submission."));
-            }
+
 
             Result<WorkingHoursWindow> parsed = WorkingHoursTimeParser.Parse(start: start, end: end, timezone: timezone);
 
@@ -128,10 +128,10 @@ public sealed class WorkingHoursSchedules(
                 return new Result<Optional<WorkingHoursWindow>>(OperationFailureException.Validation(description: rejection));
         }
         else if (start is not null || end is not null || timezone is not null)
-        {
+
             return new Result<Optional<WorkingHoursWindow>>(
                 OperationFailureException.Validation(description: "Disabling accepts no start, end or timezone options."));
-        }
+
 
         return window;
     }
@@ -144,10 +144,11 @@ public sealed class WorkingHoursSchedules(
         Optional<WorkingHoursWindow> window,
         CancellationToken ct)
     {
-        var preference = await db.WorkingHours
-           .SingleOrDefaultAsync(
+        WorkingHoursPreference? preference = await db.WorkingHours
+            .SingleOrDefaultAsync(
                 item => item.GuildId == guildId && item.MemberId == memberId,
                 cancellationToken: ct);
+
         // Consume only losses preceding this explicit command; later gateway losses remain pending.
         var priorLoss = state.ConsumeLoss(memberId);
 
@@ -164,7 +165,9 @@ public sealed class WorkingHoursSchedules(
                 preference.EnableSchedule(schedule);
             }
             else
+
                 preference?.DisableSchedule();
+
 
             await db.SaveChangesAsync(ct);
         }
@@ -178,6 +181,6 @@ public sealed class WorkingHoursSchedules(
 
     private static Task<WorkingHoursSettings?> LoadSettingsAsync(BotDbContext db, ulong guildId, CancellationToken ct) =>
         db.WorkingHoursSettings
-           .Include(settings => settings.EligibleRoles)
-           .SingleOrDefaultAsync(settings => settings.GuildId == guildId, cancellationToken: ct);
+            .Include(settings => settings.EligibleRoles)
+            .SingleOrDefaultAsync(settings => settings.GuildId == guildId, cancellationToken: ct);
 }

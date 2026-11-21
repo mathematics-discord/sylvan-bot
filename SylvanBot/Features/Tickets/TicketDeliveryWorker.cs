@@ -1,7 +1,6 @@
-namespace SylvanBot.Features.Tickets;
+﻿namespace SylvanBot.Features.Tickets;
 
 using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Gateway;
 
@@ -77,6 +76,7 @@ public sealed class TicketDeliveryWorker(
             while (!token.IsCancellationRequested)
             {
                 await wake.WaitAsync(TimeSpan.FromSeconds(30), token);
+
                 if (!_ready || client.ConnectionState != ConnectionState.Connected)
                     continue;
 
@@ -113,6 +113,7 @@ public sealed class TicketDeliveryWorker(
     {
         if (reviewSummary.MarkChannelDirty(message.Channel.Id))
             Signal(_publications);
+
         return Task.CompletedTask;
     }
 
@@ -120,23 +121,32 @@ public sealed class TicketDeliveryWorker(
     {
         if (reviewSummary.MarkChannelDirty(channel.Id))
             Signal(_publications);
+
         return Task.CompletedTask;
     }
 
     private async Task PublishAsync(CancellationToken token)
     {
         long after = 0;
+
         while (true)
         {
-            await using var db = await contextFactory.CreateDbContextAsync(token);
+            await using BotDbContext db = await contextFactory.CreateDbContextAsync(token);
+
             var pending = await db.Tickets
                 .AsNoTracking()
                 .Where(ticket => ticket.Id > after
-                    && db.TicketConfigurations.Any(config => config.GuildId == ticket.GuildId && config.Enabled && config.DestinationChannelId != null)
-                    && ((!ticket.Hidden && !ticket.SendUncertain
-                         && !ticket.Publications.Any(reference => reference.Current && !reference.Removed && reference.Revision == ticket.Version))
-                        || ticket.Publications.Any(reference => !reference.Removed
-                            && (reference.ApprovalReactionCleanupPending || ticket.Hidden || !reference.Current || reference.Revision != ticket.Version))))
+                                 && db.TicketConfigurations.Any(config
+                                     => config.GuildId == ticket.GuildId && config.Enabled && config.DestinationChannelId != null)
+                                 && ((!ticket.Hidden
+                                      && !ticket.SendUncertain
+                                      && !ticket.Publications.Any(reference
+                                          => reference.Current && !reference.Removed && reference.Revision == ticket.Version))
+                                     || ticket.Publications.Any(reference => !reference.Removed
+                                                                             && (reference.ApprovalReactionCleanupPending
+                                                                                 || ticket.Hidden
+                                                                                 || !reference.Current
+                                                                                 || reference.Revision != ticket.Version))))
                 .OrderBy(ticket => ticket.Id)
                 .Select(ticket => new { ticket.GuildId, ticket.Id })
                 .Take(100)
@@ -147,9 +157,9 @@ public sealed class TicketDeliveryWorker(
 
             foreach (var ticket in pending)
             {
-                await using var scope = scopes.CreateAsyncScope();
-                var publisher = scope.ServiceProvider.GetRequiredService<TicketPublisher>();
-                var result = await publisher.SynchronizeAsync(ticket.GuildId, ticket.Id, token);
+                await using AsyncServiceScope scope = scopes.CreateAsyncScope();
+                TicketPublisher publisher = scope.ServiceProvider.GetRequiredService<TicketPublisher>();
+                TicketPublicationResult result = await publisher.SynchronizeAsync(ticket.GuildId, ticket.Id, token);
 
                 if (result.Changed)
                     reviewSummary.MarkDirty(ticket.GuildId);
@@ -170,7 +180,7 @@ public sealed class TicketDeliveryWorker(
 
         while (true)
         {
-            await using var db = await contextFactory.CreateDbContextAsync(token);
+            await using BotDbContext db = await contextFactory.CreateDbContextAsync(token);
 
             IQueryable<ulong> enabled = db.TicketConfigurations
                 .Where(config => config.Enabled && config.DestinationChannelId != null)
@@ -196,11 +206,11 @@ public sealed class TicketDeliveryWorker(
                 return;
 
             foreach (var user in users)
-            {
+
                 try
                 {
-                    await using var scope = scopes.CreateAsyncScope();
-                    var reminders = scope.ServiceProvider.GetRequiredService<TicketReminders>();
+                    await using AsyncServiceScope scope = scopes.CreateAsyncScope();
+                    TicketReminders reminders = scope.ServiceProvider.GetRequiredService<TicketReminders>();
                     await reminders.RemindAsync(user, force: false, token);
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -211,7 +221,7 @@ public sealed class TicketDeliveryWorker(
                 {
                     _logger.Warning("Ticket reminder failed for moderator {ModeratorId} ({FailureType})", user, exception.GetType().Name);
                 }
-            }
+
 
             after = users[^1];
         }

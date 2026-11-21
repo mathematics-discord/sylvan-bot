@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SylvanBot.Application.Features.Activity;
 using SylvanBot.Interactions;
 
@@ -18,14 +19,14 @@ public sealed class ActivityModule(ActivityService activity, IHostApplicationLif
     private async Task SetParticipationAsync(bool optedOut)
     {
         await DeferAsync(ephemeral: true);
-        var ct = lifetime.ApplicationStopping;
+        CancellationToken ct = lifetime.ApplicationStopping;
         var response = optedOut ? "Activity tracking stopped and your progress erased." : "You are participating in activity XP.";
 
         await activity.RunAsync(
             Context.Guild.Id,
             async db =>
             {
-                var member = await db.ActivityMembers.FindAsync([Context.Guild.Id, Context.User.Id], ct);
+                ActivityMember? member = await db.ActivityMembers.FindAsync([Context.Guild.Id, Context.User.Id], ct);
 
                 if (!optedOut && member is not { OptedOut: true })
                     return;
@@ -38,7 +39,7 @@ public sealed class ActivityModule(ActivityService activity, IHostApplicationLif
                 member.Xp = 0;
                 member.OptedOut = optedOut;
                 member.ResetAt = DateTimeOffset.UtcNow;
-                await using var transaction = await db.Database.BeginTransactionAsync(ct);
+                await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(ct);
 
                 await db.ActivityAwards
                     .Where(row => row.GuildId == member.GuildId && row.UserId == member.UserId)
@@ -47,7 +48,7 @@ public sealed class ActivityModule(ActivityService activity, IHostApplicationLif
                 await db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
 
-                var settings = await db.ActivitySettings.FindAsync([Context.Guild.Id], ct) ?? new ActivitySettings();
+                ActivitySettings settings = await db.ActivitySettings.FindAsync([Context.Guild.Id], ct) ?? new ActivitySettings();
 
                 try
                 {

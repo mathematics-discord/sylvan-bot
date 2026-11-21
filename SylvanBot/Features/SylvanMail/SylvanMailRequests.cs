@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using Discord.Net;
+using Discord.Rest;
 
 namespace SylvanBot.Features.SylvanMail;
 
@@ -27,9 +28,9 @@ internal static class SylvanMailRequests
         CancellationToken ct,
         RetryMode retryMode = RetryMode.AlwaysFail)
     {
-        var options = Options(ct);
+        RequestOptions options = Options(ct);
         options.RetryMode = retryMode;
-        var channel = await client.Rest.GetChannelAsync(id: channelId, options);
+        RestChannel channel = await client.Rest.GetChannelAsync(id: channelId, options);
 
         return channel as IMessageChannel ?? throw new BotCommandException("The delivery channel is inaccessible.");
     }

@@ -31,14 +31,9 @@ public sealed class SylvanMailPersistence
         builder.HasIndex(item => item.Number).IsUnique();
 
         builder
-           .HasIndex(item => new
-            {
-                item.GuildId,
-                item.ForumId,
-                item.UserId,
-            })
-           .IsUnique()
-           .HasFilter("NOT \"Retired\"");
+            .HasIndex(item => new { item.GuildId, item.ForumId, item.UserId, })
+            .IsUnique()
+            .HasFilter("NOT \"Retired\"");
 
         builder.HasIndex(item => item.ThreadId).IsUnique();
     }

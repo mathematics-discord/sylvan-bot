@@ -10,7 +10,7 @@ public sealed class TicketAutomodApprovalTests
     public void AcceptCreation_AutomodAction_RequiresApprovalDespiteReviewerPermission(TicketAction action)
     {
         // Arrange
-        var ticket = TicketTests.Create(action);
+        Ticket ticket = TicketTests.Create(action);
 
         // Act
         ticket.AcceptCreation(canReview: true, requiresApproval: true);
@@ -29,7 +29,7 @@ public sealed class TicketAutomodApprovalTests
     public void AcceptCreation_Note_NeverEntersReview(bool requiresApproval)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Note);
+        Ticket ticket = TicketTests.Create(TicketAction.Note);
 
         // Act
         ticket.AcceptCreation(canReview: true, requiresApproval);
@@ -43,7 +43,7 @@ public sealed class TicketAutomodApprovalTests
     public void SetDuration_AutomodExtension_ReturnsAcceptedTimeoutToReview()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Timeout, canReview: true);
+        Ticket ticket = TicketTests.Create(TicketAction.Timeout, canReview: true);
 
         // Act
         ticket.SetDuration(seconds: 7200, moderatorId: null, canReview: true, requiresApproval: true);

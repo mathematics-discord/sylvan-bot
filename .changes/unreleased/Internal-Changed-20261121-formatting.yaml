@@ -1,0 +1,4 @@
+component: Internal
+kind: Changed
+body: Aligned C# formatting across the solution and configured Rider and analyzers to omit optional braces, including for single statements that span several lines.
+time: 2026-11-21T23:27:00Z

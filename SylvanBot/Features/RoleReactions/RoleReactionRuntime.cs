@@ -11,7 +11,7 @@ public sealed class RoleReactionRuntime : IDisposable
 
     public void Dispose()
     {
-        foreach (var gate in _gates.Values)
+        foreach (SemaphoreSlim gate in _gates.Values)
             gate.Dispose();
     }
 }

@@ -12,8 +12,8 @@ public sealed class SylvanMailConversations(ISylvanMailForum forum)
         SylvanMailOperation operation,
         CancellationToken ct)
     {
-        var conversation = await db.SylvanMailConversations
-           .SingleOrDefaultAsync(
+        SylvanMailConversation? conversation = await db.SylvanMailConversations
+            .SingleOrDefaultAsync(
                 item => item.GuildId == settings.GuildId && item.ForumId == settings.ForumId && item.UserId == message.AuthorId && !item.Retired,
                 cancellationToken: ct);
 
@@ -35,12 +35,7 @@ public sealed class SylvanMailConversations(ISylvanMailForum forum)
 
         if (conversation is null)
         {
-            conversation = new SylvanMailConversation
-            {
-                GuildId = settings.GuildId,
-                ForumId = settings.ForumId,
-                UserId = message.AuthorId,
-            };
+            conversation = new SylvanMailConversation { GuildId = settings.GuildId, ForumId = settings.ForumId, UserId = message.AuthorId };
 
             db.SylvanMailConversations.Add(conversation);
         }
@@ -72,10 +67,9 @@ public sealed class SylvanMailConversations(ISylvanMailForum forum)
                 ct: ct);
 
             if (found is not { HasValue: true, Value: var recoveredThread })
-            {
+
                 throw new BotCommandException(
                     "An earlier post creation has an uncertain outcome. No replacement was created; staff must reconcile the saved attempt.");
-            }
 
             conversation.ThreadId = recoveredThread;
         }
@@ -89,10 +83,7 @@ public sealed class SylvanMailConversations(ISylvanMailForum forum)
                 conversation.ThreadId = await forum.CreatePostAsync(
                     new SylvanMailPost
                     {
-                        GuildId = conversation.GuildId,
-                        ForumId = conversation.ForumId,
-                        Number = conversation.Number,
-                        UserId = conversation.UserId,
+                        GuildId = conversation.GuildId, ForumId = conversation.ForumId, Number = conversation.Number, UserId = conversation.UserId,
                     },
                     roleId: roleId,
                     username: username,

@@ -28,11 +28,11 @@ public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, 
         if (before.HasValue)
         {
             ImmutableArray<ulong> roles = ((IGuildUser)before.Value).RoleIds
-               .ToImmutableArray();
+                .ToImmutableArray();
 
             var unchanged = roles
-               .ToHashSet()
-               .SetEquals(((IGuildUser)after).RoleIds);
+                .ToHashSet()
+                .SetEquals(((IGuildUser)after).RoleIds);
 
             if (unchanged)
                 return;

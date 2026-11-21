@@ -1,4 +1,4 @@
-namespace SylvanBot.Features.Tickets;
+﻿namespace SylvanBot.Features.Tickets;
 
 using System.Globalization;
 using SylvanBot.Application.Features.Tickets;
@@ -18,7 +18,7 @@ internal static class TicketPresentation
 
     internal static MessageComponent Buttons(Ticket ticket, TicketActor? actor = null)
     {
-        var builder = new ComponentBuilder();
+        ComponentBuilder builder = new ComponentBuilder();
         var isNote = ticket.Action == TicketAction.Note;
         var senior = actor?.IsAdministrator != false || actor.CanViewAuditLog;
 
@@ -26,10 +26,12 @@ internal static class TicketPresentation
             builder.WithButton("Edit", $"ticket:edit:{ticket.Number}");
 
         if (!ticket.Hidden && (isNote || senior))
+
             builder.WithButton(
                 "Hide",
                 isNote ? $"ticket:hide:{ticket.Number}" : $"ticket:moderation-hide:{ticket.Number}:{ticket.Version}",
                 ButtonStyle.Danger);
+
 
         if (!isNote && senior)
         {
@@ -49,6 +51,7 @@ internal static class TicketPresentation
     {
         var subject = $"<@{ticket.SubjectUserId}>";
         var moderator = $"<@{ticket.ModeratorUserId}>";
+
         return ticket.Action switch
         {
             TicketAction.Note => $"**Note** for {subject} by {moderator}",
@@ -68,11 +71,15 @@ internal static class TicketPresentation
         var status = string.Empty;
 
         if (ticket.Status == TicketStatus.Reverted)
+
             status = " (REVERTED)";
+
         else if (!isNote && !ticket.IsApproved)
+
             status = " (UNAPPROVED)";
 
-        var embed = new EmbedBuilder()
+
+        EmbedBuilder embed = new EmbedBuilder()
             .WithAuthor($"Ticket #{ticket.Number}")
             .WithTitle(ActionName(ticket.Action) + status + (isNote && ticket.Hidden ? " · Hidden" : string.Empty))
             .WithColor(ModerationColour(ticket))
@@ -82,9 +89,13 @@ internal static class TicketPresentation
             embed.WithThumbnailUrl("https://media.tenor.com/PHREyAefRckAAAAM/packwatch.gif");
 
         if (ticket.Comment.Length > InlineCommentLimit)
+
             description += "\n\nThe full comment is attached.";
+
         else if (ticket.Comment.Length > 0)
+
             description += $"\n\n{ticket.Comment}";
+
 
         string FormatId(ulong id) => id.ToString(CultureInfo.InvariantCulture);
 
@@ -93,12 +104,22 @@ internal static class TicketPresentation
         embed.AddField("Moderator ID", FormatId(ticket.ModeratorUserId), inline: true);
 
         if (ticket.Action != TicketAction.Kick)
-            embed.AddField("Duration", ticket.DurationSeconds is { } seconds
-                ? TimeSpan.FromSeconds(seconds).ToString()
-                : "**Permanent**", inline: true);
+
+            embed.AddField(
+                "Duration",
+                ticket.DurationSeconds is { } seconds
+                    ? TimeSpan.FromSeconds(seconds).ToString()
+                    : "**Permanent**",
+                inline: true);
+
 
         if (ticket.ExpiresAtUtc is { } expiry)
-            embed.AddField(ticket.Action is TicketAction.VoiceMute or TicketAction.VoiceDeafen ? "Descriptive end" : "Expires", FormatExpiry(expiry), inline: true);
+
+            embed.AddField(
+                ticket.Action is TicketAction.VoiceMute or TicketAction.VoiceDeafen ? "Descriptive end" : "Expires",
+                FormatExpiry(expiry),
+                inline: true);
+
 
         if (ticket.Action is TicketAction.VoiceMute or TicketAction.VoiceDeafen)
             embed.AddField("Voice restriction", "Use Revert Ticket to lift this restriction. Its duration is descriptive.");
@@ -108,10 +129,15 @@ internal static class TicketPresentation
 
         if (ticket.Pending is not null)
             embed.AddField("Pending", "Expiry or a Discord change is awaiting confirmation.");
-        if (ticket.ExpirySuspended && ticket.Status == TicketStatus.Active
+
+        if (ticket.ExpirySuspended
+            && ticket.Status == TicketStatus.Active
             && ticket.Action is not (TicketAction.VoiceMute or TicketAction.VoiceDeafen))
-            embed.AddField(ticket.Action == TicketAction.Timeout ? "Enforcement paused" : "Expiry paused",
+
+            embed.AddField(
+                ticket.Action == TicketAction.Timeout ? "Enforcement paused" : "Expiry paused",
                 "Automatic changes are paused because the saved restriction could not be verified. Use Edit to set a new duration.");
+
 
         AddHistory(embed, ticket);
 
@@ -135,9 +161,11 @@ internal static class TicketPresentation
             text += " A Discord change is awaiting reconciliation.";
 
         if (ticket.ExpirySuspended && ticket.Action is not (TicketAction.VoiceMute or TicketAction.VoiceDeafen))
+
             text += ticket.Action == TicketAction.Timeout
                 ? " Automatic timeout changes are paused. Use Edit to set a new duration."
                 : " Automatic expiry is paused. Use Edit to set a new duration.";
+
 
         if (ticket.Status == TicketStatus.Superseded)
             text += $" Superseded by ticket #{ticket.SupersededByNumber}.";
@@ -158,7 +186,7 @@ internal static class TicketPresentation
         List<string> lines = [];
         var length = 0;
 
-        foreach (var entry in history)
+        foreach (TicketHistoryEntry entry in history)
         {
             var line = entry.Format();
 
@@ -177,7 +205,7 @@ internal static class TicketPresentation
 
     private static Color ModerationColour(Ticket ticket)
     {
-        var palette = ticket.Action switch
+        (int Pending, int Complete, int Ended) palette = ticket.Action switch
         {
             TicketAction.Note => (Pending: 0xFFFFFF, Complete: 0xFFFFFF, Ended: 0x666666),
             TicketAction.Ban => (Pending: 0xFF6666, Complete: 0xFF0000, Ended: 0x990000),

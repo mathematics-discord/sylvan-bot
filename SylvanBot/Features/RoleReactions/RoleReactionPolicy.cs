@@ -29,12 +29,12 @@ internal static class RoleReactionPolicy
 
         // Threads inherit their parent's overwrites; Discord.NET does not support reading their own.
         IEnumerable<OverwritePermissions?> overwrites = guild
-           .Channels
-           .Where(channel => channel is not SocketThreadChannel)
-           .Select(channel => channel.GetPermissionOverwrite(role));
+            .Channels
+            .Where(channel => channel is not SocketThreadChannel)
+            .Select(channel => channel.GetPermissionOverwrite(role));
 
         var grantsStaffPermissions = overwrites
-           .Any(overwrite => overwrite.HasValue && (overwrite.Value.AllowValue & (ulong)PersistentRolePolicy.StaffPermissions) != 0);
+            .Any(overwrite => overwrite.HasValue && (overwrite.Value.AllowValue & (ulong)PersistentRolePolicy.StaffPermissions) != 0);
 
         return grantsStaffPermissions
             ? new Optional<string>("The role has staff or moderation permissions in a channel override and cannot be assigned by reaction.")
@@ -43,12 +43,12 @@ internal static class RoleReactionPolicy
 
     public static Optional<string> ValidateChannelAccess(SocketGuild guild, SocketGuildUser moderator, IGuildChannel channel)
     {
-        var moderatorPermissions = moderator.GetPermissions(channel);
+        ChannelPermissions moderatorPermissions = moderator.GetPermissions(channel);
 
         if (moderatorPermissions is not { ViewChannel: true, ReadMessageHistory: true })
             return new Optional<string>("You must be able to view the linked channel and read its message history.");
 
-        var botPermissions = guild.CurrentUser.GetPermissions(channel);
+        ChannelPermissions botPermissions = guild.CurrentUser.GetPermissions(channel);
 
         return botPermissions is { ViewChannel: true, ReadMessageHistory: true, AddReactions: true }
             ? default

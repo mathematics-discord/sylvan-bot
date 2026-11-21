@@ -1,4 +1,4 @@
-namespace SylvanBot.Features.Tickets;
+﻿namespace SylvanBot.Features.Tickets;
 
 using DotNext;
 using System.Collections.Concurrent;
@@ -45,20 +45,20 @@ public sealed class TicketReviewSummary(
 
         while (true)
         {
-            await using var db = await contexts.CreateDbContextAsync(token);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(token);
 
             List<TicketConfiguration> configurations = await db.TicketConfigurations
-               .Where(config => config.GuildId > after
-                          && ((config.Enabled && config.DestinationChannelId != null)
-                              || config.ReviewSummaryMessageId != null))
-               .OrderBy(config => config.GuildId)
-               .Take(100)
-               .ToListAsync(token);
+                .Where(config => config.GuildId > after
+                                 && ((config.Enabled && config.DestinationChannelId != null)
+                                     || config.ReviewSummaryMessageId != null))
+                .OrderBy(config => config.GuildId)
+                .Take(100)
+                .ToListAsync(token);
 
             if (configurations.Count == 0)
                 return;
 
-            foreach (var config in configurations)
+            foreach (TicketConfiguration config in configurations)
             {
                 var dirty = _dirty.TryRemove(config.GuildId, out _);
 
@@ -98,12 +98,12 @@ public sealed class TicketReviewSummary(
     private async Task RefreshGuildAsync(BotDbContext db, TicketConfiguration config, CancellationToken token)
     {
         var destination = config.Enabled ? config.DestinationChannelId : null;
-        var options = backoff.Options(config.DestinationChannelId ?? config.ReviewSummaryChannelId ?? 0, token);
-        var guild = (IGuild?)client.GetGuild(config.GuildId) ?? await client.Rest.GetGuildAsync(config.GuildId, options);
+        RequestOptions options = backoff.Options(config.DestinationChannelId ?? config.ReviewSummaryChannelId ?? 0, token);
+        IGuild guild = (IGuild?)client.GetGuild(config.GuildId) ?? await client.Rest.GetGuildAsync(config.GuildId, options);
 
         if (config.ReviewSummaryChannelId is { } previous && previous != destination)
         {
-            var oldChannel = await guild.GetTextChannelAsync(previous, options: options);
+            ITextChannel? oldChannel = await guild.GetTextChannelAsync(previous, options: options);
 
             if (oldChannel is not null && config.ReviewSummaryMessageId is { } oldMessage)
                 await DeleteAsync(oldChannel, oldMessage, token);
@@ -119,31 +119,31 @@ public sealed class TicketReviewSummary(
 
         _channels.TryAdd(channelId, config.GuildId);
 
-        var channel = await guild.GetTextChannelAsync(channelId, options: options)
-            ?? throw new InvalidOperationException("The tickets channel is unavailable.");
+        ITextChannel channel = await guild.GetTextChannelAsync(channelId, options: options)
+                               ?? throw new InvalidOperationException("The tickets channel is unavailable.");
 
-        var summary = await FindSummaryAtBottomAsync(channel, config.ReviewSummaryMessageId, token);
+        IUserMessage? summary = await FindSummaryAtBottomAsync(channel, config.ReviewSummaryMessageId, token);
         var text = await DescribeAsync(db, config, token);
 
-        var row = new ActionRowBuilder()
-           .WithButton("Review tickets", ReviewButtonId);
+        ActionRowBuilder row = new ActionRowBuilder()
+            .WithButton("Review tickets", ReviewButtonId);
 
-        var container = new ContainerBuilder()
-           .WithTextDisplay(new TextDisplayBuilder().WithContent(text))
-           .WithActionRow(row);
+        ContainerBuilder container = new ContainerBuilder()
+            .WithTextDisplay(new TextDisplayBuilder().WithContent(text))
+            .WithActionRow(row);
 
-        var components = new ComponentBuilderV2(container).Build();
+        MessageComponent components = new ComponentBuilderV2(container).Build();
 
         if (summary is null)
-        {
+
             summary = await channel.SendMessageAsync(
                 components: components,
                 flags: MessageFlags.ComponentsV2,
                 allowedMentions: AllowedMentions.None,
                 options: options);
-        }
+
         else if (!string.Equals(SummaryText(summary), text, StringComparison.Ordinal))
-        {
+
             await summary.ModifyAsync(
                 properties =>
                 {
@@ -151,7 +151,7 @@ public sealed class TicketReviewSummary(
                     properties.AllowedMentions = AllowedMentions.None;
                 },
                 options);
-        }
+
 
         config.ReviewSummaryChannelId = channelId;
         config.ReviewSummaryMessageId = summary.Id;
@@ -160,59 +160,59 @@ public sealed class TicketReviewSummary(
 
     private async Task<IUserMessage?> FindSummaryAtBottomAsync(IMessageChannel channel, ulong? storedId, CancellationToken token)
     {
-        var options = backoff.Options(channel.Id, token);
+        RequestOptions options = backoff.Options(channel.Id, token);
 
         IEnumerable<IMessage> recent = await channel.GetMessagesAsync(options: options)
-           .FlattenAsync();
+            .FlattenAsync();
 
         List<IMessage> messages = recent
-           .OrderByDescending(message => message.Id)
-           .ToList();
+            .OrderByDescending(message => message.Id)
+            .ToList();
 
         // Recover a send that reached Discord before the database save completed.
         List<IUserMessage> summaries = messages
-           .OfType<IUserMessage>()
-           .Where(IsSummary)
-           .ToList();
+            .OfType<IUserMessage>()
+            .Where(IsSummary)
+            .ToList();
 
         var storedIsRecent = summaries
-           .Any(message => message.Id == storedId);
+            .Any(message => message.Id == storedId);
 
         if (storedId is { } stored && !storedIsRecent)
         {
-            var saved = await channel.GetMessageAsync(stored, options: options);
+            IMessage saved = await channel.GetMessageAsync(stored, options: options);
 
             if (saved is IUserMessage message && IsSummary(message))
                 summaries.Add(message);
         }
 
-        var latest = messages
-           .FirstOrDefault();
+        IMessage? latest = messages
+            .FirstOrDefault();
 
-        var summary = summaries
-           .FirstOrDefault(message => message.Id == latest?.Id);
+        IUserMessage? summary = summaries
+            .FirstOrDefault(message => message.Id == latest?.Id);
 
-        foreach (var obsolete in summaries.Where(obsolete => obsolete.Id != summary?.Id))
+        foreach (IUserMessage obsolete in summaries.Where(obsolete => obsolete.Id != summary?.Id))
             await DeleteAsync(channel, obsolete.Id, token);
 
         return summary;
     }
 
     private bool IsSummary(IUserMessage message) => message.Author.Id == client.CurrentUser.Id
-        && message.Components
-           .OfType<ContainerComponent>()
-           .SelectMany(container => container.Components)
-           .OfType<ActionRowComponent>()
-           .SelectMany(row => row.Components)
-           .OfType<ButtonComponent>()
-           .Any(button => string.Equals(button.CustomId, ReviewButtonId, StringComparison.Ordinal));
+                                                    && message.Components
+                                                        .OfType<ContainerComponent>()
+                                                        .SelectMany(container => container.Components)
+                                                        .OfType<ActionRowComponent>()
+                                                        .SelectMany(row => row.Components)
+                                                        .OfType<ButtonComponent>()
+                                                        .Any(button => string.Equals(button.CustomId, ReviewButtonId, StringComparison.Ordinal));
 
     private static string? SummaryText(IUserMessage message) => message.Components
-       .OfType<ContainerComponent>()
-       .SelectMany(container => container.Components)
-       .OfType<TextDisplayComponent>()
-       .FirstOrDefault()
-      ?.Content;
+        .OfType<ContainerComponent>()
+        .SelectMany(container => container.Components)
+        .OfType<TextDisplayComponent>()
+        .FirstOrDefault()
+        ?.Content;
 
     private async Task DeleteAsync(IMessageChannel channel, ulong messageId, CancellationToken token)
     {
@@ -230,19 +230,23 @@ public sealed class TicketReviewSummary(
     {
         IQueryable<Ticket> pending = TicketCoordinator.AwaitingApproval(db.Tickets.AsNoTracking(), config.GuildId);
         var count = await pending.CountAsync(token);
-        var text = new StringBuilder(Heading)
-           .AppendLine()
-           .AppendLine(count == 0 ? "No tickets are awaiting approval." : $"**{count}** tickets awaiting approval.");
+
+        StringBuilder text = new StringBuilder(Heading)
+            .AppendLine()
+            .AppendLine(count == 0 ? "No tickets are awaiting approval." : $"**{count}** tickets awaiting approval.");
 
         var shown = 0;
 
-        await foreach (var ticket in pending.OrderBy(ticket => ticket.Number).AsAsyncEnumerable().WithCancellation(token))
+        await foreach (Ticket ticket in pending.OrderBy(ticket => ticket.Number).AsAsyncEnumerable().WithCancellation(token))
         {
-            var publication = ticket.Publications.FirstOrDefault(copy => copy.Current && !copy.Removed);
+            TicketPublication? publication = ticket.Publications.FirstOrDefault(copy => copy.Current && !copy.Removed);
+
             Optional<TicketMessage> published = publication is null
                 ? Optional<TicketMessage>.None
                 : publication.Message();
+
             var line = ReviewLine(ticket, published);
+
             if (text.Length + line.Length + 1 > 3950)
                 break;
 
@@ -259,10 +263,10 @@ public sealed class TicketReviewSummary(
     internal static string ReviewLine(Ticket ticket, Optional<TicketMessage> published)
     {
         var label = $"#{ticket.Number}";
-        if (published.TryGet(out var target))
+
+        if (published.TryGet(out TicketMessage? target))
             label = $"[{label}]({TicketPresentation.Link(ticket.GuildId, target.ChannelId, target.MessageId)})";
 
         return $"- {label} - {TicketPresentation.ActionDescription(ticket)}";
     }
-
 }

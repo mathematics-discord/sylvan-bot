@@ -25,7 +25,7 @@ public sealed class ModerationLogPublisher(
     public async Task PublishMemberAsync(MemberLogEntry entry, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var logChannel = await scope.GetMemberLogChannelAsync(entry.GuildId, ct);
+        IMessageChannel? logChannel = await scope.GetMemberLogChannelAsync(entry.GuildId, ct);
 
         if (logChannel is null)
             return;
@@ -44,17 +44,18 @@ public sealed class ModerationLogPublisher(
         CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var logChannel = await scope.GetLogChannelAsync(guildId: guildId, sourceChannel: sourceChannel, forEdits: true, ct: ct);
+        IMessageChannel? logChannel = await scope.GetLogChannelAsync(guildId: guildId, sourceChannel: sourceChannel, forEdits: true, ct: ct);
 
         if (logChannel is null || expiresAtUtc <= DateTimeOffset.UtcNow)
             return;
 
-        var compactLog = ModerationLogComponents.BuildEditLog(
+        ModerationLogComponents.ModerationLogMessage compactLog = ModerationLogComponents.BuildEditLog(
             messageJumpUrl: messageJumpUrl,
             channelId: sourceChannel.Id,
             authorId: authorId,
             beforeContent: beforeContent,
             afterContent: afterContent);
+
         await SendLogAsync(logChannel: logChannel, attachments: compactLog.Attachments, ct: ct, components: compactLog.Components);
     }
 
@@ -67,7 +68,7 @@ public sealed class ModerationLogPublisher(
         var messageId = deletedMessage.MessageId;
 
         ct.ThrowIfCancellationRequested();
-        var logChannel = await scope.GetLogChannelAsync(guildId: guildId, sourceChannel: sourceChannel, forEdits: false, ct: ct);
+        IMessageChannel? logChannel = await scope.GetLogChannelAsync(guildId: guildId, sourceChannel: sourceChannel, forEdits: false, ct: ct);
 
         if (logChannel is null)
             return false;
@@ -76,7 +77,7 @@ public sealed class ModerationLogPublisher(
         var precedingMessageJumpUrl = await TryGetPrecedingMessageJumpUrlAsync(sourceChannel: sourceChannel, deletedMessageId: messageId, ct: ct);
         int omittedAttachmentCount;
 
-        using (var downloadTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct))
+        using (CancellationTokenSource downloadTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct))
         {
             downloadTimeout.CancelAfter(TimeSpan.FromSeconds(10));
 
@@ -88,7 +89,7 @@ public sealed class ModerationLogPublisher(
 
         ct.ThrowIfCancellationRequested();
 
-        var compactLog = ModerationLogComponents.BuildDeleteLog(
+        ModerationLogComponents.ModerationLogMessage compactLog = ModerationLogComponents.BuildDeleteLog(
             channelId: sourceChannel.Id,
             authorId: deletedMessage.AuthorId,
             precedingMessageJumpUrl: precedingMessageJumpUrl,
@@ -117,7 +118,11 @@ public sealed class ModerationLogPublisher(
         if (sourceChannel is not IGuildChannel guildChannel)
             return false;
 
-        var logChannel = await scope.GetLogChannelAsync(guildId: guildChannel.GuildId, sourceChannel: sourceChannel, forEdits: false, ct: ct);
+        IMessageChannel? logChannel = await scope.GetLogChannelAsync(
+            guildId: guildChannel.GuildId,
+            sourceChannel: sourceChannel,
+            forEdits: false,
+            ct: ct);
 
         if (logChannel is null)
             return false;
@@ -129,6 +134,7 @@ public sealed class ModerationLogPublisher(
             soleAuthorId: soleAuthorId,
             deletedAt: deletedAt,
             ct: ct);
+
         var timestamp = ModerationLogComponents.FormatTimestamp(deletedAt);
 
         var text = moderatorId is { } actorId
@@ -136,10 +142,10 @@ public sealed class ModerationLogPublisher(
             : $"Bulk delete in <#{sourceChannel.Id}> at {timestamp}. Moderator could not be determined.";
 
         ImmutableArray<CachedMessageSnapshot> retained = messages
-           .Where(message => message.ExpiresAtUtc > DateTimeOffset.UtcNow)
-           .OrderBy(message => message.CreatedAtUtc)
-           .ThenBy(message => message.MessageId)
-           .ToImmutableArray();
+            .Where(message => message.ExpiresAtUtc > DateTimeOffset.UtcNow)
+            .OrderBy(message => message.CreatedAtUtc)
+            .ThenBy(message => message.MessageId)
+            .ToImmutableArray();
 
         if (retained.IsEmpty)
             return false;
@@ -147,11 +153,11 @@ public sealed class ModerationLogPublisher(
         Dictionary<ulong, string> usernames = new Dictionary<ulong, string>();
 
         var authors = retained
-           .Select(message => message.AuthorId)
-           .Distinct()
-           .ToArray();
+            .Select(message => message.AuthorId)
+            .Distinct()
+            .ToArray();
 
-        using var usernameTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        using CancellationTokenSource usernameTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         usernameTimeout.CancelAfter(TimeSpan.FromSeconds(10));
 
         foreach (var authorId in authors)
@@ -159,7 +165,7 @@ public sealed class ModerationLogPublisher(
             IUser? author = client.GetUser(authorId);
 
             if (author is null && !usernameTimeout.IsCancellationRequested)
-            {
+
                 try
                 {
                     author = await client.Rest.GetUserAsync(
@@ -174,20 +180,20 @@ public sealed class ModerationLogPublisher(
                 {
                     _logger.Warning("Bulk deletion author lookup failed for {AuthorId}: {ExceptionType}", authorId, exception.GetType().Name);
                 }
-            }
+
 
             usernames[authorId] = author?.Username ?? authorId.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         (DateTimeOffset CreatedAtUtc, string Name, string, string Content)[] rows = retained
-           .Where(message => message.ExpiresAtUtc > DateTimeOffset.UtcNow)
-           .Select(message => (message.CreatedAtUtc, sourceChannel.Name, usernames[message.AuthorId], message.Content))
-           .ToArray();
+            .Where(message => message.ExpiresAtUtc > DateTimeOffset.UtcNow)
+            .Select(message => (message.CreatedAtUtc, sourceChannel.Name, usernames[message.AuthorId], message.Content))
+            .ToArray();
 
         if (rows.Length == 0)
             return false;
 
-        var transcript = new DownloadedAttachment("bulk-delete.txt", "text/plain; charset=utf-8", BulkDeleteTranscript.Create(rows));
+        DownloadedAttachment transcript = new DownloadedAttachment("bulk-delete.txt", "text/plain; charset=utf-8", BulkDeleteTranscript.Create(rows));
 
         await SendLogAsync(logChannel: logChannel, [transcript], ct: ct, text: text);
 
@@ -202,8 +208,8 @@ public sealed class ModerationLogPublisher(
         MessageComponent? components = null)
     {
         ct.ThrowIfCancellationRequested();
-        var flags = components is null ? MessageFlags.SuppressNotification : CompactLogMessageFlags;
-        var request = new RequestOptions { CancelToken = ct };
+        MessageFlags flags = components is null ? MessageFlags.SuppressNotification : CompactLogMessageFlags;
+        RequestOptions request = new RequestOptions { CancelToken = ct };
 
         if (attachments.Count == 0)
         {
@@ -223,8 +229,8 @@ public sealed class ModerationLogPublisher(
         {
             files.AddRange(
                 attachments.Select(attachment => new FileAttachment(
-                                       stream: new MemoryStream(buffer: attachment.Bytes, writable: false),
-                                       fileName: attachment.FileName)));
+                    stream: new MemoryStream(buffer: attachment.Bytes, writable: false),
+                    fileName: attachment.FileName)));
 
             await logChannel.SendFilesAsync(
                 attachments: files,
@@ -236,7 +242,7 @@ public sealed class ModerationLogPublisher(
         }
         finally
         {
-            foreach (var file in files)
+            foreach (FileAttachment file in files)
                 file.Dispose();
         }
     }
@@ -253,9 +259,9 @@ public sealed class ModerationLogPublisher(
         var remainingBytes = MaxUploadAttachmentBytes - uploadedBytes;
 
         IEnumerable<MessageAttachment> candidates = deletedMessage.Attachments
-           .Take(_options.MaxAttachmentCountPerMessage);
+            .Take(_options.MaxAttachmentCountPerMessage);
 
-        foreach (var attachment in candidates)
+        foreach (MessageAttachment attachment in candidates)
         {
             var uploadLimitReached = attachments.Count >= MaxUploadAttachmentCount || remainingBytes <= 0 || ct.IsCancellationRequested;
 
@@ -299,18 +305,18 @@ public sealed class ModerationLogPublisher(
 
     private async Task<string?> TryGetPrecedingMessageJumpUrlAsync(IMessageChannel sourceChannel, ulong deletedMessageId, CancellationToken ct)
     {
-        using var lookupTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        using CancellationTokenSource lookupTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         lookupTimeout.CancelAfter(TimeSpan.FromSeconds(2));
 
         try
         {
-            var request = new RequestOptions { CancelToken = lookupTimeout.Token };
+            RequestOptions request = new RequestOptions { CancelToken = lookupTimeout.Token };
 
             IEnumerable<IMessage> messages = await sourceChannel
-               .GetMessagesAsync(fromMessageId: deletedMessageId, dir: Direction.Before, limit: 1, options: request)
-               .FlattenAsync();
+                .GetMessagesAsync(fromMessageId: deletedMessageId, dir: Direction.Before, limit: 1, options: request)
+                .FlattenAsync();
 
-            var precedingMessage = messages.FirstOrDefault();
+            IMessage? precedingMessage = messages.FirstOrDefault();
 
             return precedingMessage?.GetJumpUrl();
         }

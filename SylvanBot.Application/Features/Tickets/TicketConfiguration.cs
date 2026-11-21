@@ -23,9 +23,9 @@ public sealed class TicketConfiguration
     public int ReminderIntervalSeconds { get; set; } = 86400;
 
     public ulong PublicationChannel(Ticket ticket) => ticket.Publications
-        .OrderByDescending(publication => publication.MessageId)
-        .Select(publication => (ulong?)publication.ChannelId)
-        .FirstOrDefault()
-        ?? DestinationChannelId
-        ?? throw new InvalidOperationException("Tickets have no configured destination.");
+                                                          .OrderByDescending(publication => publication.MessageId)
+                                                          .Select(publication => (ulong?)publication.ChannelId)
+                                                          .FirstOrDefault()
+                                                      ?? DestinationChannelId
+                                                      ?? throw new InvalidOperationException("Tickets have no configured destination.");
 }

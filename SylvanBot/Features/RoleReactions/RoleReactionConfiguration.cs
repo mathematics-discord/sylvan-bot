@@ -35,12 +35,12 @@ public sealed class RoleReactionConfiguration(
         if (parsedEmoji is not { HasValue: true, Value: var emote })
             return "Provide one Unicode emoji or a custom emoji mention.";
 
-        var gate = runtime.ForGuild(guild.Id);
+        SemaphoreSlim gate = runtime.ForGuild(guild.Id);
         await gate.WaitAsync(ct);
 
         try
         {
-            var role = guild.GetRole(roleId);
+            SocketRole? role = guild.GetRole(roleId);
 
             if (role is null)
                 return "The target must be an existing, ordinary role other than @everyone.";
@@ -53,8 +53,8 @@ public sealed class RoleReactionConfiguration(
             if (moderator.Id != guild.OwnerId && moderator.Hierarchy <= role.Position)
                 return "The target role must be below your highest role.";
 
-            var request = new RequestOptions { CancelToken = ct };
-            var channel = await ReadChannelAsync(guildId: guild.Id, channelId: link.ChannelId, request: request);
+            RequestOptions request = new RequestOptions { CancelToken = ct };
+            IMessageChannel? channel = await ReadChannelAsync(guildId: guild.Id, channelId: link.ChannelId, request: request);
 
             if (channel is not IGuildChannel guildChannel)
                 return "The linked channel is unavailable or does not belong to this server.";
@@ -64,7 +64,7 @@ public sealed class RoleReactionConfiguration(
             if (channelError is { HasValue: true, Value: var channelReason })
                 return channelReason;
 
-            var message = await channel.GetMessageAsync(id: link.MessageId, options: request);
+            IMessage? message = await channel.GetMessageAsync(id: link.MessageId, options: request);
 
             if (message is null)
                 return "The linked message could not be found.";
@@ -99,16 +99,16 @@ public sealed class RoleReactionConfiguration(
         if (parsedEmoji is not { HasValue: true, Value: var emote })
             return "Provide one Unicode emoji or a custom emoji mention.";
 
-        var gate = runtime.ForGuild(guild.Id);
+        SemaphoreSlim gate = runtime.ForGuild(guild.Id);
         await gate.WaitAsync(ct);
 
         try
         {
             var emojiKey = GetEmojiKey(emote);
-            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            await using BotDbContext db = await contextFactory.CreateDbContextAsync(ct);
 
-            var mapping = await db.RoleReactions
-               .SingleOrDefaultAsync(
+            RoleReaction? mapping = await db.RoleReactions
+                .SingleOrDefaultAsync(
                     mapping =>
                         mapping.GuildId == guild.Id
                         && mapping.ChannelId == link.ChannelId
@@ -134,10 +134,10 @@ public sealed class RoleReactionConfiguration(
     {
         try
         {
-            var request = new RequestOptions { CancelToken = ct };
-            var channel = await ReadChannelAsync(guildId: mapping.GuildId, channelId: mapping.ChannelId, request: request);
-            var message = channel is null ? null : await channel.GetMessageAsync(id: mapping.MessageId, options: request);
-            var configuredEmote = ParseEmoji(mapping.EmojiText) is { HasValue: true, Value: var savedEmote } ? savedEmote : emote;
+            RequestOptions request = new RequestOptions { CancelToken = ct };
+            IMessageChannel? channel = await ReadChannelAsync(guildId: mapping.GuildId, channelId: mapping.ChannelId, request: request);
+            IMessage? message = channel is null ? null : await channel.GetMessageAsync(id: mapping.MessageId, options: request);
+            IEmote configuredEmote = ParseEmoji(mapping.EmojiText) is { HasValue: true, Value: var savedEmote } ? savedEmote : emote;
 
             if (message is not null)
                 await message.RemoveAllReactionsForEmoteAsync(emote: configuredEmote, options: request);
@@ -178,12 +178,13 @@ public sealed class RoleReactionConfiguration(
         CancellationToken ct)
     {
         var emojiKey = GetEmojiKey(emote);
-        await using var db = await contextFactory.CreateDbContextAsync(ct);
+        await using BotDbContext db = await contextFactory.CreateDbContextAsync(ct);
 
-        var mapping = await db.RoleReactions
-           .SingleOrDefaultAsync(
+        RoleReaction? mapping = await db.RoleReactions
+            .SingleOrDefaultAsync(
                 mapping => mapping.GuildId == guildId && mapping.MessageId == message.Id && mapping.EmojiKey == emojiKey,
                 cancellationToken: ct);
+
         var conflicts = mapping is not null && (mapping.RoleId != roleId || mapping.ChannelId != message.Channel.Id);
 
         if (conflicts)

@@ -32,7 +32,7 @@ public sealed class MessageCacheSamplingWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
+        using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromMinutes(5));
 
         try
         {
@@ -43,7 +43,7 @@ public sealed class MessageCacheSamplingWorker(
 
                 try
                 {
-                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                    using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
                     timeout.CancelAfter(TimeSpan.FromSeconds(30));
 
                     if (_initiallyReady && client.ConnectionState == ConnectionState.Connected)
@@ -75,7 +75,7 @@ public sealed class MessageCacheSamplingWorker(
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        statistics.TryGetValue((guildId, channel.Id), out var measurement);
+        statistics.TryGetValue((guildId, channel.Id), out CachedChannelStatistics? measurement);
 
         return new ChannelMeasurement(
             guildId.ToString(CultureInfo.InvariantCulture),
@@ -104,7 +104,7 @@ public sealed class MessageCacheSamplingWorker(
         Queue<ChannelMeasurement> measurements = [];
         long cachedGuildMembers = 0;
 
-        foreach (var guild in client.Guilds)
+        foreach (SocketGuild guild in client.Guilds)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -117,11 +117,11 @@ public sealed class MessageCacheSamplingWorker(
             cachedGuildMembers += guild.Users.Count;
 
             IEnumerable<ISocketMessageChannel> channels = guild
-               .Channels.Concat(guild.ThreadChannels)
-               .DistinctBy(channel => channel.Id)
-               .OfType<ISocketMessageChannel>();
+                .Channels.Concat(guild.ThreadChannels)
+                .DistinctBy(channel => channel.Id)
+                .OfType<ISocketMessageChannel>();
 
-            foreach (var channel in channels)
+            foreach (ISocketMessageChannel channel in channels)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -145,9 +145,9 @@ public sealed class MessageCacheSamplingWorker(
         var populatedChannels = channels.Count(channel => channel.CachedMessageCount > 0);
         var totalCachedMessages = channels.Sum(channel => (long)channel.CachedMessageCount);
 
-        using var process = Process.GetCurrentProcess();
+        using Process process = Process.GetCurrentProcess();
         var workingSetBytes = process.WorkingSet64;
-        var uptime = DateTime.UtcNow - process.StartTime.ToUniversalTime();
+        TimeSpan uptime = DateTime.UtcNow - process.StartTime.ToUniversalTime();
         var collectedAtUtc = DateTimeOffset.UtcNow.ToString("u", formatProvider: CultureInfo.InvariantCulture);
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -155,19 +155,19 @@ public sealed class MessageCacheSamplingWorker(
         if (client.ConnectionState != ConnectionState.Connected)
             return;
 
-        var snapshotLogger = _logger
-           .ForContext("ProcessRunId", value: _processRunId)
-           .ForContext("CollectedAtUtc", value: collectedAtUtc)
-           .ForContext("RetentionHours", value: 24)
-           .ForContext("CacheReady", value: cache.Ready)
-           .ForContext("HandlingFailures", value: loggingHandler.Failures)
-           .ForContext("MaintenanceFailures", value: maintenance.Failures)
-           .ForContext("SampledChannelCount", value: channels.Count)
-           .ForContext("PopulatedChannelCount", value: populatedChannels)
-           .ForContext("TotalCachedMessages", value: totalCachedMessages)
-           .ForContext("CachedGuildMemberCount", value: cachedGuildMembers)
-           .ForContext("ProcessWorkingSetBytes", value: workingSetBytes)
-           .ForContext("ProcessUptime", value: uptime);
+        ILogger snapshotLogger = _logger
+            .ForContext("ProcessRunId", value: _processRunId)
+            .ForContext("CollectedAtUtc", value: collectedAtUtc)
+            .ForContext("RetentionHours", value: 24)
+            .ForContext("CacheReady", value: cache.Ready)
+            .ForContext("HandlingFailures", value: loggingHandler.Failures)
+            .ForContext("MaintenanceFailures", value: maintenance.Failures)
+            .ForContext("SampledChannelCount", value: channels.Count)
+            .ForContext("PopulatedChannelCount", value: populatedChannels)
+            .ForContext("TotalCachedMessages", value: totalCachedMessages)
+            .ForContext("CachedGuildMemberCount", value: cachedGuildMembers)
+            .ForContext("ProcessWorkingSetBytes", value: workingSetBytes)
+            .ForContext("ProcessUptime", value: uptime);
 
         snapshotLogger.ForContext("MessageCacheSample", value: true).Debug("Message-cache snapshot: {@Channels}", propertyValue: channels);
 

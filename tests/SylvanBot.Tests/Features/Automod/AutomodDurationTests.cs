@@ -73,10 +73,10 @@ public sealed class AutomodDurationTests
     public void MuteExpiry_ValidDuration_UsesRequestedSeconds(long seconds)
     {
         // Arrange
-        var now = new DateTimeOffset(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);
+        DateTimeOffset now = new DateTimeOffset(2026, 11, 2, 12, 0, 0, TimeSpan.Zero);
 
         // Act
-        var expiry = AutomodDuration.MuteExpiry(new Optional<long>(seconds), now);
+        DateTimeOffset expiry = AutomodDuration.MuteExpiry(new Optional<long>(seconds), now);
 
         // Assert
         expiry.ShouldBe(now.AddSeconds(seconds));
@@ -105,7 +105,7 @@ public sealed class AutomodDurationTests
     public void CoversExpiry_ObservedTimeout_PreservesEqualOrLongerExpiry(int offsetSeconds, bool expected)
     {
         // Arrange
-        var requested = DateTimeOffset.UnixEpoch.AddHours(1);
+        DateTimeOffset requested = DateTimeOffset.UnixEpoch.AddHours(1);
         Optional<DateTimeOffset> existing = new Optional<DateTimeOffset>(requested.AddSeconds(offsetSeconds));
 
         // Act / Assert

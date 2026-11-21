@@ -11,7 +11,11 @@ public sealed class SylvanMailDeliveryOutcomeTests
         Optional<string> refusal = default;
 
         // Act
-        var outcome = SylvanMailDeliveryOutcome.FromFailure(confirmedParts: 2, uncertainDelivery: true, uncertainPost: false, refusal: refusal);
+        SylvanMailDeliveryOutcome outcome = SylvanMailDeliveryOutcome.FromFailure(
+            confirmedParts: 2,
+            uncertainDelivery: true,
+            uncertainPost: false,
+            refusal: refusal);
 
         // Assert
         outcome.State.ShouldBe("Uncertain");
@@ -25,7 +29,11 @@ public sealed class SylvanMailDeliveryOutcomeTests
         Optional<string> refusal = new Optional<string>("Discord refused this part.");
 
         // Act
-        var outcome = SylvanMailDeliveryOutcome.FromFailure(confirmedParts: 1, uncertainDelivery: true, uncertainPost: false, refusal: refusal);
+        SylvanMailDeliveryOutcome outcome = SylvanMailDeliveryOutcome.FromFailure(
+            confirmedParts: 1,
+            uncertainDelivery: true,
+            uncertainPost: false,
+            refusal: refusal);
 
         // Assert
         outcome.State.ShouldBe("Partial");
@@ -39,7 +47,11 @@ public sealed class SylvanMailDeliveryOutcomeTests
         Optional<string> refusal = default;
 
         // Act
-        var outcome = SylvanMailDeliveryOutcome.FromFailure(confirmedParts: 0, uncertainDelivery: false, uncertainPost: true, refusal: refusal);
+        SylvanMailDeliveryOutcome outcome = SylvanMailDeliveryOutcome.FromFailure(
+            confirmedParts: 0,
+            uncertainDelivery: false,
+            uncertainPost: true,
+            refusal: refusal);
 
         // Assert
         outcome.State.ShouldBe("Uncertain");
@@ -53,7 +65,11 @@ public sealed class SylvanMailDeliveryOutcomeTests
         Optional<string> refusal = default;
 
         // Act
-        var outcome = SylvanMailDeliveryOutcome.FromFailure(confirmedParts: 0, uncertainDelivery: false, uncertainPost: false, refusal: refusal);
+        SylvanMailDeliveryOutcome outcome = SylvanMailDeliveryOutcome.FromFailure(
+            confirmedParts: 0,
+            uncertainDelivery: false,
+            uncertainPost: false,
+            refusal: refusal);
 
         // Assert
         outcome.State.ShouldBe("Unpublished");

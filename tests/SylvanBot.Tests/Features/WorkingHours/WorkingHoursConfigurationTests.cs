@@ -14,7 +14,7 @@ public sealed class WorkingHoursConfigurationTests
     public void DesiredPingRole_GlobalDisable_IgnoresSavedSchedule(bool exempt, bool scheduled, bool active, bool? expected)
     {
         // Arrange
-        var settings = new WorkingHoursSettings { Enabled = false };
+        WorkingHoursSettings settings = new WorkingHoursSettings { Enabled = false };
 
         // Act
         Optional<bool> desired = settings.DesiredPingRole(eligible: true, exempt: exempt, scheduleEnabled: scheduled, active: active);
@@ -27,7 +27,7 @@ public sealed class WorkingHoursConfigurationTests
     public void ChangeRoles_InvalidRelationships_PreservesSettings()
     {
         // Arrange
-        var settings = new WorkingHoursSettings { GuildId = 123 };
+        WorkingHoursSettings settings = new WorkingHoursSettings { GuildId = 123 };
         settings.SetPingRole(10).IsSuccessful.ShouldBeTrue();
         settings.ChangeEligibleRole(roleId: 20, add: true).IsSuccessful.ShouldBeTrue();
         settings.ChangeExemptRole(roleId: 20, add: true).IsSuccessful.ShouldBeTrue();
@@ -44,7 +44,7 @@ public sealed class WorkingHoursConfigurationTests
         settings.PingRoleId.ShouldBe(10UL);
         settings.EligibleRoles.Count.ShouldBe(1);
 
-        var role = settings.EligibleRoles.Single();
+        WorkingHoursEligibleRole role = settings.EligibleRoles.Single();
         role.RoleId.ShouldBe(20UL);
         role.IsExempt.ShouldBeTrue();
         settings.IsComplete.ShouldBeTrue();
@@ -54,7 +54,7 @@ public sealed class WorkingHoursConfigurationTests
     public void ChangeRoles_EnabledGuild_RequiresDisablingBeforeTargetOrLastEligibilityRemoval()
     {
         // Arrange
-        var settings = new WorkingHoursSettings { GuildId = 123 };
+        WorkingHoursSettings settings = new WorkingHoursSettings { GuildId = 123 };
         settings.SetPingRole(10);
         settings.ChangeEligibleRole(roleId: 20, add: true);
         settings.Enabled = true;
@@ -75,15 +75,16 @@ public sealed class WorkingHoursConfigurationTests
     public void DesiredPingRole_ReenabledGuild_ResumesSavedScheduleAtCurrentTime()
     {
         // Arrange
-        var settings = new WorkingHoursSettings { Enabled = false };
-        var preference = new WorkingHoursPreference(guildId: 123, memberId: 456);
+        WorkingHoursSettings settings = new WorkingHoursSettings { Enabled = false };
+        WorkingHoursPreference preference = new WorkingHoursPreference(guildId: 123, memberId: 456);
         preference.EnableSchedule(WorkingHoursTimeParser.Parse("09:00:00Z", "17:00:00Z", timezone: null).Value);
-        var now = new DateTimeOffset(year: 2026, month: 10, day: 28, hour: 18, minute: 0, second: 0, offset: TimeSpan.Zero);
+        DateTimeOffset now = new DateTimeOffset(year: 2026, month: 10, day: 28, hour: 18, minute: 0, second: 0, offset: TimeSpan.Zero);
         var active = preference.Window!.IsActive(now);
 
         // Act / Assert
         settings.DesiredPingRole(eligible: true, exempt: false, scheduleEnabled: preference.Enabled, active: active)
             .ShouldBe(new Optional<bool>(true));
+
         preference.Enabled.ShouldBeTrue();
         settings.Enabled = true;
 
@@ -95,7 +96,7 @@ public sealed class WorkingHoursConfigurationTests
     public void DisableSchedule_ConfirmedLoss_RetainsWindowWithoutReactivatingOnReappointment()
     {
         // Arrange
-        var preference = new WorkingHoursPreference(guildId: 123, memberId: 456);
+        WorkingHoursPreference preference = new WorkingHoursPreference(guildId: 123, memberId: 456);
         preference.EnableSchedule(WorkingHoursTimeParser.Parse("22:00:00.123456789Z", "07:00:00Z", timezone: null).Value);
 
         // Act
@@ -104,10 +105,11 @@ public sealed class WorkingHoursConfigurationTests
         // Assert
         preference.Enabled.ShouldBeFalse();
         preference.Window!.StartText.ShouldBe("22:00:00.123456789");
-        var settings = new WorkingHoursSettings { Enabled = true };
+        WorkingHoursSettings settings = new WorkingHoursSettings { Enabled = true };
 
         settings.DesiredPingRole(eligible: true, exempt: false, scheduleEnabled: preference.Enabled, active: false)
             .ShouldBe(new Optional<bool>(true));
+
         settings.DesiredPingRole(eligible: true, exempt: true, scheduleEnabled: preference.Enabled, active: false).HasValue.ShouldBeFalse();
     }
 }

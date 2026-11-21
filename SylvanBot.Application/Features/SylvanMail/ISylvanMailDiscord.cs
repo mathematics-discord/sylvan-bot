@@ -14,7 +14,12 @@ public interface ISylvanMailDiscord
 
     Task SendTicketListAsync(ulong guildId, ulong threadId, ulong userId, CancellationToken ct);
 
-    Task<ulong> SendAttachmentAsync(SylvanMailDestination destination, SylvanMailAttachment attachment, byte[] bytes, string label, CancellationToken ct);
+    Task<ulong> SendAttachmentAsync(
+        SylvanMailDestination destination,
+        SylvanMailAttachment attachment,
+        byte[] bytes,
+        string label,
+        CancellationToken ct);
 
     Task<byte[]> DownloadAsync(SylvanMailAttachment attachment, CancellationToken ct);
 

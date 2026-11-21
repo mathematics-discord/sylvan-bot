@@ -23,6 +23,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
             RatelimitCallback = info =>
             {
                 if (info.Remaining == 0 || info.IsGlobal)
+
                     logger.Debug(
                         "SylvanMail reaction request exhausted rate bucket {Bucket}: limit {Limit}, remaining {Remaining}, reset after {ResetAfterMs} ms, retry after {RetryAfter}, global {Global}, estimated lag {LagMs} ms",
                         info.Bucket,
@@ -33,6 +34,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
                         info.IsGlobal,
                         info.Lag?.TotalMilliseconds);
 
+
                 return Task.CompletedTask;
             },
         };
@@ -40,9 +42,9 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
     public static SylvanMailMessage ReadMessage(IUserMessage source, ulong? guildId)
     {
         ImmutableArray<SylvanMailAttachment> attachments = source
-           .Attachments
-           .Select(item => new SylvanMailAttachment(Url: item.Url, Filename: item.Filename, Size: item.Size, item.IsSpoiler()))
-           .ToImmutableArray();
+            .Attachments
+            .Select(item => new SylvanMailAttachment(Url: item.Url, Filename: item.Filename, Size: item.Size, item.IsSpoiler()))
+            .ToImmutableArray();
 
         var unsupported =
             source.Stickers.Count > 0
@@ -71,12 +73,12 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         SylvanMailDraftAction action,
         CancellationToken ct)
     {
-        var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
+        IMessageChannel channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
 
         if (channel is not IThreadChannel thread)
             return default;
 
-        var fetched = await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, ReactionOptions(ct));
+        IMessage fetched = await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, ReactionOptions(ct));
 
         if (fetched is not IUserMessage source)
             return default;
@@ -90,13 +92,13 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         var control = action == SylvanMailDraftAction.SendSigned ? SignedEmoji
             : action == SylvanMailDraftAction.Cancel ? CancelEmoji : AnonymousEmoji;
 
-        var hasMarker = source.Reactions.TryGetValue(new Emoji(control), out var reaction) && reaction.IsMe;
+        var hasMarker = source.Reactions.TryGetValue(new Emoji(control), out ReactionMetadata reaction) && reaction.IsMe;
 
         if (action != SylvanMailDraftAction.Update && !hasMarker)
             return default;
 
         var content = source.Content ?? string.Empty;
-        var reply = SylvanMailReply.Parse(content: content, botId: client.CurrentUser.Id, replyToBot: false, replyPingEnabled: false);
+        SylvanMailReply? reply = SylvanMailReply.Parse(content: content, botId: client.CurrentUser.Id, replyToBot: false, replyPingEnabled: false);
         var hasReplyPing = source.Type == MessageType.Reply && source.MentionedUserIds.Contains(client.CurrentUser.Id);
 
         // A body mention prepares a draft without needing the referenced message.
@@ -106,7 +108,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
             if (!replyToBot && source.Reference?.MessageId.IsSpecified == true)
             {
-                var referenced = await channel.GetMessageAsync(
+                IMessage? referenced = await channel.GetMessageAsync(
                     id: source.Reference.MessageId.Value,
                     mode: CacheMode.AllowDownload,
                     ReactionOptions(ct));
@@ -127,36 +129,32 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
         var prefix = action != SylvanMailDraftAction.SendSigned ? "From staff: " : $"From {Format.Sanitize(source.Author.Username)}: ";
 
         return new Optional<SylvanMailMessage>(
-            ReadMessage(source: source, guildId: thread.GuildId) with
-            {
-                Content = reply.Content,
-                OutboundPrefix = prefix,
-            });
+            ReadMessage(source: source, guildId: thread.GuildId) with { Content = reply.Content, OutboundPrefix = prefix });
     }
 
     public async Task SetDraftReadyAsync(ulong threadId, ulong messageId, bool ready, CancellationToken ct)
     {
-        using var timing = new OperationTiming(logger.ForContext("SourceId", messageId), "sylvanmail.draft_controls", "channel");
+        using OperationTiming timing = new OperationTiming(logger.ForContext("SourceId", messageId), "sylvanmail.draft_controls", "channel");
 
         try
         {
-            var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
+            IMessageChannel channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
             timing.Next("message");
 
             if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, ReactionOptions(ct)) is not IUserMessage message)
                 return;
 
-            var oldSend = new Emoji("\U0001F4E4");
+            Emoji oldSend = new Emoji("\U0001F4E4");
             timing.Next("reactions");
             List<Task> changes = [];
 
-            if (message.Reactions.TryGetValue(oldSend, out var oldReaction) && oldReaction.IsMe)
+            if (message.Reactions.TryGetValue(oldSend, out ReactionMetadata oldReaction) && oldReaction.IsMe)
                 changes.Add(ChangeReactionAsync(oldSend, add: false));
 
             foreach (var control in new[] { AnonymousEmoji, SignedEmoji, CancelEmoji })
             {
-                var emoji = new Emoji(control);
-                var marked = message.Reactions.TryGetValue(key: emoji, out var reaction) && reaction.IsMe;
+                Emoji emoji = new Emoji(control);
+                var marked = message.Reactions.TryGetValue(key: emoji, out ReactionMetadata reaction) && reaction.IsMe;
 
                 if (ready == marked)
                     continue;
@@ -168,13 +166,19 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
             async Task ChangeReactionAsync(Emoji emoji, bool add)
             {
-                using var reactionTiming = new OperationTiming(logger
-                    .ForContext("SourceId", messageId)
-                    .ForContext("Control", emoji.Name), "sylvanmail.draft_reaction", add ? "add" : "remove");
+                using OperationTiming reactionTiming = new OperationTiming(
+                    logger
+                        .ForContext("SourceId", messageId)
+                        .ForContext("Control", emoji.Name),
+                    "sylvanmail.draft_reaction",
+                    add ? "add" : "remove");
 
                 if (add)
+
                     await message.AddReactionAsync(emote: emoji, ReactionOptions(ct));
+
                 else
+
                     await message.RemoveReactionAsync(emote: emoji, userId: client.CurrentUser.Id, ReactionOptions(ct));
             }
         }
@@ -186,7 +190,7 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
     public async Task ClearReactionsAsync(ulong threadId, ulong messageId, CancellationToken ct)
     {
-        var channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
+        IMessageChannel channel = await MessageChannelAsync(client: client, channelId: threadId, ct: ct, retryMode: RetryMode.RetryRatelimit);
 
         if (await channel.GetMessageAsync(id: messageId, mode: CacheMode.AllowDownload, ReactionOptions(ct)) is IUserMessage message)
             await message.RemoveAllReactionsAsync(ReactionOptions(ct));
@@ -194,11 +198,19 @@ public sealed class SylvanMailDrafts(DiscordSocketClient client, ILogger logger)
 
     public async Task MarkDeliveredAsync(SylvanMailMessage message, CancellationToken ct)
     {
-        using var timing = new OperationTiming(logger.ForContext("SourceId", message.SourceMessageId), "sylvanmail.delivered_marker", "channel");
+        using OperationTiming timing = new OperationTiming(
+            logger.ForContext("SourceId", message.SourceMessageId),
+            "sylvanmail.delivered_marker",
+            "channel");
 
         try
         {
-            var channel = await MessageChannelAsync(client: client, channelId: message.SourceChannelId, ct: ct, retryMode: RetryMode.RetryRatelimit);
+            IMessageChannel channel = await MessageChannelAsync(
+                client: client,
+                channelId: message.SourceChannelId,
+                ct: ct,
+                retryMode: RetryMode.RetryRatelimit);
+
             timing.Next("message");
 
             if (await channel.GetMessageAsync(id: message.SourceMessageId, mode: CacheMode.AllowDownload, ReactionOptions(ct)) is IUserMessage source)

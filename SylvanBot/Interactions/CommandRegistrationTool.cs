@@ -1,4 +1,4 @@
-using Discord.Rest;
+﻿using Discord.Rest;
 
 namespace SylvanBot.Interactions;
 
@@ -60,18 +60,20 @@ internal static class CommandRegistrationTool
 
         try
         {
-            await using var client = new DiscordRestClient();
+            await using DiscordRestClient client = new DiscordRestClient();
             await client.LoginAsync(tokenType: TokenType.Bot, token: token);
             Console.WriteLine($"Authenticated as {client.CurrentUser.Username} ({client.CurrentUser.Id}).");
 
             if (global)
-            {
+
                 try
                 {
                     IReadOnlyCollection<RestGlobalCommand> commands = await client.GetGlobalApplicationCommands(true);
 
                     if (string.Equals(a: action, "inspect", comparisonType: StringComparison.Ordinal))
+
                         PrintCommands("global", commands: commands);
+
                     else
                     {
                         IReadOnlyCollection<RestGlobalCommand> remaining = await client.BulkOverwriteGlobalCommands([]);
@@ -90,11 +92,12 @@ internal static class CommandRegistrationTool
 
                     return 1;
                 }
-            }
+
 
             var failed = false;
 
             foreach (var guildId in guildIds)
+
                 try
                 {
                     IReadOnlyCollection<RestGuildCommand> commands = await client.GetGuildApplicationCommands(
@@ -103,7 +106,9 @@ internal static class CommandRegistrationTool
                     );
 
                     if (string.Equals(a: action, "inspect", comparisonType: StringComparison.Ordinal))
+
                         PrintCommands($"guild {guildId}", commands: commands);
+
                     else
                     {
                         IReadOnlyCollection<RestGuildCommand> remaining = await client.BulkOverwriteGuildCommands([], guildId: guildId);
@@ -121,6 +126,7 @@ internal static class CommandRegistrationTool
                     failed = true;
                 }
 
+
             return failed ? 1 : 0;
         }
         catch (Exception ex)
@@ -135,7 +141,7 @@ internal static class CommandRegistrationTool
     {
         Console.WriteLine($"{scope}: {commands.Count} application commands.");
 
-        foreach (var command in commands.OrderBy(command => command.Name, comparer: StringComparer.Ordinal))
+        foreach (IApplicationCommand? command in commands.OrderBy(command => command.Name, comparer: StringComparer.Ordinal))
         {
             Console.WriteLine($"  {command.Type} {command.Name} ({command.Id}): {command.Description}");
 
@@ -146,7 +152,7 @@ internal static class CommandRegistrationTool
 
     private static void PrintOptions(IEnumerable<IApplicationCommandOption> options, string indent)
     {
-        foreach (var option in options)
+        foreach (IApplicationCommandOption option in options)
         {
             Console.WriteLine($"{indent}{option.Type} {option.Name} (required: {option.IsRequired}): {option.Description}");
 

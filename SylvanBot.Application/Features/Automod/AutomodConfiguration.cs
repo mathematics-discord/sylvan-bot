@@ -9,7 +9,11 @@ public sealed class AutomodConfiguration
     {
     }
 
-    public AutomodConfiguration(IEnumerable<AutomodRule> rules, IEnumerable<ulong> exemptRoleIds, IEnumerable<AutomodAction> disabledActions, bool enabled = true)
+    public AutomodConfiguration(
+        IEnumerable<AutomodRule> rules,
+        IEnumerable<ulong> exemptRoleIds,
+        IEnumerable<AutomodAction> disabledActions,
+        bool enabled = true)
     {
         ImmutableHashSet<AutomodAction> disabled = disabledActions.ToImmutableHashSet();
 

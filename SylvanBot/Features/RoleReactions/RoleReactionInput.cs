@@ -12,7 +12,7 @@ internal static class RoleReactionInput
             return "custom:" + custom.Id.ToString(CultureInfo.InvariantCulture);
 
         var unicode = emote.Name.Replace("\uFE0E", newValue: string.Empty, comparisonType: StringComparison.Ordinal)
-           .Replace("\uFE0F", newValue: string.Empty, comparisonType: StringComparison.Ordinal);
+            .Replace("\uFE0F", newValue: string.Empty, comparisonType: StringComparison.Ordinal);
 
         return "unicode:" + unicode;
     }
@@ -24,7 +24,7 @@ internal static class RoleReactionInput
         if (input.Length is 0 or > 128)
             return default;
 
-        if (Emote.TryParse(text: input, out var custom))
+        if (Emote.TryParse(text: input, out Emote custom))
         {
             var validCustomEmoji = custom.Id != 0 && string.Equals(a: input, custom.ToString(), comparisonType: StringComparison.Ordinal);
 
@@ -34,12 +34,12 @@ internal static class RoleReactionInput
         if (StringInfo.ParseCombiningCharacters(input).Length != 1)
             return default;
 
-        return Emoji.TryParse(text: input, out var unicode) ? new Optional<IEmote>(unicode) : default;
+        return Emoji.TryParse(text: input, out Emoji unicode) ? new Optional<IEmote>(unicode) : default;
     }
 
     public static Optional<MessageLink> ParseMessageLink(string text, ulong guildId)
     {
-        if (!Uri.TryCreate(text.Trim(), uriKind: UriKind.Absolute, out var uri))
+        if (!Uri.TryCreate(text.Trim(), uriKind: UriKind.Absolute, out Uri? uri))
             return default;
 
         var discordHost = uri.Host is "discord.com" or "canary.discord.com" or "ptb.discord.com";

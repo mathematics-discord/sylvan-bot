@@ -11,7 +11,7 @@ public sealed class MessageCacheMaintenanceWorker(MessageSnapshotCache cache, IL
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
+        using PeriodicTimer timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
 
         try
         {
@@ -20,7 +20,7 @@ public sealed class MessageCacheMaintenanceWorker(MessageSnapshotCache cache, IL
                 if (!cache.Ready)
                     continue;
 
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
                 timeout.CancelAfter(TimeSpan.FromSeconds(30));
 
                 try

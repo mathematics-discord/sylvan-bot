@@ -1,4 +1,4 @@
-namespace SylvanBot.Features.Tickets;
+﻿namespace SylvanBot.Features.Tickets;
 
 using DotNext;
 using System.Globalization;
@@ -21,7 +21,7 @@ public sealed class TicketBoundary(
         DateTimeOffset boundary,
         CancellationToken cancellationToken)
     {
-        using var timing = new OperationTiming(logger.ForContext("GuildId", guildId), "ticket.audit_scan", "gate");
+        using OperationTiming timing = new OperationTiming(logger.ForContext("GuildId", guildId), "ticket.audit_scan", "gate");
         await _auditReadLock.WaitAsync(cancellationToken);
         timing.Next("audit_pages");
 
@@ -46,10 +46,10 @@ public sealed class TicketBoundary(
 
         while (true)
         {
-            using var page = await ReadAuditPageAsync(guildId, cursor, cancellationToken);
+            using JsonDocument page = await ReadAuditPageAsync(guildId, cursor, cancellationToken);
             HashSet<ulong> botIds = ReadBotIds(page.RootElement);
 
-            var entries = page.RootElement.GetProperty("audit_log_entries");
+            JsonElement entries = page.RootElement.GetProperty("audit_log_entries");
 
             if (entries.GetArrayLength() == 0)
                 break;
@@ -57,13 +57,13 @@ public sealed class TicketBoundary(
             var oldestId = ulong.MaxValue;
             var reachedBoundary = false;
 
-            foreach (var entry in entries.EnumerateArray())
-            {
+            foreach (JsonElement entry in entries.EnumerateArray())
+
                 try
                 {
                     var auditId = TicketAuditReader.RequiredId(entry, "id");
                     oldestId = Math.Min(oldestId, auditId);
-                    var createdAt = SnowflakeUtils.FromSnowflake(auditId);
+                    DateTimeOffset createdAt = SnowflakeUtils.FromSnowflake(auditId);
 
                     if (createdAt < boundary)
                     {
@@ -76,8 +76,8 @@ public sealed class TicketBoundary(
                 }
                 catch (Exception exception) when (exception is InvalidDataException or FormatException or JsonException)
                 {
-                    var audit = entry.TryGetProperty("id", out var id) ? id.ToString() : "missing";
-                    var action = entry.TryGetProperty("action_type", out var type) ? type.ToString() : "missing";
+                    var audit = entry.TryGetProperty("id", out JsonElement id) ? id.ToString() : "missing";
+                    var action = entry.TryGetProperty("action_type", out JsonElement type) ? type.ToString() : "missing";
 
                     logger.Error(
                         "Rejected audit entry {AuditId} in guild {GuildId}, action {Action}: {Failure}",
@@ -86,7 +86,7 @@ public sealed class TicketBoundary(
                         action,
                         exception.Message);
                 }
-            }
+
 
             if (entries.GetArrayLength() < 100 || reachedBoundary)
                 break;
@@ -103,8 +103,8 @@ public sealed class TicketBoundary(
         }
 
         ImmutableArray<TicketObservation> ordered = observations
-           .OrderBy(observation => observation.AuditId)
-           .ToImmutableArray();
+            .OrderBy(observation => observation.AuditId)
+            .ToImmutableArray();
 
         return new TicketAuditScan(lastAuditId, ordered);
     }
@@ -113,14 +113,13 @@ public sealed class TicketBoundary(
     {
         HashSet<ulong> botIds = [];
 
-        if (root.TryGetProperty("users", out var users))
-        {
-            foreach (var user in users.EnumerateArray())
-            {
-                if (user.TryGetProperty("bot", out var bot) && bot.GetBoolean())
+        if (root.TryGetProperty("users", out JsonElement users))
+
+            foreach (JsonElement user in users.EnumerateArray())
+
+                if (user.TryGetProperty("bot", out JsonElement bot) && bot.GetBoolean())
                     botIds.Add(TicketAuditReader.RequiredId(user, "id"));
-            }
-        }
+
 
         return botIds;
     }
@@ -134,14 +133,14 @@ public sealed class TicketBoundary(
 
         for (var attempt = 0;; attempt++)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            using HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, uri);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bot", discordOptions.Value.Token);
             request.Headers.UserAgent.ParseAdd("DiscordBot (https://github.com/mathematics-discord/sylvan-bot, 1.0)");
-            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using HttpResponseMessage response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
 
             if (response.StatusCode == HttpStatusCode.TooManyRequests && attempt < 3)
             {
-                using var rateLimit = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+                using JsonDocument rateLimit = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
                 var seconds = rateLimit.RootElement.GetProperty("retry_after").GetDouble();
 
                 if (!double.IsFinite(seconds) || seconds < 0 || seconds > 300)
@@ -152,7 +151,7 @@ public sealed class TicketBoundary(
             }
 
             response.EnsureSuccessStatusCode();
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             return await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
         }
     }
@@ -161,7 +160,7 @@ public sealed class TicketBoundary(
     {
         try
         {
-            var member = await GetMemberAsync(guildId, userId, token);
+            IGuildUser? member = await GetMemberAsync(guildId, userId, token);
             return member is not null && (member.GuildPermissions.Administrator || member.GuildPermissions.ViewAuditLog);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -173,8 +172,12 @@ public sealed class TicketBoundary(
 
     public async Task<TicketActor> GetActorAsync(ulong guildId, ulong userId, CancellationToken cancellationToken)
     {
-        using var timing = new OperationTiming(logger.ForContext("GuildId", guildId).ForContext("UserId", userId), "ticket.actor", "guild");
-        var member = await GetMemberAsync(guildId, userId, cancellationToken);
+        using OperationTiming timing = new OperationTiming(
+            logger.ForContext("GuildId", guildId).ForContext("UserId", userId),
+            "ticket.actor",
+            "guild");
+
+        IGuildUser? member = await GetMemberAsync(guildId, userId, cancellationToken);
 
         if (member?.IsBot != false)
             throw new BotCommandException("The responsible moderator is not an available human member of this server.");
@@ -184,7 +187,7 @@ public sealed class TicketBoundary(
 
     internal async Task<IGuildUser?> GetMemberAsync(ulong guildId, ulong userId, CancellationToken token)
     {
-        var guild = socketClient.GetGuild(guildId);
+        SocketGuild guild = socketClient.GetGuild(guildId);
 
         if (guild is not { IsConnected: true, IsSynced: true })
             throw new BotCommandException("Server data is not ready. Try again shortly.");
@@ -194,7 +197,7 @@ public sealed class TicketBoundary(
 
     internal static TicketActor Actor(IGuildUser member)
     {
-        var permissions = member.GuildPermissions;
+        GuildPermissions permissions = member.GuildPermissions;
 
         return new TicketActor(
             member.GuildId,
@@ -211,18 +214,14 @@ public sealed class TicketBoundary(
 
     public async Task CheckCaptureAsync(ulong guildId, CancellationToken cancellationToken)
     {
-        var bot = await GetMemberAsync(guildId, socketClient.CurrentUser.Id, cancellationToken)
-            ?? throw new BotCommandException("Sylvan is not available in this server.");
+        IGuildUser bot = await GetMemberAsync(guildId, socketClient.CurrentUser.Id, cancellationToken)
+                         ?? throw new BotCommandException("Sylvan is not available in this server.");
 
         if (!bot.GuildPermissions.ViewAuditLog)
             throw new BotCommandException("Sylvan needs View Audit Log to capture and reconcile moderation actions.");
     }
 
-    internal static RequestOptions Options(CancellationToken token) => new RequestOptions
-    {
-        CancelToken = token,
-        RetryMode = RetryMode.AlwaysFail,
-    };
+    internal static RequestOptions Options(CancellationToken token) => new RequestOptions { CancelToken = token, RetryMode = RetryMode.AlwaysFail };
 
     public void Dispose() => _auditReadLock.Dispose();
 }

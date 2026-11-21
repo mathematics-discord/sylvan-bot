@@ -17,7 +17,7 @@ public sealed class TicketDetailsTests
     public void ChangesDuration_CommentEdit_RequiresDifferentDuration(string? duration, long? currentSeconds, bool expected)
     {
         // Arrange
-        var details = TicketDetails.ParseFields(duration, "updated comment");
+        TicketDetails details = TicketDetails.ParseFields(duration, "updated comment");
 
         // Act
         var changesDuration = details.ChangesDuration(currentSeconds);
@@ -31,11 +31,11 @@ public sealed class TicketDetailsTests
     public void PermanentDuration_Expiry_DoesNotOverflow()
     {
         // Arrange
-        var details = TicketDetails.ParseFields("permanent", "reason");
-        var actionTime = DateTimeOffset.UtcNow;
+        TicketDetails details = TicketDetails.ParseFields("permanent", "reason");
+        DateTimeOffset actionTime = DateTimeOffset.UtcNow;
 
         // Act
-        var expiry = details.Expiry(actionTime);
+        DateTimeOffset expiry = details.Expiry(actionTime);
 
         // Assert
         details.DurationSeconds.ShouldBe(long.MaxValue);
@@ -50,7 +50,7 @@ public sealed class TicketDetailsTests
         const string reply = "1 day 8 hours, breaking rules";
 
         // Act
-        var details = TicketDetails.ParseReply(reply);
+        TicketDetails details = TicketDetails.ParseReply(reply);
 
         // Assert
         details.HasDuration.ShouldBeTrue();
@@ -65,7 +65,7 @@ public sealed class TicketDetailsTests
     {
         // Arrange
         // Act
-        var details = TicketDetails.ParseReply(reply);
+        TicketDetails details = TicketDetails.ParseReply(reply);
 
         // Assert
         details.HasDuration.ShouldBeTrue();
@@ -80,7 +80,7 @@ public sealed class TicketDetailsTests
         const string reply = "persistent spam";
 
         // Act
-        var details = TicketDetails.ParseReply(reply);
+        TicketDetails details = TicketDetails.ParseReply(reply);
 
         // Assert
         details.HasDuration.ShouldBeFalse();
@@ -110,7 +110,7 @@ public sealed class TicketDetailsTests
         const string reply = "2 hours";
 
         // Act
-        var details = TicketDetails.ParseReply(reply);
+        TicketDetails details = TicketDetails.ParseReply(reply);
 
         // Assert
         details.DurationSeconds.ShouldBe(7200);
@@ -125,7 +125,7 @@ public sealed class TicketDetailsTests
     {
         // Arrange
         // Act
-        var details = TicketDetails.ParseReply(reply);
+        TicketDetails details = TicketDetails.ParseReply(reply);
 
         // Assert
         details.DurationSeconds.ShouldBe(seconds);
@@ -156,11 +156,11 @@ public sealed class TicketDetailsTests
     public void Expiry_FiniteDuration_UsesActionTime()
     {
         // Arrange
-        var actionTime = new DateTimeOffset(year: 2026, month: 1, day: 1, hour: 12, minute: 0, second: 0, TimeSpan.Zero);
-        var details = TicketDetails.ParseReply("2 days");
+        DateTimeOffset actionTime = new DateTimeOffset(year: 2026, month: 1, day: 1, hour: 12, minute: 0, second: 0, TimeSpan.Zero);
+        TicketDetails details = TicketDetails.ParseReply("2 days");
 
         // Act
-        var expiry = details.Expiry(actionTime);
+        DateTimeOffset expiry = details.Expiry(actionTime);
 
         // Assert
         expiry.ShouldBe(actionTime.AddDays(2));
@@ -170,8 +170,8 @@ public sealed class TicketDetailsTests
     public void TimeoutExpiry_Permanent_RejectsDuration()
     {
         // Arrange
-        var now = DateTimeOffset.UtcNow;
-        var details = TicketDetails.ParseReply("permanent");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        TicketDetails details = TicketDetails.ParseReply("permanent");
 
         // Act
         // Assert
@@ -182,11 +182,11 @@ public sealed class TicketDetailsTests
     public void TimeoutExpiry_BeyondDiscordLimit_PreservesFullDuration()
     {
         // Arrange
-        var now = DateTimeOffset.UtcNow;
-        var details = TicketDetails.ParseReply("29 days");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        TicketDetails details = TicketDetails.ParseReply("29 days");
 
         // Act
-        var expiry = details.TimeoutExpiry(now);
+        DateTimeOffset expiry = details.TimeoutExpiry(now);
 
         // Assert
         expiry.ShouldBe(now.AddDays(29));
@@ -196,11 +196,11 @@ public sealed class TicketDetailsTests
     public void TimeoutExpiry_ElapsedDuration_ReturnsPastExpiry()
     {
         // Arrange
-        var now = DateTimeOffset.UtcNow;
-        var details = TicketDetails.ParseReply("1 day");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        TicketDetails details = TicketDetails.ParseReply("1 day");
 
         // Act
-        var expiry = details.TimeoutExpiry(now.AddDays(-2));
+        DateTimeOffset expiry = details.TimeoutExpiry(now.AddDays(-2));
 
         // Assert
         expiry.ShouldBe(now.AddDays(-1));
@@ -210,11 +210,11 @@ public sealed class TicketDetailsTests
     public void TimeoutExpiry_OldActionTime_UsesOriginalActionTime()
     {
         // Arrange
-        var now = DateTimeOffset.UtcNow;
-        var details = TicketDetails.ParseReply("50 days");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        TicketDetails details = TicketDetails.ParseReply("50 days");
 
         // Act
-        var expiry = details.TimeoutExpiry(now.AddDays(-30));
+        DateTimeOffset expiry = details.TimeoutExpiry(now.AddDays(-30));
 
         // Assert
         expiry.ShouldBe(now.AddDays(20));

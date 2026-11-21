@@ -12,7 +12,7 @@ public sealed class AutomodMatcher
         _rules = rules
             .Select(rule =>
             {
-                var copy = new AutomodRule
+                AutomodRule copy = new AutomodRule
                 {
                     Id = rule.Id,
                     GuildId = rule.GuildId,
@@ -40,9 +40,9 @@ public sealed class AutomodMatcher
         Optional<AutomodRule> selected = default;
         var earliestPosition = int.MaxValue;
         var matchLength = 0;
-        var timedOutRuleIds = ImmutableArray.CreateBuilder<long>();
+        ImmutableArray<long>.Builder timedOutRuleIds = ImmutableArray.CreateBuilder<long>();
 
-        foreach (var (rule, regex) in _rules)
+        foreach ((AutomodRule rule, Regex regex) in _rules)
         {
             Match match;
 
@@ -57,9 +57,9 @@ public sealed class AutomodMatcher
                 continue;
             }
 
-            var precedesSelected = match.Success &&
-                                   (match.Index < earliestPosition ||
-                                    (match.Index == earliestPosition && (!selected.HasValue || rule.Id < selected.Value.Id)));
+            var precedesSelected = match.Success
+                                   && (match.Index < earliestPosition
+                                       || (match.Index == earliestPosition && (!selected.HasValue || rule.Id < selected.Value.Id)));
 
             if (precedesSelected)
             {
@@ -76,6 +76,26 @@ public sealed class AutomodMatcher
         return new AutomodMatchResult(selected, timedOutRuleIds.ToImmutable(), reason);
     }
 
+    internal static Regex CreateRegex(string pattern, AutomodMatchType matchType)
+    {
+        if (string.IsNullOrWhiteSpace(pattern))
+            throw new FormatException("Automod patterns cannot be empty.");
+
+        var expression = matchType switch
+        {
+            AutomodMatchType.Word => @"\b" + Regex.Escape(pattern) + @"\b",
+            AutomodMatchType.Regex => pattern,
+            _ => throw new ArgumentOutOfRangeException(nameof(matchType)),
+        };
+
+        Regex regex = new Regex(expression, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+
+        if (regex.IsMatch(string.Empty))
+            throw new FormatException("Automod patterns must not match empty text.");
+
+        return regex;
+    }
+
     private static string FormatReason(string text, long ruleId, int position, int length)
     {
         const int contextLimit = 390;
@@ -84,7 +104,7 @@ public sealed class AutomodMatcher
         if (text.Length > contextLimit)
         {
             const int retainedLength = contextLimit - 6;
-            var start = Math.Clamp(position - Math.Max(0, retainedLength - length) / 2, 0, text.Length - retainedLength);
+            var start = Math.Clamp(position - (Math.Max(0, retainedLength - length) / 2), 0, text.Length - retainedLength);
             var end = start + retainedLength;
             context = (start > 0 ? "..." : string.Empty) + text[start..end] + (end < text.Length ? "..." : string.Empty);
         }
@@ -104,25 +124,5 @@ public sealed class AutomodMatcher
         }
 
         return $"Automatic action: message matches pattern {ruleId}\n{delimiter}{context}{delimiter}";
-    }
-
-    internal static Regex CreateRegex(string pattern, AutomodMatchType matchType)
-    {
-        if (string.IsNullOrWhiteSpace(pattern))
-            throw new FormatException("Automod patterns cannot be empty.");
-
-        var expression = matchType switch
-        {
-            AutomodMatchType.Word => @"\b" + Regex.Escape(pattern) + @"\b",
-            AutomodMatchType.Regex => pattern,
-            _ => throw new ArgumentOutOfRangeException(nameof(matchType)),
-        };
-
-        var regex = new Regex(expression, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
-
-        if (regex.IsMatch(string.Empty))
-            throw new FormatException("Automod patterns must not match empty text.");
-
-        return regex;
     }
 }

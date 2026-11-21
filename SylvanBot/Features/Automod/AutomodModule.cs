@@ -67,7 +67,7 @@ public sealed class AutomodModule(AutomodManagement management, IHostApplication
     {
         RequireAuditLogAccess();
         await DeferAsync(ephemeral: true);
-        var result = await management.RemoveAsync(Context.Guild.Id, id, lifetime.ApplicationStopping);
+        (bool Removed, bool RuntimeRefreshed) result = await management.RemoveAsync(Context.Guild.Id, id, lifetime.ApplicationStopping);
 
         var response = result.Removed
             ? $"Removed automod rule {id}."
@@ -84,7 +84,7 @@ public sealed class AutomodModule(AutomodManagement management, IHostApplication
         RequireAuditLogAccess();
         await DeferAsync(ephemeral: false);
         ImmutableArray<AutomodRule> rules = await management.ListAsync(Context.Guild.Id, lifetime.ApplicationStopping);
-        var components = BuildListComponents(rules, page: 0);
+        MessageComponent components = BuildListComponents(rules, page: 0);
 
         await ModifyOriginalResponseAsync(properties =>
         {
@@ -104,8 +104,8 @@ public sealed class AutomodModule(AutomodManagement management, IHostApplication
             throw new BotCommandException("This control is not an automod list.");
 
         var validSource = guildId == Context.Guild.Id
-            && component.Message.Author.Id == Context.Client.CurrentUser.Id
-            && direction is "prev" or "next";
+                          && component.Message.Author.Id == Context.Client.CurrentUser.Id
+                          && direction is "prev" or "next";
 
         IEnumerable<TextDisplayComponent> listText = component.Message.Components
             .OfType<ContainerComponent>()
@@ -120,7 +120,7 @@ public sealed class AutomodModule(AutomodManagement management, IHostApplication
 
         await component.DeferAsync();
         ImmutableArray<AutomodRule> rules = await management.ListAsync(Context.Guild.Id, lifetime.ApplicationStopping);
-        var components = BuildListComponents(rules, page);
+        MessageComponent components = BuildListComponents(rules, page);
 
         await component.ModifyOriginalResponseAsync(properties =>
         {
@@ -131,14 +131,18 @@ public sealed class AutomodModule(AutomodManagement management, IHostApplication
 
     private MessageComponent BuildListComponents(ImmutableArray<AutomodRule> rules, int page)
     {
-        var result = AutomodRuleList.CreatePage(rules, page);
+        (string Text, int Index, int Count) result = AutomodRuleList.CreatePage(rules, page);
         var previousId = string.Create(CultureInfo.InvariantCulture, $"automod-list:{Context.Guild.Id}:{Math.Max(0, result.Index - 1)}:prev");
-        var nextId = string.Create(CultureInfo.InvariantCulture, $"automod-list:{Context.Guild.Id}:{Math.Min(result.Count - 1, result.Index + 1)}:next");
-        var controls = new ActionRowBuilder()
+
+        var nextId = string.Create(
+            CultureInfo.InvariantCulture,
+            $"automod-list:{Context.Guild.Id}:{Math.Min(result.Count - 1, result.Index + 1)}:next");
+
+        ActionRowBuilder controls = new ActionRowBuilder()
             .WithButton("Prev", previousId, ButtonStyle.Secondary, disabled: result.Index == 0)
             .WithButton("Next", nextId, ButtonStyle.Secondary, disabled: result.Index == result.Count - 1);
 
-        var container = new ContainerBuilder()
+        ContainerBuilder container = new ContainerBuilder()
             .WithTextDisplay(new TextDisplayBuilder().WithContent(result.Text))
             .WithActionRow(controls);
 

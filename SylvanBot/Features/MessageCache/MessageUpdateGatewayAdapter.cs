@@ -66,31 +66,31 @@ public sealed class MessageUpdateGatewayAdapter(ILogger logger)
         {
             var messageId = ReadId(data.GetProperty("id"));
             var channelId = ReadId(data.GetProperty("channel_id"));
-            var guildId = data.TryGetProperty("guild_id", out var guild) ? ReadId(guild) : 0;
+            var guildId = data.TryGetProperty("guild_id", out JsonElement guild) ? ReadId(guild) : 0;
             Optional<DateTimeOffset?> editedAtUtc = default;
             Optional<string> content = default;
             Optional<ImmutableArray<MessageAttachment>> attachments = default;
 
-            if (data.TryGetProperty("edited_timestamp", out var editedAt))
+            if (data.TryGetProperty("edited_timestamp", out JsonElement editedAt))
             {
                 DateTimeOffset? timestamp = editedAt.ValueKind == JsonValueKind.Null ? null : editedAt.GetDateTimeOffset().ToUniversalTime();
                 editedAtUtc = new Optional<DateTimeOffset?>(timestamp);
             }
 
-            if (data.TryGetProperty("content", out var body))
+            if (data.TryGetProperty("content", out JsonElement body))
                 content = new Optional<string>(body.GetString() ?? throw new JsonException("Content must be a string."));
 
-            if (data.TryGetProperty("attachments", out var attachmentData))
+            if (data.TryGetProperty("attachments", out JsonElement attachmentData))
             {
                 ImmutableArray<MessageAttachment> suppliedAttachments = attachmentData
-                   .EnumerateArray()
-                   .Select(attachment => new MessageAttachment(
-                               attachment.GetProperty("url").GetString() ?? throw new JsonException("Attachment URL must be a string."),
-                               attachment.TryGetProperty("proxy_url", out var proxy) ? proxy.GetString() : null,
-                               attachment.TryGetProperty("content_type", out var contentType) ? contentType.GetString() : null,
-                               attachment.GetProperty("size").GetInt64()
-                           ))
-                   .ToImmutableArray();
+                    .EnumerateArray()
+                    .Select(attachment => new MessageAttachment(
+                        attachment.GetProperty("url").GetString() ?? throw new JsonException("Attachment URL must be a string."),
+                        attachment.TryGetProperty("proxy_url", out JsonElement proxy) ? proxy.GetString() : null,
+                        attachment.TryGetProperty("content_type", out JsonElement contentType) ? contentType.GetString() : null,
+                        attachment.GetProperty("size").GetInt64()
+                    ))
+                    .ToImmutableArray();
 
                 if (suppliedAttachments.Any(attachment => string.IsNullOrWhiteSpace(attachment.Url) || attachment.Size < 0))
                     throw new JsonException("Invalid attachment metadata.");
@@ -122,11 +122,11 @@ public sealed class MessageUpdateGatewayAdapter(ILogger logger)
             {
                 try
                 {
-                    using var document = JsonDocument.Parse(text);
-                    var frame = document.RootElement;
+                    using JsonDocument document = JsonDocument.Parse(text);
+                    JsonElement frame = document.RootElement;
 
                     var isUpdate =
-                        frame.TryGetProperty("t", out var type)
+                        frame.TryGetProperty("t", out JsonElement type)
                         && string.Equals(type.GetString(), "MESSAGE_UPDATE", comparisonType: StringComparison.Ordinal);
 
                     if (isUpdate && frame.GetProperty("d").TryGetProperty("guild_id", value: out _))

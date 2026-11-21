@@ -8,8 +8,8 @@ public sealed class TicketDeliveryBackoffTests
     public void ModeratorFailed_LocalLimit_LeavesOtherDeliveryAvailable()
     {
         // Arrange
-        var clock = new DeliveryClock();
-        var backoff = new TicketDeliveryBackoff(clock);
+        DeliveryClock clock = new DeliveryClock();
+        TicketDeliveryBackoff backoff = new TicketDeliveryBackoff(clock);
 
         // Act
         backoff.ModeratorFailed(1);
@@ -25,7 +25,7 @@ public sealed class TicketDeliveryBackoffTests
     public void Failed_ChannelLimit_LeavesOtherDeliveryAvailable()
     {
         // Arrange
-        var backoff = new TicketDeliveryBackoff(new DeliveryClock());
+        TicketDeliveryBackoff backoff = new TicketDeliveryBackoff(new DeliveryClock());
 
         // Act
         backoff.Failed(1);
@@ -40,8 +40,8 @@ public sealed class TicketDeliveryBackoffTests
     public void DeferGlobal_ConfirmedGlobalLimit_DefersChannelsAndModerators()
     {
         // Arrange
-        var clock = new DeliveryClock();
-        var backoff = new TicketDeliveryBackoff(clock);
+        DeliveryClock clock = new DeliveryClock();
+        TicketDeliveryBackoff backoff = new TicketDeliveryBackoff(clock);
 
         // Act
         backoff.DeferGlobal(clock.GetUtcNow().AddMinutes(1));
@@ -56,8 +56,8 @@ public sealed class TicketDeliveryBackoffTests
     public void IsDeferred_DeadlineReached_AllowsDelivery()
     {
         // Arrange
-        var clock = new DeliveryClock();
-        var backoff = new TicketDeliveryBackoff(clock);
+        DeliveryClock clock = new DeliveryClock();
+        TicketDeliveryBackoff backoff = new TicketDeliveryBackoff(clock);
         backoff.Failed(1);
         backoff.ModeratorFailed(2);
         backoff.DeferGlobal(clock.GetUtcNow().AddSeconds(20));
@@ -80,8 +80,8 @@ public sealed class TicketDeliveryBackoffTests
     public void Failed_RepeatedFailures_CapsFallbackDelay(int failures, int seconds)
     {
         // Arrange
-        var clock = new DeliveryClock();
-        var backoff = new TicketDeliveryBackoff(clock);
+        DeliveryClock clock = new DeliveryClock();
+        TicketDeliveryBackoff backoff = new TicketDeliveryBackoff(clock);
 
         // Act
         for (var attempt = 0; attempt < failures; attempt++)
@@ -98,8 +98,8 @@ public sealed class TicketDeliveryBackoffTests
     public void Succeeded_DiscordDeadline_PreservesDeadlineAndResetsFailures()
     {
         // Arrange
-        var clock = new DeliveryClock();
-        var backoff = new TicketDeliveryBackoff(clock);
+        DeliveryClock clock = new DeliveryClock();
+        TicketDeliveryBackoff backoff = new TicketDeliveryBackoff(clock);
         backoff.Failed(1);
         backoff.Failed(1);
         backoff.DeferChannel(1, clock.GetUtcNow().AddMinutes(2));
@@ -118,8 +118,8 @@ public sealed class TicketDeliveryBackoffTests
     public void ModeratorSucceeded_GlobalDeadline_PreservesGlobalCooldown()
     {
         // Arrange
-        var clock = new DeliveryClock();
-        var backoff = new TicketDeliveryBackoff(clock);
+        DeliveryClock clock = new DeliveryClock();
+        TicketDeliveryBackoff backoff = new TicketDeliveryBackoff(clock);
         backoff.ModeratorFailed(1);
         backoff.DeferGlobal(clock.GetUtcNow().AddMinutes(1));
 

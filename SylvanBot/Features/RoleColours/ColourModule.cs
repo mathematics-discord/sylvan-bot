@@ -95,17 +95,17 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
 
     internal static MessageComponent BuildMenu(ulong ownerUserId, ImmutableArray<IRole> eligible)
     {
-        var components = new ComponentBuilder();
+        ComponentBuilder components = new ComponentBuilder();
 
         if (!eligible.IsEmpty)
         {
-            var menu = new SelectMenuBuilder()
-               .WithCustomId($"{SwapPrefix}:select:{ownerUserId}")
-               .WithPlaceholder("Choose a colour…")
-               .WithMinValues(1)
-               .WithMaxValues(1);
+            SelectMenuBuilder menu = new SelectMenuBuilder()
+                .WithCustomId($"{SwapPrefix}:select:{ownerUserId}")
+                .WithPlaceholder("Choose a colour…")
+                .WithMinValues(1)
+                .WithMaxValues(1);
 
-            foreach (var role in eligible)
+            foreach (IRole role in eligible)
                 menu.AddOption(label: role.Name, role.Id.ToString());
 
             components.WithSelectMenu(menu);
@@ -127,9 +127,9 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
 
     private static string BuildListResponse(IReadOnlyList<RoleColourOption> options)
     {
-        var builder = new StringBuilder("Configured colour options:");
+        StringBuilder builder = new StringBuilder("Configured colour options:");
 
-        foreach (var option in options)
+        foreach (RoleColourOption option in options)
             builder.AppendLine().Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
 
         return builder.ToString();

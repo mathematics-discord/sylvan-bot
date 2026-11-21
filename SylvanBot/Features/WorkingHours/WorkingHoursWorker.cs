@@ -8,7 +8,8 @@ public sealed class WorkingHoursWorker(DiscordSocketClient client, WorkingHoursR
         {
             while (!ct.IsCancellationRequested)
             {
-                foreach (var guild in client.Guilds)
+                foreach (SocketGuild? guild in client.Guilds)
+
                     try
                     {
                         await coordinator.ReconcileAsync(guildId: guild.Id, ct: ct);
@@ -21,6 +22,7 @@ public sealed class WorkingHoursWorker(DiscordSocketClient client, WorkingHoursR
                     {
                         logger.Error(exception: ex, "Working Hours pass failed for guild {GuildId}", propertyValue: guild.Id);
                     }
+
 
                 await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken: ct);
             }

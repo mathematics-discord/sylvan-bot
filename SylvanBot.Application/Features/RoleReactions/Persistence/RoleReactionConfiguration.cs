@@ -11,12 +11,7 @@ public sealed class RoleReactionConfiguration : IEntityTypeConfiguration<RoleRea
     {
         builder.ToTable("RoleReactions");
 
-        builder.HasKey(mapping => new
-        {
-            mapping.GuildId,
-            mapping.MessageId,
-            mapping.EmojiKey,
-        });
+        builder.HasKey(mapping => new { mapping.GuildId, mapping.MessageId, mapping.EmojiKey });
 
         builder.Property(mapping => mapping.GuildId).ValueGeneratedNever();
 

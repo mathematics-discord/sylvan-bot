@@ -1,5 +1,11 @@
-﻿
-namespace SylvanBot.Application.Features.Tickets;
+﻿namespace SylvanBot.Application.Features.Tickets;
+
+public enum TicketOperationKind
+{
+    SetTimeoutExpiry,
+    RemoveBan,
+    RemoveRole,
+}
 
 public sealed class TicketOperation
 {
@@ -16,12 +22,4 @@ public sealed class TicketOperation
     public DateTimeOffset RequestedAtUtc { get; set; } = DateTimeOffset.UtcNow;
 
     public bool Attempted { get; set; }
-
-}
-
-public enum TicketOperationKind
-{
-    SetTimeoutExpiry,
-    RemoveBan,
-    RemoveRole,
 }

@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace SylvanBot.Features.EmojiYoink;
 
@@ -18,7 +18,7 @@ public static partial class CustomEmojiMentionParser
 
     public static Result<Emote> ParseMessage(string content)
     {
-        var matches = MentionPattern.Matches(content);
+        MatchCollection matches = MentionPattern.Matches(content);
 
         if (matches.Count != 1)
             return new Result<Emote>(EmojiYoinkErrors.InvalidMessageEmoji);
@@ -29,11 +29,13 @@ public static partial class CustomEmojiMentionParser
     private static Result<Emote> ParseMention(string candidate, OperationFailureException error)
     {
         if (
-            !Emote.TryParse(text: candidate, out var emote)
+            !Emote.TryParse(text: candidate, out Emote emote)
             || emote.Id == 0
             || !string.Equals(a: candidate, emote.ToString(), comparisonType: StringComparison.Ordinal)
         )
+
             return new Result<Emote>(error);
+
 
         return emote;
     }

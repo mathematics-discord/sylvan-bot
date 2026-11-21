@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using SylvanBot.Application.Features.Automod;
 
@@ -15,31 +15,32 @@ internal static class AutomodRuleList
     public static (string Text, int Index, int Count) CreatePage(IEnumerable<AutomodRule> rules, int requestedPage)
     {
         List<string> pages = [];
-        var body = new StringBuilder();
+        StringBuilder body = new StringBuilder();
         var entryCount = 0;
+
         IEnumerable<AutomodRule> orderedRules = rules
             .OrderBy(rule => rule.Id);
 
-        foreach (var rule in orderedRules)
+        foreach (AutomodRule rule in orderedRules)
+
+        foreach (var entry in FormatEntries(rule))
         {
-            foreach (var entry in FormatEntries(rule))
+            var pageFull = entryCount == EntriesPerPage || body.Length + entry.Length + 1 > BodyLimit;
+
+            if (pageFull)
             {
-                var pageFull = entryCount == EntriesPerPage || body.Length + entry.Length + 1 > BodyLimit;
-
-                if (pageFull)
-                {
-                    pages.Add(body.ToString());
-                    body.Clear();
-                    entryCount = 0;
-                }
-
-                if (entryCount > 0)
-                    body.Append('\n');
-
-                body.Append(entry);
-                entryCount++;
+                pages.Add(body.ToString());
+                body.Clear();
+                entryCount = 0;
             }
+
+            if (entryCount > 0)
+                body.Append('\n');
+
+            body.Append(entry);
+            entryCount++;
         }
+
 
         if (body.Length > 0)
             pages.Add(body.ToString());
@@ -60,10 +61,10 @@ internal static class AutomodRuleList
         const string opening = " ? ||`";
         const string closing = "`||";
         var patternLimit = BodyLimit - label.Length - continuation.Length - opening.Length - closing.Length - 1;
-        var pattern = new StringBuilder();
+        StringBuilder pattern = new StringBuilder();
         var continued = false;
 
-        foreach (var rune in rule.Pattern.EnumerateRunes())
+        foreach (Rune rune in rule.Pattern.EnumerateRunes())
         {
             // Display dangerous delimiters and control characters literally without changing the stored rule.
             var escaped = rune.Value switch
@@ -80,6 +81,7 @@ internal static class AutomodRuleList
             if (pattern.Length + escaped.Length > patternLimit)
             {
                 yield return label + (continued ? continuation : string.Empty) + opening + pattern + closing;
+
                 pattern.Clear();
                 continued = true;
             }

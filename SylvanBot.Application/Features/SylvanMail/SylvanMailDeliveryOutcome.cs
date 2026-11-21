@@ -33,8 +33,7 @@ public sealed record SylvanMailDeliveryOutcome
             ? new SylvanMailDeliveryOutcome { State = "Refused", Detail = rejection }
             : new SylvanMailDeliveryOutcome
             {
-                State = "Unpublished",
-                Detail = "Saved but unpublished: delivery could not start. No automatic resend.",
+                State = "Unpublished", Detail = "Saved but unpublished: delivery could not start. No automatic resend.",
             };
     }
 }

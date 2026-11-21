@@ -45,7 +45,7 @@ public static partial class AutomodDuration
         if (!duration.HasValue)
             return action == AutomodAction.Mute ? new Optional<long>(MaximumMuteSeconds) : default;
 
-        var match = DurationPattern.Match(duration.Value);
+        Match match = DurationPattern.Match(duration.Value);
 
         if (!match.Success)
             throw new FormatException("Use a positive whole-number duration such as 30m or 2 days (s, m, h, d or w).");

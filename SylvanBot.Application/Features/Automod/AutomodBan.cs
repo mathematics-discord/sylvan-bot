@@ -1,4 +1,4 @@
-using static System.StringComparison;
+﻿using static System.StringComparison;
 
 namespace SylvanBot.Application.Features.Automod;
 
@@ -50,9 +50,8 @@ public sealed class AutomodBan
             Status = "Active";
         }
         else
-        {
+
             Status = ownRemoval && string.Equals(Status, "Removing", Ordinal) ? "Ended" : "Superseded";
-        }
     }
 
     public bool AuditCoverageLost(DateTimeOffset now) => now - CheckedAt >= TimeSpan.FromDays(45);

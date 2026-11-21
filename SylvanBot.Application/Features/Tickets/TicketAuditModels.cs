@@ -22,16 +22,15 @@ public sealed record TicketObservation
     public Optional<Guid> OperationId { get; init; } = Optional<Guid>.None;
 
     public bool CreatesTicket => !Removed
-        && (Action != TicketAction.Timeout
-            || (Timeout.TryGet(out var current) && current > CreatedAtUtc));
+                                 && (Action != TicketAction.Timeout
+                                     || (Timeout.TryGet(out DateTimeOffset current) && current > CreatedAtUtc));
 
     public bool ContinuesTimeout(Ticket ticket) => Action == TicketAction.Timeout
-        && ticket.Action == TicketAction.Timeout
-        && ticket.GuildId == GuildId
-        && ticket.SubjectUserId == SubjectUserId
-        && ticket.Status == TicketStatus.Active
-        && ticket.ExpiresAtUtc > CreatedAtUtc;
+                                                   && ticket.Action == TicketAction.Timeout
+                                                   && ticket.GuildId == GuildId
+                                                   && ticket.SubjectUserId == SubjectUserId
+                                                   && ticket.Status == TicketStatus.Active
+                                                   && ticket.ExpiresAtUtc > CreatedAtUtc;
 }
-
 
 public sealed record TicketAuditScan(Optional<ulong> LastAuditId, ImmutableArray<TicketObservation> Observations);

@@ -1,4 +1,4 @@
-namespace SylvanBot.Features.WorkingHours;
+﻿namespace SylvanBot.Features.WorkingHours;
 
 internal static class WorkingHoursReply
 {
@@ -27,10 +27,13 @@ internal static class WorkingHoursReply
                     properties.Content = content;
                     properties.AllowedMentions = AllowedMentions.None;
                 });
+
                 first = false;
             }
             else
+
                 await interaction.FollowupAsync(text: content, ephemeral: true, allowedMentions: AllowedMentions.None);
+
 
             message = message[length..].TrimStart('\n');
         }

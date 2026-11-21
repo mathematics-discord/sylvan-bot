@@ -1,5 +1,6 @@
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using Discord.Net;
+using Discord.Rest;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Automod;
 using SylvanBot.Application.Infrastructure.Data;
@@ -27,7 +28,7 @@ public sealed class AutomodBanEnforcement(
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
             var outstanding = await db.AutomodBans
                 .AnyAsync(OutstandingBanFor(guildId, userId), ct);
@@ -35,7 +36,7 @@ public sealed class AutomodBanEnforcement(
             if (outstanding)
                 return;
 
-            var guild = await client.Rest.GetGuildAsync(guildId, Options(ct));
+            RestGuild guild = await client.Rest.GetGuildAsync(guildId, Options(ct));
 
             if (await guild.GetBanAsync(userId, Options(ct)) is not null)
                 return;
@@ -43,15 +44,23 @@ public sealed class AutomodBanEnforcement(
             if (!runtime.IsEnabled(guildId))
                 return;
 
-            var now = clock.GetUtcNow();
+            DateTimeOffset now = clock.GetUtcNow();
 
-            var operation = new AutomodBan
+            AutomodBan operation = new AutomodBan
             {
-                Id = Guid.NewGuid(), GuildId = guildId, UserId = userId,
-                MessageId = messageId, RuleId = rule.Id, RequestedAt = now,
+                Id = Guid.NewGuid(),
+                GuildId = guildId,
+                UserId = userId,
+                MessageId = messageId,
+                RuleId = rule.Id,
+                RequestedAt = now,
                 ActionReason = reason,
-                CheckedAt = now, NextCheckAt = now.AddSeconds(30), LastAttemptAt = now, ExpiresAt = expiry,
+                CheckedAt = now,
+                NextCheckAt = now.AddSeconds(30),
+                LastAttemptAt = now,
+                ExpiresAt = expiry,
             };
+
             db.AutomodBans.Add(operation);
             await db.SaveChangesAsync(ct);
 
@@ -83,10 +92,7 @@ public sealed class AutomodBanEnforcement(
                  && value.UserId == userId
                  && (value.Status == "Pending" || value.Status == "Active" || value.Status == "Removing");
 
-    private static RequestOptions Options(CancellationToken ct) => new RequestOptions
-    {
-        CancelToken = ct, RetryMode = RetryMode.AlwaysFail,
-    };
+    private static RequestOptions Options(CancellationToken ct) => new RequestOptions { CancelToken = ct, RetryMode = RetryMode.AlwaysFail };
 
     public void Dispose() => _gate.Dispose();
 }

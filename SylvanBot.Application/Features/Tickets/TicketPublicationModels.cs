@@ -1,5 +1,12 @@
 ﻿namespace SylvanBot.Application.Features.Tickets;
 
+public enum TicketPublicationFormat
+{
+    Unknown,
+    Embed,
+    ComponentsV2,
+}
+
 public sealed class TicketPublication
 {
     public ulong ChannelId { get; init; }
@@ -18,12 +25,5 @@ public sealed class TicketPublication
 
     public TicketMessage Message() => new TicketMessage(ChannelId, MessageId);
 }
-public enum TicketPublicationFormat
-{
-    Unknown,
-    Embed,
-    ComponentsV2,
-}
-
 
 public sealed record TicketMessage(ulong ChannelId, ulong MessageId);

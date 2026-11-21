@@ -105,9 +105,10 @@ public sealed class WorkingHoursResponseTests
     public void DesiredPingRole_FullRoleTable_ReturnsPolicy(bool eligible, bool exempt, bool enabled, bool active, bool? expected)
     {
         // Arrange
-        var settings = new WorkingHoursSettings { Enabled = true };
+        WorkingHoursSettings settings = new WorkingHoursSettings { Enabled = true };
 
         // Act / Assert
-        settings.DesiredPingRole(eligible: eligible, exempt: exempt, scheduleEnabled: enabled, active: active).ShouldBe(expected.HasValue ? new Optional<bool>(expected.Value) : default);
+        settings.DesiredPingRole(eligible: eligible, exempt: exempt, scheduleEnabled: enabled, active: active)
+            .ShouldBe(expected.HasValue ? new Optional<bool>(expected.Value) : default);
     }
 }

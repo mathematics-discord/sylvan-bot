@@ -43,6 +43,7 @@ public sealed partial class ConfigModule(
         {
             properties.Content =
                 $"SylvanMail enabled in <#{forum.Id}> for <@&{role.Id}>. Changes apply immediately; previous posts and mappings are retained.";
+
             properties.AllowedMentions = AllowedMentions.None;
         });
     }

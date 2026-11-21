@@ -1,10 +1,10 @@
-﻿using static System.Net.HttpStatusCode;
+﻿using Discord.Rest;
+using static System.Net.HttpStatusCode;
 
 namespace SylvanBot.Features.Tickets;
 
 using Discord.Net;
 using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Application.Infrastructure.Data;
 
@@ -27,15 +27,15 @@ public sealed class TicketTimeoutEnforcement(DiscordSocketClient client, TicketB
             return "Historical timeout details saved.";
         }
 
-        var expiry = details.TimeoutExpiry(ticket.CreatedAtUtc);
+        DateTimeOffset expiry = details.TimeoutExpiry(ticket.CreatedAtUtc);
 
         if (expiry == ticket.ExpiresAtUtc && !ticket.ExpirySuspended)
             return string.Empty;
 
-        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
         DateTimeOffset? recordedExpiry = ticket.AppliedTimeoutUntilUtc;
-        var guild = await client.Rest.GetGuildAsync(ticket.GuildId, TicketBoundary.Options(cancellationToken));
-        var member = await guild.GetUserAsync(ticket.SubjectUserId, TicketBoundary.Options(cancellationToken));
+        RestGuild guild = await client.Rest.GetGuildAsync(ticket.GuildId, TicketBoundary.Options(cancellationToken));
+        RestGuildUser? member = await guild.GetUserAsync(ticket.SubjectUserId, TicketBoundary.Options(cancellationToken));
         DateTimeOffset? liveExpiry = member?.TimedOutUntil;
 
         if (member is null)
@@ -87,7 +87,7 @@ public sealed class TicketTimeoutEnforcement(DiscordSocketClient client, TicketB
             return;
 
         var enforcementStopped = ticket.Status != TicketStatus.Active
-            || (ticket.ExpirySuspended && ticket.Pending?.RequestedBy is null);
+                                 || (ticket.ExpirySuspended && ticket.Pending?.RequestedBy is null);
 
         if (enforcementStopped)
         {
@@ -95,10 +95,10 @@ public sealed class TicketTimeoutEnforcement(DiscordSocketClient client, TicketB
             return;
         }
 
-        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
         DateTimeOffset? recordedExpiry = ticket.AppliedTimeoutUntilUtc;
-        var guild = await client.Rest.GetGuildAsync(ticket.GuildId, TicketBoundary.Options(cancellationToken));
-        var member = await guild.GetUserAsync(ticket.SubjectUserId, TicketBoundary.Options(cancellationToken));
+        RestGuild guild = await client.Rest.GetGuildAsync(ticket.GuildId, TicketBoundary.Options(cancellationToken));
+        RestGuildUser? member = await guild.GetUserAsync(ticket.SubjectUserId, TicketBoundary.Options(cancellationToken));
         DateTimeOffset? liveExpiry = member?.TimedOutUntil;
 
         if (ticket.Pending is null)
@@ -154,32 +154,32 @@ public sealed class TicketTimeoutEnforcement(DiscordSocketClient client, TicketB
 
         if (ticket.Pending is { } pending)
         {
-            var expiry = pending.ExpiryUtc!.Value;
-            var nativeExpiry = pending.NativeExpiryUtc ?? expiry;
+            DateTimeOffset expiry = pending.ExpiryUtc!.Value;
+            DateTimeOffset nativeExpiry = pending.NativeExpiryUtc ?? expiry;
             var ended = liveExpiry is null || liveExpiry <= now;
             var confirmed = expiry > now ? member is not null && liveExpiry == nativeExpiry : ended;
 
             if (confirmed)
-            {
+
                 ticket.ConfirmTimeoutChange(
                     now,
                     await RequesterCanReviewAsync(ticket.GuildId, pending, actor, cancellationToken));
-            }
+
             else if (member is null)
-            {
+
                 // Absence does not cancel a durable timeout or its uncertain operation.
                 ticket.TimeoutCheckAtUtc = now.AddDays(1);
-            }
+
             else if (!pending.Attempted || pending.RequestedAtUtc <= now.AddSeconds(-30))
             {
                 // Initial moderator edits express a new decision. Only automatic work and
                 // uncertain retries must establish that no later Discord action superseded it.
                 if (actor is null)
                 {
-                    var configuration = await db.TicketConfigurations
+                    TicketConfiguration configuration = await db.TicketConfigurations
                         .SingleAsync(value => value.GuildId == ticket.GuildId, cancellationToken);
 
-                    var from = configuration.LastAuditScanAtUtc ?? configuration.CaptureFromUtc!.Value;
+                    DateTimeOffset from = configuration.LastAuditScanAtUtc ?? configuration.CaptureFromUtc!.Value;
 
                     if (from < now.AddDays(-45))
                     {
@@ -195,13 +195,13 @@ public sealed class TicketTimeoutEnforcement(DiscordSocketClient client, TicketB
                         return string.Empty;
                     }
 
-                    var scan = await boundary.ReadAuditAsync(ticket.GuildId, from.AddMinutes(-10), cancellationToken);
+                    TicketAuditScan scan = await boundary.ReadAuditAsync(ticket.GuildId, from.AddMinutes(-10), cancellationToken);
 
                     var newer = scan.Observations
                         .Any(value => value.Action == TicketAction.Timeout
-                                 && value.SubjectUserId == ticket.SubjectUserId
-                                 && value.AuditId > ticket.LastAuditId
-                                 && (!value.OperationId.HasValue || value.OperationId.Value != pending.Id));
+                                      && value.SubjectUserId == ticket.SubjectUserId
+                                      && value.AuditId > ticket.LastAuditId
+                                      && (!value.OperationId.HasValue || value.OperationId.Value != pending.Id));
 
                     if (newer)
                         return string.Empty;
@@ -222,15 +222,19 @@ public sealed class TicketTimeoutEnforcement(DiscordSocketClient client, TicketB
                 pending.Attempted = true;
                 pending.RequestedAtUtc = now;
                 await db.SaveChangesAsync(cancellationToken);
-                var options = TicketBoundary.Options(cancellationToken);
+                RequestOptions options = TicketBoundary.Options(cancellationToken);
                 options.AuditLogReason = $"Sylvan ticket {ticket.Number}; operation {pending.Id:D}";
 
                 try
                 {
                     if (expiry > now)
+
                         await member.ModifyAsync(properties => properties.TimedOutUntil = nativeExpiry, options);
+
                     else
+
                         await member.RemoveTimeOutAsync(options);
+
 
                     ticket.ConfirmTimeoutChange(
                         now,

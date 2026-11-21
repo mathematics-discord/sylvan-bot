@@ -1,13 +1,11 @@
-using SylvanBot.Interactions;
-
 namespace SylvanBot.Features.Configuration;
 
 public sealed partial class ConfigModule
 {
     [SlashCommand("announcements", "Set the announcements channel and create its subscription role")]
     public async Task AnnouncementsAsync(
-        [Summary("channel", "The channel for announcements and subscription buttons")]
-        [ChannelTypes(ChannelType.Text, ChannelType.News)] ITextChannel channel)
+        [Summary("channel", "The channel for announcements and subscription buttons")] [ChannelTypes(ChannelType.Text, ChannelType.News)]
+        ITextChannel channel)
     {
         if (channel.GuildId != Context.Guild.Id)
             throw new BotCommandException("Choose a text or announcement channel from this server.");

@@ -21,7 +21,7 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
     {
         Env.TraversePath().Load();
 
-        var configurationRoot = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+        IConfigurationRoot configurationRoot = new ConfigurationBuilder().AddEnvironmentVariables().Build();
 
         var connectionString =
             configurationRoot.GetConnectionString("BotDb")
@@ -35,8 +35,8 @@ public sealed class DesignTimeBotDbContextFactory : IDesignTimeDbContextFactory<
             throw new InvalidOperationException("Design-time connection string missing. Set DB__CONNECTION_STRING or discrete DB__* vars.");
 
         DbContextOptions<BotDbContext> options = new DbContextOptionsBuilder<BotDbContext>()
-           .UseNpgsql(connectionString: connectionString, postgres => postgres.MigrationsAssembly("SylvanBot"))
-           .Options;
+            .UseNpgsql(connectionString: connectionString, postgres => postgres.MigrationsAssembly("SylvanBot"))
+            .Options;
 
         return new BotDbContext(options);
     }

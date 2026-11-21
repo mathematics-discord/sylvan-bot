@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Application.Infrastructure.Data;
 
@@ -6,14 +6,20 @@ namespace SylvanBot.Features.Tickets;
 
 public sealed partial class TicketCoordinator
 {
-    private async Task RecordAuditAsync(BotDbContext db, TicketObservation observation, IReadOnlyDictionary<Guid, ulong> operationAudits, bool automodEnabled, Func<ulong, Task<bool>> resolveReviewPermissionAsync, CancellationToken ct)
+    private async Task RecordAuditAsync(
+        BotDbContext db,
+        TicketObservation observation,
+        IReadOnlyDictionary<Guid, ulong> operationAudits,
+        bool automodEnabled,
+        Func<ulong, Task<bool>> resolveReviewPermissionAsync,
+        CancellationToken ct)
     {
         var alreadyRecorded = await db.Tickets
             .AnyAsync(
                 ticket => ticket.GuildId == observation.GuildId
-                    && ticket.SourceAuditId == observation.AuditId
-                    && ticket.Action == observation.Action
-                    && ticket.RoleId == observation.RoleId,
+                          && ticket.SourceAuditId == observation.AuditId
+                          && ticket.Action == observation.Action
+                          && ticket.RoleId == observation.RoleId,
                 ct);
 
         if (alreadyRecorded)
@@ -21,16 +27,16 @@ public sealed partial class TicketCoordinator
 
         IQueryable<Ticket> matching = db.Tickets
             .Where(ticket => ticket.GuildId == observation.GuildId
-                       && ticket.SubjectUserId == observation.SubjectUserId
-                       && ticket.Action == observation.Action
-                       && ticket.RoleId == observation.RoleId);
+                             && ticket.SubjectUserId == observation.SubjectUserId
+                             && ticket.Action == observation.Action
+                             && ticket.RoleId == observation.RoleId);
 
-        var latest = await matching
+        Ticket? latest = await matching
             .Where(ticket => ticket.SourceAuditId != null)
             .OrderByDescending(ticket => ticket.SourceAuditId)
             .FirstOrDefaultAsync(ct);
 
-        var operation = observation.OperationId.HasValue
+        Ticket? operation = observation.OperationId.HasValue
             ? await matching.SingleOrDefaultAsync(ticket => ticket.Pending != null && ticket.Pending.Id == observation.OperationId.Value, ct)
             : null;
 
@@ -42,7 +48,7 @@ public sealed partial class TicketCoordinator
             return;
 
         var completedTimeoutOperation = observation is { Action: TicketAction.Timeout, OperationId.HasValue: true }
-            && operation is null;
+                                        && operation is null;
 
         if (completedTimeoutOperation)
         {
@@ -63,19 +69,22 @@ public sealed partial class TicketCoordinator
         await ApplyAuditAsync(db, observation, operationAudits, automodEnabled, latest, operation, older, resolveReviewPermissionAsync, ct);
     }
 
-    private static async Task<bool> ConfirmAuditOperationAsync(Ticket ticket, TicketObservation observation, Func<ulong, Task<bool>> resolveReviewPermissionAsync)
+    private static async Task<bool> ConfirmAuditOperationAsync(
+        Ticket ticket,
+        TicketObservation observation,
+        Func<ulong, Task<bool>> resolveReviewPermissionAsync)
     {
-        var pending = ticket.Pending!;
+        TicketOperation pending = ticket.Pending!;
         var changesTimeout = pending is { Kind: TicketOperationKind.SetTimeoutExpiry, ExpiryUtc: not null };
 
         if (changesTimeout)
         {
-            var timeoutExpiry = pending.ExpiryUtc!.Value;
-            var nativeExpiry = pending.NativeExpiryUtc ?? timeoutExpiry;
+            DateTimeOffset timeoutExpiry = pending.ExpiryUtc!.Value;
+            DateTimeOffset nativeExpiry = pending.NativeExpiryUtc ?? timeoutExpiry;
 
             var matchesRequestedExpiry = timeoutExpiry <= observation.CreatedAtUtc
                 ? observation.Removed
-                : observation.Timeout.TryGet(out var applied) && applied == nativeExpiry;
+                : observation.Timeout.TryGet(out DateTimeOffset applied) && applied == nativeExpiry;
 
             var suspendedRenewal = ticket.ExpirySuspended && pending.RequestedBy is null;
             var canConfirm = matchesRequestedExpiry && ticket.Status == TicketStatus.Active && !suspendedRenewal;
@@ -84,7 +93,7 @@ public sealed partial class TicketCoordinator
                 return false;
 
             var requesterCanReview = pending.RequestedBy is { } requester
-                && await resolveReviewPermissionAsync(requester);
+                                     && await resolveReviewPermissionAsync(requester);
 
             ticket.ConfirmTimeoutChange(observation.CreatedAtUtc, requesterCanReview);
         }
@@ -111,7 +120,7 @@ public sealed partial class TicketCoordinator
         Func<ulong, Task<bool>> resolveReviewPermissionAsync,
         CancellationToken ct)
     {
-        var config = await db.TicketConfigurations.SingleAsync(value => value.GuildId == observation.GuildId, ct);
+        TicketConfiguration config = await db.TicketConfigurations.SingleAsync(value => value.GuildId == observation.GuildId, ct);
 
         if (observation.RestoredTicketNumber is { } restoredNumber)
         {
@@ -120,15 +129,15 @@ public sealed partial class TicketCoordinator
         }
 
         var tracked = observation.Action != TicketAction.Role
-            || (observation.RoleId is { } role && config.TrackedRoleIds.Contains(checked((long)role)));
+                      || (observation.RoleId is { } role && config.TrackedRoleIds.Contains(checked((long)role)));
 
         var continuesTimeout = latest is not null && observation.ContinuesTimeout(latest);
         var captureEnabled = config.Enabled && automodEnabled && config.CaptureFromUtc <= observation.CreatedAtUtc;
 
         var createsTicket = observation is { CreatesTicket: true, OperationId.HasValue: false }
-            && !continuesTimeout
-            && tracked
-            && captureEnabled;
+                            && !continuesTimeout
+                            && tracked
+                            && captureEnabled;
 
         Ticket? created = null;
 
@@ -141,14 +150,14 @@ public sealed partial class TicketCoordinator
         }
 
         var canUpdateWithoutOperation = !observation.OperationId.HasValue
-            || operation is not null
-            || observation.Action is TicketAction.VoiceMute or TicketAction.VoiceDeafen;
+                                        || operation is not null
+                                        || observation.Action is TicketAction.VoiceMute or TicketAction.VoiceDeafen;
 
         var updateLatest = observation.Action != TicketAction.Kick
-            && latest is not null
-            && !older
-            && latest != operation
-            && canUpdateWithoutOperation;
+                           && latest is not null
+                           && !older
+                           && latest != operation
+                           && canUpdateWithoutOperation;
 
         if (updateLatest)
             await UpdateObservedTicketAsync(latest!, created, observation, operationAudits, tracked, continuesTimeout, resolveReviewPermissionAsync);
@@ -162,13 +171,13 @@ public sealed partial class TicketCoordinator
 
     private static async Task RecordRoleRestorationAsync(BotDbContext db, TicketObservation observation, long restoredNumber, CancellationToken ct)
     {
-        var restored = await db.Tickets
+        Ticket? restored = await db.Tickets
             .SingleOrDefaultAsync(
                 ticket => ticket.GuildId == observation.GuildId
-                    && ticket.Number == restoredNumber
-                    && ticket.Action == TicketAction.Role
-                    && ticket.SubjectUserId == observation.SubjectUserId
-                    && ticket.RoleId == observation.RoleId,
+                          && ticket.Number == restoredNumber
+                          && ticket.Action == TicketAction.Role
+                          && ticket.SubjectUserId == observation.SubjectUserId
+                          && ticket.RoleId == observation.RoleId,
                 ct);
 
         var newerRestoration = restored is not null && restored.LastAuditId < observation.AuditId;
@@ -190,13 +199,13 @@ public sealed partial class TicketCoordinator
             .SqlQuery<long>($"SELECT nextval('ticket_numbers') AS \"Value\"")
             .SingleAsync(token);
 
-        var details = ReadDetails(observation);
+        TicketDetails details = ReadDetails(observation);
 
         long? duration = details.HasDuration && details.DurationSeconds != long.MaxValue
             ? details.DurationSeconds
             : null;
 
-        DateTimeOffset? expiry = observation.Timeout.TryGet(out var until)
+        DateTimeOffset? expiry = observation.Timeout.TryGet(out DateTimeOffset until)
             ? until
             : null;
 
@@ -206,7 +215,7 @@ public sealed partial class TicketCoordinator
         if (observation.Action == TicketAction.Kick)
             duration = null;
 
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             GuildId = observation.GuildId,
             Number = number,
@@ -238,21 +247,21 @@ public sealed partial class TicketCoordinator
         Func<ulong, Task<bool>> resolveReviewPermissionAsync)
     {
         var replacedOutsideCapture = observation.CreatesTicket && (!tracked || !continuesTimeout);
-        var hasTimeout = observation.Timeout.TryGet(out var timeout);
+        var hasTimeout = observation.Timeout.TryGet(out DateTimeOffset timeout);
         var updatesTimeout = latest.Status == TicketStatus.Active && hasTimeout;
 
         if (created is not null)
-        {
+
             latest.End(TicketStatus.Superseded, observation.ModeratorUserId, created.Number);
-        }
+
         else if (replacedOutsideCapture)
-        {
+
             latest.End(TicketStatus.Reverted);
-        }
+
         else if (observation.Removed)
         {
             var expired = latest.Action is not (TicketAction.VoiceMute or TicketAction.VoiceDeafen)
-                && latest.ExpiresAtUtc <= observation.CreatedAtUtc;
+                          && latest.ExpiresAtUtc <= observation.CreatedAtUtc;
 
             latest.End(expired ? TicketStatus.Expired : TicketStatus.Reverted, observation.ModeratorUserId);
         }
@@ -261,14 +270,19 @@ public sealed partial class TicketCoordinator
             var duration = Math.Max(1, (long)Math.Ceiling((timeout - latest.CreatedAtUtc).TotalSeconds));
             ulong? moderator = observation.ModeratorIsBot ? null : observation.ModeratorUserId;
             var changesDuration = latest.DurationSeconds != duration || latest.ExpiresAtUtc != timeout;
-            var canReview = moderator is not null && changesDuration && !observation.RequiresApproval && await resolveReviewPermissionAsync(observation.ModeratorUserId);
+
+            var canReview = moderator is not null
+                            && changesDuration
+                            && !observation.RequiresApproval
+                            && await resolveReviewPermissionAsync(observation.ModeratorUserId);
+
             latest.SetDuration(duration, moderator, timeout, canReview, observation.RequiresApproval);
             latest.ObserveTimeoutWindow(timeout, observation.CreatedAtUtc);
         }
 
         var confirmationFollows = latest.Pending is { } pending
-            && operationAudits.TryGetValue(pending.Id, out var audit)
-            && audit > observation.AuditId;
+                                  && operationAudits.TryGetValue(pending.Id, out var audit)
+                                  && audit > observation.AuditId;
 
         if (!confirmationFollows)
             latest.Pending = null;

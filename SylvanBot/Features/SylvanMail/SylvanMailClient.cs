@@ -1,3 +1,5 @@
+﻿using Discord.Rest;
+
 namespace SylvanBot.Features.SylvanMail;
 
 // Owns only the member-facing connection. The unkeyed client always belongs to main Sylvan.
@@ -18,12 +20,9 @@ public sealed class SylvanMailClient : IDisposable
         _main = main;
         _options = options.Value;
         _logger = logger.ForContext<SylvanMailClient>();
-        Client = new DiscordSocketClient(new DiscordSocketConfig
-        {
-            GatewayIntents = GatewayIntents.DirectMessages,
-            AlwaysDownloadUsers = false,
-            MessageCacheSize = 0,
-        });
+
+        Client = new DiscordSocketClient(
+            new DiscordSocketConfig { GatewayIntents = GatewayIntents.DirectMessages, AlwaysDownloadUsers = false, MessageCacheSize = 0 });
 
         _main.Ready += MainReadyAsync;
         _main.Disconnected += MainDisconnectedAsync;
@@ -37,14 +36,14 @@ public sealed class SylvanMailClient : IDisposable
     // Discord.NET retains the Ready session's user on RESUMED, but replaces it on a new READY.
     // ConnectionState closes admission during disconnect; a new session must finish Ready again.
     public bool IsDmReady => _started
-        && Client.ConnectionState == ConnectionState.Connected
-        && _mailReadyUser is not null
-        && ReferenceEquals(Client.CurrentUser, _mailReadyUser);
+                             && Client.ConnectionState == ConnectionState.Connected
+                             && _mailReadyUser is not null
+                             && ReferenceEquals(Client.CurrentUser, _mailReadyUser);
 
     public bool IsReady => IsDmReady
-        && _main.ConnectionState == ConnectionState.Connected
-        && _mainReadyUser is not null
-        && ReferenceEquals(_main.CurrentUser, _mainReadyUser);
+                           && _main.ConnectionState == ConnectionState.Connected
+                           && _mainReadyUser is not null
+                           && ReferenceEquals(_main.CurrentUser, _mainReadyUser);
 
     public void RequireDmReady()
     {
@@ -60,14 +59,14 @@ public sealed class SylvanMailClient : IDisposable
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(60));
 
         try
         {
             await _mainReady.Task.WaitAsync(deadline.Token);
             await Client.LoginAsync(TokenType.Bot, _options.Token).WaitAsync(deadline.Token);
-            var application = await Client.Rest.GetApplicationInfoAsync(new RequestOptions { CancelToken = deadline.Token });
+            RestApplication application = await Client.Rest.GetApplicationInfoAsync(new RequestOptions { CancelToken = deadline.Token });
 
             if (application.Id != _options.BotId || application.Id == _main.CurrentUser.Id)
                 throw new InvalidOperationException("Unexpected SylvanMail bot identity.");
@@ -87,7 +86,7 @@ public sealed class SylvanMailClient : IDisposable
         catch (Exception exception)
         {
             _logger.Error("SylvanMail startup failed: {ExceptionType}", exception.GetType().Name);
-            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using CancellationTokenSource cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await StopAsync(cleanup.Token);
         }
 

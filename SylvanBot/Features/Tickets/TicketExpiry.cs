@@ -1,3 +1,5 @@
+﻿using Discord.Rest;
+
 namespace SylvanBot.Features.Tickets;
 
 using Discord.Net;
@@ -10,7 +12,7 @@ public sealed class TicketExpiry(DiscordSocketClient client, TicketBoundary boun
 {
     internal async Task ReconcileBanAsync(BotDbContext db, Ticket ticket, bool auditCurrent, CancellationToken token)
     {
-        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
 
         if (ticket.SourceAuditId is null)
             ticket.ExpirySuspended = true;
@@ -23,25 +25,28 @@ public sealed class TicketExpiry(DiscordSocketClient client, TicketBoundary boun
             || ticket.Status != TicketStatus.Active
             || ticket.ExpiresAtUtc is null
             || ticket.ExpiresAtUtc > now)
+
             return;
 
+
         // Recheck immediately before unban. A new audit entry must be ingested first.
-        var configuration = await db.TicketConfigurations
+        TicketConfiguration configuration = await db.TicketConfigurations
             .SingleAsync(value => value.GuildId == ticket.GuildId, token);
-        var from = configuration.LastAuditScanAtUtc!.Value;
-        var scan = await boundary.ReadAuditAsync(ticket.GuildId, from.AddMinutes(-10), token);
+
+        DateTimeOffset from = configuration.LastAuditScanAtUtc!.Value;
+        TicketAuditScan scan = await boundary.ReadAuditAsync(ticket.GuildId, from.AddMinutes(-10), token);
 
         var changed = scan.Observations
-           .Any(value => value.Action == TicketAction.Ban
-                    && value.SubjectUserId == ticket.SubjectUserId
-                    && value.AuditId > ticket.LastAuditId
-                    && (!value.OperationId.HasValue || ticket.Pending is null || value.OperationId.Value != ticket.Pending.Id));
+            .Any(value => value.Action == TicketAction.Ban
+                          && value.SubjectUserId == ticket.SubjectUserId
+                          && value.AuditId > ticket.LastAuditId
+                          && (!value.OperationId.HasValue || ticket.Pending is null || value.OperationId.Value != ticket.Pending.Id));
 
         if (changed)
             return;
 
-        var guild = await client.Rest.GetGuildAsync(ticket.GuildId, TicketBoundary.Options(token));
-        var ban = await guild.GetBanAsync(ticket.SubjectUserId, TicketBoundary.Options(token));
+        RestGuild guild = await client.Rest.GetGuildAsync(ticket.GuildId, TicketBoundary.Options(token));
+        RestBan? ban = await guild.GetBanAsync(ticket.SubjectUserId, TicketBoundary.Options(token));
 
         if (ban is null)
         {
@@ -57,7 +62,7 @@ public sealed class TicketExpiry(DiscordSocketClient client, TicketBoundary boun
             await db.SaveChangesAsync(token);
             ticket.Pending.Attempted = true;
             await db.SaveChangesAsync(token);
-            var options = TicketBoundary.Options(token);
+            RequestOptions options = TicketBoundary.Options(token);
             options.AuditLogReason = $"Sylvan ticket {ticket.Number}; operation {ticket.Pending.Id:D}";
 
             try
@@ -69,8 +74,12 @@ public sealed class TicketExpiry(DiscordSocketClient client, TicketBoundary boun
             catch (HttpException exception) when (exception.HttpCode is System.Net.HttpStatusCode.BadRequest or System.Net.HttpStatusCode.Forbidden)
             {
                 // A definitive rejection leaves the restriction intact and the expiry retryable.
-                logger.Warning("Scheduled unban rejected for ticket {TicketId} in guild {GuildId} ({HttpCode})",
-                    ticket.Id, ticket.GuildId, exception.HttpCode);
+                logger.Warning(
+                    "Scheduled unban rejected for ticket {TicketId} in guild {GuildId} ({HttpCode})",
+                    ticket.Id,
+                    ticket.GuildId,
+                    exception.HttpCode);
+
                 ticket.Pending = null;
                 await db.SaveChangesAsync(token);
 
@@ -106,22 +115,22 @@ public sealed class TicketExpiry(DiscordSocketClient client, TicketBoundary boun
         if (!auditCurrent || ticket.ExpirySuspended || ticket.ExpiresAtUtc is null || ticket.ExpiresAtUtc > DateTimeOffset.UtcNow)
             return;
 
-        var gate = persistence.Gate(ticket.GuildId);
+        SemaphoreSlim gate = persistence.Gate(ticket.GuildId);
         await gate.WaitAsync(token);
 
         try
         {
-            var config = await db.TicketConfigurations
-               .SingleAsync(value => value.GuildId == ticket.GuildId, token);
+            TicketConfiguration config = await db.TicketConfigurations
+                .SingleAsync(value => value.GuildId == ticket.GuildId, token);
 
-            var scan = await boundary.ReadAuditAsync(ticket.GuildId, config.LastAuditScanAtUtc!.Value.AddMinutes(-10), token);
+            TicketAuditScan scan = await boundary.ReadAuditAsync(ticket.GuildId, config.LastAuditScanAtUtc!.Value.AddMinutes(-10), token);
 
             var newer = scan.Observations
-               .Any(value => value.Action == TicketAction.Role
-                        && value.SubjectUserId == ticket.SubjectUserId
-                        && value.RoleId == ticket.RoleId
-                        && value.AuditId > ticket.LastAuditId
-                        && (!value.OperationId.HasValue || ticket.Pending == null || value.OperationId.Value != ticket.Pending.Id));
+                .Any(value => value.Action == TicketAction.Role
+                              && value.SubjectUserId == ticket.SubjectUserId
+                              && value.RoleId == ticket.RoleId
+                              && value.AuditId > ticket.LastAuditId
+                              && (!value.OperationId.HasValue || ticket.Pending == null || value.OperationId.Value != ticket.Pending.Id));
 
             if (newer)
                 return;
@@ -133,7 +142,7 @@ public sealed class TicketExpiry(DiscordSocketClient client, TicketBoundary boun
             }
 
             await db.SaveChangesAsync(token);
-            var member = await client.Rest.GetGuildUserAsync(ticket.GuildId, ticket.SubjectUserId, TicketBoundary.Options(token));
+            RestGuildUser? member = await client.Rest.GetGuildUserAsync(ticket.GuildId, ticket.SubjectUserId, TicketBoundary.Options(token));
 
             if (member?.RoleIds.Contains(ticket.RoleId!.Value) == true)
             {
@@ -143,7 +152,7 @@ public sealed class TicketExpiry(DiscordSocketClient client, TicketBoundary boun
                 ticket.Pending.Attempted = true;
                 ticket.Pending.RequestedAtUtc = DateTimeOffset.UtcNow;
                 await db.SaveChangesAsync(token);
-                var options = TicketBoundary.Options(token);
+                RequestOptions options = TicketBoundary.Options(token);
                 options.AuditLogReason = $"Sylvan ticket {ticket.Number}; operation {ticket.Pending.Id:D}";
 
                 try
@@ -159,8 +168,8 @@ public sealed class TicketExpiry(DiscordSocketClient client, TicketBoundary boun
             }
 
             await db.PendingRoles
-               .Where(value => value.GuildId == ticket.GuildId && value.UserId == ticket.SubjectUserId && value.RoleId == ticket.RoleId)
-               .ExecuteDeleteAsync(token);
+                .Where(value => value.GuildId == ticket.GuildId && value.UserId == ticket.SubjectUserId && value.RoleId == ticket.RoleId)
+                .ExecuteDeleteAsync(token);
 
             ticket.End(TicketStatus.Expired);
             ticket.Pending = null;

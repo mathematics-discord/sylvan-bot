@@ -1,4 +1,5 @@
 using SylvanBot.Application.Features.Automod;
+using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Features.Automod;
 using SylvanBot.Interactions;
 
@@ -13,7 +14,11 @@ public sealed partial class ConfigModule
     [RequireContext(ContextType.Guild)]
     [DefaultMemberPermissions(GuildPermission.Administrator)]
     [RequireUserPermission(GuildPermission.Administrator)]
-    public sealed class AutomodConfigModule(AutomodManagement automod, SylvanBot.Features.Tickets.TicketCoordinator tickets, AutomodRuntime runtime, IHostApplicationLifetime lifetime) : SlashCommandBase
+    public sealed class AutomodConfigModule(
+        AutomodManagement automod,
+        SylvanBot.Features.Tickets.TicketCoordinator tickets,
+        AutomodRuntime runtime,
+        IHostApplicationLifetime lifetime) : SlashCommandBase
     {
         [SlashCommand("set", "Enable or disable one automod action, or the shared ticket/Automod system")]
         public async Task SetAsync(
@@ -23,22 +28,31 @@ public sealed partial class ConfigModule
         {
             RequireAdministrator();
             await DeferAsync(ephemeral: false);
+
             Optional<AutomodAction> selectedAction = action is { } selected
                 ? new Optional<AutomodAction>(selected)
                 : default;
 
             if (!selectedAction.HasValue)
             {
-                var actor = new SylvanBot.Application.Features.Tickets.TicketActor(Context.Guild.Id, Context.User.Id, true, false);
+                TicketActor actor = new SylvanBot.Application.Features.Tickets.TicketActor(Context.Guild.Id, Context.User.Id, true, false);
                 await tickets.ConfigureAsync(actor, enabled, null, null, lifetime.ApplicationStopping);
-                await AutomodReply.SendAsync(Context.Interaction, $"Ticket capture and Automod {(enabled ? "enabled" : "disabled")}. Existing restrictions continue to expire and renew.", ephemeral: false);
+
+                await AutomodReply.SendAsync(
+                    Context.Interaction,
+                    $"Ticket capture and Automod {(enabled ? "enabled" : "disabled")}. Existing restrictions continue to expire and renew.",
+                    ephemeral: false);
+
                 return;
             }
 
             var refreshed = await automod.SetEnabledAsync(Context.Guild.Id, selectedAction, enabled, lifetime.ApplicationStopping);
             var target = selectedAction.HasValue ? selectedAction.Value.ToString() : "all actions";
             var state = enabled ? "enabled" : "disabled";
-            var response = $"Automod {target} {state}. Shared system: {(runtime.IsEnabled(Context.Guild.Id) ? "enabled" : "disabled")}. Saved rules and exemptions are retained.";
+
+            var response = $"Automod {target} {state}. Shared system: {(runtime.IsEnabled(Context.Guild.Id) ? "enabled" : "disabled")
+            }. Saved rules and exemptions are retained.";
+
             var includesStoredOnly = !selectedAction.HasValue || selectedAction.Value == AutomodAction.Note;
 
             if (enabled && includesStoredOnly)
@@ -57,6 +71,7 @@ public sealed partial class ConfigModule
 
             await DeferAsync(ephemeral: false);
             var refreshed = await automod.SetExemptAsync(Context.Guild.Id, role.Id, enabled, lifetime.ApplicationStopping);
+
             var response = enabled
                 ? $"Role {role.Id} is exempt from automod."
                 : $"Role {role.Id} is not exempt from automod.";
@@ -71,6 +86,7 @@ public sealed partial class ConfigModule
             await DeferAsync(ephemeral: false);
             ImmutableArray<AutomodAction> disabledActions = await automod.ListDisabledActionsAsync(Context.Guild.Id, lifetime.ApplicationStopping);
             ImmutableArray<ulong> ids = await automod.ListExemptRolesAsync(Context.Guild.Id, lifetime.ApplicationStopping);
+
             IEnumerable<string> statuses = Enum.GetValues<AutomodAction>()
                 .Select(action => $"{action}: {(disabledActions.Contains(action) ? "disabled" : "enabled")}");
 
@@ -78,7 +94,11 @@ public sealed partial class ConfigModule
                 .Select(id => Context.Guild.GetRole(id) is { } role ? $"{role.Name} ({id})" : $"Deleted role ({id})");
 
             var exemptions = ids.IsEmpty ? "No automod exempt roles in this guild." : "Exempt roles:\n" + string.Join("\n", rows);
-            var response = $"Ticket capture and Automod: {(runtime.IsEnabled(Context.Guild.Id) ? "enabled" : "disabled")}\n" + string.Join("\n", statuses) + "\nNote actions are stored but are not executed yet.\n\n" + exemptions;
+
+            var response = $"Ticket capture and Automod: {(runtime.IsEnabled(Context.Guild.Id) ? "enabled" : "disabled")}\n"
+                           + string.Join("\n", statuses)
+                           + "\nNote actions are stored but are not executed yet.\n\n"
+                           + exemptions;
 
             await AutomodReply.SendAsync(Context.Interaction, response, ephemeral: false);
         }

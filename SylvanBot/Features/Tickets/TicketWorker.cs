@@ -1,4 +1,4 @@
-namespace SylvanBot.Features.Tickets;
+﻿namespace SylvanBot.Features.Tickets;
 
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
@@ -40,6 +40,7 @@ public sealed class TicketWorker(
     public void Wake()
     {
         delivery.Wake();
+
         try
         {
             _wake.Release();
@@ -75,17 +76,17 @@ public sealed class TicketWorker(
 
                 try
                 {
-                    foreach (var check in _timeoutChecks.Keys)
+                    foreach ((ulong Guild, ulong User) check in _timeoutChecks.Keys)
                     {
-                        await using var scope = scopes.CreateAsyncScope();
-                        var coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
+                        await using AsyncServiceScope scope = scopes.CreateAsyncScope();
+                        TicketCoordinator coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
                         await coordinator.ScheduleTimeoutChecksAsync(check.Guild, check.User, stoppingToken);
                         _timeoutChecks.TryRemove(check, out _);
                     }
 
-                    await using (var scope = scopes.CreateAsyncScope())
+                    await using (AsyncServiceScope scope = scopes.CreateAsyncScope())
                     {
-                        var coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
+                        TicketCoordinator coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
                         await coordinator.RecoverAutomodBansAsync(stoppingToken);
                     }
 
@@ -119,7 +120,7 @@ public sealed class TicketWorker(
 
     private Task OnConnectedAsync()
     {
-        foreach (var guild in client.Guilds)
+        foreach (SocketGuild guild in client.Guilds)
             _timeoutChecks.TryAdd((guild.Id, 0), 0);
 
         Wake();
@@ -147,7 +148,7 @@ public sealed class TicketWorker(
 
         while (true)
         {
-            await using var db = await contextFactory.CreateDbContextAsync(token);
+            await using BotDbContext db = await contextFactory.CreateDbContextAsync(token);
 
             var afterCursor = cursor;
 
@@ -155,8 +156,9 @@ public sealed class TicketWorker(
                 .AsNoTracking()
                 .Where(config => config.GuildId > afterCursor
                                  && config.CaptureFromUtc != null
-                                 && (config.Enabled || db.Tickets.Any(ticket => ticket.GuildId == config.GuildId
-                                     && (ticket.Status == TicketStatus.Active || ticket.Pending != null))))
+                                 && (config.Enabled
+                                     || db.Tickets.Any(ticket => ticket.GuildId == config.GuildId
+                                                                 && (ticket.Status == TicketStatus.Active || ticket.Pending != null))))
                 .OrderBy(config => config.GuildId)
                 .Take(100)
                 .ToListAsync(token);
@@ -164,21 +166,21 @@ public sealed class TicketWorker(
             if (configurations.Count == 0)
                 return;
 
-            foreach (var config in configurations)
+            foreach (TicketConfiguration config in configurations)
             {
                 var auditCurrent = false;
 
                 try
                 {
-                    await using var scope = scopes.CreateAsyncScope();
-                    var coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
-                    var started = DateTimeOffset.UtcNow;
-                    var from = config.LastAuditScanAtUtc ?? config.CaptureFromUtc!.Value;
+                    await using AsyncServiceScope scope = scopes.CreateAsyncScope();
+                    TicketCoordinator coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
+                    DateTimeOffset started = DateTimeOffset.UtcNow;
+                    DateTimeOffset from = config.LastAuditScanAtUtc ?? config.CaptureFromUtc!.Value;
 
                     if (from < started.AddDays(-45))
                         await coordinator.SuspendRestrictionsAsync(config.GuildId, token);
 
-                    var scan = await boundary.ReadAuditAsync(config.GuildId, from.AddMinutes(-10), token);
+                    TicketAuditScan scan = await boundary.ReadAuditAsync(config.GuildId, from.AddMinutes(-10), token);
                     await coordinator.AcceptScanAsync(config, scan, started, token);
                     auditCurrent = true;
                 }
@@ -198,17 +200,21 @@ public sealed class TicketWorker(
 
                 while (true)
                 {
-                    var now = DateTimeOffset.UtcNow;
+                    DateTimeOffset now = DateTimeOffset.UtcNow;
 
                     List<long> ids = await db.Tickets
                         .AsNoTracking()
                         .Where(ticket => ticket.GuildId == config.GuildId
                                          && ticket.Id > after
                                          && (ticket.Pending != null
-                                             || (ticket.Status == TicketStatus.Active && ticket.Action != TicketAction.VoiceMute
-                                                 && ticket.Action != TicketAction.VoiceDeafen && !ticket.ExpirySuspended && ticket.ExpiresAtUtc <= now)
+                                             || (ticket.Status == TicketStatus.Active
+                                                 && ticket.Action != TicketAction.VoiceMute
+                                                 && ticket.Action != TicketAction.VoiceDeafen
+                                                 && !ticket.ExpirySuspended
+                                                 && ticket.ExpiresAtUtc <= now)
                                              || (ticket.Action == TicketAction.Timeout
-                                                 && ticket.Status == TicketStatus.Active && !ticket.ExpirySuspended
+                                                 && ticket.Status == TicketStatus.Active
+                                                 && !ticket.ExpirySuspended
                                                  && (ticket.TimeoutCheckAtUtc == null || ticket.TimeoutCheckAtUtc <= now))))
                         .OrderBy(ticket => ticket.Id)
                         .Select(ticket => ticket.Id)
@@ -219,11 +225,11 @@ public sealed class TicketWorker(
                         break;
 
                     foreach (var id in ids)
-                    {
+
                         try
                         {
-                            await using var scope = scopes.CreateAsyncScope();
-                            var coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
+                            await using AsyncServiceScope scope = scopes.CreateAsyncScope();
+                            TicketCoordinator coordinator = scope.ServiceProvider.GetRequiredService<TicketCoordinator>();
                             await coordinator.RecoverAsync(config.GuildId, id, auditCurrent, token);
                         }
                         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -238,15 +244,13 @@ public sealed class TicketWorker(
                                 config.GuildId,
                                 exception.GetType().Name);
                         }
-                    }
+
 
                     after = ids[^1];
                 }
-
             }
 
             cursor = configurations[^1].GuildId;
         }
     }
-
 }

@@ -5,6 +5,7 @@ using SylvanBot.Application.Infrastructure.Data;
 namespace SylvanBot.Features.Automod;
 
 using DotNext;
+using Microsoft.EntityFrameworkCore.Storage;
 
 public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, AutomodRuntime runtime)
 {
@@ -29,7 +30,7 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
             })
             .ToImmutableArray();
 
-        await using (var db = await contexts.CreateDbContextAsync(ct))
+        await using (BotDbContext db = await contexts.CreateDbContextAsync(ct))
         {
             db.AutomodRules.AddRange(rules);
             await db.SaveChangesAsync(ct);
@@ -44,12 +45,12 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
     {
         int removed;
 
-        await using (var db = await contexts.CreateDbContextAsync(ct))
-        {
+        await using (BotDbContext db = await contexts.CreateDbContextAsync(ct))
+
             removed = await db.AutomodRules
                 .Where(rule => rule.GuildId == guildId && rule.Id == id)
                 .ExecuteDeleteAsync(ct);
-        }
+
 
         // Refresh even when already absent so a repeated removal can recover a stale snapshot.
         var refreshed = await runtime.RefreshAsync(guildId, ct);
@@ -59,7 +60,7 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
 
     public async Task<ImmutableArray<AutomodRule>> ListAsync(ulong guildId, CancellationToken ct)
     {
-        await using var db = await contexts.CreateDbContextAsync(ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
         AutomodRule[] rules = await db.AutomodRules
             .AsNoTracking()
@@ -72,7 +73,7 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
 
     public async Task<ImmutableArray<AutomodAction>> ListDisabledActionsAsync(ulong guildId, CancellationToken ct)
     {
-        await using var db = await contexts.CreateDbContextAsync(ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
         AutomodAction[] actions = await db.AutomodSettings
             .AsNoTracking()
@@ -90,12 +91,12 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
 
         AutomodAction[] actions = action.HasValue ? [action.Value] : Enum.GetValues<AutomodAction>();
 
-        await using (var db = await contexts.CreateDbContextAsync(ct))
+        await using (BotDbContext db = await contexts.CreateDbContextAsync(ct))
         {
-            await using var transaction = await db.Database.BeginTransactionAsync(ct);
+            await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(ct);
             var storedGuildId = unchecked((long)guildId);
 
-            foreach (var target in actions)
+            foreach (AutomodAction target in actions)
             {
                 var storedAction = (int)target;
 
@@ -115,8 +116,8 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
 
     public async Task<bool> SetExemptAsync(ulong guildId, ulong roleId, bool exempt, CancellationToken ct)
     {
-        await using (var db = await contexts.CreateDbContextAsync(ct))
-        {
+        await using (BotDbContext db = await contexts.CreateDbContextAsync(ct))
+
             if (exempt)
             {
                 // Match the context's ulong-to-bigint conversion and tolerate concurrent duplicate requests.
@@ -129,19 +130,18 @@ public sealed class AutomodManagement(IDbContextFactory<BotDbContext> contexts, 
                     ct);
             }
             else
-            {
+
                 await db.AutomodExemptRoles
                     .Where(role => role.GuildId == guildId && role.RoleId == roleId)
                     .ExecuteDeleteAsync(ct);
-            }
-        }
+
 
         return await runtime.RefreshAsync(guildId, ct);
     }
 
     public async Task<ImmutableArray<ulong>> ListExemptRolesAsync(ulong guildId, CancellationToken ct)
     {
-        await using var db = await contexts.CreateDbContextAsync(ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
         var ids = await db.AutomodExemptRoles
             .AsNoTracking()

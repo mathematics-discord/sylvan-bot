@@ -8,8 +8,8 @@ public sealed class RoleColourOptionTests
     public void Update_EqualSourceAndDisplay_ReturnsFailureWithoutChangingMapping()
     {
         // Arrange
-        var option = RoleColourOption.Create(1, 10, 20).Value;
-        var updatedAt = option.UpdatedAtUtc;
+        RoleColourOption option = RoleColourOption.Create(1, 10, 20).Value;
+        DateTimeOffset updatedAt = option.UpdatedAtUtc;
 
         // Act
         Result<ValueTuple> result = option.Update(30, 30);

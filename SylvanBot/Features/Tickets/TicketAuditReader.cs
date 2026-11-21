@@ -22,18 +22,18 @@ public static class TicketAuditReader
         if (!isSupportedAction)
             return [];
 
-        var observation = ReadObservation(guildId, auditId, entry, botIds, ownBotId);
+        TicketObservation observation = ReadObservation(guildId, auditId, entry, botIds, ownBotId);
         var isKickOrBanChange = action is 20 or 22 or 23;
 
         if (isKickOrBanChange)
             return [observation with { Action = action == 20 ? TicketAction.Kick : TicketAction.Ban, Removed = action == 23 }];
 
-        if (!entry.TryGetProperty("changes", out var changes))
+        if (!entry.TryGetProperty("changes", out JsonElement changes))
             return [];
 
-        var observations = ImmutableArray.CreateBuilder<TicketObservation>();
+        ImmutableArray<TicketObservation>.Builder observations = ImmutableArray.CreateBuilder<TicketObservation>();
 
-        foreach (var change in changes.EnumerateArray())
+        foreach (JsonElement change in changes.EnumerateArray())
         {
             var key = change.GetProperty("key").GetString();
 
@@ -58,11 +58,11 @@ public static class TicketAuditReader
     {
         var subjectId = RequiredId(entry, "target_id");
         var moderatorId = RequiredId(entry, "user_id");
-        var reason = entry.TryGetProperty("reason", out var reasonValue) ? reasonValue.GetString() ?? string.Empty : string.Empty;
+        var reason = entry.TryGetProperty("reason", out JsonElement reasonValue) ? reasonValue.GetString() ?? string.Empty : string.Empty;
         var ownBot = moderatorId == ownBotId;
         var moderatorIsBot = ownBot || botIds.Contains(moderatorId);
 
-        var observation = new TicketObservation
+        TicketObservation observation = new TicketObservation
         {
             GuildId = guildId,
             AuditId = auditId,
@@ -83,10 +83,10 @@ public static class TicketAuditReader
         const string operationMarker = "; operation ";
         var marker = reason.LastIndexOf(operationMarker, Ordinal);
         var hasOperationMarker = marker >= 0;
-        var parsedOperation = Guid.Empty;
+        Guid parsedOperation = Guid.Empty;
 
         var hasOperationId = hasOperationMarker
-            && Guid.TryParseExact(reason[(marker + operationMarker.Length)..], "D", out parsedOperation);
+                             && Guid.TryParseExact(reason[(marker + operationMarker.Length)..], "D", out parsedOperation);
 
         Optional<Guid> operationId = Optional<Guid>.None;
 
@@ -133,8 +133,8 @@ public static class TicketAuditReader
         JsonElement change,
         ImmutableArray<TicketObservation>.Builder observations)
     {
-        var hasOldValue = change.TryGetProperty("old_value", out var oldValue);
-        var hasNewValue = change.TryGetProperty("new_value", out var newValue);
+        var hasOldValue = change.TryGetProperty("old_value", out JsonElement oldValue);
+        var hasNewValue = change.TryGetProperty("new_value", out JsonElement newValue);
         var wasRestricted = hasOldValue && oldValue.ValueKind == JsonValueKind.True;
         var isRestricted = hasNewValue && newValue.ValueKind == JsonValueKind.True;
 
@@ -155,7 +155,7 @@ public static class TicketAuditReader
         JsonElement change,
         ImmutableArray<TicketObservation>.Builder observations)
     {
-        if (!change.TryGetProperty("new_value", out var roles))
+        if (!change.TryGetProperty("new_value", out JsonElement roles))
             return;
 
         IEnumerable<TicketObservation> roleChanges = roles
@@ -170,7 +170,7 @@ public static class TicketAuditReader
 
     public static ulong RequiredId(JsonElement entry, string field)
     {
-        var hasField = entry.TryGetProperty(field, out var value);
+        var hasField = entry.TryGetProperty(field, out JsonElement value);
         var isString = hasField && value.ValueKind == JsonValueKind.String;
         ulong id = 0;
 
@@ -184,7 +184,7 @@ public static class TicketAuditReader
 
     private static DateTimeOffset? ReadTimestamp(JsonElement change, string field)
     {
-        var hasField = change.TryGetProperty(field, out var value);
+        var hasField = change.TryGetProperty(field, out JsonElement value);
         var hasTimestamp = hasField && value.ValueKind != JsonValueKind.Null;
 
         if (!hasTimestamp)

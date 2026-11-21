@@ -7,7 +7,7 @@ public static class AutomodInputParser
     public static ImmutableArray<AutomodPattern> Parse(string input)
     {
         ArgumentNullException.ThrowIfNull(input);
-        var patterns = ImmutableArray.CreateBuilder<AutomodPattern>();
+        ImmutableArray<AutomodPattern>.Builder patterns = ImmutableArray.CreateBuilder<AutomodPattern>();
         var position = 0;
 
         while (true)
@@ -18,7 +18,7 @@ public static class AutomodInputParser
             if (position == input.Length)
                 throw new FormatException("Automod patterns cannot be empty.");
 
-            var matchType = AutomodMatchType.Word;
+            AutomodMatchType matchType = AutomodMatchType.Word;
             string pattern;
 
             if (input[position] == '`')

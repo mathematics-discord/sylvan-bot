@@ -6,12 +6,17 @@ public sealed partial class ConfigModule
 {
     [SlashCommand("tickets", "View or update ticket configuration.")]
     public async Task TicketsAsync(
-        [Summary("enabled", "Enable or disable ticket capture and Automod.")] bool? enabled = null,
-        [Summary("channel", "Staff tickets channel.")] [ChannelTypes(ChannelType.Text)] ITextChannel? channel = null,
-        [Summary("reminder-minutes", "DM reminder interval in minutes (default 1440).")] [MinValue(1)] [MaxValue(35791394)] int? reminderMinutes =
+        [Summary("enabled", "Enable or disable ticket capture and Automod.")]
+        bool? enabled = null,
+        [Summary("channel", "Staff tickets channel.")] [ChannelTypes(ChannelType.Text)]
+        ITextChannel? channel = null,
+        [Summary("reminder-minutes", "DM reminder interval in minutes (default 1440).")] [MinValue(1)] [MaxValue(35791394)]
+        int? reminderMinutes =
             null,
-        [Summary("tracked-role-add", "Create tickets when this role is granted.")] IRole? trackedAdd = null,
-        [Summary("tracked-role-remove", "Stop creating new tickets for this role.")] IRole? trackedRemove = null)
+        [Summary("tracked-role-add", "Create tickets when this role is granted.")]
+        IRole? trackedAdd = null,
+        [Summary("tracked-role-remove", "Stop creating new tickets for this role.")]
+        IRole? trackedRemove = null)
     {
         await DeferAsync(ephemeral: true);
 
@@ -27,9 +32,9 @@ public sealed partial class ConfigModule
         if (trackedAdd is not null && (trackedAdd.Id == trackedRemove?.Id || trackedAdd.Id == Context.Guild.Id || trackedAdd.IsManaged))
             throw new BotCommandException("Choose distinct ordinary roles to track and untrack.");
 
-        var actor = new TicketActor(Context.Guild.Id, moderator.Id, true, moderator.GuildPermissions.ModerateMembers);
+        TicketActor actor = new TicketActor(Context.Guild.Id, moderator.Id, true, moderator.GuildPermissions.ModerateMembers);
 
-        var configuration = await ticketCoordinator.ConfigureAsync(
+        TicketConfiguration configuration = await ticketCoordinator.ConfigureAsync(
             actor,
             enabled,
             channel?.Id,

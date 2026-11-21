@@ -50,15 +50,15 @@ public sealed class WorkingHoursWindow
         if (string.Equals(a: StartText, b: EndText, comparisonType: StringComparison.Ordinal))
             return false;
 
-        var instant = Instant.FromDateTimeOffset(now);
+        Instant instant = Instant.FromDateTimeOffset(now);
 
-        var date = _zone is null ? (instant + Duration.FromMinutes(OffsetMinutes!.Value)).InUtc().Date : instant.InZone(_zone).Date;
+        LocalDate date = _zone is null ? (instant + Duration.FromMinutes(OffsetMinutes!.Value)).InUtc().Date : instant.InZone(_zone).Date;
 
         for (var day = -1; day <= 0; day++)
         {
-            var startDate = date.PlusDays(day);
-            var start = Resolve(date: startDate, time: _start);
-            var end = Resolve(startDate.PlusDays(_overnight ? 1 : 0), time: _end);
+            LocalDate startDate = date.PlusDays(day);
+            Instant start = Resolve(date: startDate, time: _start);
+            Instant end = Resolve(startDate.PlusDays(_overnight ? 1 : 0), time: _end);
 
             if (end > start && instant >= start && instant < end)
                 return true;
@@ -73,6 +73,7 @@ public sealed class WorkingHoursWindow
             (int.Parse(text.AsSpan(start: 0, length: 2), provider: CultureInfo.InvariantCulture) * 3600)
             + (int.Parse(text.AsSpan(start: 3, length: 2), provider: CultureInfo.InvariantCulture) * 60)
             + int.Parse(text.AsSpan(start: 6, length: 2), provider: CultureInfo.InvariantCulture);
+
         var fraction = text.Length > 8 ? text[9..] : string.Empty;
         var ticksText = fraction.PadRight(totalWidth: 7, paddingChar: '0');
         var ticks = long.Parse(ticksText.AsSpan(start: 0, length: 7), provider: CultureInfo.InvariantCulture);
@@ -86,7 +87,7 @@ public sealed class WorkingHoursWindow
 
     private Instant Resolve(LocalDate date, (int Seconds, long FractionTicks) time)
     {
-        var whole = _zone is null
+        Instant whole = _zone is null
             ? date.AtMidnight().InUtc().ToInstant() + Duration.FromSeconds(time.Seconds - (OffsetMinutes!.Value * 60))
             : _zone.ResolveLocal(date.AtMidnight().PlusSeconds(time.Seconds), resolver: Resolver).ToInstant();
 

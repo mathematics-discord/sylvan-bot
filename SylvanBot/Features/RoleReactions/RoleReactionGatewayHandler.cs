@@ -9,12 +9,7 @@ public sealed class RoleReactionGatewayHandler(DiscordSocketClient client, RoleR
 {
     // Producer-consumer: gateway callbacks enqueue; one owned worker performs Discord writes in order.
     private readonly Channel<ReactionWork> _reactions = Channel.CreateBounded<ReactionWork>(
-        new BoundedChannelOptions(256)
-        {
-            SingleReader = true,
-            SingleWriter = false,
-            FullMode = BoundedChannelFullMode.Wait,
-        }
+        new BoundedChannelOptions(256) { SingleReader = true, SingleWriter = false, FullMode = BoundedChannelFullMode.Wait }
     );
 
     public Task InitializeAsync(CancellationToken ct)
@@ -36,7 +31,8 @@ public sealed class RoleReactionGatewayHandler(DiscordSocketClient client, RoleR
     {
         try
         {
-            await foreach (var work in _reactions.Reader.ReadAllAsync(stoppingToken))
+            await foreach (ReactionWork work in _reactions.Reader.ReadAllAsync(stoppingToken))
+
                 try
                 {
                     await coordinator.ProcessReactionAsync(
@@ -90,7 +86,7 @@ public sealed class RoleReactionGatewayHandler(DiscordSocketClient client, RoleR
         if (botReaction || reaction.Channel is not IGuildChannel guildChannel)
             return Task.CompletedTask;
 
-        var work = new ReactionWork(
+        ReactionWork work = new ReactionWork(
             GuildId: guildChannel.GuildId,
             ChannelId: channelId,
             MessageId: messageId,
@@ -99,14 +95,14 @@ public sealed class RoleReactionGatewayHandler(DiscordSocketClient client, RoleR
             Added: added);
 
         if (!_reactions.Writer.TryWrite(work))
-        {
+
             logger.Warning(
                 "Role reaction queue full or closed in guild {GuildId} on message {MessageId} for member {UserId}; toggle the reaction to retry",
                 propertyValue0: work.GuildId,
                 propertyValue1: messageId,
                 propertyValue2: reaction.UserId
             );
-        }
+
 
         return Task.CompletedTask;
     }

@@ -1,7 +1,24 @@
-namespace SylvanBot.Application.Features.Tickets;
-
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Globalization;
+
+namespace SylvanBot.Application.Features.Tickets;
+
+public enum TicketHistoryAction
+{
+    Historical,
+    Approved,
+    SetDuration,
+    SetComment,
+    AppendedComment,
+    HideRequested,
+    Hidden,
+    Unhidden,
+    Expired,
+    Reverted,
+    Superseded,
+    AuditObserved,
+    StaffReverted,
+}
 
 public sealed class TicketHistoryEntry
 {
@@ -33,14 +50,19 @@ public sealed class TicketHistoryEntry
 
     [NotMapped]
     public bool IsModeratorChange => Action == TicketHistoryAction.Historical
-        || (_moderatorId is > 0 && Action is TicketHistoryAction.Approved
-            or TicketHistoryAction.SetComment or TicketHistoryAction.AppendedComment
-            or TicketHistoryAction.SetDuration or TicketHistoryAction.HideRequested
-            or TicketHistoryAction.Hidden or TicketHistoryAction.Unhidden or TicketHistoryAction.StaffReverted);
+                                     || (_moderatorId is > 0
+                                         && Action is TicketHistoryAction.Approved
+                                             or TicketHistoryAction.SetComment
+                                             or TicketHistoryAction.AppendedComment
+                                             or TicketHistoryAction.SetDuration
+                                             or TicketHistoryAction.HideRequested
+                                             or TicketHistoryAction.Hidden
+                                             or TicketHistoryAction.Unhidden
+                                             or TicketHistoryAction.StaffReverted);
 
     [NotMapped]
     public DateTimeOffset Timestamp => _timestamp
-        ?? throw new InvalidOperationException("Historical text has no structured timestamp.");
+                                       ?? throw new InvalidOperationException("Historical text has no structured timestamp.");
 
     // Persisted history from before structured entries.
     private string? HistoricalText { get; set; }
@@ -53,6 +75,7 @@ public sealed class TicketHistoryEntry
             return Description ?? HistoricalText ?? throw new InvalidOperationException("Historical entry has no text.");
 
         var actor = _moderatorId is { } moderator ? $"<@{moderator}>" : "Sylvan";
+
         var action = Action switch
         {
             TicketHistoryAction.Approved => "approved",
@@ -69,6 +92,7 @@ public sealed class TicketHistoryEntry
             TicketHistoryAction.AuditObserved => "recorded an audit update",
             _ => throw new InvalidOperationException("Unknown ticket history action."),
         };
+
         return $"- {actor} {action} at <t:{Timestamp.ToUnixTimeSeconds()}:f>";
     }
 
@@ -77,25 +101,9 @@ public sealed class TicketHistoryEntry
     private string FormatDuration()
     {
         var seconds = _durationSeconds ?? throw new InvalidOperationException("Duration history has no duration.");
+
         return seconds == long.MaxValue
             ? "Permanent"
             : TimeSpan.FromSeconds(seconds).ToString(@"d\.hh\:mm\:ss", CultureInfo.InvariantCulture);
     }
-}
-
-public enum TicketHistoryAction
-{
-    Historical,
-    Approved,
-    SetDuration,
-    SetComment,
-    AppendedComment,
-    HideRequested,
-    Hidden,
-    Unhidden,
-    Expired,
-    Reverted,
-    Superseded,
-    AuditObserved,
-    StaffReverted,
 }

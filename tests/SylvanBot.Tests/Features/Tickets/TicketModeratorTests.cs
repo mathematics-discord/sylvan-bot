@@ -10,7 +10,7 @@ public sealed class TicketModeratorTests
     public void NeedsPromptRefresh_SavedRevision_RefreshesOnlyChangedPrompt(int? displayed, bool expected)
     {
         // Arrange
-        var moderator = new TicketModerator { PromptRevision = displayed };
+        TicketModerator moderator = new TicketModerator { PromptRevision = displayed };
 
         // Act
         var refresh = moderator.NeedsPromptRefresh(4);
@@ -23,12 +23,9 @@ public sealed class TicketModeratorTests
     public void ClearDelivery_PreviousPrompt_DiscardsItsRevision()
     {
         // Arrange
-        var moderator = new TicketModerator
+        TicketModerator moderator = new TicketModerator
         {
-            ActiveTicketId = 10,
-            PromptMessageId = 20,
-            PromptRevision = 4,
-            NextDeliveryUtc = DateTimeOffset.UtcNow.AddDays(1),
+            ActiveTicketId = 10, PromptMessageId = 20, PromptRevision = 4, NextDeliveryUtc = DateTimeOffset.UtcNow.AddDays(1),
         };
 
         // Act
@@ -46,8 +43,8 @@ public sealed class TicketModeratorTests
     public void IsDeliveryDue_UnchangedPrompt_PreservesReminderDeadline()
     {
         // Arrange
-        var now = DateTimeOffset.UtcNow;
-        var moderator = new TicketModerator { ActiveTicketId = 10, PromptRevision = 4, NextDeliveryUtc = now.AddHours(1) };
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        TicketModerator moderator = new TicketModerator { ActiveTicketId = 10, PromptRevision = 4, NextDeliveryUtc = now.AddHours(1) };
 
         // Act
         var due = moderator.IsDeliveryDue(10, now);

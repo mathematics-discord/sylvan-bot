@@ -1,3 +1,4 @@
+using Discord;
 using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Features.Tickets;
 
@@ -8,7 +9,7 @@ public sealed class TicketNotePresentationTests
     [Test]
     public void NoteUsesTheTicketEmbedAndPreservesItsDetails()
     {
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             Action = TicketAction.Note,
             Number = 1415,
@@ -17,7 +18,7 @@ public sealed class TicketNotePresentationTests
             CreatedAtUtc = DateTimeOffset.FromUnixTimeSeconds(1500000000),
         };
 
-        var embed = TicketPresentation.Describe(ticket);
+        Embed embed = TicketPresentation.Describe(ticket);
 
         embed.Author!.Value.Name.ShouldBe("Ticket #1415");
         embed.Title.ShouldBe("Note");

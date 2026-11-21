@@ -12,8 +12,8 @@ public sealed class TicketModerationRulesTests
     public void CanCorrect_OriginalModerator_RequiresMatchingPermission(TicketAction action, bool timeout, bool ban, bool allowed)
     {
         // Arrange
-        var ticket = CreateTicket(action);
-        var actor = new TicketActor(GuildId: 1, UserId: 2, IsAdministrator: false, timeout, ban);
+        Ticket ticket = CreateTicket(action);
+        TicketActor actor = new TicketActor(GuildId: 1, UserId: 2, IsAdministrator: false, timeout, ban);
 
         // Act
         var result = ticket.CanCorrect(actor);
@@ -28,8 +28,15 @@ public sealed class TicketModerationRulesTests
     public void CanCorrect_Actor_EnforcesGuildAndSeniorAccess(ulong guild, ulong user, bool senior, bool expected)
     {
         // Arrange
-        var ticket = CreateTicket(TicketAction.Timeout);
-        var actor = new TicketActor(guild, user, IsAdministrator: false, CanTimeoutMembers: true, CanBanMembers: true, CanViewAuditLog: senior);
+        Ticket ticket = CreateTicket(TicketAction.Timeout);
+
+        TicketActor actor = new TicketActor(
+            guild,
+            user,
+            IsAdministrator: false,
+            CanTimeoutMembers: true,
+            CanBanMembers: true,
+            CanViewAuditLog: senior);
 
         // Act
         var allowed = ticket.CanCorrect(actor);
@@ -47,9 +54,9 @@ public sealed class TicketModerationRulesTests
     public void ContinuesTimeout_LogicalRestriction_KeepsIdentityUntilEnded(int remaining, int newRemaining, bool reverted, bool expected)
     {
         // Arrange
-        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             GuildId = 1,
             SubjectUserId = 2,
@@ -63,7 +70,7 @@ public sealed class TicketModerationRulesTests
         if (reverted)
             ticket.End(TicketStatus.Reverted);
 
-        var observation = new TicketObservation
+        TicketObservation observation = new TicketObservation
         {
             GuildId = 1,
             AuditId = 1,
@@ -88,7 +95,7 @@ public sealed class TicketModerationRulesTests
     public void ClearDelivery_CompletedQueue_CleansBindingOnceAndRetainsChannel()
     {
         // Arrange
-        var moderator = new TicketModerator
+        TicketModerator moderator = new TicketModerator
         {
             UserId = 1,
             ActiveTicketId = 2,
@@ -114,9 +121,9 @@ public sealed class TicketModerationRulesTests
     public void IsDeliveryDue_VersionChangesBeforeDeadline_DoesNotSendAnotherReminder()
     {
         // Arrange
-        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        var moderator = new TicketModerator { ActiveTicketId = 1, NextDeliveryUtc = now.AddMinutes(5) };
+        TicketModerator moderator = new TicketModerator { ActiveTicketId = 1, NextDeliveryUtc = now.AddMinutes(5) };
 
         // Act
         moderator.Version++;
@@ -131,8 +138,8 @@ public sealed class TicketModerationRulesTests
     public void IsDeliveryDue_NewTicketOrExplicitRedelivery_SendsImmediately()
     {
         // Arrange
-        var now = DateTimeOffset.UtcNow;
-        var moderator = new TicketModerator { ActiveTicketId = 1, NextDeliveryUtc = now.AddDays(1) };
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        TicketModerator moderator = new TicketModerator { ActiveTicketId = 1, NextDeliveryUtc = now.AddDays(1) };
 
         // Act
         var newTicketDue = moderator.IsDeliveryDue(ticketId: 2, now);
@@ -151,9 +158,9 @@ public sealed class TicketModerationRulesTests
     public void CanCorrect_NewAction_RequiresOwnerAndMatchingPermission(TicketAction action)
     {
         // Arrange
-        var ticket = CreateTicket(action);
+        Ticket ticket = CreateTicket(action);
 
-        var owner = new TicketActor(
+        TicketActor owner = new TicketActor(
             GuildId: 1,
             UserId: 2,
             IsAdministrator: false,
@@ -179,8 +186,8 @@ public sealed class TicketModerationRulesTests
     public void CanCorrect_AnotherModeratorsNote_RequiresReviewer(bool canReview, bool expected)
     {
         // Arrange
-        var ticket = CreateTicket(TicketAction.Note);
-        var actor = new TicketActor(GuildId: 1, UserId: 9, IsAdministrator: false, CanTimeoutMembers: true, CanViewAuditLog: canReview);
+        Ticket ticket = CreateTicket(TicketAction.Note);
+        TicketActor actor = new TicketActor(GuildId: 1, UserId: 9, IsAdministrator: false, CanTimeoutMembers: true, CanViewAuditLog: canReview);
 
         // Act
         var allowed = ticket.CanCorrect(actor);
@@ -191,7 +198,7 @@ public sealed class TicketModerationRulesTests
 
     private static Ticket CreateTicket(TicketAction action)
     {
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             GuildId = 1,
             Number = 1,

@@ -60,6 +60,7 @@ public sealed partial class ConfigModule
                 change: change,
                 role is null ? default : new Optional<ulong>(role.Id),
                 ct: lifetime.ApplicationStopping);
+
             await WorkingHoursReply.SendAsync(interaction: Context.Interaction, !result.IsSuccessful ? result.Error!.Message : result.Value);
         }
     }

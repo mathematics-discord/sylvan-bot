@@ -40,15 +40,18 @@ public sealed partial class ConfigModule
         Optional<ImageBurstSpamDetectorOptions> settingsResult;
 
         if (showCurrent)
+
             settingsResult = await settingsService.GetCurrentAsync(guildId: Context.Guild.Id, ct: lifetime.ApplicationStopping);
+
         else
         {
-            var saved = await settingsService.UpsertAsync(
+            ImageBurstSpamDetectorOptions saved = await settingsService.UpsertAsync(
                 guildId: Context.Guild.Id,
                 requiredChannelCount: numberOfChannels,
                 requiredAttachmentCount: attachmentCount,
                 burstDurationSeconds: burstDuration,
                 ct: lifetime.ApplicationStopping);
+
             settingsResult = new Optional<ImageBurstSpamDetectorOptions>(saved);
         }
 

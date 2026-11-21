@@ -16,13 +16,14 @@ public sealed class AutomodInputParserTests
         ImmutableArray<AutomodPattern> patterns = AutomodInputParser.Parse(input);
 
         // Assert
-        patterns.ShouldBe(new[]
-        {
-            new AutomodPattern("hello", AutomodMatchType.Word),
-            new AutomodPattern("a{1,3}", AutomodMatchType.Regex),
-            new AutomodPattern("world", AutomodMatchType.Word),
-            new AutomodPattern("x,y", AutomodMatchType.Regex),
-        });
+        patterns.ShouldBe(
+            new[]
+            {
+                new AutomodPattern("hello", AutomodMatchType.Word),
+                new AutomodPattern("a{1,3}", AutomodMatchType.Regex),
+                new AutomodPattern("world", AutomodMatchType.Word),
+                new AutomodPattern("x,y", AutomodMatchType.Regex),
+            });
     }
 
     [TestCase("`\\d+\\s+word`", @"\d+\s+word")]

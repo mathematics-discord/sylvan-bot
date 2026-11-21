@@ -12,7 +12,7 @@ public sealed class SylvanMailReplyTests
     public void Parse_ExplicitBodyMention_PreparesDraft(string text, bool reply, bool ping)
     {
         // Act
-        var draft = SylvanMailReply.Parse(content: text, botId: 42, replyToBot: reply, replyPingEnabled: ping);
+        SylvanMailReply? draft = SylvanMailReply.Parse(content: text, botId: 42, replyToBot: reply, replyPingEnabled: ping);
 
         // Assert
         draft.ShouldNotBeNull();
@@ -23,7 +23,7 @@ public sealed class SylvanMailReplyTests
     public void Parse_PingedReplyToSylvan_PreparesDraft()
     {
         // Act
-        var draft = SylvanMailReply.Parse("hello <@99>", botId: 42, replyToBot: true, replyPingEnabled: true);
+        SylvanMailReply? draft = SylvanMailReply.Parse("hello <@99>", botId: 42, replyToBot: true, replyPingEnabled: true);
 
         // Assert
         draft.ShouldNotBeNull();
@@ -36,7 +36,7 @@ public sealed class SylvanMailReplyTests
     public void Parse_MissingReplyTrigger_LeavesDiscussionUnsent(bool reply, bool ping)
     {
         // Act
-        var draft = SylvanMailReply.Parse("hello <@99>", botId: 42, replyToBot: reply, replyPingEnabled: ping);
+        SylvanMailReply? draft = SylvanMailReply.Parse("hello <@99>", botId: 42, replyToBot: reply, replyPingEnabled: ping);
 
         // Assert
         draft.ShouldBeNull();
@@ -46,10 +46,10 @@ public sealed class SylvanMailReplyTests
     public void Parse_EditedBodyMention_KeepsReplyDraft()
     {
         // Arrange
-        var original = SylvanMailReply.Parse("<@42> hello", botId: 42, replyToBot: true, replyPingEnabled: true);
+        SylvanMailReply? original = SylvanMailReply.Parse("<@42> hello", botId: 42, replyToBot: true, replyPingEnabled: true);
 
         // Act
-        var edited = SylvanMailReply.Parse("hello", botId: 42, replyToBot: true, replyPingEnabled: true);
+        SylvanMailReply? edited = SylvanMailReply.Parse("hello", botId: 42, replyToBot: true, replyPingEnabled: true);
 
         // Assert
         original.ShouldNotBeNull().Content.ShouldBe("hello");
@@ -60,7 +60,7 @@ public sealed class SylvanMailReplyTests
     public void Parse_AttachmentOnlyMention_PreservesEmptyBodyForAttachmentValidation()
     {
         // Act
-        var draft = SylvanMailReply.Parse("<@42>", botId: 42, replyToBot: false, replyPingEnabled: false);
+        SylvanMailReply? draft = SylvanMailReply.Parse("<@42>", botId: 42, replyToBot: false, replyPingEnabled: false);
 
         // Assert
         draft.ShouldNotBeNull();

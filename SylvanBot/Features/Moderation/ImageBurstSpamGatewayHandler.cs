@@ -38,7 +38,7 @@ public sealed class ImageBurstSpamGatewayHandler(
 
     private async Task HandleDetectionAsync(ImageBurstDetection detection)
     {
-        var guild = discordClient.GetGuild(detection.GuildId);
+        SocketGuild guild = discordClient.GetGuild(detection.GuildId);
 
         if (settings.Current(detection.GuildId) is not { HasValue: true, Value: var currentSettings })
             return;
@@ -87,9 +87,9 @@ public sealed class ImageBurstSpamGatewayHandler(
     private bool IsExempt(SocketGuildUser user)
     {
         return _options.ImageBurstSpamAllowlistedUserIds.Contains(user.Id)
-            || user.Roles
-               .Any(role => _options.ImageBurstSpamAllowlistedRoleIds.Contains(role.Id))
-            || HasStaffPermissions(user.GuildPermissions);
+               || user.Roles
+                   .Any(role => _options.ImageBurstSpamAllowlistedRoleIds.Contains(role.Id))
+               || HasStaffPermissions(user.GuildPermissions);
     }
 
     private void Subscribe()
@@ -124,8 +124,8 @@ public sealed class ImageBurstSpamGatewayHandler(
             return default;
 
         ImageBurstAttachment[] attachments = userMessage.Attachments
-           .Select(x => new ImageBurstAttachment(x.Url))
-           .ToArray();
+            .Select(x => new ImageBurstAttachment(x.Url))
+            .ToArray();
 
         return new Optional<ImageBurstMessage>(
             new ImageBurstMessage(

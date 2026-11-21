@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using SylvanBot.Application.Features.Tickets;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using SylvanBot.Application.Features.Automod;
 using SylvanBot.Application.Infrastructure.Data;
 
@@ -18,7 +19,8 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
     private readonly ConcurrentDictionary<ulong, byte> _closedGuilds = new ConcurrentDictionary<ulong, byte>();
 
     public bool IsEnabled(ulong guildId) => !_closedGuilds.ContainsKey(guildId)
-        && Current(guildId).TryGet(out var configuration) && configuration.Enabled;
+                                            && Current(guildId).TryGet(out AutomodConfiguration? configuration)
+                                            && configuration.Enabled;
 
     public void CloseGuild(ulong guildId) => _closedGuilds.TryAdd(guildId, 0);
 
@@ -40,9 +42,12 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
 
         try
         {
-            (AutomodRule[] rules, AutomodExemptRole[] roles, AutomodSettings[] settings, TicketConfiguration[] tickets) = await ReadAsync(default, cancellationToken);
+            (AutomodRule[] rules, AutomodExemptRole[] roles, AutomodSettings[] settings, TicketConfiguration[] tickets) =
+                await ReadAsync(default, cancellationToken);
+
             ILookup<ulong, AutomodRule> rulesByGuild = rules.ToLookup(rule => rule.GuildId);
             ILookup<ulong, ulong> rolesByGuild = roles.ToLookup(role => role.GuildId, role => role.RoleId);
+
             ILookup<ulong, AutomodAction> disabledByGuild = settings
                 .Where(setting => !setting.Enabled)
                 .ToLookup(setting => setting.GuildId, setting => setting.Action);
@@ -54,7 +59,13 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
                 .Union(tickets.Select(configuration => configuration.GuildId));
 
             ImmutableDictionary<ulong, AutomodConfiguration> configurations = guildIds
-                .ToImmutableDictionary(id => id, id => new AutomodConfiguration(rulesByGuild[id], rolesByGuild[id], disabledByGuild[id], tickets.Any(configuration => configuration.GuildId == id && configuration.Enabled)));
+                .ToImmutableDictionary(
+                    id => id,
+                    id => new AutomodConfiguration(
+                        rulesByGuild[id],
+                        rolesByGuild[id],
+                        disabledByGuild[id],
+                        tickets.Any(configuration => configuration.GuildId == id && configuration.Enabled)));
 
             Volatile.Write(ref _configurations, configurations);
             Volatile.Write(ref _loaded, true);
@@ -81,7 +92,9 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
                 if (!_loaded)
                     throw new InvalidOperationException("Automod startup loading has not completed.");
 
-                (AutomodRule[] rules, AutomodExemptRole[] roles, AutomodSettings[] settings, TicketConfiguration[] tickets) = await ReadAsync(new Optional<ulong>(guildId), ct);
+                (AutomodRule[] rules, AutomodExemptRole[] roles, AutomodSettings[] settings, TicketConfiguration[] tickets) =
+                    await ReadAsync(new Optional<ulong>(guildId), ct);
+
                 IEnumerable<ulong> roleIds = roles
                     .Select(role => role.RoleId);
 
@@ -89,10 +102,16 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
                     .Where(setting => !setting.Enabled)
                     .Select(setting => setting.Action);
 
-                var configuration = new AutomodConfiguration(rules, roleIds, disabledActions, tickets.Any(configuration => configuration.Enabled));
-                ImmutableDictionary<ulong, AutomodConfiguration> configurations = rules.Length == 0 && roles.Length == 0 && settings.Length == 0 && tickets.Length == 0
-                    ? _configurations.Remove(guildId)
-                    : _configurations.SetItem(guildId, configuration);
+                AutomodConfiguration configuration = new AutomodConfiguration(
+                    rules,
+                    roleIds,
+                    disabledActions,
+                    tickets.Any(configuration => configuration.Enabled));
+
+                ImmutableDictionary<ulong, AutomodConfiguration> configurations =
+                    rules.Length == 0 && roles.Length == 0 && settings.Length == 0 && tickets.Length == 0
+                        ? _configurations.Remove(guildId)
+                        : _configurations.SetItem(guildId, configuration);
 
                 Volatile.Write(ref _configurations, configurations);
                 return true;
@@ -113,10 +132,13 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
 
     public void Dispose() => _gate.Dispose();
 
-    private async Task<(AutomodRule[] Rules, AutomodExemptRole[] Roles, AutomodSettings[] Settings, TicketConfiguration[] Tickets)> ReadAsync(Optional<ulong> guildId, CancellationToken ct)
+    private async Task<(AutomodRule[] Rules, AutomodExemptRole[] Roles, AutomodSettings[] Settings, TicketConfiguration[] Tickets)> ReadAsync(
+        Optional<ulong> guildId,
+        CancellationToken ct)
     {
-        await using var db = await contexts.CreateDbContextAsync(ct);
-        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+        await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
+
         IQueryable<AutomodRule> rulesQuery = db.AutomodRules
             .AsNoTracking();
 
@@ -132,6 +154,7 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
         if (guildId.HasValue)
         {
             var id = guildId.Value;
+
             ticketsQuery = ticketsQuery
                 .Where(configuration => configuration.GuildId == id);
 

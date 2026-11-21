@@ -13,11 +13,11 @@ public sealed class TicketTimeoutTests
     public void NativeTimeoutExpiry_FiniteDuration_BoundsOnlyNativeWindow(int days)
     {
         // Arrange
-        var expiry = Started.AddDays(days);
-        var expected = days < 28 ? expiry : Started.AddDays(28).AddMinutes(-1);
+        DateTimeOffset expiry = Started.AddDays(days);
+        DateTimeOffset expected = days < 28 ? expiry : Started.AddDays(28).AddMinutes(-1);
 
         // Act
-        var applied = Ticket.NativeTimeoutExpiry(expiry, Started);
+        DateTimeOffset applied = Ticket.NativeTimeoutExpiry(expiry, Started);
 
         // Assert
         applied.ShouldBe(expected);
@@ -30,7 +30,7 @@ public sealed class TicketTimeoutTests
     public void NeedsTimeoutRenewal_LongTimeout_RenewsBeforeWindowExpires(int elapsedDays, bool expected)
     {
         // Arrange
-        var ticket = Create();
+        Ticket ticket = Create();
         Extend(ticket, Started.AddDays(90), Started.AddDays(28));
 
         // Act
@@ -44,10 +44,10 @@ public sealed class TicketTimeoutTests
     public void NativeTimeoutExpiry_SubmillisecondTime_ReturnsStableDiscordTimestamp()
     {
         // Arrange
-        var now = Started.AddTicks(1234567);
+        DateTimeOffset now = Started.AddTicks(1234567);
 
         // Act
-        var applied = Ticket.NativeTimeoutExpiry(now.AddDays(90), now);
+        DateTimeOffset applied = Ticket.NativeTimeoutExpiry(now.AddDays(90), now);
 
         // Assert
         applied.ShouldBe(Started.AddDays(28).AddMinutes(-1).AddMilliseconds(123));
@@ -57,7 +57,7 @@ public sealed class TicketTimeoutTests
     public void NeedsTimeoutRenewal_FinalWindow_DoesNotRenew()
     {
         // Arrange
-        var ticket = Create();
+        Ticket ticket = Create();
 
         // Act
         var due = ticket.NeedsTimeoutRenewal(Started.AddDays(6));
@@ -70,7 +70,7 @@ public sealed class TicketTimeoutTests
     public void NeedsTimeoutRenewal_SuspendedOrEnded_DoesNotRenew()
     {
         // Arrange
-        var ticket = Create();
+        Ticket ticket = Create();
         Extend(ticket, Started.AddDays(90), Started.AddDays(28));
         ticket.ExpirySuspended = true;
 
@@ -89,8 +89,8 @@ public sealed class TicketTimeoutTests
     public void ConfirmTimeoutChange_ModeratorExtension_PreservesDurationAndRequiresReview()
     {
         // Arrange
-        var ticket = Create();
-        var actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: true);
+        Ticket ticket = Create();
+        TicketActor actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: true);
         ticket.Approve(actor, ticket.Version);
 
         // Act
@@ -103,7 +103,7 @@ public sealed class TicketTimeoutTests
         ticket.ApprovedByUserId.ShouldBeNull();
         ticket.Pending.ShouldBeNull();
 
-        var lastChange = ticket.ModificationHistory
+        TicketHistoryEntry lastChange = ticket.ModificationHistory
             .Last();
 
         lastChange.Action.ShouldBe(TicketHistoryAction.SetDuration);
@@ -113,7 +113,7 @@ public sealed class TicketTimeoutTests
     public void ConfirmTimeoutChange_AutomaticRenewal_PreservesDurationAndModeratorHistory()
     {
         // Arrange
-        var ticket = Create();
+        Ticket ticket = Create();
         Extend(ticket, Started.AddDays(90), Started.AddDays(28), requester: 3);
         var historyCount = ticket.ModificationHistory.Count;
 
@@ -134,7 +134,7 @@ public sealed class TicketTimeoutTests
     public void ConfirmTimeoutChange_SuspendedRestriction_ResumesWithConfirmedDuration(int days)
     {
         // Arrange
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             GuildId = 1,
             Number = 1,
@@ -147,8 +147,8 @@ public sealed class TicketTimeoutTests
 
         ticket.Initialise("reason", 7L * 86400);
         ticket.ObserveTimeoutWindow(expiry: null, Started);
-        var expiry = Started.AddDays(days);
-        var nativeExpiry = Ticket.NativeTimeoutExpiry(expiry, Started);
+        DateTimeOffset expiry = Started.AddDays(days);
+        DateTimeOffset nativeExpiry = Ticket.NativeTimeoutExpiry(expiry, Started);
 
         // Act
         Extend(ticket, expiry, nativeExpiry, requester: 3);
@@ -166,7 +166,7 @@ public sealed class TicketTimeoutTests
     public void ConfirmTimeoutChange_PendingOperationWithoutNativeWindow_UsesOriginalNativeExpiry()
     {
         // Arrange
-        var ticket = Create();
+        Ticket ticket = Create();
 
         ticket.BeginTimeoutChange(
             new TicketOperation { Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = Started.AddDays(10), RequestedBy = 3 });
@@ -183,7 +183,7 @@ public sealed class TicketTimeoutTests
     public void ConfirmTimeoutChange_ShortenedIntoPast_EndsRestriction()
     {
         // Arrange
-        var ticket = Create();
+        Ticket ticket = Create();
 
         ticket.BeginTimeoutChange(
             new TicketOperation
@@ -202,7 +202,7 @@ public sealed class TicketTimeoutTests
 
     private static Ticket Create()
     {
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             GuildId = 1,
             Number = 1,

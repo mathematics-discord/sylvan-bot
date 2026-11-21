@@ -7,13 +7,14 @@ internal static class BulkDeleteTranscript
 {
     public static byte[] Create(IEnumerable<(DateTimeOffset Timestamp, string Channel, string Username, string Content)> messages)
     {
-        var transcript = new StringBuilder();
+        StringBuilder transcript = new StringBuilder();
 
-        foreach (var message in messages)
+        foreach ((DateTimeOffset Timestamp, string Channel, string Username, string Content) message in messages)
         {
             var timestamp = message.Timestamp.UtcDateTime.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
             var channel = string.Join(" ", message.Channel.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
             var username = string.Join(" ", message.Username.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
             var lines = message.Content
                 .Replace("\r\n", "\n", StringComparison.Ordinal)
                 .Replace('\r', '\n')

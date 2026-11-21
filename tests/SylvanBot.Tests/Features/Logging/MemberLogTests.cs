@@ -1,5 +1,4 @@
-﻿using DotNext;
-using SylvanBot.Application.Features.Logging;
+﻿using SylvanBot.Application.Features.Logging;
 using SylvanBot.Features.Logging;
 
 namespace SylvanBot.Tests.Features.Logging;
@@ -19,7 +18,7 @@ public sealed class MemberLogTests
     public void NicknameChange_RequiresKnownDifferentValues(string? before, string after, bool expected)
     {
         Optional<string> previous = before is null ? default : new Optional<string>(before);
-        var change = MemberLogEntry.NicknameChanged(1, 42, "alex", previous, after, EventTime);
+        Optional<MemberLogEntry> change = MemberLogEntry.NicknameChanged(1, 42, "alex", previous, after, EventTime);
 
         change.HasValue.ShouldBe(expected);
 
@@ -35,29 +34,35 @@ public sealed class MemberLogTests
     [TestCase(MemberLogEvent.Leave, null, "Member leave", "unavailable")]
     [TestCase(MemberLogEvent.Leave, "Alex", "Member leave", "\"Alex\"")]
     public void Format_PreservesIdentityNicknameAvailabilityAndAbsoluteTime(
-        MemberLogEvent kind, string? nickname, string label, string expectedNickname)
+        MemberLogEvent kind,
+        string? nickname,
+        string label,
+        string expectedNickname)
     {
         Optional<string> capturedNickname = nickname is null ? default : new Optional<string>(nickname);
-        var entry = new MemberLogEntry(1, 42, "alex", capturedNickname, EventTime, kind);
+        MemberLogEntry entry = new MemberLogEntry(1, 42, "alex", capturedNickname, EventTime, kind);
 
-        MemberLogFormatter.Format(entry).ShouldBe(
-            $"{label} | <@42> | ID=42 | username=\"alex\" | nickname={expectedNickname} | 2026-11-21 14:07:00 UTC");
+        MemberLogFormatter
+            .Format(entry)
+            .ShouldBe($"{label} | <@42> | ID=42 | username=\"alex\" | nickname={expectedNickname} | 2026-11-21 14:07:00 UTC");
     }
 
     [Test]
     public void Format_ClearedNickname_ShowsOldValueAndUnset()
     {
-        var entry = MemberLogEntry.NicknameChanged(1, 42, "alex", new Optional<string>("Alex"), string.Empty, EventTime).Value;
+        MemberLogEntry entry = MemberLogEntry.NicknameChanged(1, 42, "alex", new Optional<string>("Alex"), string.Empty, EventTime).Value;
 
-        MemberLogFormatter.Format(entry).ShouldBe(
-            "Nickname change | <@42> | ID=42 | username=\"alex\" | nickname=\"Alex\" → unset | 2026-11-21 14:07:00 UTC");
+        MemberLogFormatter
+            .Format(entry)
+            .ShouldBe("Nickname change | <@42> | ID=42 | username=\"alex\" | nickname=\"Alex\" → unset | 2026-11-21 14:07:00 UTC");
     }
 
     [Test]
     public void Format_UntrustedNames_CannotAddLinesMarkupOrMentions()
     {
         const string name = "**x**\r\n\t\u2028\u2029\u202e<@123> @everyone `|\\\"";
-        var entry = new MemberLogEntry(1, 42, name, new Optional<string>(name), EventTime, MemberLogEvent.Join);
+
+        MemberLogEntry entry = new MemberLogEntry(1, 42, name, new Optional<string>(name), EventTime, MemberLogEvent.Join);
         var line = MemberLogFormatter.Format(entry);
 
         line.ShouldNotContain('\r');
@@ -67,8 +72,8 @@ public sealed class MemberLogTests
         line.ShouldNotContain('\u202e');
         line.ShouldNotContain("<@123>");
         line.ShouldNotContain("@everyone");
-        line.ShouldContain("\\*\\*x\\*\\*");
-        line.ShouldContain("\\u000d\\u000a\\u0009\\u2028\\u2029\\u202e");
+        line.ShouldContain(@"\*\*x\*\*");
+        line.ShouldContain(@"\u000d\u000a\u0009\u2028\u2029\u202e");
         line.ShouldContain("＜＠123＞ ＠everyone \\`\\|\\\\\\\"");
         line.ShouldContain("<@42> | ID=42");
     }

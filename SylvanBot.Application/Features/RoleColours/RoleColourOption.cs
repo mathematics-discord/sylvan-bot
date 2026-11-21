@@ -25,12 +25,11 @@ public sealed class RoleColourOption
             return new Result<RoleColourOption>(OperationFailureException.Validation("RoleColourOption.GuildRequired", "Guild is required."));
 
         if (sourceRoleId == displayRoleId)
-        {
+
             return new Result<RoleColourOption>(
                 OperationFailureException.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different."));
-        }
 
-        var now = DateTimeOffset.UtcNow;
+        DateTimeOffset now = DateTimeOffset.UtcNow;
 
         return new RoleColourOption
         {
@@ -45,10 +44,9 @@ public sealed class RoleColourOption
     public Result<ValueTuple> Update(ulong sourceRoleId, ulong displayRoleId)
     {
         if (sourceRoleId == displayRoleId)
-        {
+
             return new Result<ValueTuple>(
                 OperationFailureException.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different."));
-        }
 
         SourceRoleId = sourceRoleId;
         DisplayRoleId = displayRoleId;

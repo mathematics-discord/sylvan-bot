@@ -19,12 +19,7 @@ public sealed class SylvanMailGatewayHandler(
 {
     // Bounded, transient work only. This is deliberately not a durable queue or a retry worker.
     private readonly Channel<MailWork> _messages = Channel.CreateBounded<MailWork>(
-        new BoundedChannelOptions(64)
-        {
-            SingleReader = true,
-            SingleWriter = false,
-            FullMode = BoundedChannelFullMode.Wait,
-        });
+        new BoundedChannelOptions(64) { SingleReader = true, SingleWriter = false, FullMode = BoundedChannelFullMode.Wait });
 
     public Task InitializeAsync(CancellationToken ct)
     {
@@ -49,11 +44,11 @@ public sealed class SylvanMailGatewayHandler(
     {
         List<Task> pending = [];
         Dictionary<ulong, Task> conversations = new Dictionary<ulong, Task>();
-        using var workers = new SemaphoreSlim(8, 8);
+        using SemaphoreSlim workers = new SemaphoreSlim(8, 8);
 
         try
         {
-            await foreach (var message in _messages.Reader.ReadAllAsync(stoppingToken))
+            await foreach (MailWork message in _messages.Reader.ReadAllAsync(stoppingToken))
             {
                 if (pending.Count >= 64)
                     await Task.WhenAny(pending).WaitAsync(stoppingToken);
@@ -61,16 +56,16 @@ public sealed class SylvanMailGatewayHandler(
                 pending.RemoveAll(task => task.IsCompleted);
 
                 var completed = conversations
-                   .Where(pair => pair.Value.IsCompleted)
-                   .Select(pair => pair.Key)
-                   .ToArray();
+                    .Where(pair => pair.Value.IsCompleted)
+                    .Select(pair => pair.Key)
+                    .ToArray();
 
                 foreach (var user in completed)
                     conversations.Remove(user);
 
                 try
                 {
-                    using var routingTimeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                    using CancellationTokenSource routingTimeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
                     routingTimeout.CancelAfter(TimeSpan.FromSeconds(10));
 
                     Optional<ulong> recipient = message is InboundMail inbound
@@ -80,8 +75,8 @@ public sealed class SylvanMailGatewayHandler(
                     if (recipient is not { HasValue: true, Value: var userId })
                         continue;
 
-                    var previous = conversations.GetValueOrDefault(userId, Task.CompletedTask);
-                    var task = ProcessAfterAsync(message, previous, workers, stoppingToken);
+                    Task previous = conversations.GetValueOrDefault(userId, Task.CompletedTask);
+                    Task task = ProcessAfterAsync(message, previous, workers, stoppingToken);
                     conversations[userId] = task;
                     pending.Add(task);
                 }
@@ -116,9 +111,9 @@ public sealed class SylvanMailGatewayHandler(
 
     private async Task ProcessAfterAsync(MailWork message, Task previous, SemaphoreSlim workers, CancellationToken stoppingToken)
     {
-        using var sourceScope = Serilog.Context.LogContext.PushProperty("SourceId", message.MessageId);
-        using var channelScope = Serilog.Context.LogContext.PushProperty("ChannelId", message.ChannelId);
-        using var operationScope = Serilog.Context.LogContext.PushProperty("MailOperation", message.GetType().Name);
+        using IDisposable sourceScope = Serilog.Context.LogContext.PushProperty("SourceId", message.MessageId);
+        using IDisposable channelScope = Serilog.Context.LogContext.PushProperty("ChannelId", message.ChannelId);
+        using IDisposable operationScope = Serilog.Context.LogContext.PushProperty("MailOperation", message.GetType().Name);
         var started = Stopwatch.GetTimestamp();
         var queueMs = 0.0;
         var acquired = false;
@@ -131,16 +126,16 @@ public sealed class SylvanMailGatewayHandler(
             acquired = true;
             queueMs = Stopwatch.GetElapsedTime(message.QueuedAt).TotalMilliseconds;
             started = Stopwatch.GetTimestamp();
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+            using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             timeout.CancelAfter(TimeSpan.FromMinutes(3));
 
             if (message is InboundMail inbound)
-            {
+
                 await workflow.RelayAsync(inbound.Message, timeout.Token);
-            }
+
             else
             {
-                var action = message switch
+                SylvanMailDraftAction action = message switch
                 {
                     DraftConfirmed confirmation => confirmation.Action,
                     DraftCancelled => SylvanMailDraftAction.Cancel,
@@ -203,12 +198,12 @@ public sealed class SylvanMailGatewayHandler(
         if (source.Channel is not IDMChannel || source is not IUserMessage message || !IsUserMessage(message))
             return Task.CompletedTask;
 
-        var input = ReadMessage(source: message, guildId: null);
+        SylvanMailMessage input = ReadMessage(source: message, guildId: null);
 
         if (!mail.IsReady)
             return RefuseBusyAsync(input, unavailable: true);
 
-        var work = new InboundMail(input);
+        InboundMail work = new InboundMail(input);
 
         return !_messages.Writer.TryWrite(work) ? RefuseBusyAsync(input) : Task.CompletedTask;
     }
@@ -263,7 +258,7 @@ public sealed class SylvanMailGatewayHandler(
 
     private async Task RefuseConfirmationAsync(MailWork work)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using CancellationTokenSource timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         try
         {
@@ -285,13 +280,16 @@ public sealed class SylvanMailGatewayHandler(
 
     private async Task RefuseBusyAsync(SylvanMailMessage message, bool unavailable = false)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using CancellationTokenSource timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         try
         {
             if (unavailable)
+
                 await workflow.RefuseUnavailableAsync(message: message, ct: timeout.Token);
+
             else
+
                 await workflow.RefuseBusyAsync(message: message, ct: timeout.Token);
         }
         catch (Exception exception)
@@ -322,7 +320,7 @@ public sealed class SylvanMailGatewayHandler(
 
     private async Task ReportFailureAsync(SylvanMailMessage message)
     {
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using CancellationTokenSource timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
         try
         {

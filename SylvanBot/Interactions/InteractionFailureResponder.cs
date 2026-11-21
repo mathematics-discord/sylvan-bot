@@ -34,9 +34,10 @@ internal static class InteractionFailureResponder
             IModalInteraction modal => modal.Message?.Id,
             _ => null,
         };
+
         var requiresOwnershipCheck = interaction is IComponentInteraction or IModalInteraction;
         var owned = !requiresOwnershipCheck || (sourceId.HasValue && sourceId.Value != original.Id);
-        var flags = original.Flags ?? MessageFlags.None;
+        MessageFlags flags = original.Flags ?? MessageFlags.None;
         var ephemeral = flags.HasFlag(MessageFlags.Ephemeral);
         var loading = flags.HasFlag(MessageFlags.Loading);
 
@@ -45,6 +46,7 @@ internal static class InteractionFailureResponder
             && original.Components.Count == 0
             && original.Embeds.Count == 0
             && original.Attachments.Count == 0;
+
         var canEdit = owned && (loading || (ephemeral && plainText));
 
         if (canEdit)
@@ -65,7 +67,7 @@ internal static class InteractionFailureResponder
 
     public static string DescribeFailure(IResult result, ILogger interactionLogger)
     {
-        var exception = result is ExecuteResult execution ? execution.Exception : null;
+        Exception? exception = result is ExecuteResult execution ? execution.Exception : null;
 
         // The SDK's generated module callback wraps command faults once before reporting completion.
         if (exception is InteractionException { InnerException: not null } sdkException)
@@ -79,9 +81,13 @@ internal static class InteractionFailureResponder
                 message = refusal.Message;
 
                 if (refusal.InnerException is not null)
+
                     interactionLogger.Warning(exception: refusal, "Command operation failed");
+
                 else
+
                     interactionLogger.Information("Command refused: {Reason}", propertyValue: message);
+
 
                 break;
             case OperationCanceledException:
@@ -105,6 +111,7 @@ internal static class InteractionFailureResponder
                         "The command arguments could not be understood.",
                     _ => GenericFailureMessage,
                 };
+
                 interactionLogger.Information("Command failed: {CommandError}", propertyValue: result.Error);
 
                 break;

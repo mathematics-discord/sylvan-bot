@@ -8,8 +8,8 @@ public sealed class SylvanMailReporting(ISylvanMailDiscord discord, ISylvanMailD
     public async Task ReportAsync(BotDbContext db, SylvanMailMessage message, ulong? threadId, SylvanMailOperation op)
     {
         // Outcome notices still get a bounded attempt when the delivery token has timed out.
-        using var noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var noticeToken = noticeTimeout.Token;
+        using CancellationTokenSource noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        CancellationToken noticeToken = noticeTimeout.Token;
 
         if (string.Equals(a: op.State, "Delivered", comparisonType: StringComparison.Ordinal))
         {
@@ -24,14 +24,15 @@ public sealed class SylvanMailReporting(ISylvanMailDiscord discord, ISylvanMailD
                 return;
 
             var previouslyAcknowledged = await db.SylvanMailOperations
-               .AsNoTracking()
-               .AnyAsync(
+                .AsNoTracking()
+                .AnyAsync(
                     item =>
                         item.GuildId == op.GuildId
                         && item.SourceChannelId == message.SourceChannelId
                         && item.ToStaff
                         && item.AcknowledgementStarted,
                     cancellationToken: noticeToken);
+
             op.AcknowledgementStarted = true;
             await db.SaveChangesAsync(noticeToken);
             Optional<ulong> acknowledgement = await discord.AcknowledgeAsync(source: message, first: !previouslyAcknowledged, ct: noticeToken);
@@ -50,6 +51,7 @@ public sealed class SylvanMailReporting(ISylvanMailDiscord discord, ISylvanMailD
             receiptId: previousReceipt,
             detail: op.Detail,
             ct: noticeToken);
+
         op.ReceiptMessageId = receipt is { HasValue: true, Value: var receiptId } ? receiptId : null;
         await db.SaveChangesAsync(noticeToken);
     }

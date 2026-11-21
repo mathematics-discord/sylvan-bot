@@ -1,8 +1,7 @@
-namespace SylvanBot.Application.Features.Tickets;
-
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.RegularExpressions;
-using Common;
+
+namespace SylvanBot.Application.Features.Tickets;
 
 public sealed record TicketDetails
 {
@@ -36,15 +35,12 @@ public sealed record TicketDetails
         _ => throw new BotCommandException("A positive duration is required."),
     };
 
-    public bool ChangesDuration(long? currentSeconds) => HasDuration
-        && DurationSeconds != (currentSeconds ?? long.MaxValue);
-
     public static TicketDetails ParseReply(string text)
     {
         if (text.Length > Ticket.CommentLimit + 200)
             throw new BotCommandException("The reply is too long. Nothing was changed.");
 
-        var permanent = Permanent.Match(text);
+        Match permanent = Permanent.Match(text);
 
         if (permanent.Success)
             return new TicketDetails(new TicketDurationEdit.Permanent(), ReadComment(text[permanent.Length..]));
@@ -56,7 +52,7 @@ public sealed record TicketDetails
         {
             while (true)
             {
-                var match = DurationItem.Match(text, offset);
+                Match match = DurationItem.Match(text, offset);
 
                 if (!match.Success)
                     break;
@@ -97,7 +93,7 @@ public sealed record TicketDetails
         if (startsWithNumber)
             throw new BotCommandException("Use a duration such as '1 day 8 hours, breaking rules'. Nothing was changed.");
 
-        var comment = ReadComment(remainder);
+        TicketCommentEdit comment = ReadComment(remainder);
 
         if (offset == 0 && comment.Value is TicketCommentEdit.Keep)
             throw new BotCommandException("Supply a duration or a nonblank comment. Nothing was changed.");
@@ -108,17 +104,21 @@ public sealed record TicketDetails
     public static TicketDetails ParseFields(string? duration, string? comment)
     {
         if (duration is null)
+
             return new TicketDetails(
                 new TicketDurationEdit.Keep(),
                 comment is null ? new TicketCommentEdit.Keep() : new TicketCommentEdit.Replace(RequireComment(comment)));
 
-        var details = ParseReply(duration);
+        TicketDetails details = ParseReply(duration);
 
         if (!details.HasDuration || details.Comment.Value is not TicketCommentEdit.Keep)
             throw new BotCommandException("The duration field must contain only a duration or 'permanent'. Nothing was changed.");
 
         return details with { Comment = comment is null ? new TicketCommentEdit.Keep() : new TicketCommentEdit.Replace(RequireComment(comment)) };
     }
+
+    public bool ChangesDuration(long? currentSeconds) => HasDuration
+                                                         && DurationSeconds != (currentSeconds ?? long.MaxValue);
 
     public DateTimeOffset Expiry(DateTimeOffset actionTime)
     {
@@ -137,7 +137,7 @@ public sealed record TicketDetails
 
     public DateTimeOffset TimeoutExpiry(DateTimeOffset actionTime)
     {
-        var expiry = Expiry(actionTime);
+        DateTimeOffset expiry = Expiry(actionTime);
 
         if (expiry == DateTimeOffset.MaxValue)
             throw new BotCommandException("Discord timeouts cannot be permanent. Nothing was changed.");

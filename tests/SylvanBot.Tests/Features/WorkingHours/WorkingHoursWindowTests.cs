@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using CsCheck;
 using SylvanBot.Application.Features.WorkingHours;
 
@@ -21,11 +21,12 @@ public sealed class WorkingHoursWindowTests
                 var magnitude = Math.Abs(offset);
                 var sign = offset < 0 ? "-" : "+";
                 var suffix = string.Create(CultureInfo.InvariantCulture, $"{sign}{magnitude / 60:00}:{magnitude % 60:00}");
-                var window = Window(Clock(start) + suffix, Clock(end) + suffix);
-                var midnight = Utc("2026-10-25T00:00:00Z").AddMinutes(-offset);
+                WorkingHoursWindow window = Window(Clock(start) + suffix, Clock(end) + suffix);
+                DateTimeOffset midnight = Utc("2026-10-25T00:00:00Z").AddMinutes(-offset);
                 var duration = (end - start + 86400) % 86400;
 
                 foreach (var second in new[] { start, end, observation })
+
                 foreach (var tick in new[] { -1, 0, 1 })
                 {
                     var localTicks = (second * TimeSpan.TicksPerSecond) + tick;
@@ -55,11 +56,11 @@ public sealed class WorkingHoursWindowTests
                 var first = $"{Clock(start)}.{startFraction}";
                 var last = $"{Clock(end)}.{endFraction}";
                 var padding = new string('0', zeros);
-                var original = Window(first + "Z", last + "Z");
-                var equivalent = Window(first + padding + "Z", last + padding + "Z");
+                WorkingHoursWindow original = Window(first + "Z", last + "Z");
+                WorkingHoursWindow equivalent = Window(first + padding + "Z", last + padding + "Z");
                 equivalent.StartText.ShouldBe(original.StartText);
                 equivalent.EndText.ShouldBe(original.EndText);
-                var now = Utc("2026-10-25T00:00:00Z").AddSeconds(start);
+                DateTimeOffset now = Utc("2026-10-25T00:00:00Z").AddSeconds(start);
                 equivalent.IsActive(now.AddTicks(1)).ShouldBe(original.IsActive(now.AddTicks(1)));
                 WorkingHoursResponses.Rejection(equivalent, "Rat").ShouldBe(WorkingHoursResponses.Rejection(original, "Rat"));
                 WorkingHoursResponses.Accepted(equivalent).ShouldBe(WorkingHoursResponses.Accepted(original));
@@ -123,7 +124,7 @@ public sealed class WorkingHoursWindowTests
     public void Parse_EquivalentFractions_HaveExactEqualityAndZeroDuration()
     {
         // Act
-        var window = Window("09:00:00.1Z", "09:00:00.100Z");
+        WorkingHoursWindow window = Window("09:00:00.1Z", "09:00:00.100Z");
 
         // Assert
         window.StartText.ShouldBe(window.EndText);
@@ -134,7 +135,7 @@ public sealed class WorkingHoursWindowTests
     public void IsActive_SubTickFraction_CannotTransitionEarly()
     {
         // Arrange
-        var window = Window("09:00:00.0000000000001Z", "10:00:00.9999999999999Z");
+        WorkingHoursWindow window = Window("09:00:00.0000000000001Z", "10:00:00.9999999999999Z");
 
         // Assert
         window.IsActive(Utc("2026-10-25T09:00:00Z")).ShouldBeFalse();
@@ -154,7 +155,7 @@ public sealed class WorkingHoursWindowTests
     public void IsActive_LondonTransitions_ResolvesPairedOccurrences(string start, string end, string now, bool expected)
     {
         // Arrange
-        var window = WorkingHoursTimeParser.Parse(start: start, end: end, "Europe/London").Value;
+        WorkingHoursWindow window = WorkingHoursTimeParser.Parse(start: start, end: end, "Europe/London").Value;
 
         // Assert
         window.IsActive(Utc(now)).ShouldBe(expected);
@@ -166,7 +167,7 @@ public sealed class WorkingHoursWindowTests
     public void IsActive_FractionCarriesAcrossMidnight_UsesNextDatedTick(string now, bool expected)
     {
         // Arrange
-        var window = Window("23:59:59.999999999999Z", "00:30:00Z");
+        WorkingHoursWindow window = Window("23:59:59.999999999999Z", "00:30:00Z");
 
         // Act
         var active = window.IsActive(Utc(now));

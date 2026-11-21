@@ -25,9 +25,9 @@ public sealed partial class ConfigModule
         private async Task ChangeAsync(SocketRole role, bool add)
         {
             await DeferAsync(ephemeral: true);
-            var ct = lifetime.ApplicationStopping;
-            var guild = Context.Guild;
-            var gate = worker.Gate(guild.Id);
+            CancellationToken ct = lifetime.ApplicationStopping;
+            SocketGuild guild = Context.Guild;
+            SemaphoreSlim gate = worker.Gate(guild.Id);
             await gate.WaitAsync(ct);
 
             try
@@ -38,11 +38,14 @@ public sealed partial class ConfigModule
                     return;
                 }
 
-                await using var db = await contexts.CreateDbContextAsync(ct);
+                await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
                 if (add)
+
                     await AddRoleAsync(role, db, ct);
+
                 else
+
                     await RemoveRoleAsync(role, db, ct);
             }
             finally
@@ -53,8 +56,8 @@ public sealed partial class ConfigModule
 
         private async Task AddRoleAsync(SocketRole role, BotDbContext db, CancellationToken ct)
         {
-            var guild = Context.Guild;
-            var actor = (SocketGuildUser)Context.User;
+            SocketGuild guild = Context.Guild;
+            SocketGuildUser actor = (SocketGuildUser)Context.User;
 
             if (!PersistentRolePolicy.IsSafe(guild, role))
             {
@@ -76,7 +79,7 @@ public sealed partial class ConfigModule
                 return;
             }
 
-            var saved = await db.PersistentRoles.FindAsync([guild.Id, role.Id], ct);
+            PersistentRole? saved = await db.PersistentRoles.FindAsync([guild.Id, role.Id], ct);
 
             if (saved is null)
                 db.PersistentRoles.Add(new PersistentRole { GuildId = guild.Id, RoleId = role.Id });
@@ -88,7 +91,7 @@ public sealed partial class ConfigModule
 
         private async Task RemoveRoleAsync(SocketRole role, BotDbContext db, CancellationToken ct)
         {
-            var saved = await db.PersistentRoles.FindAsync([Context.Guild.Id, role.Id], ct);
+            PersistentRole? saved = await db.PersistentRoles.FindAsync([Context.Guild.Id, role.Id], ct);
 
             if (saved is not null)
                 db.PersistentRoles.Remove(saved);
@@ -102,13 +105,13 @@ public sealed partial class ConfigModule
         public async Task ListAsync()
         {
             await DeferAsync(ephemeral: false);
-            await using var db = await contexts.CreateDbContextAsync(lifetime.ApplicationStopping);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(lifetime.ApplicationStopping);
 
             var ids = await db.PersistentRoles
-               .Where(role => role.GuildId == Context.Guild.Id)
-               .Select(role => role.RoleId)
-               .OrderBy(id => id)
-               .ToArrayAsync(lifetime.ApplicationStopping);
+                .Where(role => role.GuildId == Context.Guild.Id)
+                .Select(role => role.RoleId)
+                .OrderBy(id => id)
+                .ToArrayAsync(lifetime.ApplicationStopping);
 
             if (ids.Length == 0)
             {
@@ -122,7 +125,7 @@ public sealed partial class ConfigModule
 
                 foreach (var id in page)
                 {
-                    var role = Context.Guild.GetRole(id);
+                    SocketRole? role = Context.Guild.GetRole(id);
 
                     if (role is null)
                     {
@@ -131,8 +134,8 @@ public sealed partial class ConfigModule
                     }
 
                     var restorationBlocked = !PersistentRolePolicy.IsSafe(Context.Guild, role)
-                        || !Context.Guild.CurrentUser.GuildPermissions.ManageRoles
-                        || Context.Guild.CurrentUser.Hierarchy <= role.Position;
+                                             || !Context.Guild.CurrentUser.GuildPermissions.ManageRoles
+                                             || Context.Guild.CurrentUser.Hierarchy <= role.Position;
 
                     var status = restorationBlocked
                         ? " - restoration blocked"

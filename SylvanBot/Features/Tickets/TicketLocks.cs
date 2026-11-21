@@ -17,7 +17,7 @@ public sealed class TicketLocks(ILogger logger)
 
     public async Task<IDisposable> TicketsAsync(IEnumerable<long> ids, CancellationToken token, [CallerMemberName] string operation = "")
     {
-        var leases = new LeaseSet();
+        LeaseSet leases = new LeaseSet();
 
         try
         {
@@ -39,7 +39,7 @@ public sealed class TicketLocks(ILogger logger)
 
     private async Task<IDisposable> AcquireAsync(string scope, ulong id, CancellationToken token, string operation)
     {
-        var key = (scope, id);
+        (string scope, ulong id) key = (scope, id);
         Entry entry;
 
         // This protects only the dictionary and reference counts, never ticket work.
@@ -54,10 +54,13 @@ public sealed class TicketLocks(ILogger logger)
             entry.Users++;
         }
 
-        var timing = new OperationTiming(logger
-            .ForContext("lock_scope", scope)
-            .ForContext("lock_resource_id", id)
-            .ForContext("ticket_operation", operation), "ticket.gate", "wait");
+        OperationTiming timing = new OperationTiming(
+            logger
+                .ForContext("lock_scope", scope)
+                .ForContext("lock_resource_id", id)
+                .ForContext("ticket_operation", operation),
+            "ticket.gate",
+            "wait");
 
         try
         {
@@ -101,7 +104,7 @@ public sealed class TicketLocks(ILogger logger)
 
         public void Dispose()
         {
-            var current = Interlocked.Exchange(ref _owner, null);
+            TicketLocks? current = Interlocked.Exchange(ref _owner, null);
 
             if (current is null)
                 return;

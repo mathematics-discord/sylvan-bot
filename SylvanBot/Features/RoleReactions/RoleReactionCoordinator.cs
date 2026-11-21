@@ -25,17 +25,17 @@ public sealed class RoleReactionCoordinator(
         bool added,
         CancellationToken ct)
     {
-        var gate = runtime.ForGuild(guildId);
+        SemaphoreSlim gate = runtime.ForGuild(guildId);
         await gate.WaitAsync(ct);
 
         try
         {
             var emojiKey = GetEmojiKey(emote);
-            await using var db = await contextFactory.CreateDbContextAsync(ct);
+            await using BotDbContext db = await contextFactory.CreateDbContextAsync(ct);
 
-            var mapping = await db.RoleReactions
-               .AsNoTracking()
-               .SingleOrDefaultAsync(
+            RoleReaction? mapping = await db.RoleReactions
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
                     mapping =>
                         mapping.GuildId == guildId
                         && mapping.ChannelId == channelId
@@ -46,14 +46,15 @@ public sealed class RoleReactionCoordinator(
             if (mapping is null)
                 return;
 
-            var guild = client.GetGuild(guildId);
+            SocketGuild? guild = client.GetGuild(guildId);
 
             if (guild is null)
                 return;
 
-            var request = new RequestOptions { CancelToken = ct, AuditLogReason = $"Role reaction on message {messageId}" };
+            RequestOptions request = new RequestOptions { CancelToken = ct, AuditLogReason = $"Role reaction on message {messageId}" };
 
-            var member = guild.GetUser(userId) ?? (IGuildUser?)await client.Rest.GetGuildUserAsync(guildId: guildId, id: userId, options: request);
+            IGuildUser? member = guild.GetUser(userId)
+                                 ?? (IGuildUser?)await client.Rest.GetGuildUserAsync(guildId: guildId, id: userId, options: request);
 
             if (member?.IsBot != false)
                 return;
@@ -68,7 +69,7 @@ public sealed class RoleReactionCoordinator(
 
     private async Task UpdateRoleAsync(SocketGuild guild, IGuildUser member, RoleReaction mapping, bool added, RequestOptions request)
     {
-        var role = guild.GetRole(mapping.RoleId);
+        SocketRole? role = guild.GetRole(mapping.RoleId);
 
         Optional<string> roleError = role switch
         {
@@ -93,8 +94,11 @@ public sealed class RoleReactionCoordinator(
         try
         {
             if (added)
+
                 await member.AddRoleAsync(roleId: mapping.RoleId, options: request);
+
             else
+
                 await member.RemoveRoleAsync(roleId: mapping.RoleId, options: request);
         }
         catch (HttpException exception)

@@ -20,32 +20,32 @@ public sealed class InteractionDiagnostics(ILogger logger)
     public static void LogCommandUsage(ILogger interactionLogger, IInteractionContext context, CommandUsageDetails usage)
     {
         interactionLogger
-           .ForContext("method_context", $"{nameof(DiscordInteractionHandler)}.{nameof(LogCommandUsage)}")
-           .ForContext("event_kind", "interaction.command_invoked")
-           .ForContext("component", "interaction_dispatch")
-           .ForContext("outcome", "received")
-           .ForContext("gateway_delay_ms", (DateTimeOffset.UtcNow - context.Interaction.CreatedAt).TotalMilliseconds)
-           .ForContext("command_name", value: usage.CommandName)
-           .ForContext("invoker_user_id", value: context.User.Id)
-           .ForContext("invokee_user_id", value: usage.InvokeeUserId)
-           .ForContext("invokee_username", value: usage.InvokeeUsername)
-           .ForContext("invokee_source", value: usage.InvokeeSource)
-           .Debug("Command invoked");
+            .ForContext("method_context", $"{nameof(DiscordInteractionHandler)}.{nameof(LogCommandUsage)}")
+            .ForContext("event_kind", "interaction.command_invoked")
+            .ForContext("component", "interaction_dispatch")
+            .ForContext("outcome", "received")
+            .ForContext("gateway_delay_ms", (DateTimeOffset.UtcNow - context.Interaction.CreatedAt).TotalMilliseconds)
+            .ForContext("command_name", value: usage.CommandName)
+            .ForContext("invoker_user_id", value: context.User.Id)
+            .ForContext("invokee_user_id", value: usage.InvokeeUserId)
+            .ForContext("invokee_username", value: usage.InvokeeUsername)
+            .ForContext("invokee_source", value: usage.InvokeeSource)
+            .Debug("Command invoked");
     }
 
     public ILogger CreateInteractionDiagnosticsLogger(IInteractionContext context)
     {
-        var interactionLogger = _logger
-           .ForContext("diag_event", value: DiagEventName)
-           .ForContext("service_instance_id", value: _serviceInstanceId)
-           .ForContext("process_id", value: Environment.ProcessId)
-           .ForContext("interaction_id", value: context.Interaction.Id)
-           .ForContext("interaction_type", context.Interaction.Type.ToString());
+        ILogger interactionLogger = _logger
+            .ForContext("diag_event", value: DiagEventName)
+            .ForContext("service_instance_id", value: _serviceInstanceId)
+            .ForContext("process_id", value: Environment.ProcessId)
+            .ForContext("interaction_id", value: context.Interaction.Id)
+            .ForContext("interaction_type", context.Interaction.Type.ToString());
 
         return context.Interaction is SocketInteraction socketInteraction
             ? interactionLogger
-               .ForContext("interaction_name", GetInteractionName(socketInteraction))
-               .ForContext("interaction_created_at_utc", socketInteraction.CreatedAt.UtcDateTime.ToString("O"))
+                .ForContext("interaction_name", GetInteractionName(socketInteraction))
+                .ForContext("interaction_created_at_utc", socketInteraction.CreatedAt.UtcDateTime.ToString("O"))
             : interactionLogger;
     }
 
@@ -68,11 +68,11 @@ public sealed class InteractionDiagnostics(ILogger logger)
 
     private static IEnumerable<SocketSlashCommandDataOption> EnumerateSlashOptions(IReadOnlyCollection<SocketSlashCommandDataOption> options)
     {
-        foreach (var option in options)
+        foreach (SocketSlashCommandDataOption option in options)
         {
             yield return option;
 
-            foreach (var nested in EnumerateSlashOptions(option.Options))
+            foreach (SocketSlashCommandDataOption nested in EnumerateSlashOptions(option.Options))
                 yield return nested;
         }
     }
@@ -108,9 +108,9 @@ public sealed class InteractionDiagnostics(ILogger logger)
 
         while (true)
         {
-            var subCommandOption = options.FirstOrDefault(option =>
-                                                              option.Type is ApplicationCommandOptionType.SubCommand
-                                                                             or ApplicationCommandOptionType.SubCommandGroup);
+            SocketSlashCommandDataOption? subCommandOption = options.FirstOrDefault(option =>
+                option.Type is ApplicationCommandOptionType.SubCommand
+                    or ApplicationCommandOptionType.SubCommandGroup);
 
             if (subCommandOption is null)
                 return string.Join(" ", values: parts);
@@ -126,7 +126,7 @@ public sealed class InteractionDiagnostics(ILogger logger)
 
         IEnumerable<SocketSlashCommandDataOption> options = EnumerateSlashOptions(slashCommand.Data.Options);
 
-        foreach (var option in options)
+        foreach (SocketSlashCommandDataOption option in options)
         {
             if (option.Type is not (ApplicationCommandOptionType.User or ApplicationCommandOptionType.Mentionable))
                 continue;
@@ -165,7 +165,7 @@ public sealed class InteractionDiagnostics(ILogger logger)
 
     private static CommandUsageDetails GetUserContextUsageDetails(SocketUserCommand userCommand)
     {
-        var invokee = userCommand.Data.Member ?? ((IUserCommandInteractionData)userCommand.Data).User;
+        IUser? invokee = userCommand.Data.Member ?? ((IUserCommandInteractionData)userCommand.Data).User;
 
         return new CommandUsageDetails(
             CommandName: userCommand.Data.Name,

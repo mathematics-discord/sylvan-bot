@@ -16,13 +16,13 @@ public sealed class WorkingHoursConfiguration(
 {
     public async Task<Result<string>> UpdateAsync(ulong guildId, WorkingConditionsChange change, Optional<ulong> roleId, CancellationToken ct)
     {
-        var state = runtime.ForGuild(guildId);
+        WorkingHoursGuildState state = runtime.ForGuild(guildId);
         await state.Gate.WaitAsync(ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
-            var settings = await LoadSettingsAsync(db: db, guildId: guildId, ct: ct);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+            WorkingHoursSettings? settings = await LoadSettingsAsync(db: db, guildId: guildId, ct: ct);
             var isNew = settings is null;
             settings ??= new WorkingHoursSettings { GuildId = guildId };
             Result<ValueTuple> validation = ApplyConfigurationChange(settings: settings, change: change, roleId: roleId);
@@ -57,30 +57,29 @@ public sealed class WorkingHoursConfiguration(
 
     private static Task<WorkingHoursSettings?> LoadSettingsAsync(BotDbContext db, ulong guildId, CancellationToken ct) =>
         db.WorkingHoursSettings
-           .Include(settings => settings.EligibleRoles)
-           .SingleOrDefaultAsync(settings => settings.GuildId == guildId, cancellationToken: ct);
+            .Include(settings => settings.EligibleRoles)
+            .SingleOrDefaultAsync(settings => settings.GuildId == guildId, cancellationToken: ct);
 
     private Result<ValueTuple> ApplyConfigurationChange(WorkingHoursSettings settings, WorkingConditionsChange change, Optional<ulong> roleId)
     {
-        var guild = client.GetGuild(settings.GuildId);
+        SocketGuild? guild = client.GetGuild(settings.GuildId);
 
         if (roleId is { HasValue: true, Value: var submittedId })
         {
-            var role = guild?.GetRole(submittedId);
+            SocketRole? role = guild?.GetRole(submittedId);
 
             var available = client.ConnectionState == ConnectionState.Connected && guild is { IsConnected: true };
 
             if (!available || role is null)
-            {
+
                 return new Result<ValueTuple>(
                     OperationFailureException.Validation(description: "The selected role is unavailable in this guild. No settings changed."));
-            }
+
 
             if (change == WorkingConditionsChange.PingRole && role.IsManaged)
-            {
+
                 return new Result<ValueTuple>(
                     OperationFailureException.Validation(description: "An integration-managed role cannot be the ping role."));
-            }
         }
 
         Result<ValueTuple> validation = (change, roleId) switch

@@ -2,5 +2,6 @@
 
 public enum AutomodMatchType
 {
-    Word = 0, Regex = 1,
+    Word = 0,
+    Regex = 1,
 }

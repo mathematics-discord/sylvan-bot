@@ -33,25 +33,25 @@ public static class MemberLogFormatter
 
     private static string Quote(string value)
     {
-        var result = new StringBuilder("\"");
+        StringBuilder result = new StringBuilder("\"");
 
         foreach (var character in value)
         {
-            var category = char.GetUnicodeCategory(character);
+            UnicodeCategory category = char.GetUnicodeCategory(character);
 
             var unsafeControl = char.IsControl(character)
                                 || category is UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator or UnicodeCategory.Format;
 
             if (unsafeControl)
-            {
+
                 result
                     .Append("\\u")
                     .Append(((int)character).ToString("x4", CultureInfo.InvariantCulture));
-            }
+
             else if (character is '<' or '>' or '@')
-            {
+
                 result.Append(character switch { '<' => '＜', '>' => '＞', _ => '＠' });
-            }
+
             else
             {
                 if (character is '\\' or '"' or '*' or '_' or '~' or '`' or '|' or '[' or ']' or '(' or ')' or '#')

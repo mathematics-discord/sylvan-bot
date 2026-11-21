@@ -1,4 +1,4 @@
-using SylvanBot.Interactions;
+﻿using SylvanBot.Interactions;
 
 namespace SylvanBot.Features.EmojiYoink;
 
@@ -26,7 +26,7 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
 
     private async Task ExecuteAsync(Result<Emote> sourceResult, bool rejectLocalSource)
     {
-        var guild = Context.Guild;
+        SocketGuild? guild = Context.Guild;
 
         if (guild is null)
         {
@@ -42,7 +42,7 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
             return;
         }
 
-        var source = sourceResult.Value;
+        Emote source = sourceResult.Value;
 
         if (rejectLocalSource && guild.Emotes.Any(emote => emote.Id == source.Id))
         {
@@ -54,12 +54,15 @@ public sealed class EmojiYoinkModule(DiscordGuildEmojiImporter importer) : Slash
         await DeferAsync().ConfigureAwait(false);
 
         Result<GuildEmote> result = await importer
-           .ImportAsync(guild: guild, moderator: Context.User, source: source, ct: CancellationToken.None)
-           .ConfigureAwait(false);
+            .ImportAsync(guild: guild, moderator: Context.User, source: source, ct: CancellationToken.None)
+            .ConfigureAwait(false);
 
         if (result.IsSuccessful)
+
             await FollowupAsync($"Added emoji {result.Value}.").ConfigureAwait(false);
+
         else
+
             await FollowupAsync(result.Error!.Message).ConfigureAwait(false);
     }
 }

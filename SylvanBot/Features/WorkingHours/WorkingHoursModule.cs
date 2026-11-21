@@ -27,6 +27,7 @@ public sealed class WorkingHoursModule(WorkingHoursSchedules coordinator, IHostA
             end: end,
             timezone: timezone,
             ct: lifetime.ApplicationStopping);
+
         await WorkingHoursReply.SendAsync(interaction: Context.Interaction, !result.IsSuccessful ? result.Error!.Message : result.Value);
     }
 }

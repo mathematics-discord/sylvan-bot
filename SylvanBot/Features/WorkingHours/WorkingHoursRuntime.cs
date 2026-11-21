@@ -11,26 +11,27 @@ public sealed class WorkingHoursRuntime : IDisposable
 
     public void DataReady(ulong? guildId = null)
     {
-        foreach (var (id, state) in _guilds)
+        foreach ((var id, WorkingHoursGuildState state) in _guilds)
+
             if (!guildId.HasValue || id == guildId.Value)
                 state.Invalidate();
     }
 
     public void MemberChanged(SocketGuildUser member)
     {
-        if (_guilds.TryGetValue(key: member.Guild.Id, out var state))
+        if (_guilds.TryGetValue(key: member.Guild.Id, out WorkingHoursGuildState? state))
             state.Observe(member);
     }
 
     public void MemberLeft(ulong guildId, ulong memberId)
     {
-        if (_guilds.TryGetValue(key: guildId, out var state))
+        if (_guilds.TryGetValue(key: guildId, out WorkingHoursGuildState? state))
             state.MemberLeft(memberId);
     }
 
     public void Dispose()
     {
-        foreach (var state in _guilds.Values)
+        foreach (WorkingHoursGuildState state in _guilds.Values)
             state.Dispose();
     }
 }

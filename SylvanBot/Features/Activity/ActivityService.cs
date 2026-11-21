@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.Activity;
 using SylvanBot.Application.Infrastructure.Data;
@@ -12,12 +12,12 @@ public sealed class ActivityService(IDbContextFactory<BotDbContext> contexts)
 
     public async Task RunAsync(ulong guildId, Func<BotDbContext, Task> action, CancellationToken ct)
     {
-        var gate = _gates.GetOrAdd(guildId, _ => new SemaphoreSlim(1, 1));
+        SemaphoreSlim gate = _gates.GetOrAdd(guildId, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync(ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
             await action(db);
         }
         finally
@@ -51,12 +51,12 @@ public sealed class ActivityService(IDbContextFactory<BotDbContext> contexts)
             channel.Guild.Id,
             async db =>
             {
-                var settings = await db.ActivitySettings.FindAsync([channel.Guild.Id], ct);
+                ActivitySettings? settings = await db.ActivitySettings.FindAsync([channel.Guild.Id], ct);
 
                 if (settings is null || settings.Role1Id == 0)
                     return;
 
-                var member = await db.ActivityMembers.FindAsync([channel.Guild.Id, message.Author.Id], ct);
+                ActivityMember? member = await db.ActivityMembers.FindAsync([channel.Guild.Id, message.Author.Id], ct);
 
                 if (member is { OptedOut: true })
                     return;
@@ -71,7 +71,7 @@ public sealed class ActivityService(IDbContextFactory<BotDbContext> contexts)
                 if (duplicate)
                     return;
 
-                var parent = channel is SocketThreadChannel thread ? thread.ParentChannel : channel;
+                SocketGuildChannel parent = channel is SocketThreadChannel thread ? thread.ParentChannel : channel;
                 var categoryId = parent is SocketForumChannel forum ? forum.CategoryId : (parent as SocketTextChannel)?.CategoryId;
 
                 Dictionary<ulong, decimal> weights = await db.ActivityWeights
@@ -79,8 +79,8 @@ public sealed class ActivityService(IDbContextFactory<BotDbContext> contexts)
                     .ToDictionaryAsync(row => row.ChannelId, row => row.Weight, ct);
 
                 var weight = ResolveWeight(weights, channel.Id, parent.Id, categoryId);
-                var now = DateTimeOffset.UtcNow;
-                var cutoff = now.AddHours(-24);
+                DateTimeOffset now = DateTimeOffset.UtcNow;
+                DateTimeOffset cutoff = now.AddHours(-24);
 
                 var recent = await db.ActivityAwards
                     .Where(row => row.GuildId == channel.Guild.Id && row.UserId == member.UserId && row.AwardedAt > cutoff)
@@ -107,7 +107,7 @@ public sealed class ActivityService(IDbContextFactory<BotDbContext> contexts)
 
     public static async Task ReconcileAsync(SocketGuild guild, ActivityMember member, ActivitySettings settings, CancellationToken ct)
     {
-        var user = await ((IGuild)guild).GetUserAsync(member.UserId, options: new RequestOptions { CancelToken = ct });
+        IGuildUser? user = await ((IGuild)guild).GetUserAsync(member.UserId, options: new RequestOptions { CancelToken = ct });
 
         if (user is null)
             return;
@@ -115,16 +115,21 @@ public sealed class ActivityService(IDbContextFactory<BotDbContext> contexts)
         ulong desired = 0;
 
         if (!member.OptedOut && settings.Role1Id != 0)
+
             if (member.Xp >= settings.Role1Score)
+
                 desired = settings.Role1Id;
+
             else if (member.Xp >= settings.Role2Score)
+
                 desired = settings.Role2Id;
 
-        var options = new RequestOptions { CancelToken = ct, AuditLogReason = "Activity XP role update" };
+
+        RequestOptions options = new RequestOptions { CancelToken = ct, AuditLogReason = "Activity XP role update" };
 
         if (desired != 0 && !user.RoleIds.Contains(desired))
         {
-            var role = guild.GetRole(desired) ?? throw new BotCommandException("An activity role no longer exists.");
+            SocketRole role = guild.GetRole(desired) ?? throw new BotCommandException("An activity role no longer exists.");
             DotNext.Optional<string> error = RoleReactionPolicy.ValidateRole(guild, role);
 
             if (error.HasValue)
@@ -155,7 +160,7 @@ public sealed class ActivityService(IDbContextFactory<BotDbContext> contexts)
                 UserId = member.UserId,
                 MessageId = messageId,
                 AwardedAt = awardedAt,
-                Xp = xp
+                Xp = xp,
             });
     }
 }

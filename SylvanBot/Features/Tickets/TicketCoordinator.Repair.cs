@@ -1,3 +1,6 @@
+﻿using Discord.Rest;
+using SylvanBot.Application.Infrastructure.Data;
+
 namespace SylvanBot.Features.Tickets;
 
 using Microsoft.EntityFrameworkCore;
@@ -18,8 +21,9 @@ public sealed partial class TicketCoordinator
 
         using (await LockTicketAsync(actor.GuildId, number, token))
         {
-            await using var db = await contexts.CreateDbContextAsync(token);
-            var ticket = await db.Tickets
+            await using BotDbContext db = await contexts.CreateDbContextAsync(token);
+
+            Ticket ticket = await db.Tickets
                 .SingleAsync(value => value.GuildId == actor.GuildId && value.Number == number, token);
 
             if (messageLink is null && !resend)
@@ -27,12 +31,12 @@ public sealed partial class TicketCoordinator
                 IEnumerable<string> references = ticket.Publications
                     .OrderByDescending(reference => reference.MessageId)
                     .Select(reference => $"[Message]({TicketPresentation.Link(actor.GuildId, reference.ChannelId, reference.MessageId)}): "
-                        + (reference.Removed ? "removed" : reference.Current ? "current" : "superseded"));
+                                         + (reference.Removed ? "removed" : reference.Current ? "current" : "superseded"));
 
-                return ( $"Ticket #{number}: {(ticket.Hidden ? "hidden" : "visible")}; "
-                    + $"publication {(ticket.SendUncertain ? "uncertain" : "not uncertain")}.\n"
-                    + string.Join("\n", references.Take(10))
-                    + "\nCheck the channel before using `message` to adopt a copy or `resend: true` to retry.");
+                return ($"Ticket #{number}: {(ticket.Hidden ? "hidden" : "visible")}; "
+                        + $"publication {(ticket.SendUncertain ? "uncertain" : "not uncertain")}.\n"
+                        + string.Join("\n", references.Take(10))
+                        + "\nCheck the channel before using `message` to adopt a copy or `resend: true` to retry.");
             }
 
             if (ticket.Hidden)
@@ -40,27 +44,38 @@ public sealed partial class TicketCoordinator
 
             if (messageLink is not null)
             {
-                var reference = TicketReference.ParseMessageLink(messageLink, actor.GuildId);
-                var guild = await client.Rest.GetGuildAsync(actor.GuildId, TicketBoundary.Options(token));
-                var channel = await guild.GetTextChannelAsync(reference.ChannelId, options: TicketBoundary.Options(token))
-                    ?? throw new BotCommandException("The message channel is unavailable in this server.");
-                var message = await channel.GetMessageAsync(reference.MessageId, options: TicketBoundary.Options(token));
+                TicketMessage reference = TicketReference.ParseMessageLink(messageLink, actor.GuildId);
+                RestGuild guild = await client.Rest.GetGuildAsync(actor.GuildId, TicketBoundary.Options(token));
+
+                RestTextChannel channel = await guild.GetTextChannelAsync(reference.ChannelId, options: TicketBoundary.Options(token))
+                                          ?? throw new BotCommandException("The message channel is unavailable in this server.");
+
+                RestMessage? message = await channel.GetMessageAsync(reference.MessageId, options: TicketBoundary.Options(token));
                 var expectedAuthor = $"Ticket #{ticket.Number}";
-                if (message is null || message.Author.Id != client.CurrentUser.Id
+
+                if (message is null
+                    || message.Author.Id != client.CurrentUser.Id
                     || !message.Embeds.Any(embed => string.Equals(embed.Author?.Name, expectedAuthor, StringComparison.Ordinal)))
+
                     throw new BotCommandException("That message is not a Sylvan publication of this ticket.");
 
+
                 var belongsElsewhere = await db.Tickets
-                    .AnyAsync(value => value.Id != ticket.Id && value.Publications.Any(publication =>
-                        publication.ChannelId == reference.ChannelId && publication.MessageId == reference.MessageId), token);
+                    .AnyAsync(
+                        value => value.Id != ticket.Id
+                                 && value.Publications.Any(publication =>
+                                     publication.ChannelId == reference.ChannelId && publication.MessageId == reference.MessageId),
+                        token);
+
                 if (belongsElsewhere)
                     throw new BotCommandException("That message is already recorded against another ticket.");
 
-                foreach (var publication in ticket.Publications)
+                foreach (TicketPublication publication in ticket.Publications)
                     publication.Current = false;
 
-                var adopted = ticket.Publications
+                TicketPublication? adopted = ticket.Publications
                     .SingleOrDefault(publication => publication.ChannelId == reference.ChannelId && publication.MessageId == reference.MessageId);
+
                 if (adopted is null)
                 {
                     adopted = new TicketPublication { ChannelId = reference.ChannelId, MessageId = reference.MessageId };
@@ -68,26 +83,30 @@ public sealed partial class TicketCoordinator
                 }
 
                 adopted.Format = message.Flags?.HasFlag(MessageFlags.ComponentsV2) == true
-                    ? TicketPublicationFormat.ComponentsV2 : TicketPublicationFormat.Embed;
+                    ? TicketPublicationFormat.ComponentsV2
+                    : TicketPublicationFormat.Embed;
+
                 adopted.Current = true;
                 adopted.Removed = false;
                 adopted.Revision = -1;
             }
 
-            foreach (var publication in ticket.Publications)
+            foreach (TicketPublication publication in ticket.Publications)
+
                 if (!publication.Removed)
                     publication.Revision = -1;
+
 
             ticket.SendUncertain = false;
             await db.SaveChangesAsync(token);
             ticketId = ticket.Id;
         }
 
-        var outcome = await publisher.SynchronizeAsync(actor.GuildId, ticketId, token, allowDisabled: true);
+        TicketPublicationResult outcome = await publisher.SynchronizeAsync(actor.GuildId, ticketId, token, allowDisabled: true);
 
         if (outcome.Changed)
             reviewSummary.MarkDirty(actor.GuildId);
 
-        return ( $"Publication repair saved for ticket #{number}." + "\n" + outcome.Message);
+        return ($"Publication repair saved for ticket #{number}." + "\n" + outcome.Message);
     }
 }

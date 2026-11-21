@@ -3,16 +3,24 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace SylvanBot.Application.Features.Activity;
 
-public sealed class ActivityMapping : IEntityTypeConfiguration<ActivitySettings>, IEntityTypeConfiguration<ActivityWeight>,
-    IEntityTypeConfiguration<ActivityMember>, IEntityTypeConfiguration<ActivityAward>
+public sealed class ActivityMapping : IEntityTypeConfiguration<ActivitySettings>,
+    IEntityTypeConfiguration<ActivityWeight>,
+    IEntityTypeConfiguration<ActivityMember>,
+    IEntityTypeConfiguration<ActivityAward>
 {
     public void Configure(EntityTypeBuilder<ActivitySettings> builder)
     {
-        builder.ToTable("activity_settings", table =>
-        {
-            table.HasCheckConstraint("CK_activity_cap", "\"MaxDaily\" >= 0");
-            table.HasCheckConstraint("CK_activity_scores", "(\"Role1Id\" = 0 AND \"Role2Id\" = 0 AND \"Role1Score\" = 0 AND \"Role2Score\" = 0) OR (\"Role1Id\" <> 0 AND \"Role2Id\" <> 0 AND \"Role1Id\" <> \"Role2Id\" AND \"Role1Score\" > \"Role2Score\" AND \"Role2Score\" > 1000)");
-        });
+        builder.ToTable(
+            "activity_settings",
+            table =>
+            {
+                table.HasCheckConstraint("CK_activity_cap", "\"MaxDaily\" >= 0");
+
+                table.HasCheckConstraint(
+                    "CK_activity_scores",
+                    "(\"Role1Id\" = 0 AND \"Role2Id\" = 0 AND \"Role1Score\" = 0 AND \"Role2Score\" = 0) OR (\"Role1Id\" <> 0 AND \"Role2Id\" <> 0 AND \"Role1Id\" <> \"Role2Id\" AND \"Role1Score\" > \"Role2Score\" AND \"Role2Score\" > 1000)");
+            });
+
         builder.HasKey(row => row.GuildId);
         builder.Property(row => row.GuildId).ValueGeneratedNever();
     }

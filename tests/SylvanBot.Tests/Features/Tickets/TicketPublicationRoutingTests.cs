@@ -8,9 +8,9 @@ public sealed class TicketPublicationRoutingTests
     public void PublicationChannel_ExistingPost_PreservesItsChannel()
     {
         // Arrange
-        var ticket = new Ticket();
+        Ticket ticket = new Ticket();
         ticket.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 100, Removed = true });
-        var configuration = new TicketConfiguration { DestinationChannelId = 20 };
+        TicketConfiguration configuration = new TicketConfiguration { DestinationChannelId = 20 };
 
         // Act
         var channel = configuration.PublicationChannel(ticket);

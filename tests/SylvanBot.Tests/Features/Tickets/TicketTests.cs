@@ -8,8 +8,8 @@ public sealed class TicketTests
     public void CompleteStaffReversal_RepeatedConfirmation_RetainsRequesterOnce()
     {
         // Arrange
-        var ticket = Create(TicketAction.Ban);
-        var timestamp = DateTimeOffset.UtcNow;
+        Ticket ticket = Create(TicketAction.Ban);
+        DateTimeOffset timestamp = DateTimeOffset.UtcNow;
 
         // Act
         ticket.CompleteStaffReversal(moderatorId: 42, timestamp);
@@ -27,7 +27,7 @@ public sealed class TicketTests
     public void Initialise_NoteAtCommentLimit_PreservesComment()
     {
         // Arrange
-        var ticket = Create(TicketAction.Note);
+        Ticket ticket = Create(TicketAction.Note);
         var comment = new string(c: 'a', Ticket.CommentLimit);
 
         // Act
@@ -42,13 +42,15 @@ public sealed class TicketTests
     [Test]
     [Combinatorial]
     public void SetHidden_ActiveRestriction_RejectsVisibilityChange(
-        [Values(TicketAction.Ban, TicketAction.Timeout, TicketAction.VoiceMute, TicketAction.VoiceDeafen, TicketAction.Role)] TicketAction action,
-        [Values] bool pendingOperation)
+        [Values(TicketAction.Ban, TicketAction.Timeout, TicketAction.VoiceMute, TicketAction.VoiceDeafen, TicketAction.Role)]
+        TicketAction action,
+        [Values]
+        bool pendingOperation)
     {
         // Arrange
-        var ticket = Create(action);
+        Ticket ticket = Create(action);
 
-        var pending = pendingOperation
+        TicketOperation? pending = pendingOperation
             ? new TicketOperation
             {
                 Kind = action == TicketAction.Ban ? TicketOperationKind.RemoveBan : TicketOperationKind.SetTimeoutExpiry,
@@ -59,7 +61,7 @@ public sealed class TicketTests
         ticket.Pending = pending;
         DateTimeOffset? expiry = ticket.ExpiresAtUtc;
         var version = ticket.Version;
-        var actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: false);
+        TicketActor actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: false);
 
         // Act
         void Act()
@@ -85,8 +87,8 @@ public sealed class TicketTests
     public void SetHidden_RevertedRestriction_HidesRecord(TicketAction action)
     {
         // Arrange
-        var ticket = Create(action);
-        var actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: false);
+        Ticket ticket = Create(action);
+        TicketActor actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: false);
         ticket.End(TicketStatus.Reverted, actor.UserId);
 
         // Act
@@ -106,8 +108,8 @@ public sealed class TicketTests
     public void SetHidden_RestoringEndedAction_ChangesOnlyVisibility(TicketAction action)
     {
         // Arrange
-        var ticket = Create(action);
-        var actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: false);
+        Ticket ticket = Create(action);
+        TicketActor actor = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: true, CanTimeoutMembers: false);
         ticket.End(TicketStatus.Reverted);
         ticket.SetHidden(actor, ticket.Version, hidden: true);
 
@@ -125,8 +127,8 @@ public sealed class TicketTests
     public void ValidateEdit_InvalidCombinedTimeoutEdit_PreservesAllFields(string duration, string comment)
     {
         // Arrange
-        var ticket = Create(TicketAction.Timeout);
-        var details = TicketDetails.ParseFields(duration, comment);
+        Ticket ticket = Create(TicketAction.Timeout);
+        TicketDetails details = TicketDetails.ParseFields(duration, comment);
         var version = ticket.Version;
 
         // Act
@@ -150,8 +152,8 @@ public sealed class TicketTests
     public void ValidateEdit_ArbitraryTimeoutDuration_AcceptsWithoutClamping(long seconds)
     {
         // Arrange
-        var ticket = Create(TicketAction.Timeout);
-        var details = new TicketDetails(new TicketDurationEdit.Set(seconds), new TicketCommentEdit.Keep());
+        Ticket ticket = Create(TicketAction.Timeout);
+        TicketDetails details = new TicketDetails(new TicketDurationEdit.Set(seconds), new TicketCommentEdit.Keep());
 
         // Act
         var comment = ticket.ValidateEdit(details);
@@ -165,9 +167,9 @@ public sealed class TicketTests
     public void ValidateEdit_AppendExceedsLimit_PreservesComment()
     {
         // Arrange
-        var ticket = Create(TicketAction.Note);
+        Ticket ticket = Create(TicketAction.Note);
         ticket.Initialise(new string(c: 'a', Ticket.CommentLimit - 1), seconds: null);
-        var details = new TicketDetails(new TicketDurationEdit.Keep(), new TicketCommentEdit.Append("b"));
+        TicketDetails details = new TicketDetails(new TicketDurationEdit.Keep(), new TicketCommentEdit.Append("b"));
 
         // Act
         void Act()
@@ -184,7 +186,7 @@ public sealed class TicketTests
     public void Complete_ReminderExemptWithoutComment_RemainsIncomplete()
     {
         // Arrange
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             GuildId = 1,
             Number = 1,
@@ -208,7 +210,7 @@ public sealed class TicketTests
     public void End_MissingComment_RemainsIncomplete(TicketStatus status)
     {
         // Arrange
-        var ticket = Create(TicketAction.Timeout);
+        Ticket ticket = Create(TicketAction.Timeout);
         ticket.Initialise("", seconds: 3600);
 
         // Act
@@ -223,8 +225,8 @@ public sealed class TicketTests
     public void ValidateEdit_DefaultUnion_RejectsMissingChoice()
     {
         // Arrange
-        var ticket = Create(TicketAction.Ban);
-        var details = TicketDetails.ParseFields(duration: null, comment: null) with { Duration = default };
+        Ticket ticket = Create(TicketAction.Ban);
+        TicketDetails details = TicketDetails.ParseFields(duration: null, comment: null) with { Duration = default };
 
         // Act
         void Act()
@@ -243,7 +245,7 @@ public sealed class TicketTests
     public void End_LifecycleChange_UpdatesStateWithoutModificationHistory(TicketStatus status)
     {
         // Arrange
-        var ticket = Create(TicketAction.Timeout);
+        Ticket ticket = Create(TicketAction.Timeout);
         var version = ticket.Version;
 
         // Act
@@ -260,7 +262,7 @@ public sealed class TicketTests
     public void Record_AuditObserved_AdvancesVersionWithoutModificationHistory()
     {
         // Arrange
-        var ticket = Create(TicketAction.Timeout);
+        Ticket ticket = Create(TicketAction.Timeout);
         var version = ticket.Version;
 
         // Act
@@ -277,7 +279,7 @@ public sealed class TicketTests
     public void SetDuration_FiniteDuration_FormatsHistoryAsDaysAndTime(long seconds, string expected)
     {
         // Arrange
-        var ticket = Create(TicketAction.Ban);
+        Ticket ticket = Create(TicketAction.Ban);
 
         // Act
         ticket.SetDuration(seconds, moderatorId: 4);
@@ -290,10 +292,10 @@ public sealed class TicketTests
     public void SetDuration_SystemChange_PreservesModeratorHistory()
     {
         // Arrange
-        var ticket = Create(TicketAction.Timeout);
+        Ticket ticket = Create(TicketAction.Timeout);
         ticket.SetDuration(seconds: 600, moderatorId: 4);
         var version = ticket.Version;
-        var history = ticket.ModificationHistory.ShouldHaveSingleItem();
+        TicketHistoryEntry history = ticket.ModificationHistory.ShouldHaveSingleItem();
         var originalDescription = history.Format();
 
         // Act
@@ -312,7 +314,7 @@ public sealed class TicketTests
     public void Initialise_MissingIdentity_RejectsCreation(ulong guild, ulong subject, ulong moderator)
     {
         // Arrange
-        var ticket = new Ticket { GuildId = guild, Number = 1, SubjectUserId = subject, ModeratorUserId = moderator };
+        Ticket ticket = new Ticket { GuildId = guild, Number = 1, SubjectUserId = subject, ModeratorUserId = moderator };
 
         // Act
         void Act()
@@ -330,7 +332,7 @@ public sealed class TicketTests
     public void ValidateEdit_ReversibleAction_AcceptsPermanentAndFiniteDuration(TicketAction action)
     {
         // Arrange
-        var ticket = Create(action);
+        Ticket ticket = Create(action);
 
         // Act
         var finite = ticket.ValidateEdit(TicketDetails.ParseFields("1 hour", comment: null));
@@ -345,7 +347,7 @@ public sealed class TicketTests
     public void ValidateEdit_Kick_RejectsDuration()
     {
         // Arrange
-        var ticket = Create(TicketAction.Kick);
+        Ticket ticket = Create(TicketAction.Kick);
 
         // Act
         void Act()
@@ -367,7 +369,7 @@ public sealed class TicketTests
     public void Initialise_CompleteAuditTicket_QueuesInitialPromptForHumanActions(TicketAction action, bool expected)
     {
         // Arrange
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             GuildId = 1,
             Number = 1,
@@ -391,7 +393,7 @@ public sealed class TicketTests
     public void Initialise_AutomatedAuditTicket_DoesNotPromptBot(TicketAction action)
     {
         // Arrange
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             GuildId = 1,
             Number = 1,
@@ -412,7 +414,7 @@ public sealed class TicketTests
 
     internal static Ticket Create(TicketAction action, bool canReview = false)
     {
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             GuildId = 1,
             Number = 1,

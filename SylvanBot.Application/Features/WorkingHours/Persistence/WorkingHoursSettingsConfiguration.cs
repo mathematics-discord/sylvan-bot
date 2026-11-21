@@ -18,6 +18,7 @@ public sealed class WorkingHoursSettingsConfiguration
                 table.HasCheckConstraint(
                     "CK_working_hours_settings_target",
                     "\"PingRoleId\" IS NULL OR (\"PingRoleId\" <> 0 AND \"PingRoleId\" <> \"GuildId\")");
+
                 table.HasCheckConstraint("CK_working_hours_settings_enabled", "NOT \"Enabled\" OR \"PingRoleId\" IS NOT NULL");
             });
 

@@ -1,4 +1,4 @@
-using static System.Net.HttpStatusCode;
+﻿using static System.Net.HttpStatusCode;
 
 namespace SylvanBot.Features.Tickets;
 
@@ -17,7 +17,12 @@ public sealed class TicketReminders(
     TicketDeliveryBackoff backoff,
     ILogger logger)
 {
-    internal async Task RemindAsync(ulong userId, bool force, CancellationToken token, ulong? requestedGuild = null, Optional<TicketActor> resolvedActor = default)
+    internal async Task RemindAsync(
+        ulong userId,
+        bool force,
+        CancellationToken token,
+        ulong? requestedGuild = null,
+        Optional<TicketActor> resolvedActor = default)
     {
         if (backoff.IsModeratorDeferred(userId))
             return;
@@ -33,35 +38,41 @@ public sealed class TicketReminders(
         }
     }
 
-    private async Task DeliverAsync(ulong userId, bool force, CancellationToken token, ulong? requestedGuild = null, Optional<TicketActor> resolvedActor = default)
+    private async Task DeliverAsync(
+        ulong userId,
+        bool force,
+        CancellationToken token,
+        ulong? requestedGuild = null,
+        Optional<TicketActor> resolvedActor = default)
     {
-        using var moderatorGate = await locks.ModeratorAsync(userId, token);
-        await using var db = await contexts.CreateDbContextAsync(token);
+        using IDisposable moderatorGate = await locks.ModeratorAsync(userId, token);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(token);
 
         IQueryable<ulong> enabled = db.TicketConfigurations
-           .Where(config => config.Enabled && config.DestinationChannelId != null)
-           .Select(config => config.GuildId);
+            .Where(config => config.Enabled && config.DestinationChannelId != null)
+            .Select(config => config.GuildId);
 
         IQueryable<Ticket> outstanding = db.Tickets
-           .Where(value => value.ModeratorUserId == userId
-                      && !value.Hidden
-                      && !value.ReminderExempt
-                      && value.Pending == null
-                      && (value.InitialPromptAfterUtc != null
-                          || string.IsNullOrWhiteSpace(value.Comment)
-                          || (value.Action == TicketAction.Timeout && value.DurationSeconds == null))
-                      && enabled.Contains(value.GuildId));
+            .Where(value => value.ModeratorUserId == userId
+                            && !value.Hidden
+                            && !value.ReminderExempt
+                            && value.Pending == null
+                            && (value.InitialPromptAfterUtc != null
+                                || string.IsNullOrWhiteSpace(value.Comment)
+                                || (value.Action == TicketAction.Timeout && value.DurationSeconds == null))
+                            && enabled.Contains(value.GuildId));
 
-        var now = DateTimeOffset.UtcNow;
-        var ticket = await outstanding
-           .Where(value => force || value.InitialPromptAfterUtc == null || value.InitialPromptAfterUtc <= now)
-           .OrderByDescending(value => value.InitialPromptAfterUtc != null && !force)
-           .ThenByDescending(value => value.CreatedAtUtc)
-           .ThenByDescending(value => value.Id)
-           .FirstOrDefaultAsync(token);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
 
-        var moderator = await db.TicketModerators
-           .SingleOrDefaultAsync(value => value.UserId == userId, token);
+        Ticket? ticket = await outstanding
+            .Where(value => force || value.InitialPromptAfterUtc == null || value.InitialPromptAfterUtc <= now)
+            .OrderByDescending(value => value.InitialPromptAfterUtc != null && !force)
+            .ThenByDescending(value => value.CreatedAtUtc)
+            .ThenByDescending(value => value.Id)
+            .FirstOrDefaultAsync(token);
+
+        TicketModerator? moderator = await db.TicketModerators
+            .SingleOrDefaultAsync(value => value.UserId == userId, token);
 
         List<long> ticketIds = [];
 
@@ -71,7 +82,7 @@ public sealed class TicketReminders(
         if (moderator?.ActiveTicketId is { } activeId)
             ticketIds.Add(activeId);
 
-        using var ticketGates = await locks.TicketsAsync(ticketIds, token);
+        using IDisposable ticketGates = await locks.TicketsAsync(ticketIds, token);
         var selectedId = ticket?.Id;
         db.ChangeTracker.Clear();
 
@@ -97,10 +108,10 @@ public sealed class TicketReminders(
 
         if (moderator.PromptMessageId is not null && moderator.ChannelId is not null)
         {
-            var old = moderator.ActiveTicketId == ticket?.Id
+            Ticket? old = moderator.ActiveTicketId == ticket?.Id
                 ? ticket
                 : await db.Tickets
-                   .SingleOrDefaultAsync(value => value.Id == moderator.ActiveTicketId, token);
+                    .SingleOrDefaultAsync(value => value.Id == moderator.ActiveTicketId, token);
 
             if (old is not null && !await enabled.ContainsAsync(old.GuildId, token))
                 old = null;
@@ -135,7 +146,7 @@ public sealed class TicketReminders(
         if (moderator.ChannelId is { } knownChannel && backoff.IsDeferred(knownChannel))
             return;
 
-        var config = await TicketCoordinator.EnabledAsync(db, ticket.GuildId, token);
+        TicketConfiguration config = await TicketCoordinator.EnabledAsync(db, ticket.GuildId, token);
 
         // Persist backoff before sending, including when the DM outcome is uncertain.
         if (moderator.ActiveTicketId != ticket.Id)
@@ -152,16 +163,20 @@ public sealed class TicketReminders(
 
         moderator.Version++;
         await db.SaveChangesAsync(token);
-        var guild = client.GetGuild(ticket.GuildId)
-            ?? throw new BotCommandException("Server data is not ready. Try again shortly.");
-        var user = await boundary.GetMemberAsync(ticket.GuildId, userId, token)
-            ?? throw new BotCommandException("The moderator is no longer available.");
-        var actor = resolvedActor.TryGet(out var suppliedActor) ? suppliedActor : TicketBoundary.Actor(user);
+
+        SocketGuild guild = client.GetGuild(ticket.GuildId)
+                            ?? throw new BotCommandException("Server data is not ready. Try again shortly.");
+
+        IGuildUser user = await boundary.GetMemberAsync(ticket.GuildId, userId, token)
+                          ?? throw new BotCommandException("The moderator is no longer available.");
+
+        TicketActor actor = resolvedActor.TryGet(out TicketActor? suppliedActor) ? suppliedActor : TicketBoundary.Actor(user);
+
         if (!ticket.CanCorrect(actor))
             throw new BotCommandException("You no longer have access to complete this ticket.");
 
-        var channel = client.GetChannel(moderator.ChannelId ?? 0) as IDMChannel
-            ?? await user.CreateDMChannelAsync(backoff.ModeratorOptions(userId, token));
+        IDMChannel channel = client.GetChannel(moderator.ChannelId ?? 0) as IDMChannel
+                             ?? await user.CreateDMChannelAsync(backoff.ModeratorOptions(userId, token));
 
         if (backoff.IsDeferred(channel.Id))
             return;
@@ -202,18 +217,20 @@ public sealed class TicketReminders(
             if (backoff.IsDeferred(moderator.ChannelId!.Value))
                 return false;
 
-            var channel = client.GetChannel(moderator.ChannelId.Value) as IDMChannel
-                ?? await ((IDiscordClient)client.Rest).GetChannelAsync(moderator.ChannelId.Value, options: backoff.Options(moderator.ChannelId.Value, token)) as IDMChannel;
+            IDMChannel? channel = client.GetChannel(moderator.ChannelId.Value) as IDMChannel
+                                  ?? await ((IDiscordClient)client.Rest).GetChannelAsync(
+                                      moderator.ChannelId.Value,
+                                      options: backoff.Options(moderator.ChannelId.Value, token)) as IDMChannel;
 
             if (channel is null)
                 return false;
 
             if (ticket?.Hidden != false)
-            {
+
                 await channel.DeleteMessageAsync(moderator.PromptMessageId!.Value, backoff.Options(channel.Id, token));
-            }
+
             else
-            {
+
                 await channel.ModifyMessageAsync(
                     moderator.PromptMessageId!.Value,
                     properties =>
@@ -224,7 +241,7 @@ public sealed class TicketReminders(
                         properties.AllowedMentions = AllowedMentions.None;
                     },
                     backoff.Options(channel.Id, token));
-            }
+
 
             return true;
         }

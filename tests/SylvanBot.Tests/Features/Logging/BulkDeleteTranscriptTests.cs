@@ -10,7 +10,7 @@ public sealed class BulkDeleteTranscriptTests
     public void Create_Message_UsesUtcTimeAndChatLogFormat()
     {
         // Arrange
-        var timestamp = new DateTimeOffset(2026, 11, 6, 14, 34, 56, TimeSpan.FromHours(2));
+        DateTimeOffset timestamp = new DateTimeOffset(2026, 11, 6, 14, 34, 56, TimeSpan.FromHours(2));
 
         // Act
         var text = Encoding.UTF8.GetString(BulkDeleteTranscript.Create([(timestamp, "general", "ratgirl", "hello 🐀 café")]));
@@ -67,9 +67,9 @@ public sealed class BulkDeleteTranscriptTests
         var content = new string('x', 4000);
 
         (DateTimeOffset, string, string, string content)[] messages = Enumerable
-           .Range(1, 100)
-           .Select(index => (DateTimeOffset.UnixEpoch.AddSeconds(index), "general", $"user{index}", content))
-           .ToArray();
+            .Range(1, 100)
+            .Select(index => (DateTimeOffset.UnixEpoch.AddSeconds(index), "general", $"user{index}", content))
+            .ToArray();
 
         // Act
         var text = Encoding.UTF8.GetString(BulkDeleteTranscript.Create(messages));

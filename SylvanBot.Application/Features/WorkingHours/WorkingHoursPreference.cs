@@ -43,7 +43,11 @@ public sealed class WorkingHoursPreference
             if (start is null || end is null || start.Value.OffsetMinutes.HasValue || end.Value.OffsetMinutes.HasValue)
                 throw new InvalidOperationException("Invalid persisted availability window.");
 
-            var window = new WorkingHoursWindow(start: start.Value.Time, end: end.Value.Time, offsetMinutes: OffsetMinutes, zoneId: ZoneId);
+            WorkingHoursWindow window = new WorkingHoursWindow(
+                start: start.Value.Time,
+                end: end.Value.Time,
+                offsetMinutes: OffsetMinutes,
+                zoneId: ZoneId);
 
             return WorkingHoursResponses.Rejection(window: window, username: string.Empty) is not null
                 ? throw new InvalidOperationException("Invalid persisted availability window.")

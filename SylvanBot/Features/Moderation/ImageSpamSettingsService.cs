@@ -17,7 +17,9 @@ public sealed class ImageSpamSettingsService(IDbContextFactory<BotDbContext> con
     public void Dispose() => _gate.Dispose();
 
     public Optional<ImageBurstSpamDetectorOptions> Current(ulong guildId) =>
-        _settings.TryGetValue(key: guildId, out var settings) ? new Optional<ImageBurstSpamDetectorOptions>(settings) : default;
+        _settings.TryGetValue(key: guildId, out ImageBurstSpamDetectorOptions? settings)
+            ? new Optional<ImageBurstSpamDetectorOptions>(settings)
+            : default;
 
     public async Task<Optional<ImageBurstSpamDetectorOptions>> GetCurrentAsync(ulong guildId, CancellationToken ct)
     {
@@ -25,11 +27,11 @@ public sealed class ImageSpamSettingsService(IDbContextFactory<BotDbContext> con
 
         try
         {
-            await using var dbContext = await contexts.CreateDbContextAsync(ct);
+            await using BotDbContext dbContext = await contexts.CreateDbContextAsync(ct);
 
-            var settings = await dbContext.ImageSpamSettings
-               .AsNoTracking()
-               .SingleOrDefaultAsync(x => x.GuildId == guildId, cancellationToken: ct);
+            ImageSpamSettings? settings = await dbContext.ImageSpamSettings
+                .AsNoTracking()
+                .SingleOrDefaultAsync(x => x.GuildId == guildId, cancellationToken: ct);
 
             if (settings is not { IsEnabled: true })
             {
@@ -38,7 +40,7 @@ public sealed class ImageSpamSettingsService(IDbContextFactory<BotDbContext> con
                 return default;
             }
 
-            var options = ToOptions(settings);
+            ImageBurstSpamDetectorOptions options = ToOptions(settings);
             _settings[guildId] = options;
 
             return new Optional<ImageBurstSpamDetectorOptions>(options);
@@ -55,14 +57,14 @@ public sealed class ImageSpamSettingsService(IDbContextFactory<BotDbContext> con
 
         try
         {
-            await using var dbContext = await contexts.CreateDbContextAsync(ct);
+            await using BotDbContext dbContext = await contexts.CreateDbContextAsync(ct);
 
             List<ImageSpamSettings> settings = await dbContext.ImageSpamSettings
-               .AsNoTracking()
-               .Where(x => x.IsEnabled)
-               .ToListAsync(ct);
+                .AsNoTracking()
+                .Where(x => x.IsEnabled)
+                .ToListAsync(ct);
 
-            foreach (var setting in settings)
+            foreach (ImageSpamSettings setting in settings)
                 _settings[setting.GuildId] = ToOptions(setting);
         }
         finally
@@ -82,10 +84,10 @@ public sealed class ImageSpamSettingsService(IDbContextFactory<BotDbContext> con
 
         try
         {
-            await using var dbContext = await contexts.CreateDbContextAsync(ct);
+            await using BotDbContext dbContext = await contexts.CreateDbContextAsync(ct);
 
-            var settings = await dbContext.ImageSpamSettings
-               .SingleOrDefaultAsync(x => x.GuildId == guildId, cancellationToken: ct);
+            ImageSpamSettings? settings = await dbContext.ImageSpamSettings
+                .SingleOrDefaultAsync(x => x.GuildId == guildId, cancellationToken: ct);
 
             if (settings is null)
             {
@@ -97,9 +99,10 @@ public sealed class ImageSpamSettingsService(IDbContextFactory<BotDbContext> con
                 requiredChannelCount: requiredChannelCount,
                 requiredAttachmentCount: requiredAttachmentCount,
                 burstDurationSeconds: burstDurationSeconds);
+
             await dbContext.SaveChangesAsync(ct);
 
-            var options = ToOptions(settings);
+            ImageBurstSpamDetectorOptions options = ToOptions(settings);
             _settings[guildId] = options;
 
             return options;

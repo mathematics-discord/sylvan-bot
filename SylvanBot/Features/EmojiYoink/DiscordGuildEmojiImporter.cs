@@ -38,10 +38,13 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
             return new Result<GuildEmote>(downloadResult.Error!);
         }
 
-        await using var imageStream = downloadResult.Value;
-        using var image = new Image(imageStream);
+        await using MemoryStream imageStream = downloadResult.Value;
+        using Image image = new Image(imageStream);
 
-        var options = new RequestOptions { CancelToken = ct, AuditLogReason = $"Emoji yoink by moderator {moderator.Id}; source emoji {source.Id}" };
+        RequestOptions options = new RequestOptions
+        {
+            CancelToken = ct, AuditLogReason = $"Emoji yoink by moderator {moderator.Id}; source emoji {source.Id}",
+        };
 
         Result<GuildEmote> result;
 
@@ -61,7 +64,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
             return new Result<GuildEmote>(result.Error!);
         }
 
-        var created = result.Value;
+        GuildEmote created = result.Value;
 
         _logger.Information(
             "Moderator {ModeratorUsername} ({ModeratorUserId}) added emoji {EmojiName} ({CreatedEmojiId}) to guild {GuildId} "
@@ -115,14 +118,14 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
     private async Task<Result<MemoryStream>> DownloadAsync(Emote source, CancellationToken ct)
     {
         var animatedQuery = source.Animated ? "?animated=true" : string.Empty;
-        var cdnUri = new Uri($"https://cdn.discordapp.com/emojis/{source.Id}.webp{animatedQuery}");
+        Uri cdnUri = new Uri($"https://cdn.discordapp.com/emojis/{source.Id}.webp{animatedQuery}");
         MemoryStream? imageStream = null;
 
         try
         {
-            using var response = await httpClient
-               .GetAsync(requestUri: cdnUri, completionOption: HttpCompletionOption.ResponseHeadersRead, cancellationToken: ct)
-               .ConfigureAwait(false);
+            using HttpResponseMessage response = await httpClient
+                .GetAsync(requestUri: cdnUri, completionOption: HttpCompletionOption.ResponseHeadersRead, cancellationToken: ct)
+                .ConfigureAwait(false);
 
             if (response.StatusCode == HttpStatusCode.NotFound)
                 return new Result<MemoryStream>(EmojiYoinkErrors.SourceUnavailable);
@@ -133,7 +136,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
             if (response.Content.Headers.ContentLength > MaximumEmojiBytes)
                 return new Result<MemoryStream>(EmojiYoinkErrors.ImageTooLarge);
 
-            await using var responseStream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+            await using Stream responseStream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             imageStream = new MemoryStream(MaximumEmojiBytes);
             var buffer = new byte[81920];
 
@@ -151,7 +154,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
             }
 
             imageStream.Position = 0;
-            var completedStream = imageStream;
+            MemoryStream completedStream = imageStream;
             imageStream = null;
 
             return completedStream;

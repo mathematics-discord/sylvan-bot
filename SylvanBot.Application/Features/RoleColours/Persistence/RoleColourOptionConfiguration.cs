@@ -22,12 +22,7 @@ public sealed class RoleColourOptionConfiguration : IEntityTypeConfiguration<Rol
         builder.Property(x => x.UpdatedAtUtc).IsRequired().HasColumnType("timestamp with time zone");
 
         builder
-           .HasIndex(x => new
-            {
-                x.GuildId,
-                x.SourceRoleId,
-                x.DisplayRoleId,
-            })
-           .IsUnique();
+            .HasIndex(x => new { x.GuildId, x.SourceRoleId, x.DisplayRoleId })
+            .IsUnique();
     }
 }

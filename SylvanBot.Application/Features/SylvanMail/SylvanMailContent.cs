@@ -11,13 +11,12 @@ internal static class SylvanMailContent
         var totalBytes = message.Attachments.Sum(item => (long)item.Size);
 
         var oversized = message.Attachments
-           .Any(item => item.Size is < 0 or > MaxAttachmentBytes);
+            .Any(item => item.Size is < 0 or > MaxAttachmentBytes);
 
         if (message.UnsupportedContent)
-        {
+
             throw new BotCommandException(
                 "Not relayed: stickers, polls, voice messages, forwards and interactive content are unsupported. Send text or ordinary attachments.");
-        }
 
         var exceedsLimits = message.Content.Length > 16000 || message.Attachments.Length > 10 || oversized || totalBytes > 24 * 1024 * 1024;
 
@@ -30,7 +29,7 @@ internal static class SylvanMailContent
 
     public static ImmutableArray<string> SplitContent(string content, int size)
     {
-        var chunks = ImmutableArray.CreateBuilder<string>();
+        ImmutableArray<string>.Builder chunks = ImmutableArray.CreateBuilder<string>();
         var index = 0;
 
         while (index < content.Length)

@@ -1,10 +1,8 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using SylvanBot.Features.Activity;
 using SylvanBot.Features.Announcements;
 using SylvanBot.Application.Features.MessageCache;
-using SylvanBot.Application.Features.Automod;
 using SylvanBot.Application.Features.SylvanMail;
-using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Application.Infrastructure.Data;
 using SylvanBot.Features.EmojiYoink;
 using SylvanBot.Features.Automod;
@@ -60,12 +58,13 @@ public static class DependencyInjection
             services.AddHostedService(sp => sp.GetRequiredService<AutomodRuntime>());
             services.AddSingleton<AutomodGatewayHandler>();
             services.AddSingleton<IDiscordGatewayHandler>(sp => sp.GetRequiredService<AutomodGatewayHandler>());
+
             services
-               .AddOptions<SylvanMailOptions>()
-               .Bind(configuration.GetSection(SylvanMailOptions.SectionName))
-               .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "SylvanMail token is required.")
-               .Validate(options => options.BotId != 0, "SylvanMail bot ID is required.")
-               .ValidateOnStart();
+                .AddOptions<SylvanMailOptions>()
+                .Bind(configuration.GetSection(SylvanMailOptions.SectionName))
+                .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "SylvanMail token is required.")
+                .Validate(options => options.BotId != 0, "SylvanMail bot ID is required.")
+                .ValidateOnStart();
 
             services.AddSingleton<SylvanMailClient>();
 
@@ -130,13 +129,13 @@ public static class DependencyInjection
         private void AddModerationLogging(IConfiguration configuration)
         {
             services
-               .AddOptions<LoggingOptions>()
-               .Bind(configuration.GetSection(LoggingOptions.SectionName))
-               .Validate(options => options.MaxAttachmentCountPerMessage >= 0, "Logging max attachment count per message must not be negative.")
-               .Validate(
+                .AddOptions<LoggingOptions>()
+                .Bind(configuration.GetSection(LoggingOptions.SectionName))
+                .Validate(options => options.MaxAttachmentCountPerMessage >= 0, "Logging max attachment count per message must not be negative.")
+                .Validate(
                     options => options.MaxAttachmentBytesPerAttachment >= 0,
                     "Logging max attachment bytes per attachment must not be negative.")
-               .ValidateOnStart();
+                .ValidateOnStart();
 
             services.AddSingleton<IMessageCachePersistence, PostgresMessageCachePersistence>();
             services.AddSingleton<MessageSnapshotCache>();
@@ -167,25 +166,25 @@ public static class DependencyInjection
             var connectionString = PostgresConnectionStringBuilder.Build(configuration);
 
             services.AddDbContextFactory<BotDbContext>(options =>
-                                                           options.UseNpgsql(
-                                                               connectionString: connectionString,
-                                                               postgres => postgres.MigrationsAssembly("SylvanBot")));
+                options.UseNpgsql(
+                    connectionString: connectionString,
+                    postgres => postgres.MigrationsAssembly("SylvanBot")));
         }
 
         private void AddDiscord(IConfiguration configuration)
         {
             services
-               .AddOptions<DiscordOptions>()
-               .Bind(configuration.GetSection(DiscordOptions.SectionName))
-               .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "Discord token is required.")
-               .Validate(options => options.MessageCacheSize is >= 0 and <= 50000, "Discord message cache size must be between 0 and 50000.")
-               .ValidateOnStart();
+                .AddOptions<DiscordOptions>()
+                .Bind(configuration.GetSection(DiscordOptions.SectionName))
+                .Validate(options => !string.IsNullOrWhiteSpace(options.Token), "Discord token is required.")
+                .Validate(options => options.MessageCacheSize is >= 0 and <= 50000, "Discord message cache size must be between 0 and 50000.")
+                .ValidateOnStart();
 
             services.AddSingleton<MessageUpdateGatewayAdapter>();
 
             services.AddSingleton(sp =>
             {
-                var options = sp.GetRequiredService<IOptions<DiscordOptions>>().Value;
+                DiscordOptions options = sp.GetRequiredService<IOptions<DiscordOptions>>().Value;
 
                 return new DiscordSocketClient(
                     new DiscordSocketConfig
@@ -206,14 +205,9 @@ public static class DependencyInjection
             });
 
             services.AddSingleton(sp => new InteractionService(
-                                      sp.GetRequiredService<DiscordSocketClient>(),
-                                      new InteractionServiceConfig
-                                      {
-                                          AutoServiceScopes = true,
-                                          ThrowOnError = false,
-                                          EnableAutocompleteHandlers = true,
-                                      }
-                                  ));
+                sp.GetRequiredService<DiscordSocketClient>(),
+                new InteractionServiceConfig { AutoServiceScopes = true, ThrowOnError = false, EnableAutocompleteHandlers = true }
+            ));
 
             services.AddSingleton<InteractionDiagnostics>();
             services.AddSingleton<InteractionCommandRegistrar>();

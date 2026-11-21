@@ -1,7 +1,7 @@
 ﻿using System.Collections.Immutable;
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
 using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Application.Features.SylvanMail;
@@ -12,8 +12,7 @@ public sealed class SylvanMailWorkflow(
     ISylvanMailForum forum,
     SylvanMailReporting reporting,
     SylvanMailConversations conversations,
-    ILogger<SylvanMailWorkflow> logger
-)
+    ILogger<SylvanMailWorkflow> logger)
 {
     public async Task RelayAsync(SylvanMailMessage message, CancellationToken ct)
     {
@@ -21,7 +20,7 @@ public sealed class SylvanMailWorkflow(
         if (message.GuildId is not null)
             return;
 
-        await using var db = await contexts.CreateDbContextAsync(ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
         await SylvanMailSerialisation.EnterConversationAsync(db, message.AuthorId, logger, ct);
 
         try
@@ -43,9 +42,9 @@ public sealed class SylvanMailWorkflow(
     internal async Task RelayLockedAsync(BotDbContext db, SylvanMailMessage message, CancellationToken ct)
     {
         SylvanMailSettings[] destinations = await db.SylvanMailSettings
-           .AsNoTracking()
-           .Take(2)
-           .ToArrayAsync(ct);
+            .AsNoTracking()
+            .Take(2)
+            .ToArrayAsync(ct);
 
         if (destinations.Length != 1)
         {
@@ -54,20 +53,20 @@ public sealed class SylvanMailWorkflow(
             return;
         }
 
-        var settings = destinations[0];
+        SylvanMailSettings settings = destinations[0];
         var toStaff = message.GuildId is null;
 
         if (!toStaff && message.GuildId != settings.GuildId)
             return;
 
-        var conversation = await FindConversationAsync(db: db, settings: settings, message: message, ct: ct);
+        SylvanMailConversation? conversation = await FindConversationAsync(db: db, settings: settings, message: message, ct: ct);
 
         if (!toStaff && conversation is null)
             return;
 
-        var operation = await db.SylvanMailOperations
-           .Include(item => item.Deliveries)
-           .SingleOrDefaultAsync(item => item.SourceMessageId == message.SourceMessageId, cancellationToken: ct);
+        SylvanMailOperation? operation = await db.SylvanMailOperations
+            .Include(item => item.Deliveries)
+            .SingleOrDefaultAsync(item => item.SourceMessageId == message.SourceMessageId, cancellationToken: ct);
 
         if (operation is not null)
         {
@@ -83,10 +82,9 @@ public sealed class SylvanMailWorkflow(
         conversation = await DeliverAsync(db: db, settings: settings, message: message, operation: operation, conversation: conversation, ct: ct);
 
         if (conversation is null && operation.ConversationId.HasValue)
-        {
+
             conversation = await db.SylvanMailConversations
-               .SingleOrDefaultAsync(item => item.Id == operation.ConversationId, cancellationToken: ct);
-        }
+                .SingleOrDefaultAsync(item => item.Id == operation.ConversationId, cancellationToken: ct);
 
         var deliveredToNewPost =
             toStaff
@@ -94,7 +92,7 @@ public sealed class SylvanMailWorkflow(
             && conversation?.ThreadId != previousThreadId;
 
         if (deliveredToNewPost && conversation is { ThreadId: { } newThread })
-        {
+
             try
             {
                 await discord.SendTicketListAsync(conversation.GuildId, newThread, conversation.UserId, ct);
@@ -109,7 +107,6 @@ public sealed class SylvanMailWorkflow(
                     newThread,
                     conversation.UserId);
             }
-        }
 
         await reporting.ReportAsync(db: db, message: message, threadId: conversation?.ThreadId, op: operation);
 
@@ -129,7 +126,7 @@ public sealed class SylvanMailWorkflow(
         SylvanMailMessage message,
         CancellationToken ct)
     {
-        var operation = new SylvanMailOperation
+        SylvanMailOperation operation = new SylvanMailOperation
         {
             SourceMessageId = message.SourceMessageId,
             SourceChannelId = message.SourceChannelId,
@@ -152,14 +149,14 @@ public sealed class SylvanMailWorkflow(
         CancellationToken ct)
     {
         IQueryable<SylvanMailConversation> active = db.SylvanMailConversations
-           .Where(item => item.GuildId == settings.GuildId && item.ForumId == settings.ForumId)
-           .Where(item => !item.Retired);
+            .Where(item => item.GuildId == settings.GuildId && item.ForumId == settings.ForumId)
+            .Where(item => !item.Retired);
 
         return message.GuildId is null
             ? active
-               .SingleOrDefaultAsync(item => item.UserId == message.AuthorId, cancellationToken: ct)
+                .SingleOrDefaultAsync(item => item.UserId == message.AuthorId, cancellationToken: ct)
             : active
-               .SingleOrDefaultAsync(item => item.ThreadId == message.SourceChannelId, cancellationToken: ct);
+                .SingleOrDefaultAsync(item => item.ThreadId == message.SourceChannelId, cancellationToken: ct);
     }
 
     private static async Task<SylvanMailConversation?> RecordDeliveryFailureAsync(
@@ -169,23 +166,22 @@ public sealed class SylvanMailWorkflow(
         Exception exception)
     {
         if (conversation is null && operation.ConversationId.HasValue)
-        {
+
             conversation = await db.SylvanMailConversations
-               .SingleOrDefaultAsync(
+                .SingleOrDefaultAsync(
                     item => item.Id == operation.ConversationId,
                     cancellationToken: CancellationToken.None);
-        }
 
         var confirmedParts = operation.Deliveries
-           .Count(item => item.MessageId.HasValue);
+            .Count(item => item.MessageId.HasValue);
 
         var uncertainDelivery = operation.Deliveries
-           .Any(item => item.MessageId is null);
+            .Any(item => item.MessageId is null);
 
         var uncertainPost = operation.ToStaff && conversation is { CreationStarted: true, ThreadId: null };
         Optional<string> refusal = exception is BotCommandException ? new Optional<string>(exception.Message) : default;
 
-        var outcome = SylvanMailDeliveryOutcome.FromFailure(
+        SylvanMailDeliveryOutcome outcome = SylvanMailDeliveryOutcome.FromFailure(
             confirmedParts: confirmedParts,
             uncertainDelivery: uncertainDelivery,
             uncertainPost: uncertainPost,
@@ -203,12 +199,12 @@ public sealed class SylvanMailWorkflow(
     private async Task RefuseAsync(SylvanMailMessage message, string detail, CancellationToken ct)
     {
         // Do not wait behind relay's Discord calls when the transient buffer is full.
-        await using var db = await contexts.CreateDbContextAsync(ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
         SylvanMailSettings[] settings = await db.SylvanMailSettings
-           .AsNoTracking()
-           .Take(2)
-           .ToArrayAsync(ct);
+            .AsNoTracking()
+            .Take(2)
+            .ToArrayAsync(ct);
 
         if (settings.Length != 1)
         {
@@ -217,18 +213,18 @@ public sealed class SylvanMailWorkflow(
             return;
         }
 
-        var destination = settings[0];
+        SylvanMailSettings destination = settings[0];
         var toStaff = message.GuildId is null;
 
         IQueryable<SylvanMailConversation> conversationQuery = db.SylvanMailConversations
-           .AsNoTracking()
-           .Where(item => item.GuildId == destination.GuildId && item.ForumId == destination.ForumId && !item.Retired);
+            .AsNoTracking()
+            .Where(item => item.GuildId == destination.GuildId && item.ForumId == destination.ForumId && !item.Retired);
 
-        var conversation = toStaff
+        SylvanMailConversation? conversation = toStaff
             ? await conversationQuery
-               .SingleOrDefaultAsync(item => item.UserId == message.AuthorId, cancellationToken: ct)
+                .SingleOrDefaultAsync(item => item.UserId == message.AuthorId, cancellationToken: ct)
             : await conversationQuery
-               .SingleOrDefaultAsync(item => item.ThreadId == message.SourceChannelId, cancellationToken: ct);
+                .SingleOrDefaultAsync(item => item.ThreadId == message.SourceChannelId, cancellationToken: ct);
 
         if (!toStaff)
         {
@@ -239,12 +235,12 @@ public sealed class SylvanMailWorkflow(
         }
 
         var recorded = await db.SylvanMailOperations
-           .AnyAsync(item => item.SourceMessageId == message.SourceMessageId, cancellationToken: ct);
+            .AnyAsync(item => item.SourceMessageId == message.SourceMessageId, cancellationToken: ct);
 
         if (recorded)
             return;
 
-        var operation = new SylvanMailOperation
+        SylvanMailOperation operation = new SylvanMailOperation
         {
             SourceMessageId = message.SourceMessageId,
             SourceChannelId = message.SourceChannelId,
@@ -265,7 +261,7 @@ public sealed class SylvanMailWorkflow(
     {
         discord.RequireReady(op.ToStaff ? SylvanMailDestinationKind.StaffThread : SylvanMailDestinationKind.MemberDm);
 
-        var delivery = new SylvanMailDelivery { SourceMessageId = op.SourceMessageId, Ordinal = ordinal };
+        SylvanMailDelivery delivery = new SylvanMailDelivery { SourceMessageId = op.SourceMessageId, Ordinal = ordinal };
         op.Deliveries.Add(delivery);
         op.State = "Sending";
         await db.SaveChangesAsync(ct);
@@ -306,7 +302,7 @@ public sealed class SylvanMailWorkflow(
         ImmutableArray<byte[]> attachments,
         CancellationToken ct)
     {
-        var destination = new SylvanMailDestination(
+        SylvanMailDestination destination = new SylvanMailDestination(
             operation.ToStaff ? SylvanMailDestinationKind.StaffThread : SylvanMailDestinationKind.MemberDm,
             destinationChannelId);
 
@@ -315,6 +311,7 @@ public sealed class SylvanMailWorkflow(
         var ordinal = 0;
 
         foreach (var chunk in chunks)
+
             await PublishAsync(
                 db: db,
                 op: operation,
@@ -324,7 +321,7 @@ public sealed class SylvanMailWorkflow(
 
         for (var index = 0; index < message.Attachments.Length; index++)
         {
-            var attachment = message.Attachments[index];
+            SylvanMailAttachment attachment = message.Attachments[index];
             var bytes = attachments[index];
 
             await PublishAsync(
@@ -339,9 +336,9 @@ public sealed class SylvanMailWorkflow(
     private async Task ReportPreviousAsync(BotDbContext db, SylvanMailMessage message, SylvanMailOperation operation, CancellationToken ct)
     {
         var previousThread = await db.SylvanMailConversations
-           .Where(item => item.Id == operation.ConversationId)
-           .Select(item => item.ThreadId)
-           .SingleOrDefaultAsync(ct);
+            .Where(item => item.Id == operation.ConversationId)
+            .Select(item => item.ThreadId)
+            .SingleOrDefaultAsync(ct);
 
         if (string.Equals(a: operation.State, "Sending", comparisonType: StringComparison.Ordinal))
         {
@@ -390,22 +387,21 @@ public sealed class SylvanMailWorkflow(
 
             // Discord already accepted outgoing drafts; only inbound delivery needs destination validation.
             if (toStaff)
-            {
+
                 await forum.ValidateForumAsync(
                     guildId: settings.GuildId,
                     forumId: settings.ForumId,
                     roleId: settings.RoleId,
                     ct: ct,
                     validatePing: false);
-            }
 
             SylvanMailContent.Validate(message);
 
             // Download all attachments before publishing any of this message; retain at most 24 MiB of attachment payload.
             NextStage("download_attachments");
-            var attachments = ImmutableArray.CreateBuilder<byte[]>(message.Attachments.Length);
+            ImmutableArray<byte[]>.Builder attachments = ImmutableArray.CreateBuilder<byte[]>(message.Attachments.Length);
 
-            foreach (var attachment in message.Attachments)
+            foreach (SylvanMailAttachment attachment in message.Attachments)
                 attachments.Add(await discord.DownloadAsync(attachment: attachment, ct: ct));
 
             NextStage("resolve_conversation");

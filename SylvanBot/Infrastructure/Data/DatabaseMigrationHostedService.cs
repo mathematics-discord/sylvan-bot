@@ -9,8 +9,8 @@ public sealed class DatabaseMigrationHostedService(IServiceScopeFactory scopeFac
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<BotDbContext>();
+        await using AsyncServiceScope scope = scopeFactory.CreateAsyncScope();
+        BotDbContext dbContext = scope.ServiceProvider.GetRequiredService<BotDbContext>();
 
         List<string> pendingMigrations = (await dbContext.Database.GetPendingMigrationsAsync(cancellationToken)).ToList();
 

@@ -1,4 +1,4 @@
-using SylvanBot.Application.Features.Tickets;
+﻿using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Features.Tickets;
 
 namespace SylvanBot.Tests.Features.Tickets;
@@ -12,7 +12,7 @@ public sealed class TicketApprovalTests
     public void IsApproved_UnreviewedTicket_OnlyReversalAcceptsIt(TicketStatus status, bool expected)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Timeout);
+        Ticket ticket = TicketTests.Create(TicketAction.Timeout);
 
         // Act
         ticket.End(status);
@@ -28,10 +28,10 @@ public sealed class TicketApprovalTests
     public void CompleteStaffReversal_HistoricalEdits_PreservesAcceptanceAndReviewer(bool previouslyApproved)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Timeout, canReview: previouslyApproved);
+        Ticket ticket = TicketTests.Create(TicketAction.Timeout, canReview: previouslyApproved);
         DateTimeOffset? approvedAt = ticket.ApprovedAtUtc;
         var approvedBy = ticket.ApprovedByUserId;
-        var timestamp = ticket.CreatedAtUtc.AddMinutes(1);
+        DateTimeOffset timestamp = ticket.CreatedAtUtc.AddMinutes(1);
 
         // Act
         ticket.CompleteStaffReversal(moderatorId: 42, timestamp);
@@ -59,10 +59,10 @@ public sealed class TicketApprovalTests
     public void Approve_RevertedIncompleteTicket_DoesNotRecordReviewer()
     {
         // Arrange
-        var ticket = new Ticket { GuildId = 1, Action = TicketAction.Ban };
+        Ticket ticket = new Ticket { GuildId = 1, Action = TicketAction.Ban };
         ticket.End(TicketStatus.Reverted);
         var version = ticket.Version;
-        var reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
+        TicketActor reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
 
         // Act
         ticket.Approve(reviewer, version);
@@ -80,11 +80,11 @@ public sealed class TicketApprovalTests
     public void TryApproveReaction_RevertedTicket_DoesNotRecordReviewer()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
         ticket.End(TicketStatus.Reverted);
         ticket.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 20, Current = true, Revision = ticket.Version });
         var version = ticket.Version;
-        var reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
+        TicketActor reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
 
         // Act
         var approved = ticket.TryApproveReaction(reviewer, channelId: 10, messageId: 20);
@@ -103,7 +103,7 @@ public sealed class TicketApprovalTests
     public void AcceptCreation_ReviewerPermission_DeterminesAcceptance(bool canReview)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
 
         // Act
         ticket.AcceptCreation(canReview);
@@ -118,7 +118,7 @@ public sealed class TicketApprovalTests
     public void ConfirmTimeoutChange_DurationEdit_UsesReviewerPermission(bool canReview)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Timeout);
+        Ticket ticket = TicketTests.Create(TicketAction.Timeout);
 
         ticket.Approve(
             new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: false, CanTimeoutMembers: false, CanViewAuditLog: true),
@@ -142,12 +142,12 @@ public sealed class TicketApprovalTests
     public void ConfirmTimeoutChange_AutomaticNativeRenewal_PreservesApproval()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Timeout);
+        Ticket ticket = TicketTests.Create(TicketAction.Timeout);
         ticket.SetDuration(60 * 86400, moderatorId: 3);
         ticket.Approve(new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false), ticket.Version);
 
         DateTimeOffset? acceptedAt = ticket.ApprovedAtUtc;
-        var now = ticket.CreatedAtUtc.AddDays(21);
+        DateTimeOffset now = ticket.CreatedAtUtc.AddDays(21);
 
         ticket.BeginTimeoutChange(
             new TicketOperation
@@ -188,10 +188,10 @@ public sealed class TicketApprovalTests
     public void TryApproveReaction_DefinitiveMessage_RecordsFirstReviewerOnly()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
         ticket.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 20, Current = true, Revision = ticket.Version });
-        var first = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: false, CanTimeoutMembers: false, CanViewAuditLog: true);
-        var second = new TicketActor(GuildId: 1, UserId: 5, IsAdministrator: true, CanTimeoutMembers: false);
+        TicketActor first = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: false, CanTimeoutMembers: false, CanViewAuditLog: true);
+        TicketActor second = new TicketActor(GuildId: 1, UserId: 5, IsAdministrator: true, CanTimeoutMembers: false);
 
         // Act
         var approved = ticket.TryApproveReaction(first, channelId: 10, messageId: 20);
@@ -211,10 +211,10 @@ public sealed class TicketApprovalTests
     public void TryApproveReaction_OldOrDifferentMessage_DoesNothing(ulong channel, ulong message, bool current, bool removed)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
         ticket.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 20, Current = current, Removed = removed });
 
-        var reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
+        TicketActor reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
 
         // Act
         var approved = ticket.TryApproveReaction(reviewer, channel, message);
@@ -229,10 +229,10 @@ public sealed class TicketApprovalTests
     public void TryApproveReaction_CommunityModerator_UsesExistingApprovalPermissions()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
         ticket.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 20, Current = true });
 
-        var moderator = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: false, CanTimeoutMembers: true, CanBanMembers: true);
+        TicketActor moderator = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: false, CanTimeoutMembers: true, CanBanMembers: true);
 
         // Act
         void Act()
@@ -249,11 +249,11 @@ public sealed class TicketApprovalTests
     public void TryApproveReaction_UnpublishedEdit_RejectsApprovalOfUnseenChanges()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
         ticket.Publications.Add(new TicketPublication { ChannelId = 10, MessageId = 20, Current = true, Revision = ticket.Version });
         ticket.SetComment("new reason", moderatorId: 3);
 
-        var reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
+        TicketActor reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
 
         // Act
         void Act()
@@ -269,7 +269,7 @@ public sealed class TicketApprovalTests
     [Test]
     public void ReviewLineLinksOnlyTheNumberAndRetainsTheActionAndBothMentions()
     {
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             GuildId = 1,
             Number = 42,
@@ -288,8 +288,8 @@ public sealed class TicketApprovalTests
     [Test]
     public void AwaitingApproval_InSameGuild_OmitsAcceptedTicketsAndNotes()
     {
-        var live = new Ticket { GuildId = 1, Action = TicketAction.Timeout };
-        var archive = new Ticket { GuildId = 1, Action = TicketAction.Ban };
+        Ticket live = new Ticket { GuildId = 1, Action = TicketAction.Timeout };
+        Ticket archive = new Ticket { GuildId = 1, Action = TicketAction.Ban };
 
         IQueryable<Ticket> pending = new[]
         {
@@ -309,8 +309,8 @@ public sealed class TicketApprovalTests
     public void Approve_SeniorReviewer_RecordsOnlyOneApproval()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
-        var reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: false, CanTimeoutMembers: false, CanViewAuditLog: true);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
+        TicketActor reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: false, CanTimeoutMembers: false, CanViewAuditLog: true);
 
         // Act
         ticket.Approve(reviewer, ticket.Version);
@@ -327,8 +327,8 @@ public sealed class TicketApprovalTests
     public void Approve_OrdinaryModerator_RejectsApproval()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
-        var moderator = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: false, CanTimeoutMembers: true, CanBanMembers: true);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
+        TicketActor moderator = new TicketActor(GuildId: 1, UserId: 3, IsAdministrator: false, CanTimeoutMembers: true, CanBanMembers: true);
 
         // Act
         void Act()
@@ -345,7 +345,7 @@ public sealed class TicketApprovalTests
     public void Approve_StaleVersion_RejectsApproval()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
 
         // Act
         void Act()
@@ -361,12 +361,16 @@ public sealed class TicketApprovalTests
     public void Approve_IncompleteOrPending_RejectsApproval([Values] bool pending)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
 
         if (pending)
+
             ticket.Pending = new TicketOperation { Kind = TicketOperationKind.RemoveBan };
+
         else
+
             ticket.Initialise("", seconds: null);
+
 
         // Act
         void Act()
@@ -382,14 +386,14 @@ public sealed class TicketApprovalTests
     public void SetComment_ApprovedTicket_PreservesApproval([Values] bool append)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
         ticket.Approve(new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false), ticket.Version);
 
         DateTimeOffset? approvedAt = ticket.ApprovedAtUtc;
 
         var version = ticket.Version;
         var comment = append ? "reason\nAdditional detail" : "Changed";
-        var action = append ? TicketHistoryAction.AppendedComment : TicketHistoryAction.SetComment;
+        TicketHistoryAction action = append ? TicketHistoryAction.AppendedComment : TicketHistoryAction.SetComment;
 
         // Act
         ticket.SetComment(comment, moderatorId: 3, append);
@@ -414,7 +418,7 @@ public sealed class TicketApprovalTests
     public void SetDuration_ApprovedTicket_UsesEditorPermission(TicketAction action, bool canReview)
     {
         // Arrange
-        var ticket = TicketTests.Create(action);
+        Ticket ticket = TicketTests.Create(action);
         ticket.Approve(new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false), ticket.Version);
         DateTimeOffset? approvedAt = ticket.ApprovedAtUtc;
 
@@ -437,13 +441,13 @@ public sealed class TicketApprovalTests
     public void BeginTimeoutChange_ApprovedTicket_PreservesApproval()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Timeout);
+        Ticket ticket = TicketTests.Create(TicketAction.Timeout);
         ticket.Approve(new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false), ticket.Version);
         DateTimeOffset? approvedAt = ticket.ApprovedAtUtc;
 
         var version = ticket.Version;
 
-        var operation = new TicketOperation
+        TicketOperation operation = new TicketOperation
         {
             Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = ticket.CreatedAtUtc.AddHours(2), RequestedBy = 3,
         };
@@ -463,10 +467,10 @@ public sealed class TicketApprovalTests
     public void TimeoutChange_ConfirmedOrdinaryEdit_RequiresApproval([Values] bool confirmed)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Timeout);
+        Ticket ticket = TicketTests.Create(TicketAction.Timeout);
         ticket.Approve(new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false), ticket.Version);
         DateTimeOffset? approvedAt = ticket.ApprovedAtUtc;
-        var expiry = ticket.CreatedAtUtc.AddHours(2);
+        DateTimeOffset expiry = ticket.CreatedAtUtc.AddHours(2);
 
         ticket.BeginTimeoutChange(
             new TicketOperation { Kind = TicketOperationKind.SetTimeoutExpiry, ExpiryUtc = expiry, RequestedBy = 3 });
@@ -488,15 +492,15 @@ public sealed class TicketApprovalTests
     public void Approve_AfterEdit_PreservesOriginalApproval([Values] bool anotherReviewer)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
         ticket.Approve(new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false), ticket.Version);
         DateTimeOffset? approvedAt = ticket.ApprovedAtUtc;
 
-        var approvalHistoryTimestamp = ticket.ModificationHistory[0].Timestamp;
+        DateTimeOffset approvalHistoryTimestamp = ticket.ModificationHistory[0].Timestamp;
         ticket.SetComment("Changed", moderatorId: 3);
 
         var version = ticket.Version;
-        var reviewer = new TicketActor(GuildId: 1, anotherReviewer ? 5UL : 4UL, IsAdministrator: true, CanTimeoutMembers: false);
+        TicketActor reviewer = new TicketActor(GuildId: 1, anotherReviewer ? 5UL : 4UL, IsAdministrator: true, CanTimeoutMembers: false);
 
         // Act
         ticket.Approve(reviewer, ticket.Version);
@@ -515,13 +519,17 @@ public sealed class TicketApprovalTests
     public void Content_UnapprovedTicketEdited_RemainsUnapproved([Values] bool duration)
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
 
         // Act
         if (duration)
+
             ticket.SetDuration(seconds: 60, moderatorId: 3, canReview: true);
+
         else
+
             ticket.SetComment("Changed", moderatorId: 3);
+
 
         // Assert
         ticket.ApprovedByUserId.ShouldBeNull();
@@ -532,7 +540,7 @@ public sealed class TicketApprovalTests
     public void Content_UnchangedThenExpired_PreservesApproval()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban);
         ticket.Approve(new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false), ticket.Version);
 
         // Act
@@ -548,7 +556,7 @@ public sealed class TicketApprovalTests
     public void Content_AutomaticallyAcceptedTicketEdited_PreservesAcceptance()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Ban, canReview: true);
+        Ticket ticket = TicketTests.Create(TicketAction.Ban, canReview: true);
 
         // Act
         ticket.SetComment("Changed", moderatorId: 4);
@@ -561,7 +569,7 @@ public sealed class TicketApprovalTests
     public void CanCorrect_SeniorModerator_CanEditEveryStoredType([Values] TicketAction action)
     {
         // Arrange
-        var ticket = TicketTests.Create(action);
+        Ticket ticket = TicketTests.Create(action);
 
         // Act
         var allowed = ticket.CanCorrect(

@@ -1,7 +1,8 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using Discord.Net;
+using Discord.Rest;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using SylvanBot.Application.Features.SealHunts;
@@ -27,7 +28,7 @@ public sealed class SealHuntWorker(
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            foreach (var guild in client.Guilds)
+            foreach (SocketGuild guild in client.Guilds)
             {
                 if (!guild.IsConnected)
                     continue;
@@ -49,14 +50,14 @@ public sealed class SealHuntWorker(
     private async Task TickAsync(SocketGuild guild, CancellationToken ct)
     {
         var id = (long)guild.Id;
-        await using var db = await contexts.CreateDbContextAsync(ct);
-        var state = await LoadScheduleAsync(db, id, ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+        SealHunt state = await LoadScheduleAsync(db, id, ct);
 
-        var options = new RequestOptions { CancelToken = ct };
+        RequestOptions options = new RequestOptions { CancelToken = ct };
 
         if (state.ChannelId is long previousChannel)
         {
-            var now = DateTimeOffset.UtcNow;
+            DateTimeOffset now = DateTimeOffset.UtcNow;
 
             var needsRecovery = state.MessageId is null
                 ? state.StartedAt <= now.AddMinutes(-1)
@@ -83,7 +84,7 @@ public sealed class SealHuntWorker(
         if (candidates.Length == 0)
             return;
 
-        var destination = candidates[Random.Shared.Next(candidates.Length)];
+        IMessageChannel destination = candidates[Random.Shared.Next(candidates.Length)];
         await ResolveRoleAsync(db, guild, state.RoleId, options, ct);
         await RunHuntAsync(db, guild.Id, destination, options, ct);
     }
@@ -94,12 +95,12 @@ public sealed class SealHuntWorker(
             .AsNoTracking()
             .Where(hunt => hunt.GuildId == id);
 
-        var state = await schedules.SingleOrDefaultAsync(ct);
+        SealHunt? state = await schedules.SingleOrDefaultAsync(ct);
 
         if (state is not null)
             return state;
 
-        var created = new SealHunt { GuildId = id, NextAt = DateTimeOffset.UtcNow + SampleInterval() };
+        SealHunt created = new SealHunt { GuildId = id, NextAt = DateTimeOffset.UtcNow + SampleInterval() };
         db.SealHunts.Add(created);
 
         try
@@ -129,7 +130,7 @@ public sealed class SealHuntWorker(
 
             if (role is null)
             {
-                var restGuild = await client.Rest.GetGuildAsync(guild.Id, options);
+                RestGuild restGuild = await client.Rest.GetGuildAsync(guild.Id, options);
 
                 try
                 {
@@ -144,7 +145,7 @@ public sealed class SealHuntWorker(
 
         if (role is null)
         {
-            var emoji = guild.Features.HasFeature(GuildFeature.RoleIcons) ? new Emoji("🦭") : null;
+            Emoji? emoji = guild.Features.HasFeature(GuildFeature.RoleIcons) ? new Emoji("🦭") : null;
 
             role = await guild.CreateRoleAsync(
                 "Sealed",
@@ -176,7 +177,7 @@ public sealed class SealHuntWorker(
         CancellationToken ct)
     {
         var id = (long)guildId;
-        var started = DateTimeOffset.UtcNow;
+        DateTimeOffset started = DateTimeOffset.UtcNow;
         var key = started.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
 
         // Keep the destination and button key so a restart during the upload can find the post.
@@ -193,18 +194,20 @@ public sealed class SealHuntWorker(
 
         logger.Debug(
             "Reserved seal hunt in guild {GuildId}, channel {ChannelId}, started at {StartedAt}",
-            guildId, destination.Id, started);
+            guildId,
+            destination.Id,
+            started);
 
-        var photo = _photos[Random.Shared.Next(_photos.Length)];
+        SealPhoto photo = _photos[Random.Shared.Next(_photos.Length)];
 
-        var message = await destination.SendFileAsync(
+        IUserMessage message = await destination.SendFileAsync(
             Path.Combine(AssetDirectory, photo.File),
             options: options,
             allowedMentions: AllowedMentions.None,
             components: SealHuntModule.BuildPost(photo, key),
             flags: MessageFlags.ComponentsV2);
 
-        var next = message.Timestamp + SampleInterval();
+        DateTimeOffset next = message.Timestamp + SampleInterval();
 
         await db.SealHunts
             .Where(hunt => hunt.GuildId == id && hunt.StartedAt == started)
@@ -216,12 +219,15 @@ public sealed class SealHuntWorker(
 
         logger.Information(
             "Posted seal hunt {MessageId} in guild {GuildId}, channel {ChannelId}; next hunt at {NextAt}",
-            message.Id, guildId, destination.Id, next);
+            message.Id,
+            guildId,
+            destination.Id,
+            next);
     }
 
     private static async Task DeleteAtExpiryAsync(IMessage message, DateTimeOffset deadline, CancellationToken ct)
     {
-        var remaining = deadline - DateTimeOffset.UtcNow;
+        TimeSpan remaining = deadline - DateTimeOffset.UtcNow;
 
         if (remaining > TimeSpan.Zero)
             await Task.Delay(remaining, ct);
@@ -246,26 +252,32 @@ public sealed class SealHuntWorker(
     {
         logger.Debug(
             "Checking seal hunt recovery in guild {GuildId}, channel {ChannelId}, message {MessageId}, expiry {ExpiresAt}",
-            id, channelId, state.MessageId, state.ExpiresAt);
+            id,
+            channelId,
+            state.MessageId,
+            state.ExpiresAt);
 
         try
         {
-            var channel = await client.Rest.GetChannelAsync((ulong)channelId, options) as IMessageChannel;
+            IMessageChannel? channel = await client.Rest.GetChannelAsync((ulong)channelId, options) as IMessageChannel;
 
             if (channel is not null && state.MessageId is long messageId)
             {
                 if (state.ExpiresAt.HasValue)
+
                     await channel.DeleteMessageAsync((ulong)messageId, options);
+
                 else if (await channel.GetMessageAsync((ulong)messageId, options: options) is not null)
+
                     return;
             }
             else if (channel is not null && state.StartedAt is DateTimeOffset started)
             {
-                var message = await FindInterruptedPostAsync(channel, started, options);
+                IMessage? message = await FindInterruptedPostAsync(channel, started, options);
 
                 if (message is not null)
                 {
-                    var next = message.Timestamp + SampleInterval();
+                    DateTimeOffset next = message.Timestamp + SampleInterval();
 
                     await db.SealHunts
                         .Where(hunt => hunt.GuildId == id && hunt.StartedAt == started)
@@ -277,7 +289,9 @@ public sealed class SealHuntWorker(
 
                     logger.Information(
                         "Recovered interrupted seal post {MessageId} in guild {GuildId}, channel {ChannelId}",
-                        message.Id, id, channelId);
+                        message.Id,
+                        id,
+                        channelId);
 
                     return;
                 }
@@ -289,9 +303,12 @@ public sealed class SealHuntWorker(
         }
 
         await ClearMessageAsync(db, id, ct);
+
         logger.Debug(
             "Cleared expired or missing seal post in guild {GuildId}, channel {ChannelId}, message {MessageId}",
-            id, channelId, state.MessageId);
+            id,
+            channelId,
+            state.MessageId);
     }
 
     private async Task<IMessage?> FindInterruptedPostAsync(IMessageChannel channel, DateTimeOffset started, RequestOptions options)
@@ -309,11 +326,11 @@ public sealed class SealHuntWorker(
                 .OrderBy(message => message.Id)
                 .ToArray();
 
-            foreach (var message in page)
-            {
+            foreach (IMessage message in page)
+
                 if (message.Author.Id == client.CurrentUser.Id && SealHuntModule.ContainsClaim(message, claimId))
                     return message;
-            }
+
 
             if (page.Length < 100 || page[^1].Timestamp > started.AddMinutes(5))
                 return null;
@@ -349,9 +366,9 @@ public sealed class SealHuntWorker(
         if (channel is not IMessageChannel)
             return false;
 
-        var guild = channel.Guild;
-        var parent = channel;
-        var thread = channel as SocketThreadChannel;
+        SocketGuild guild = channel.Guild;
+        SocketGuildChannel parent = channel;
+        SocketThreadChannel? thread = channel as SocketThreadChannel;
 
         if (thread is not null)
         {
@@ -361,7 +378,7 @@ public sealed class SealHuntWorker(
             parent = thread.ParentChannel;
         }
 
-        var bot = guild.CurrentUser.GetPermissions(parent);
+        ChannelPermissions bot = guild.CurrentUser.GetPermissions(parent);
 
         if (thread is { IsPrivateThread: true, HasJoined: false } && !bot.ManageThreads)
             return false;
@@ -384,7 +401,7 @@ public sealed class SealHuntWorker(
 
     private static bool EveryoneCanChat(SocketGuildChannel channel)
     {
-        var everyone = channel.Guild.EveryoneRole;
+        SocketRole everyone = channel.Guild.EveryoneRole;
         OverwritePermissions? overwrite = channel.GetPermissionOverwrite(everyone);
         var effective = (everyone.Permissions.RawValue & ~(overwrite?.DenyValue ?? 0)) | (overwrite?.AllowValue ?? 0);
         const ulong needed = (ulong)(ChannelPermission.ViewChannel | ChannelPermission.SendMessages);
@@ -393,7 +410,7 @@ public sealed class SealHuntWorker(
 
     internal async Task<HashSet<long>> GetDestinationsAsync(ulong guildId, CancellationToken ct)
     {
-        await using var db = await contexts.CreateDbContextAsync(ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
         return await db.SealDestinations
             .Where(destination => destination.GuildId == (long)guildId)
@@ -403,7 +420,7 @@ public sealed class SealHuntWorker(
 
     internal async Task SetDestinationAsync(ulong guildId, ulong destinationId, bool allow, CancellationToken ct)
     {
-        await using var db = await contexts.CreateDbContextAsync(ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
         if (!allow)
         {
@@ -443,9 +460,9 @@ public sealed class SealHuntWorker(
         var guildId = (long)member.Guild.Id;
         var userId = (long)member.Id;
 
-        await using var db = await contexts.CreateDbContextAsync(ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
-        var state = await LoadScheduleAsync(db, guildId, ct);
+        SealHunt state = await LoadScheduleAsync(db, guildId, ct);
         var currentKey = state.StartedAt?.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);
 
         var current = string.Equals(currentKey, key, StringComparison.Ordinal)
@@ -456,7 +473,10 @@ public sealed class SealHuntWorker(
         {
             logger.Debug(
                 "Rejected stale seal interaction from user {UserId} in guild {GuildId} for message {MessageId}",
-                userId, guildId, click.Message.Id);
+                userId,
+                guildId,
+                click.Message.Id);
+
             return "This seal has gone.";
         }
 
@@ -477,13 +497,13 @@ public sealed class SealHuntWorker(
         if (((IGuildUser)member).RoleIds.Contains((ulong)roleId))
             return "You have already claimed him. You may not do so again.";
 
-        var role = member.Guild.GetRole((ulong)roleId);
+        SocketRole? role = member.Guild.GetRole((ulong)roleId);
 
         if (role is not null && RoleReactionPolicy.ValidateRole(member.Guild, role).HasValue)
             throw new BotCommandException("Sylvan cannot safely grant the Sealed role.");
 
-        var lifetime = TimeSpan.FromSeconds(Math.Sqrt(2) + Random.Shared.NextDouble() * (Math.PI - Math.Sqrt(2)));
-        var deadline = click.CreatedAt + lifetime;
+        TimeSpan lifetime = TimeSpan.FromSeconds(Math.Sqrt(2) + Random.Shared.NextDouble() * (Math.PI - Math.Sqrt(2)));
+        DateTimeOffset deadline = click.CreatedAt + lifetime;
 
         var opened = await appearance
             .Where(hunt => hunt.ExpiresAt == null && !hunt.Abandoned.Contains(userId))
@@ -497,21 +517,32 @@ public sealed class SealHuntWorker(
                 return eligible is false ? "You abandoned this seal. You must live with the consequences." : "This seal has gone.";
         }
 
-        var grant = member.AddRoleAsync((ulong)roleId, new RequestOptions { CancelToken = ct, AuditLogReason = "Claimed the seal" });
+        Task grant = member.AddRoleAsync((ulong)roleId, new RequestOptions { CancelToken = ct, AuditLogReason = "Claimed the seal" });
 
         if (opened == 1)
+
             logger.Debug(
                 "Opened seal claim window in guild {GuildId} for message {MessageId} until {ExpiresAt}",
-                guildId, click.Message.Id, deadline);
+                guildId,
+                click.Message.Id,
+                deadline);
+
 
         if (opened == 1)
+
             await Task.WhenAll(grant, DeleteAtExpiryAsync(click.Message, deadline, ct));
+
         else
+
             await grant;
+
 
         logger.Information(
             "User {UserId} claimed seal {MessageId} and received role {RoleId} in guild {GuildId}",
-            userId, click.Message.Id, roleId, guildId);
+            userId,
+            click.Message.Id,
+            roleId,
+            guildId);
 
         return "You claimed him! You are now Sealed.";
     }

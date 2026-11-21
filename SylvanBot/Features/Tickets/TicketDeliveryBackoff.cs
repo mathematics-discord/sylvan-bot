@@ -1,4 +1,4 @@
-namespace SylvanBot.Features.Tickets;
+﻿namespace SylvanBot.Features.Tickets;
 
 // Shared delivery state. Moderation operations do not wait on these cooldowns.
 public sealed class TicketDeliveryBackoff(TimeProvider clock)
@@ -19,10 +19,9 @@ public sealed class TicketDeliveryBackoff(TimeProvider clock)
     internal void DeferGlobal(DateTimeOffset until)
     {
         lock (_gate)
-        {
+
             if (until > _globalUntil)
                 _globalUntil = until;
-        }
     }
 
     internal void DeferChannel(ulong channelId, DateTimeOffset until) => Defer(_channels, channelId, until);
@@ -31,8 +30,8 @@ public sealed class TicketDeliveryBackoff(TimeProvider clock)
     {
         lock (_gate)
         {
-            var until = entries.GetValueOrDefault(id).Until;
-            var remaining = (until > _globalUntil ? until : _globalUntil) - clock.GetUtcNow();
+            DateTimeOffset until = entries.GetValueOrDefault(id).Until;
+            TimeSpan remaining = (until > _globalUntil ? until : _globalUntil) - clock.GetUtcNow();
             return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
         }
     }
@@ -41,9 +40,9 @@ public sealed class TicketDeliveryBackoff(TimeProvider clock)
     {
         lock (_gate)
         {
-            var previous = entries.GetValueOrDefault(id);
+            (DateTimeOffset Until, int Failures) previous = entries.GetValueOrDefault(id);
             var seconds = Math.Min(300, 30 * (1 << previous.Failures));
-            var until = clock.GetUtcNow().AddSeconds(seconds);
+            DateTimeOffset until = clock.GetUtcNow().AddSeconds(seconds);
             entries[id] = (until > previous.Until ? until : previous.Until, Math.Min(4, previous.Failures + 1));
         }
     }
@@ -51,17 +50,16 @@ public sealed class TicketDeliveryBackoff(TimeProvider clock)
     private void Succeeded(Dictionary<ulong, (DateTimeOffset Until, int Failures)> entries, ulong id)
     {
         lock (_gate)
-        {
-            if (entries.TryGetValue(id, out var previous))
+
+            if (entries.TryGetValue(id, out (DateTimeOffset Until, int Failures) previous))
                 entries[id] = (previous.Until, 0);
-        }
     }
 
     private void Defer(Dictionary<ulong, (DateTimeOffset Until, int Failures)> entries, ulong id, DateTimeOffset until)
     {
         lock (_gate)
         {
-            var previous = entries.GetValueOrDefault(id);
+            (DateTimeOffset Until, int Failures) previous = entries.GetValueOrDefault(id);
             entries[id] = (until > previous.Until ? until : previous.Until, previous.Failures);
         }
     }
@@ -71,18 +69,23 @@ public sealed class TicketDeliveryBackoff(TimeProvider clock)
 
     private RequestOptions Options(Action<DateTimeOffset> defer, CancellationToken token)
     {
-        var options = TicketBoundary.Options(token);
+        RequestOptions options = TicketBoundary.Options(token);
+
         options.RatelimitCallback = info =>
         {
             if (info.Remaining != 0 && !info.IsGlobal)
                 return Task.CompletedTask;
 
-            var until = info.Reset ?? clock.GetUtcNow().Add(info.ResetAfter ?? TimeSpan.FromSeconds(info.RetryAfter ?? 30));
+            DateTimeOffset until = info.Reset ?? clock.GetUtcNow().Add(info.ResetAfter ?? TimeSpan.FromSeconds(info.RetryAfter ?? 30));
 
             if (info.IsGlobal)
+
                 DeferGlobal(until);
+
             else
+
                 defer(until);
+
 
             return Task.CompletedTask;
         };

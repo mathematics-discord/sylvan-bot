@@ -14,17 +14,19 @@ public sealed class TicketModerator
 
     public int? PromptRevision { get; set; }
 
-    public bool NeedsPromptRefresh(int revision) => PromptRevision != revision;
-
     public int Version { get; set; }
+
+    public bool NeedsPromptRefresh(int revision) => PromptRevision != revision;
 
     public bool IsDeliveryDue(long ticketId, DateTimeOffset now) =>
         ActiveTicketId != ticketId || NextDeliveryUtc is null || NextDeliveryUtc <= now;
 
     public void ClearDelivery()
     {
-        var hasDelivery = ActiveTicketId is not null || PromptMessageId is not null
-                          || NextDeliveryUtc is not null || PromptRevision is not null;
+        var hasDelivery = ActiveTicketId is not null
+                          || PromptMessageId is not null
+                          || NextDeliveryUtc is not null
+                          || PromptRevision is not null;
 
         if (!hasDelivery)
             return;

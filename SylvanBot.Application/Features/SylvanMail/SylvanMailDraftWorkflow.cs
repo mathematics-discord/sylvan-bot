@@ -1,7 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Infrastructure.Data;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using SylvanBot.Application.Infrastructure.Data;
+using static SylvanBot.Application.Features.SylvanMail.SylvanMailDraftAction;
 
 namespace SylvanBot.Application.Features.SylvanMail;
 
@@ -10,27 +11,23 @@ public sealed class SylvanMailDraftWorkflow(
     ISylvanMailDrafts drafts,
     ISylvanMailDiscord discord,
     SylvanMailWorkflow relay,
-    ILogger<SylvanMailDraftWorkflow> logger
-)
+    ILogger<SylvanMailDraftWorkflow> logger)
 {
     public async Task<Optional<ulong>> ConversationUserAsync(ulong threadId, CancellationToken ct)
     {
-        await using var db = await contexts.CreateDbContextAsync(ct);
-        var conversation = await ActiveConversationAsync(db, threadId, ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+        SylvanMailConversation? conversation = await ActiveConversationAsync(db, threadId, ct);
 
         return conversation is null ? default : new Optional<ulong>(conversation.UserId);
     }
 
     public async Task HandleDraftAsync(ulong threadId, ulong messageId, ulong authorId, SylvanMailDraftAction action, CancellationToken ct)
     {
-        if (action is not (SylvanMailDraftAction.Update
-                           or SylvanMailDraftAction.SendAnonymous
-                           or SylvanMailDraftAction.SendSigned
-                           or SylvanMailDraftAction.Cancel))
+        if (action is not (Update or SendAnonymous or SendSigned or Cancel))
             throw new ArgumentOutOfRangeException(nameof(action));
 
-        await using var db = await contexts.CreateDbContextAsync(ct);
-        var original = await ActiveConversationAsync(db, threadId, ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+        SylvanMailConversation? original = await ActiveConversationAsync(db, threadId, ct);
 
         if (original is null)
             return;
@@ -40,7 +37,7 @@ public sealed class SylvanMailDraftWorkflow(
 
         try
         {
-            var conversation = await ActiveConversationAsync(db: db, threadId: threadId, ct: ct);
+            SylvanMailConversation? conversation = await ActiveConversationAsync(db: db, threadId: threadId, ct: ct);
 
             if (conversation is null || conversation.Id != original.Id)
                 return;
@@ -67,14 +64,13 @@ public sealed class SylvanMailDraftWorkflow(
             if (observed is not { HasValue: true, Value: var message })
                 return;
 
-            if (action == SylvanMailDraftAction.Cancel)
+            if (action == Cancel)
             {
                 var recorded = await db.SylvanMailOperations
-                   .AnyAsync(item => item.SourceMessageId == messageId, cancellationToken: ct);
+                    .AnyAsync(item => item.SourceMessageId == messageId, cancellationToken: ct);
 
                 if (recorded)
-                    throw new BotCommandException(
-                        "Cannot cancel: delivery has already been attempted. Check what arrived before sending another message.");
+                    throw new BotCommandException("Cannot cancel: delivery already been attempted. Check what arrived before sending another.");
 
                 await drafts.ClearReactionsAsync(threadId: threadId, messageId: messageId, ct: ct);
             }
@@ -83,13 +79,13 @@ public sealed class SylvanMailDraftWorkflow(
         }
         catch (Exception exception) when (observed is { HasValue: true, Value: var message })
         {
-            using var noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using CancellationTokenSource noticeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-            if (action != SylvanMailDraftAction.Update)
+            if (action != Update)
             {
                 var detail = "Delivery could not be confirmed. Some content may have arrived; do not assume it is safe to resend.";
 
-                if (action == SylvanMailDraftAction.Cancel)
+                if (action == Cancel)
                     detail =
                         "Cancellation could not be confirmed. Remove and re-add your cancel reaction to try again; contact staff if it continues to fail.";
 
@@ -104,7 +100,7 @@ public sealed class SylvanMailDraftWorkflow(
                     ct: noticeTimeout.Token);
             }
 
-            if (action != SylvanMailDraftAction.Cancel)
+            if (action != Cancel)
                 await drafts.SetDraftReadyAsync(threadId: threadId, messageId: messageId, ready: false, ct: noticeTimeout.Token);
 
             if (exception is not BotCommandException)
@@ -118,11 +114,11 @@ public sealed class SylvanMailDraftWorkflow(
 
     public async Task RefuseConfirmationAsync(ulong threadId, ulong messageId, ulong authorId, SylvanMailDraftAction action, CancellationToken ct)
     {
-        if (action is not (SylvanMailDraftAction.SendAnonymous or SylvanMailDraftAction.SendSigned or SylvanMailDraftAction.Cancel))
+        if (action is not (SendAnonymous or SendSigned or Cancel))
             throw new ArgumentOutOfRangeException(nameof(action));
 
-        await using var db = await contexts.CreateDbContextAsync(ct);
-        var conversation = await ActiveConversationAsync(db: db, threadId: threadId, ct: ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+        SylvanMailConversation? conversation = await ActiveConversationAsync(db: db, threadId: threadId, ct: ct);
 
         if (conversation is null)
             return;
@@ -135,8 +131,7 @@ public sealed class SylvanMailDraftWorkflow(
             ct: ct);
 
         if (observed is { HasValue: true, Value: var message })
-        {
-            if (action == SylvanMailDraftAction.Cancel)
+            if (action == Cancel)
                 await discord.ReportAsync(
                     source: message,
                     new Optional<ulong>(threadId),
@@ -145,25 +140,24 @@ public sealed class SylvanMailDraftWorkflow(
                     ct: ct);
             else
                 await relay.RefuseBusyAsync(message: message, ct: ct);
-        }
     }
 
     private static Task<SylvanMailConversation?> ActiveConversationAsync(BotDbContext db, ulong threadId, CancellationToken ct) =>
         db.SylvanMailConversations
-           .AsNoTracking()
-           .Where(item => item.ThreadId == threadId && !item.Retired)
-           .Where(item => db.SylvanMailSettings
-                     .Any(settings => settings.GuildId == item.GuildId && settings.ForumId == item.ForumId))
-           .SingleOrDefaultAsync(ct);
+            .AsNoTracking()
+            .Where(item => item.ThreadId == threadId && !item.Retired)
+            .Where(item => db.SylvanMailSettings
+                .Any(settings => settings.GuildId == item.GuildId && settings.ForumId == item.ForumId))
+            .SingleOrDefaultAsync(ct);
 
     private async Task ProcessDraftAsync(BotDbContext db, SylvanMailMessage message, SylvanMailDraftAction action, CancellationToken ct)
     {
         var recorded = await db.SylvanMailOperations
-           .AnyAsync(item => item.SourceMessageId == message.SourceMessageId, cancellationToken: ct);
+            .AnyAsync(item => item.SourceMessageId == message.SourceMessageId, cancellationToken: ct);
 
         if (recorded)
         {
-            if (action is SylvanMailDraftAction.SendAnonymous or SylvanMailDraftAction.SendSigned)
+            if (action is SendAnonymous or SendSigned)
                 await relay.RelayLockedAsync(db: db, message: message, ct: ct);
 
             await drafts.SetDraftReadyAsync(threadId: message.SourceChannelId, messageId: message.SourceMessageId, ready: false, ct: ct);
@@ -176,7 +170,7 @@ public sealed class SylvanMailDraftWorkflow(
 
         SylvanMailContent.Validate(message);
 
-        if (action is SylvanMailDraftAction.SendAnonymous or SylvanMailDraftAction.SendSigned)
+        if (action is SendAnonymous or SendSigned)
         {
             await relay.RelayLockedAsync(db: db, message: message, ct: ct);
             await drafts.SetDraftReadyAsync(threadId: message.SourceChannelId, messageId: message.SourceMessageId, ready: false, ct: ct);

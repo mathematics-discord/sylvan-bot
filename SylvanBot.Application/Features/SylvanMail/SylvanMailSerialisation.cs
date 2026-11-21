@@ -1,7 +1,7 @@
-﻿using Microsoft.EntityFrameworkCore;
-using SylvanBot.Application.Infrastructure.Data;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using SylvanBot.Application.Infrastructure.Data;
 
 namespace SylvanBot.Application.Features.SylvanMail;
 

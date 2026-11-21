@@ -17,7 +17,7 @@ public sealed class TicketAuditReaderTests
     public void Read_ApprovalRequirement_DistinguishesSylvanAutomodFromOtherActions(ulong moderator, int action, string reason, bool expected)
     {
         // Arrange
-        using var document = JsonDocument.Parse(
+        using JsonDocument document = JsonDocument.Parse(
             JsonSerializer.Serialize(
                 new
                 {
@@ -30,7 +30,7 @@ public sealed class TicketAuditReaderTests
                 }));
 
         // Act
-        var observation = TicketAuditReader.Read(guildId: 1, document.RootElement, new HashSet<ulong> { 456 }, ownBotId: 999)
+        TicketObservation observation = TicketAuditReader.Read(guildId: 1, document.RootElement, new HashSet<ulong> { 456 }, ownBotId: 999)
             .Single();
 
         // Assert
@@ -41,7 +41,7 @@ public sealed class TicketAuditReaderTests
     public void Read_UncachedUsers_PreservesRawIdentities()
     {
         // Arrange
-        using var document = JsonDocument.Parse(
+        using JsonDocument document = JsonDocument.Parse(
             """
             {"id":"1430000000000000000","action_type":22,"target_id":"123","user_id":"456"}
             """);
@@ -67,7 +67,7 @@ public sealed class TicketAuditReaderTests
         };
 
         values.Remove(field);
-        using var document = JsonDocument.Parse(JsonSerializer.Serialize(values));
+        using JsonDocument document = JsonDocument.Parse(JsonSerializer.Serialize(values));
 
         // Act
         void Act()
@@ -83,7 +83,7 @@ public sealed class TicketAuditReaderTests
     public void Read_RemovedTimeout_UsesExplicitNoTimeoutState()
     {
         // Arrange
-        using var document = JsonDocument.Parse(
+        using JsonDocument document = JsonDocument.Parse(
             """
             {"id":"1430000000000000000","action_type":24,"target_id":"123","user_id":"456",
              "changes":[{"key":"communication_disabled_until","old_value":"2026-11-01T00:00:00Z","new_value":null}]}
@@ -102,7 +102,7 @@ public sealed class TicketAuditReaderTests
     public void Read_SimultaneousVoiceChanges_PreservesBothActions()
     {
         // Arrange
-        using var document = JsonDocument.Parse(
+        using JsonDocument document = JsonDocument.Parse(
             """
             {"id":"1430000000000000000","action_type":24,"target_id":"123","user_id":"456",
              "changes":[{"key":"mute","old_value":false,"new_value":true},
@@ -125,7 +125,7 @@ public sealed class TicketAuditReaderTests
     public void Read_MultipleRoleChanges_PreservesEachRoleAndDirection()
     {
         // Arrange
-        using var document = JsonDocument.Parse(
+        using JsonDocument document = JsonDocument.Parse(
             """
             {"id":"1430000000000000000","action_type":25,"target_id":"123","user_id":"456",
              "changes":[{"key":"$add","new_value":[{"id":"10"},{"id":"20"}]},
@@ -148,7 +148,7 @@ public sealed class TicketAuditReaderTests
     public void Read_RestorationReason_TrustsOnlyOwnBot(ulong moderator, long? expected)
     {
         // Arrange
-        using var document = JsonDocument.Parse(
+        using JsonDocument document = JsonDocument.Parse(
             $$"""
               {"id":"1430000000000000000","action_type":25,"target_id":"123","user_id":"{{
                   moderator
@@ -167,7 +167,7 @@ public sealed class TicketAuditReaderTests
     public void Read_SelfVoiceAndUnrelatedChanges_CreatesNothing()
     {
         // Arrange
-        using var document = JsonDocument.Parse(
+        using JsonDocument document = JsonDocument.Parse(
             """
             {"id":"1430000000000000000","action_type":24,"target_id":"123","user_id":"456",
              "changes":[{"key":"self_mute","new_value":true},{"key":"nick","new_value":"name"}]}

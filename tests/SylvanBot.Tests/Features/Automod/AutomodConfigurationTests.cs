@@ -8,7 +8,7 @@ public sealed class AutomodConfigurationTests
     public void Construct_EmptyConfiguration_HasNoMatchOrExemptions()
     {
         // Act
-        var configuration = new AutomodConfiguration([], []);
+        AutomodConfiguration configuration = new AutomodConfiguration([], []);
 
         // Assert
         configuration.Matcher.Match("hello").Rule.HasValue.ShouldBeFalse();
@@ -20,7 +20,7 @@ public sealed class AutomodConfigurationTests
     {
         // Arrange
         List<ulong> roles = [1, 1, 2];
-        var configuration = new AutomodConfiguration([], roles);
+        AutomodConfiguration configuration = new AutomodConfiguration([], roles);
 
         // Act
         roles.Clear();
@@ -34,13 +34,21 @@ public sealed class AutomodConfigurationTests
     public void Construct_Rules_OwnsIndependentRuleInstances()
     {
         // Arrange
-        var rule = new AutomodRule { Id = 7, GuildId = 3, Pattern = "hello", Action = AutomodAction.Ban, DurationSeconds = 60 };
+        AutomodRule rule = new AutomodRule
+        {
+            Id = 7,
+            GuildId = 3,
+            Pattern = "hello",
+            Action = AutomodAction.Ban,
+            DurationSeconds = 60
+        };
+
         List<AutomodRule> rules = [rule];
-        var configuration = new AutomodConfiguration(rules, []);
+        AutomodConfiguration configuration = new AutomodConfiguration(rules, []);
 
         // Act
         rules.Clear();
-        var match = configuration.Matcher.Match("hello").Rule.Value;
+        AutomodRule match = configuration.Matcher.Match("hello").Rule.Value;
 
         // Assert
         ReferenceEquals(match, rule).ShouldBeFalse();
@@ -57,10 +65,10 @@ public sealed class AutomodConfigurationTests
     public void Construct_InvalidStoredPattern_RejectsConfiguration(string pattern)
     {
         // Arrange
-        var rule = new AutomodRule { Id = 7, GuildId = 3, Pattern = pattern, MatchType = AutomodMatchType.Regex };
+        AutomodRule rule = new AutomodRule { Id = 7, GuildId = 3, Pattern = pattern, MatchType = AutomodMatchType.Regex };
 
         // Act
-        var error = Should.Throw<FormatException>(() => new AutomodConfiguration([rule], []));
+        FormatException error = Should.Throw<FormatException>(() => new AutomodConfiguration([rule], []));
 
         // Assert
         error.Message.ShouldContain("rule 7");
@@ -74,11 +82,11 @@ public sealed class AutomodConfigurationTests
     public void Match_DisabledAction_DoesNotSelectItsRules(AutomodAction action)
     {
         // Arrange
-        var rule = new AutomodRule { Id = 1, Pattern = "hello", Action = action };
-        var configuration = new AutomodConfiguration([rule], [], [action]);
+        AutomodRule rule = new AutomodRule { Id = 1, Pattern = "hello", Action = action };
+        AutomodConfiguration configuration = new AutomodConfiguration([rule], [], [action]);
 
         // Act
-        var result = configuration.Matcher.Match("hello");
+        AutomodMatchResult result = configuration.Matcher.Match("hello");
 
         // Assert
         result.Rule.HasValue.ShouldBeFalse();
@@ -88,12 +96,12 @@ public sealed class AutomodConfigurationTests
     public void Match_DisabledEarlierRule_SelectsEnabledAction()
     {
         // Arrange
-        var deletion = new AutomodRule { Id = 1, Pattern = "first", Action = AutomodAction.Delete };
-        var mute = new AutomodRule { Id = 2, Pattern = "later", Action = AutomodAction.Mute, DurationSeconds = 60 };
-        var configuration = new AutomodConfiguration([deletion, mute], [], [AutomodAction.Delete]);
+        AutomodRule deletion = new AutomodRule { Id = 1, Pattern = "first", Action = AutomodAction.Delete };
+        AutomodRule mute = new AutomodRule { Id = 2, Pattern = "later", Action = AutomodAction.Mute, DurationSeconds = 60 };
+        AutomodConfiguration configuration = new AutomodConfiguration([deletion, mute], [], [AutomodAction.Delete]);
 
         // Act
-        var result = configuration.Matcher.Match("first then later");
+        AutomodMatchResult result = configuration.Matcher.Match("first then later");
 
         // Assert
         result.Rule.Value.Id.ShouldBe(2);
@@ -103,12 +111,12 @@ public sealed class AutomodConfigurationTests
     public void Match_ReenabledAction_UsesRetainedRulesAndExemptions()
     {
         // Arrange
-        var rule = new AutomodRule { Id = 1, Pattern = "hello", Action = AutomodAction.Delete };
+        AutomodRule rule = new AutomodRule { Id = 1, Pattern = "hello", Action = AutomodAction.Delete };
         List<AutomodRule> rules = [rule];
-        var disabled = new AutomodConfiguration(rules, [42UL], [AutomodAction.Delete]);
+        AutomodConfiguration disabled = new AutomodConfiguration(rules, [42UL], [AutomodAction.Delete]);
 
         // Act
-        var enabled = new AutomodConfiguration(rules, [42UL], []);
+        AutomodConfiguration enabled = new AutomodConfiguration(rules, [42UL], []);
 
         // Assert
         disabled.Matcher.Match("hello").Rule.HasValue.ShouldBeFalse();

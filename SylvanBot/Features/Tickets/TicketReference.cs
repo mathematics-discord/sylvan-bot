@@ -8,7 +8,7 @@ using SylvanBot.Application.Features.Tickets;
 public static class TicketReference
 {
     public static TicketMessage ParseMessageLink(string value, ulong guildId) =>
-        TryParseMessageLink(value, guildId, out var message)
+        TryParseMessageLink(value, guildId, out TicketMessage? message)
             ? message
             : throw new BotCommandException("Provide a Discord message link in this server.");
 
@@ -16,16 +16,23 @@ public static class TicketReference
     {
         message = null;
         var normalized = value.Trim();
-        if (Uri.TryCreate(normalized, UriKind.Absolute, out var uri))
+
+        if (Uri.TryCreate(normalized, UriKind.Absolute, out Uri? uri))
         {
-            var validHost = uri.Host is "discord.com" or "discordapp.com" or "www.discord.com"
-                or "ptb.discord.com" or "canary.discord.com";
+            var validHost = uri.Host is "discord.com"
+                or "discordapp.com"
+                or "www.discord.com"
+                or "ptb.discord.com"
+                or "canary.discord.com";
 
             var parts = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            var validLink = validHost && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal)
-                && parts.Length == 4 && string.Equals(parts[0], "channels", StringComparison.Ordinal)
-                && ulong.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var linkGuild)
-                && linkGuild == guildId;
+
+            var validLink = validHost
+                            && string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal)
+                            && parts.Length == 4
+                            && string.Equals(parts[0], "channels", StringComparison.Ordinal)
+                            && ulong.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var linkGuild)
+                            && linkGuild == guildId;
 
             if (validLink)
             {

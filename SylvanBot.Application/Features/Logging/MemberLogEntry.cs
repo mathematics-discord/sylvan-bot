@@ -1,6 +1,4 @@
-﻿using DotNext;
-
-namespace SylvanBot.Application.Features.Logging;
+﻿namespace SylvanBot.Application.Features.Logging;
 
 /// <summary>A captured member event. A present empty nickname means unset; absence means unavailable.</summary>
 public sealed record MemberLogEntry(

@@ -1,4 +1,5 @@
 ﻿using Discord.Net;
+using Discord.Rest;
 using SylvanBot.Application.Features.Automod;
 using SylvanBot.Features.MessageCache;
 using SylvanBot.Gateway;
@@ -88,8 +89,11 @@ public sealed class AutomodGatewayHandler(
 
         try
         {
-            var member = client.GetGuild(guildId)?.GetUser(message.Author.Id)
-                         ?? (IGuildUser?)await client.Rest.GetGuildUserAsync(guildId, message.Author.Id, new RequestOptions { CancelToken = ct });
+            IGuildUser? member = client.GetGuild(guildId)?.GetUser(message.Author.Id)
+                                 ?? (IGuildUser?)await client.Rest.GetGuildUserAsync(
+                                     guildId,
+                                     message.Author.Id,
+                                     new RequestOptions { CancelToken = ct });
 
             if (member?.RoleIds != null)
                 return new Optional<bool>(configuration.ExemptRoleIds.Overlaps(member.RoleIds));
@@ -138,7 +142,8 @@ public sealed class AutomodGatewayHandler(
 
         if (!runtime.IsEnabled(guildId))
             return;
-        var ct = lifetime.ApplicationStopping;
+
+        CancellationToken ct = lifetime.ApplicationStopping;
 
         try
         {
@@ -154,7 +159,7 @@ public sealed class AutomodGatewayHandler(
             if (!exemption.HasValue || exemption.Value)
                 return;
 
-            var result = configuration.Matcher.Match(content);
+            AutomodMatchResult result = configuration.Matcher.Match(content);
 
             foreach (var ruleId in result.TimedOutRuleIds)
                 _logger.Warning("Automod regex timed out for guild {GuildId}, message {MessageId}, rule {RuleId}", guildId, message.Id, ruleId);
@@ -252,9 +257,9 @@ public sealed class AutomodGatewayHandler(
         try
         {
             Optional<long> duration = rule.DurationSeconds is { } seconds ? new Optional<long>(seconds) : default;
-            var requestedExpiry = AutomodDuration.MuteExpiry(duration, DateTimeOffset.UtcNow);
-            var request = new RequestOptions { CancelToken = ct, RetryMode = RetryMode.AlwaysFail, AuditLogReason = reason };
-            var member = await client.Rest.GetGuildUserAsync(guildId, message.Author.Id, request);
+            DateTimeOffset requestedExpiry = AutomodDuration.MuteExpiry(duration, DateTimeOffset.UtcNow);
+            RequestOptions request = new RequestOptions { CancelToken = ct, RetryMode = RetryMode.AlwaysFail, AuditLogReason = reason };
+            RestGuildUser? member = await client.Rest.GetGuildUserAsync(guildId, message.Author.Id, request);
 
             if (member is null)
             {

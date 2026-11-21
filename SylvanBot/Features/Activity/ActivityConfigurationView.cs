@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using SylvanBot.Application.Features.Activity;
 
 namespace SylvanBot.Features.Activity;
@@ -16,15 +16,17 @@ internal static class ActivityConfigurationView
             .ThenBy(channel => channel.Id)
             .ToArray();
 
-        foreach (var channel in channels.Where(channel => CategoryId(channel) is null))
+        foreach (SocketGuildChannel channel in channels.Where(channel => CategoryId(channel) is null))
+
             if (weights.TryGetValue(channel.Id, out var weight) && weight != 1)
                 entries.Add(Format(channel.Id, weight));
+
 
         IOrderedEnumerable<SocketCategoryChannel> categories = guild.CategoryChannels
             .OrderBy(category => category.Position)
             .ThenBy(category => category.Id);
 
-        foreach (var category in categories)
+        foreach (SocketCategoryChannel category in categories)
         {
             var weight = weights.GetValueOrDefault(category.Id, 1m);
 
@@ -108,7 +110,7 @@ internal static class ActivityConfigurationView
 
         var cap = settings.MaxDaily == 0 ? "Unlimited" : settings.MaxDaily.ToString(CultureInfo.InvariantCulture) + " XP";
 
-        var buttons = new ActionRowBuilder()
+        ActionRowBuilder buttons = new ActionRowBuilder()
             .WithButton("Prev", $"activity-page:{guild.Id}:{ownerId}:{Math.Max(0, index - 1)}", ButtonStyle.Secondary, disabled: index == 0)
             .WithButton("Next", $"activity-page:{guild.Id}:{ownerId}:{index + 1}", ButtonStyle.Secondary, disabled: index == pages.Count - 1);
 

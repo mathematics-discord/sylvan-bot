@@ -3,7 +3,7 @@ root = true
 [*]
 resharper_wrap_chained_method_calls = chop_if_long
 resharper_wrap_before_arrow_with_expressions = true
-resharper_max_attribute_length_for_same_line = 10000
+resharper_max_attribute_length_for_same_line = 0
 resharper_instance_members_qualify_declared_in = base_class
 resharper_empty_string = string_empty
 resharper_csharp_wrap_before_binary_opsign = true
@@ -52,7 +52,7 @@ dotnet_style_require_accessibility_modifiers = for_non_interface_members:suggest
 resharper_apply_auto_detected_rules = false
 resharper_arguments_named = positional
 resharper_autodetect_indent_settings = false
-resharper_braces_for_ifelse = required_for_multiline
+resharper_braces_for_ifelse = not_required
 resharper_cpp_insert_final_newline = false
 resharper_csharp_wrap_after_invocation_lpar = true
 resharper_csharp_wrap_arguments_style = chop_if_long
@@ -111,12 +111,15 @@ resharper_blank_lines_before_control_transfer_statements = 0
 resharper_blank_lines_before_multiline_statements = 1
 resharper_csharp_max_line_length = 150
 resharper_csharp_wrap_after_declaration_lpar = true
+resharper_csharp_wrap_before_declaration_rpar = false
+resharper_csharp_wrap_before_primary_constructor_declaration_rpar = false
+resharper_csharp_wrap_before_invocation_rpar = false
 resharper_csharp_wrap_lines = true
 resharper_csharp_wrap_parameters_style = chop_if_long
 resharper_csharp_wrap_primary_constructor_parameters_style = chop_if_long
 resharper_csharp_wrap_multiple_type_parameter_constraints_style = chop_if_long
 resharper_csharp_wrap_extends_list_style = chop_if_long
-resharper_csharp_wrap_enum_declaration = chop_if_long
+resharper_csharp_wrap_enum_declaration = chop_always
 resharper_csharp_wrap_for_stmt_header_style = chop_if_long
 resharper_csharp_wrap_multiple_declaration_style = chop_if_long
 resharper_csharp_wrap_switch_expression = chop_if_long
@@ -1004,8 +1007,11 @@ dotnet_diagnostic.ma0076.severity = none
 
 dotnet_diagnostic.ma0015.severity = none
 
+
+dotnet_diagnostic.CA1873.severity = none
+
 [*.cs]
-MA0051.maximum_lines_per_method = 100
+ma0051.maximum_lines_per_method = 100
 dotnet_diagnostic.rcs1001.severity = none
 dotnet_diagnostic.rcs1123.severity = none
 dotnet_diagnostic.rcs1261.severity = error
@@ -1026,5 +1032,29 @@ dotnet_diagnostic.sa1009.severity = none
 resharper_csharp_int_align = false
 resharper_csharp_outdent_dots = false
 csharp_style_implicit_object_creation_when_type_is_apparent = false
+csharp_style_var_when_type_is_apparent = false:error
+csharp_style_var_elsewhere = false:error
+csharp_prefer_braces = false:none
 resharper_csharp_object_creation_when_type_evident = explicitly_typed
 resharper_csharp_object_creation_when_type_not_evident = explicitly_typed
+
+resharper_csharp_place_simple_enum_on_single_line = false
+resharper_csharp_place_accessorholder_attribute_on_same_line = false
+resharper_csharp_place_field_attribute_on_same_line = false
+
+resharper_csharp_braces_for_for = not_required
+resharper_csharp_braces_for_foreach = not_required
+resharper_csharp_braces_for_while = not_required
+resharper_csharp_braces_for_dowhile = not_required
+resharper_csharp_braces_for_using = not_required
+resharper_csharp_braces_for_fixed = not_required
+resharper_csharp_braces_for_lock = not_required
+
+# Single embedded statements omit braces, even when the statement spans several lines.
+resharper_csharp_braces_redundant = true
+resharper_remove_redundant_braces_highlighting = error
+resharper_enforce_if_statement_braces_highlighting = none
+dotnet_diagnostic.IDE0011.severity = none
+dotnet_diagnostic.rcs1002.severity = error
+dotnet_diagnostic.sa1520.severity = none
+dotnet_diagnostic.rcs1003.severity = none

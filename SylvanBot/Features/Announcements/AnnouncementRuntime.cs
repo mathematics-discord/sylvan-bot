@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Threading.Channels;
 using Discord.Net;
@@ -22,13 +22,13 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
 
     public async Task InitializeAsync(CancellationToken ct)
     {
-        await using var db = await contexts.CreateDbContextAsync(ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
         AnnouncementSettings[] settings = await db.AnnouncementSettings
             .AsNoTracking()
             .ToArrayAsync(ct);
 
-        foreach (var row in settings)
+        foreach (AnnouncementSettings row in settings)
             _channels[row.ChannelId] = row.GuildId;
 
         client.Ready += ReadyAsync;
@@ -48,13 +48,13 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
 
     public async Task<ulong> ConfigureAsync(SocketGuild guild, ITextChannel channel, CancellationToken ct)
     {
-        var gate = Gate(guild.Id);
+        SemaphoreSlim gate = Gate(guild.Id);
         await gate.WaitAsync(ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
-            var settings = await db.AnnouncementSettings.FindAsync([guild.Id], ct);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+            AnnouncementSettings? settings = await db.AnnouncementSettings.FindAsync([guild.Id], ct);
 
             if (settings is null)
             {
@@ -62,7 +62,7 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
                 db.AnnouncementSettings.Add(settings);
             }
 
-            var options = new RequestOptions { CancelToken = ct, AuditLogReason = "Configure announcements" };
+            RequestOptions options = new RequestOptions { CancelToken = ct, AuditLogReason = "Configure announcements" };
             IRole? role = guild.GetRole(settings.RoleId);
 
             if (role is null)
@@ -77,7 +77,7 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
                 settings.RoleId = role.Id;
             }
             else
-            {
+
                 await role.ModifyAsync(
                     properties =>
                     {
@@ -86,7 +86,7 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
                         properties.Mentionable = false;
                     },
                     options);
-            }
+
 
             var previousChannelId = settings.ChannelId;
             var previousMessageId = settings.MessageId;
@@ -106,7 +106,7 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
             if (!moved || previousMessageId == 0)
                 return settings.RoleId;
 
-            var previousChannel = await client.Rest.GetChannelAsync(previousChannelId, options) as ITextChannel;
+            ITextChannel? previousChannel = await client.Rest.GetChannelAsync(previousChannelId, options) as ITextChannel;
 
             if (previousChannel is not null)
                 await DeleteSubscriptionAsync(previousChannel, previousMessageId, ct);
@@ -129,23 +129,24 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
         if (string.IsNullOrWhiteSpace(title) || title.Contains('\n') || title.Contains('\r'))
             throw new BotCommandException("Enter a non-empty, single-line title after removing its heading marks.");
 
-        var gate = Gate(guild.Id);
+        SemaphoreSlim gate = Gate(guild.Id);
         await gate.WaitAsync(ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
-            var settings = await SettingsAsync(db, guild.Id, ct);
-            var options = new RequestOptions { CancelToken = ct };
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+            AnnouncementSettings settings = await SettingsAsync(db, guild.Id, ct);
+            RequestOptions options = new RequestOptions { CancelToken = ct };
 
-            var channel = await client.Rest.GetChannelAsync(settings.ChannelId, options) as ITextChannel
-                          ?? throw new BotCommandException("The announcements channel is missing. Ask an administrator to configure it again.");
+            ITextChannel channel = await client.Rest.GetChannelAsync(settings.ChannelId, options) as ITextChannel
+                                   ?? throw new BotCommandException(
+                                       "The announcements channel is missing. Ask an administrator to configure it again.");
 
-            var components = new ComponentBuilderV2()
+            MessageComponent components = new ComponentBuilderV2()
                 .WithTextDisplay($"## <@&{settings.RoleId}> — {title}\n{body}")
                 .Build();
 
-            var message = await channel.SendMessageAsync(
+            IUserMessage message = await channel.SendMessageAsync(
                 options: options,
                 allowedMentions: new AllowedMentions { RoleIds = new List<ulong> { settings.RoleId } },
                 components: components,
@@ -182,14 +183,14 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
         if (component.User is not SocketGuildUser member)
             throw new BotCommandException("Use the subscription buttons in the server's announcements channel.");
 
-        var guild = member.Guild;
-        var gate = Gate(guild.Id);
+        SocketGuild guild = member.Guild;
+        SemaphoreSlim gate = Gate(guild.Id);
         await gate.WaitAsync(ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
-            var settings = await SettingsAsync(db, guild.Id, ct);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+            AnnouncementSettings settings = await SettingsAsync(db, guild.Id, ct);
 
             var currentMessage = component.Channel.Id == settings.ChannelId
                                  && component.Message.Id == settings.MessageId
@@ -198,11 +199,14 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
             if (!currentMessage)
                 throw new BotCommandException("Use the current subscription buttons at the bottom of the announcements channel.");
 
-            var options = new RequestOptions { CancelToken = ct, AuditLogReason = "Member changed announcement subscription" };
+            RequestOptions options = new RequestOptions { CancelToken = ct, AuditLogReason = "Member changed announcement subscription" };
 
             if (subscribe)
+
                 await member.AddRoleAsync(settings.RoleId, options);
+
             else
+
                 await member.RemoveRoleAsync(settings.RoleId, options);
         }
         finally
@@ -216,19 +220,19 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
         await foreach (var guildId in _work.Reader.ReadAllAsync(stoppingToken))
         {
             _pending.TryRemove(guildId, out _);
-            var gate = Gate(guildId);
+            SemaphoreSlim gate = Gate(guildId);
             await gate.WaitAsync(stoppingToken);
 
             try
             {
-                var guild = client.GetGuild(guildId);
+                SocketGuild? guild = client.GetGuild(guildId);
 
                 if (((IGuild)guild)?.Available != true)
                     continue;
 
-                await using var db = await contexts.CreateDbContextAsync(stoppingToken);
-                var settings = await SettingsAsync(db, guildId, stoppingToken);
-                var options = new RequestOptions { CancelToken = stoppingToken };
+                await using BotDbContext db = await contexts.CreateDbContextAsync(stoppingToken);
+                AnnouncementSettings settings = await SettingsAsync(db, guildId, stoppingToken);
+                RequestOptions options = new RequestOptions { CancelToken = stoppingToken };
 
                 if (await client.Rest.GetChannelAsync(settings.ChannelId, options) is not ITextChannel channel)
                     throw new BotCommandException("The configured announcements channel is missing.");
@@ -254,17 +258,19 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
     {
         base.Dispose();
 
-        foreach (var gate in _gates.Values)
+        foreach (SemaphoreSlim gate in _gates.Values)
             gate.Dispose();
     }
 
     private async Task MaintainMessageAsync(BotDbContext db, AnnouncementSettings settings, ITextChannel channel, CancellationToken ct)
     {
-        var options = new RequestOptions { CancelToken = ct };
+        RequestOptions options = new RequestOptions { CancelToken = ct };
 
         if (channel is SocketTextChannel)
+
             channel = await client.Rest.GetChannelAsync(channel.Id, options) as ITextChannel
                       ?? throw new BotCommandException("The announcements channel is unavailable.");
+
 
         IEnumerable<IMessage> latest = await channel.GetMessagesAsync(limit: 1, options: options)
             .FlattenAsync();
@@ -274,16 +280,16 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
         if (alreadyLast)
             return;
 
-        var buttons = new ActionRowBuilder()
+        ActionRowBuilder buttons = new ActionRowBuilder()
             .WithButton("Subscribe", SubscribeId)
             .WithButton("Unsubscribe", UnsubscribeId, ButtonStyle.Secondary);
 
-        var components = new ComponentBuilderV2()
+        MessageComponent components = new ComponentBuilderV2()
             .WithTextDisplay("Subscribe to receive announcement notifications.")
             .WithActionRow(buttons)
             .Build();
 
-        var message = await channel.SendMessageAsync(
+        IUserMessage message = await channel.SendMessageAsync(
             components: components,
             flags: MessageFlags.ComponentsV2,
             allowedMentions: AllowedMentions.None,
@@ -299,7 +305,7 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
 
     private async Task DeleteSubscriptionAsync(ITextChannel channel, ulong messageId, CancellationToken ct)
     {
-        var options = new RequestOptions { CancelToken = ct };
+        RequestOptions options = new RequestOptions { CancelToken = ct };
 
         try
         {

@@ -22,7 +22,7 @@ public sealed class InteractionCommandRegistrar(
     {
         _logger.Information("Registering application commands in {GuildCount} guilds", propertyValue: discordClient.Guilds.Count);
 
-        foreach (var guild in discordClient.Guilds)
+        foreach (SocketGuild guild in discordClient.Guilds)
             await RegisterCommandsToGuildAsync(guild);
     }
 
@@ -41,11 +41,11 @@ public sealed class InteractionCommandRegistrar(
 
     private static IEnumerable<ModuleInfo> EnumerateModules(IEnumerable<ModuleInfo> modules)
     {
-        foreach (var module in modules)
+        foreach (ModuleInfo module in modules)
         {
             yield return module;
 
-            foreach (var subModule in EnumerateModules(module.SubModules))
+            foreach (ModuleInfo subModule in EnumerateModules(module.SubModules))
                 yield return subModule;
         }
     }
@@ -54,45 +54,45 @@ public sealed class InteractionCommandRegistrar(
     {
         List<object> commands = [];
 
-        foreach (var module in modules)
+        foreach (ModuleInfo module in modules)
         {
             commands.AddRange(
                 module.SlashCommands
-                   .Select(command =>
-                               DescribeCommand(
-                                   "Slash",
-                                   module: module,
-                                   command: command,
-                                   slashGroup: module.SlashGroupName,
-                                   wildcards: null,
-                                   modalType: null)));
+                    .Select(command =>
+                        DescribeCommand(
+                            "Slash",
+                            module: module,
+                            command: command,
+                            slashGroup: module.SlashGroupName,
+                            wildcards: null,
+                            modalType: null)));
 
             commands.AddRange(
                 module.ContextCommands
-                   .Select(command =>
-                               DescribeCommand("Context", module: module, command: command, slashGroup: null, wildcards: null, modalType: null)));
+                    .Select(command =>
+                        DescribeCommand("Context", module: module, command: command, slashGroup: null, wildcards: null, modalType: null)));
 
             commands.AddRange(
                 module.ComponentCommands
-                   .Select(command =>
-                               DescribeCommand(
-                                   "Component",
-                                   module: module,
-                                   command: command,
-                                   slashGroup: null,
-                                   wildcards: command.SupportsWildCards,
-                                   modalType: null)));
+                    .Select(command =>
+                        DescribeCommand(
+                            "Component",
+                            module: module,
+                            command: command,
+                            slashGroup: null,
+                            wildcards: command.SupportsWildCards,
+                            modalType: null)));
 
             commands.AddRange(
                 module.ModalCommands
-                   .Select(command =>
-                               DescribeCommand(
-                                   "Modal",
-                                   module: module,
-                                   command: command,
-                                   slashGroup: null,
-                                   wildcards: command.SupportsWildCards,
-                                   modalType: command.Modal.Type.FullName)));
+                    .Select(command =>
+                        DescribeCommand(
+                            "Modal",
+                            module: module,
+                            command: command,
+                            slashGroup: null,
+                            wildcards: command.SupportsWildCards,
+                            modalType: command.Modal.Type.FullName)));
         }
 
         return commands;
@@ -120,10 +120,10 @@ public sealed class InteractionCommandRegistrar(
     private void LogRegisteredInteractionCommands()
     {
         ModuleInfo[] modules = EnumerateModules(interactionService.Modules)
-           .ToArray();
+            .ToArray();
 
         var moduleDetails = modules
-           .Select(module => new
+            .Select(module => new
             {
                 module.Name,
                 module.SlashGroupName,
@@ -132,7 +132,7 @@ public sealed class InteractionCommandRegistrar(
                 ComponentCommandCount = module.ComponentCommands.Count,
                 ModalCommandCount = module.ModalCommands.Count,
             })
-           .ToArray();
+            .ToArray();
 
         IReadOnlyCollection<object> commandDetails = DescribeCommands(modules);
 

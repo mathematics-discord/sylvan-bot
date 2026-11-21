@@ -11,7 +11,11 @@ public sealed class ActivityScoreTests
     [TestCase(null, "0", "3", "0")]
     [TestCase(null, null, "3", "3")]
     [TestCase(null, null, null, "1")]
-    public void ResolveWeight_ThreadOverrides_UseMostSpecificWeight(decimal? threadWeight, decimal? channelWeight, decimal? categoryWeight, decimal expected)
+    public void ResolveWeight_ThreadOverrides_UseMostSpecificWeight(
+        decimal? threadWeight,
+        decimal? channelWeight,
+        decimal? categoryWeight,
+        decimal expected)
     {
         // Arrange
         Dictionary<ulong, decimal> weights = new Dictionary<ulong, decimal>();

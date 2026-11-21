@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace SylvanBot.Application.Features.MessageCache;
@@ -11,12 +11,7 @@ public sealed class CachedMessageConfiguration : IEntityTypeConfiguration<Cached
             "cached_messages",
             table => table.HasCheckConstraint("ck_cached_messages_expiry", "expires_at_utc = created_at_utc + interval '24 hours'"));
 
-        builder.HasKey(message => new
-        {
-            message.BotId,
-            message.GuildId,
-            message.MessageId,
-        });
+        builder.HasKey(message => new { message.BotId, message.GuildId, message.MessageId });
 
         builder.Property(message => message.BotId).HasColumnName("bot_id");
 
@@ -32,11 +27,6 @@ public sealed class CachedMessageConfiguration : IEntityTypeConfiguration<Cached
 
         builder.HasIndex(message => message.ExpiresAtUtc);
 
-        builder.HasIndex(message => new
-        {
-            message.BotId,
-            message.GuildId,
-            message.ExpiresAtUtc,
-        });
+        builder.HasIndex(message => new { message.BotId, message.GuildId, message.ExpiresAtUtc });
     }
 }

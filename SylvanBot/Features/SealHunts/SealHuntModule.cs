@@ -14,16 +14,16 @@ public sealed class SealHuntModule(SealHuntWorker hunts, IHostApplicationLifetim
 
     internal static MessageComponent BuildPost(SealHuntWorker.SealPhoto photo, string key)
     {
-        var attachment = new MediaGalleryItemProperties
+        MediaGalleryItemProperties attachment = new MediaGalleryItemProperties
         {
             Media = new UnfurledMediaItemProperties($"attachment://{photo.File}"), Description = photo.Credit,
         };
 
-        var buttons = new ActionRowBuilder()
+        ActionRowBuilder buttons = new ActionRowBuilder()
             .WithButton("Claim Him", $"seal:claim:{key}", ButtonStyle.Success)
             .WithButton("Abandon Him", $"seal:abandon:{key}", ButtonStyle.Danger);
 
-        var container = new ContainerBuilder()
+        ContainerBuilder container = new ContainerBuilder()
             .WithMediaGallery(new MediaGalleryBuilder().AddItem(attachment))
             .WithTextDisplay($"-# {photo.Credit} · [Source]({photo.Source}) · [{photo.Licence}]({photo.LicenceUrl})")
             .WithActionRow(buttons);

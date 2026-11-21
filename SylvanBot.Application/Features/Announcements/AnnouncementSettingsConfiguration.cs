@@ -8,6 +8,7 @@ public sealed class AnnouncementSettingsConfiguration : IEntityTypeConfiguration
     public void Configure(EntityTypeBuilder<AnnouncementSettings> builder)
     {
         builder.HasKey(settings => settings.GuildId);
+
         builder.Property(settings => settings.GuildId)
             .ValueGeneratedNever();
     }

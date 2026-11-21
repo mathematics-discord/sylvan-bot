@@ -12,39 +12,35 @@ public static partial class WorkingHoursTimeParser
         (string Time, int? OffsetMinutes)? last = ParseEndpoint(end);
 
         if (first is null || last is null)
-        {
+
             return new Result<WorkingHoursWindow>(
                 OperationFailureException.Validation(
                     description: "Use HH:MM:SS[.fraction], with Z or ±HH:MM for fixed offsets. No dates, whitespace, leap seconds or -00:00."));
-        }
 
         if (first.Value.OffsetMinutes != last.Value.OffsetMinutes)
-        {
+
             return new Result<WorkingHoursWindow>(
                 OperationFailureException.Validation(description: "Both endpoints must have numerically equal offsets, or both must omit offsets."));
-        }
 
         if (first.Value.OffsetMinutes.HasValue)
         {
             if (timezone is not null)
-            {
+
                 return new Result<WorkingHoursWindow>(
                     OperationFailureException.Validation(description: "Do not combine fixed offsets with a named timezone."));
-            }
         }
         else if (timezone is null || DateTimeZoneProviders.Tzdb.GetZoneOrNull(timezone) is null)
-        {
+
             return new Result<WorkingHoursWindow>(
                 OperationFailureException.Validation(
                     description: "Offset-free times require a supported IANA timezone ID (for example Europe/London)."));
-        }
 
         return new WorkingHoursWindow(start: first.Value.Time, end: last.Value.Time, offsetMinutes: first.Value.OffsetMinutes, zoneId: timezone);
     }
 
     internal static (string Time, int? OffsetMinutes)? ParseEndpoint(string input)
     {
-        var match = ClockPattern().Match(input);
+        Match match = ClockPattern().Match(input);
 
         if (!match.Success)
             return null;
@@ -70,9 +66,8 @@ public static partial class WorkingHoursTimeParser
             offsetMinutes = ((offsetHour * 60) + offsetMinute) * (offset[0] == '-' ? -1 : 1);
         }
         else if (offset.Length == 1)
-        {
+
             offsetMinutes = 0;
-        }
 
         var fraction = match.Groups["fraction"].Value.TrimEnd('0');
         var clock = input[..8];

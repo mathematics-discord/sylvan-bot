@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using Discord.Net;
+using Discord.Rest;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.WorkingHours;
 using SylvanBot.Application.Infrastructure.Data;
@@ -19,28 +20,28 @@ public sealed class WorkingHoursReconciler(
 {
     public async Task ReconcileAsync(ulong guildId, CancellationToken ct)
     {
-        var state = runtime.ForGuild(guildId);
+        WorkingHoursGuildState state = runtime.ForGuild(guildId);
         await state.Gate.WaitAsync(ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
-            var settings = await LoadSettingsAsync(db: db, guildId: guildId, ct: ct);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+            WorkingHoursSettings? settings = await LoadSettingsAsync(db: db, guildId: guildId, ct: ct);
 
             if (settings is null)
                 return;
 
-            var guild = client.GetGuild(guildId);
+            SocketGuild guild = client.GetGuild(guildId);
 
             if (!rules.IsReady(guild))
                 return;
 
             // Ready guild role metadata confirms deletions. Never infer deletion while disconnected.
             WorkingHoursEligibleRole[] deleted = settings.EligibleRoles
-               .Where(role => guild.GetRole(role.RoleId) is null)
-               .ToArray();
+                .Where(role => guild.GetRole(role.RoleId) is null)
+                .ToArray();
 
-            foreach (var role in deleted)
+            foreach (WorkingHoursEligibleRole role in deleted)
                 settings.EligibleRoles.Remove(role);
 
             if (settings.PingRoleId is { } target && guild.GetRole(target) is null)
@@ -67,15 +68,15 @@ public sealed class WorkingHoursReconciler(
     {
         try
         {
-            var guild = client.GetGuild(settings.GuildId);
+            SocketGuild guild = client.GetGuild(settings.GuildId);
             state.PublishSettingsAndSeed(settings: settings, guild: guild, rules.IsReady(guild));
 
             if (!rules.IsReady(guild))
                 return default;
 
             Dictionary<ulong, WorkingHoursPreference> preferences = await db.WorkingHours
-               .Where(item => item.GuildId == settings.GuildId)
-               .ToDictionaryAsync(item => item.MemberId, cancellationToken: ct);
+                .Where(item => item.GuildId == settings.GuildId)
+                .ToDictionaryAsync(item => item.MemberId, cancellationToken: ct);
 
             await ApplyLossesAsync(db: db, state: state, preferences: preferences, onlyMember: onlyMember, ct: ct);
             ICollection<string> problems = rules.ConfigurationProblems(settings: settings, guild: guild);
@@ -93,8 +94,8 @@ public sealed class WorkingHoursReconciler(
             ISet<ulong> members = state.MemberIds();
 
             IEnumerable<ulong> scheduled = preferences.Values
-               .Where(preference => preference.Enabled)
-               .Select(preference => preference.MemberId);
+                .Where(preference => preference.Enabled)
+                .Select(preference => preference.MemberId);
 
             members.UnionWith(scheduled);
 
@@ -136,8 +137,10 @@ public sealed class WorkingHoursReconciler(
         try
         {
             foreach (var memberId in losses)
-                if (preferences.TryGetValue(key: memberId, out var preference))
+
+                if (preferences.TryGetValue(key: memberId, out WorkingHoursPreference? preference))
                     preference.DisableSchedule();
+
 
             await db.SaveChangesAsync(ct);
         }
@@ -151,8 +154,8 @@ public sealed class WorkingHoursReconciler(
 
     private static Task<WorkingHoursSettings?> LoadSettingsAsync(BotDbContext db, ulong guildId, CancellationToken ct) =>
         db.WorkingHoursSettings
-           .Include(settings => settings.EligibleRoles)
-           .SingleOrDefaultAsync(settings => settings.GuildId == guildId, cancellationToken: ct);
+            .Include(settings => settings.EligibleRoles)
+            .SingleOrDefaultAsync(settings => settings.GuildId == guildId, cancellationToken: ct);
 
     private async Task<int> ReconcileMembersAsync(
         BotDbContext db,
@@ -171,7 +174,7 @@ public sealed class WorkingHoursReconciler(
 
             try
             {
-                preferences.TryGetValue(key: memberId, out var preference);
+                preferences.TryGetValue(key: memberId, out WorkingHoursPreference? preference);
 
                 if (
                     !await ReconcileMemberAsync(
@@ -182,6 +185,7 @@ public sealed class WorkingHoursReconciler(
                         memberId: memberId,
                         preference: preference,
                         ct: ct))
+
                     pending++;
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -215,7 +219,7 @@ public sealed class WorkingHoursReconciler(
         if (!rules.IsReady(guild))
             return false;
 
-        var lookup = await ReadMemberAsync(guild: guild, state: state, memberId: memberId, ct: ct);
+        MemberLookup lookup = await ReadMemberAsync(guild: guild, state: state, memberId: memberId, ct: ct);
 
         if (lookup is MemberLookup.Departed)
         {
@@ -247,8 +251,9 @@ public sealed class WorkingHoursReconciler(
         var active = settings.Enabled && preference is { Enabled: true, Window: { } window } && window.IsActive(time.GetUtcNow());
 
         var exempt = settings.EligibleRoles
-           .Where(role => role.IsExempt)
-           .Any(role => member.RoleIds.Contains(role.RoleId));
+            .Where(role => role.IsExempt)
+            .Any(role => member.RoleIds.Contains(role.RoleId));
+
         Optional<bool> desired = settings.DesiredPingRole(eligible: eligible, exempt: exempt, preference?.Enabled == true, active: active);
 
         if (settings.PingRoleId is not { } target)
@@ -278,32 +283,36 @@ public sealed class WorkingHoursReconciler(
         if (desired && !WorkingHoursGuildRules.IsEligible(settings: settings, member: member))
             return false;
 
-        var request = new RequestOptions { CancelToken = ct, AuditLogReason = "Working Hours: reconcile configured ping role" };
+        RequestOptions request = new RequestOptions { CancelToken = ct, AuditLogReason = "Working Hours: reconcile configured ping role" };
 
         if (desired)
+
             await member.AddRoleAsync(roleId: target, options: request);
+
         else
+
             await member.RemoveRoleAsync(roleId: target, options: request);
+
 
         return true;
     }
 
     private async Task<MemberLookup> ReadMemberAsync(SocketGuild guild, WorkingHoursGuildState state, ulong memberId, CancellationToken ct)
     {
-        var cached = guild.GetUser(memberId);
+        SocketGuildUser? cached = guild.GetUser(memberId);
 
         if (cached is not null)
             return new MemberLookup.Found(cached);
 
         try
         {
-            var member = await client.Rest.GetGuildUserAsync(guildId: guild.Id, id: memberId, new RequestOptions { CancelToken = ct });
+            RestGuildUser? member = await client.Rest.GetGuildUserAsync(guildId: guild.Id, id: memberId, new RequestOptions { CancelToken = ct });
 
             if (member is not null)
-            {
+
                 // A REST-only member must remain indexed if disabling its preference precedes a failed role removal.
                 state.Observe(member);
-            }
+
 
             return member is null ? new MemberLookup.Unavailable() : new MemberLookup.Found(member);
         }

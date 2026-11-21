@@ -1,3 +1,6 @@
+﻿using Discord.Rest;
+using Microsoft.EntityFrameworkCore.Storage;
+
 namespace SylvanBot.Features.Tickets;
 
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +25,7 @@ public sealed partial class TicketCoordinator(
 {
     public async Task<string> CreateAsync(TicketActor actor, ulong subject, string comment, CancellationToken token)
     {
-        await using var db = await contexts.CreateDbContextAsync(token);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(token);
         await PrepareNoteAsync(db, actor, subject, token);
         Ticket.ValidateComment(comment);
 
@@ -30,7 +33,7 @@ public sealed partial class TicketCoordinator(
             .SqlQuery<long>($"SELECT nextval('ticket_numbers') AS \"Value\"")
             .SingleAsync(token);
 
-        var ticket = new Ticket
+        Ticket ticket = new Ticket
         {
             GuildId = actor.GuildId,
             Number = number,
@@ -59,7 +62,7 @@ public sealed partial class TicketCoordinator(
 
     public async Task PrepareNoteAsync(TicketActor actor, ulong subject, CancellationToken token)
     {
-        await using var db = await contexts.CreateDbContextAsync(token);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(token);
         await PrepareNoteAsync(db, actor, subject, token);
     }
 
@@ -71,14 +74,14 @@ public sealed partial class TicketCoordinator(
         bool? hidden,
         CancellationToken ct)
     {
-        using var timing = new OperationTiming(logger.ForContext("TicketNumber", number), "ticket.edit", "gate");
-        var gate = await LockTicketAsync(actor.GuildId, number, ct);
+        using OperationTiming timing = new OperationTiming(logger.ForContext("TicketNumber", number), "ticket.edit", "gate");
+        IDisposable gate = await LockTicketAsync(actor.GuildId, number, ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
-            var ticket = await FindAsync(db, actor, number, ct);
+            Ticket ticket = await FindAsync(db, actor, number, ct);
             timing.Next("edit");
             var originalVersion = ticket.Version;
             var outcome = string.Empty;
@@ -103,9 +106,9 @@ public sealed partial class TicketCoordinator(
                     outcome = "The restriction was reverted and the ticket is hidden.";
                 }
                 else if (visibility && ticket.Action is not (TicketAction.Note or TicketAction.Kick))
-                {
+
                     outcome = "The historical ticket is hidden. No live restriction was changed.";
-                }
+
 
                 ticket.SetHidden(actor, ticket.Version, visibility);
             }
@@ -119,19 +122,18 @@ public sealed partial class TicketCoordinator(
 
                 // Editors submit their pre-filled duration even when only the comment changed.
                 if (details.ChangesDuration(ticket.DurationSeconds))
-                {
+
                     if (ticket.Action == TicketAction.Timeout)
-                    {
+
                         outcome = await timeouts.EditAsync(db, ticket, actor, details, ct);
-                    }
+
                     else
-                    {
+
                         ticket.SetDuration(
                             details.DurationSeconds == long.MaxValue ? null : details.DurationSeconds,
                             actor.UserId,
                             canReview: actor.IsAdministrator || actor.CanViewAuditLog);
-                    }
-                }
+
 
                 if (details.Comment.Value is not TicketCommentEdit.Keep)
                     ticket.SetComment(comment, actor.UserId, details.Comment.Value is TicketCommentEdit.Append);
@@ -154,12 +156,12 @@ public sealed partial class TicketCoordinator(
 
     public async Task<string> RevertAsync(TicketActor actor, long number, int? version, CancellationToken ct)
     {
-        var gate = await LockTicketAsync(actor.GuildId, number, ct);
+        IDisposable gate = await LockTicketAsync(actor.GuildId, number, ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
-            var ticket = await FindAsync(db, actor, number, ct);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+            Ticket ticket = await FindAsync(db, actor, number, ct);
             await RevertAsync(db, actor, ticket, version ?? ticket.Version, ct);
 
             return Queued($"Reverted ticket #{number}. The record is retained.", changed: true);
@@ -184,20 +186,20 @@ public sealed partial class TicketCoordinator(
             throw new BotCommandException("This ticket no longer has an active restriction.");
 
         var permitted = actor.IsAdministrator
-            || ticket.Action switch
-            {
-                TicketAction.Ban => actor.CanBanMembers,
-                TicketAction.Timeout => actor.CanTimeoutMembers,
-                TicketAction.Role => actor.CanManageRoles,
-                TicketAction.VoiceMute => actor.CanMuteMembers,
-                TicketAction.VoiceDeafen => actor.CanDeafenMembers,
-                _ => false,
-            };
+                        || ticket.Action switch
+                        {
+                            TicketAction.Ban => actor.CanBanMembers,
+                            TicketAction.Timeout => actor.CanTimeoutMembers,
+                            TicketAction.Role => actor.CanManageRoles,
+                            TicketAction.VoiceMute => actor.CanMuteMembers,
+                            TicketAction.VoiceDeafen => actor.CanDeafenMembers,
+                            _ => false,
+                        };
 
         if (!permitted)
             throw new BotCommandException("You need the Discord permission for this restriction to revert it.");
 
-        var roleGate = ticket.Action == TicketAction.Role ? persistence.Gate(actor.GuildId) : null;
+        SemaphoreSlim? roleGate = ticket.Action == TicketAction.Role ? persistence.Gate(actor.GuildId) : null;
 
         if (roleGate is not null)
             await roleGate.WaitAsync(ct);
@@ -208,13 +210,13 @@ public sealed partial class TicketCoordinator(
             ticket.CompleteStaffReversal(actor.UserId, DateTimeOffset.UtcNow);
 
             if (ticket.Action == TicketAction.Role)
-            {
+
                 await db.PendingRoles
                     .Where(value => value.GuildId == actor.GuildId
-                               && value.UserId == ticket.SubjectUserId
-                               && value.RoleId == ticket.RoleId)
+                                    && value.UserId == ticket.SubjectUserId
+                                    && value.RoleId == ticket.RoleId)
                     .ExecuteDeleteAsync(ct);
-            }
+
 
             await SaveAsync(db, ct);
         }
@@ -226,9 +228,9 @@ public sealed partial class TicketCoordinator(
 
     private async Task RevertRestrictionAsync(BotDbContext db, TicketActor actor, Ticket ticket, CancellationToken ct)
     {
-        var options = TicketBoundary.Options(ct);
+        RequestOptions options = TicketBoundary.Options(ct);
         options.AuditLogReason = $"Revert Sylvan ticket {ticket.Number}; moderator {actor.UserId}";
-        var guild = await client.Rest.GetGuildAsync(actor.GuildId, options);
+        RestGuild guild = await client.Rest.GetGuildAsync(actor.GuildId, options);
 
         // Bans belong to a user ID; all other restrictions here belong to a member.
         IGuildUser? member = null;
@@ -248,10 +250,11 @@ public sealed partial class TicketCoordinator(
 
         if (member is not null)
         {
-            var moderator = await boundary.GetMemberAsync(actor.GuildId, actor.UserId, ct)
-                ?? throw new BotCommandException("The responsible moderator is no longer available.");
-            var bot = (IGuildUser?)client.GetGuild(actor.GuildId)?.CurrentUser
-                ?? await guild.GetCurrentUserAsync(options);
+            IGuildUser moderator = await boundary.GetMemberAsync(actor.GuildId, actor.UserId, ct)
+                                   ?? throw new BotCommandException("The responsible moderator is no longer available.");
+
+            IGuildUser bot = (IGuildUser?)client.GetGuild(actor.GuildId)?.CurrentUser
+                             ?? await guild.GetCurrentUserAsync(options);
 
             var moderatorPosition = moderator.RoleIds
                 .Select(id => guild.GetRole(id)?.Position ?? 0)
@@ -269,26 +272,26 @@ public sealed partial class TicketCoordinator(
                 .Max();
 
             var hierarchyBlocked = (actor.UserId != guild.OwnerId && moderatorPosition <= targetPosition)
-                || botPosition <= targetPosition;
+                                   || botPosition <= targetPosition;
 
             if (hierarchyBlocked)
                 throw new BotCommandException("The member must be below both you and Sylvan in the role hierarchy.");
 
             var timeoutChanged = ticket.Action == TicketAction.Timeout
-                && member.TimedOutUntil != ticket.AppliedTimeoutUntilUtc;
+                                 && member.TimedOutUntil != ticket.AppliedTimeoutUntilUtc;
 
             if (timeoutChanged)
                 throw new BotCommandException("The live timeout changed. Refresh after audit reconciliation.");
 
             if (ticket.Action == TicketAction.Role)
             {
-                var role = guild.GetRole(ticket.RoleId!.Value);
+                RestRole? role = guild.GetRole(ticket.RoleId!.Value);
 
                 var cannotManageRole = role is null
-                    || role.IsManaged
-                    || role.Id == guild.Id
-                    || role.Position >= botPosition
-                    || (actor.UserId != guild.OwnerId && role.Position >= moderatorPosition);
+                                       || role.IsManaged
+                                       || role.Id == guild.Id
+                                       || role.Position >= botPosition
+                                       || (actor.UserId != guild.OwnerId && role.Position >= moderatorPosition);
 
                 if (cannotManageRole)
                     throw new BotCommandException("You cannot manage this ticket's role.");
@@ -302,7 +305,7 @@ public sealed partial class TicketCoordinator(
                 case TicketAction.Ban:
                     await guild.RemoveBanAsync(ticket.SubjectUserId, options);
 
-                    var remainingBan = await guild.GetBanAsync(ticket.SubjectUserId, options);
+                    RestBan? remainingBan = await guild.GetBanAsync(ticket.SubjectUserId, options);
 
                     if (remainingBan is not null)
                         throw new BotCommandException("Discord still reports an active ban.");
@@ -324,15 +327,17 @@ public sealed partial class TicketCoordinator(
 
             if (member is not null)
             {
-                var refreshedMember = await guild.GetUserAsync(ticket.SubjectUserId, options);
-                var restrictionRemains = refreshedMember is not null && ticket.Action switch
-                {
-                    TicketAction.Timeout => refreshedMember.TimedOutUntil > DateTimeOffset.UtcNow,
-                    TicketAction.Role => refreshedMember.RoleIds.Contains(ticket.RoleId!.Value),
-                    TicketAction.VoiceMute => refreshedMember.IsMuted,
-                    TicketAction.VoiceDeafen => refreshedMember.IsDeafened,
-                    _ => false,
-                };
+                RestGuildUser? refreshedMember = await guild.GetUserAsync(ticket.SubjectUserId, options);
+
+                var restrictionRemains = refreshedMember is not null
+                                         && ticket.Action switch
+                                         {
+                                             TicketAction.Timeout => refreshedMember.TimedOutUntil > DateTimeOffset.UtcNow,
+                                             TicketAction.Role => refreshedMember.RoleIds.Contains(ticket.RoleId!.Value),
+                                             TicketAction.VoiceMute => refreshedMember.IsMuted,
+                                             TicketAction.VoiceDeafen => refreshedMember.IsDeafened,
+                                             _ => false,
+                                         };
 
                 if (restrictionRemains)
                     throw new BotCommandException("Discord still reports an active restriction.");
@@ -340,8 +345,12 @@ public sealed partial class TicketCoordinator(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.Warning(exception, "Revert could not be confirmed for ticket {TicketId} in guild {GuildId}, action {Action}",
-                ticket.Id, ticket.GuildId, ticket.Action);
+            logger.Warning(
+                exception,
+                "Revert could not be confirmed for ticket {TicketId} in guild {GuildId}, action {Action}",
+                ticket.Id,
+                ticket.GuildId,
+                ticket.Action);
 
             throw new BotCommandException(
                 "Discord could not confirm the reversal. Check permissions, hierarchy, and member state, then refresh after audit reconciliation before retrying.",
@@ -351,18 +360,18 @@ public sealed partial class TicketCoordinator(
 
     private async Task RequireCurrentRestrictionAsync(BotDbContext db, TicketActor actor, Ticket ticket, CancellationToken ct)
     {
-        var config = await EnabledAsync(db, actor.GuildId, ct);
+        TicketConfiguration config = await EnabledAsync(db, actor.GuildId, ct);
         DateTimeOffset? from = config.LastAuditScanAtUtc;
 
         if (ticket.SourceAuditId is null || from is null || from < DateTimeOffset.UtcNow.AddDays(-45))
             throw new BotCommandException("Refresh after audit reconciliation before reverting this restriction.");
 
-        var scan = await boundary.ReadAuditAsync(actor.GuildId, from.Value.AddMinutes(-10), ct);
+        TicketAuditScan scan = await boundary.ReadAuditAsync(actor.GuildId, from.Value.AddMinutes(-10), ct);
 
         var newer = scan.Observations.Any(value => value.Action == ticket.Action
-                                              && value.SubjectUserId == ticket.SubjectUserId
-                                              && value.RoleId == ticket.RoleId
-                                              && value.AuditId > ticket.LastAuditId);
+                                                   && value.SubjectUserId == ticket.SubjectUserId
+                                                   && value.RoleId == ticket.RoleId
+                                                   && value.AuditId > ticket.LastAuditId);
 
         if (newer)
             throw new BotCommandException("A newer change awaits audit reconciliation. Refresh before reverting.");
@@ -371,18 +380,18 @@ public sealed partial class TicketCoordinator(
     public async Task<string> ApproveAsync(TicketActor actor, long number, int version, CancellationToken ct)
     {
         RequireStaff(actor, hidden: true);
-        using var timing = new OperationTiming(logger.ForContext("TicketNumber", number), "ticket.approve", "gate");
-        var gate = await LockTicketAsync(actor.GuildId, number, ct);
+        using OperationTiming timing = new OperationTiming(logger.ForContext("TicketNumber", number), "ticket.approve", "gate");
+        IDisposable gate = await LockTicketAsync(actor.GuildId, number, ct);
 
         try
         {
             timing.Next("database");
-            await using var db = await contexts.CreateDbContextAsync(ct);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
             await EnabledAsync(db, actor.GuildId, ct);
 
-            var ticket = await db.Tickets
-                    .SingleOrDefaultAsync(value => value.GuildId == actor.GuildId && value.Number == number, ct)
-                ?? throw new BotCommandException("No matching ticket in this server.");
+            Ticket ticket = await db.Tickets
+                                .SingleOrDefaultAsync(value => value.GuildId == actor.GuildId && value.Number == number, ct)
+                            ?? throw new BotCommandException("No matching ticket in this server.");
 
             var previous = ticket.Version;
             ticket.Approve(actor, version);
@@ -399,7 +408,7 @@ public sealed partial class TicketCoordinator(
     public async Task<Ticket?> ShowAsync(TicketActor actor, long number, bool hidden, CancellationToken ct)
     {
         RequireStaff(actor, hidden);
-        await using var db = await contexts.CreateDbContextAsync(ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
         await EnabledAsync(db, actor.GuildId, ct);
 
         return await db.Tickets
@@ -409,8 +418,8 @@ public sealed partial class TicketCoordinator(
 
     public async Task<Ticket> PrepareEditAsync(TicketActor actor, long number, CancellationToken ct)
     {
-        await using var db = await contexts.CreateDbContextAsync(ct);
-        var ticket = await FindAsync(db, actor, number, ct);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+        Ticket ticket = await FindAsync(db, actor, number, ct);
         ticket.RequireEdit(actor, ticket.Version);
 
         return ticket;
@@ -419,47 +428,54 @@ public sealed partial class TicketCoordinator(
     internal static IQueryable<Ticket> AwaitingApproval(IQueryable<Ticket> tickets, ulong guildId) =>
         tickets
             .Where(ticket => ticket.GuildId == guildId
-                       && !ticket.Hidden
-                       && ticket.ApprovedAtUtc == null
-                       && ticket.Status != TicketStatus.Reverted
-                       && ticket.Action != TicketAction.Note);
+                             && !ticket.Hidden
+                             && ticket.ApprovedAtUtc == null
+                             && ticket.Status != TicketStatus.Reverted
+                             && ticket.Action != TicketAction.Note);
 
     public async Task<(Ticket? Ticket, int Ready, int Waiting)> ReviewQueueAsync(TicketActor actor, long after, CancellationToken ct)
     {
         RequireStaff(actor, hidden: true);
-        using var timing = new OperationTiming(logger.ForContext("GuildId", actor.GuildId), "ticket.review_queue", "configuration");
-        await using var db = await contexts.CreateDbContextAsync(ct);
+        using OperationTiming timing = new OperationTiming(logger.ForContext("GuildId", actor.GuildId), "ticket.review_queue", "configuration");
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
         await EnabledAsync(db, actor.GuildId, ct);
 
         IQueryable<Ticket> pending = AwaitingApproval(db.Tickets, actor.GuildId);
 
         // Match Complete's Unicode whitespace semantics; the provider's
         // IsNullOrWhiteSpace translation recognises only a subset of these characters.
-        const string whitespace = "\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000";
+        const string whitespace =
+            "\u0009\u000a\u000b\u000c\u000d\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000";
+
         var eligibility = pending
             .Select(ticket => new
             {
                 Ticket = ticket,
-                Ready = ticket.Comment != null && ticket.Comment.Trim(whitespace.ToCharArray()) != string.Empty
-                    && (ticket.Action != TicketAction.Timeout
-                        || (ticket.DurationSeconds > 0 && ticket.ExpiresAtUtc != null))
-                    && ticket.Pending == null,
+                Ready = ticket.Comment != null
+                        && ticket.Comment.Trim(whitespace.ToCharArray()) != string.Empty
+                        && (ticket.Action != TicketAction.Timeout
+                            || (ticket.DurationSeconds > 0 && ticket.ExpiresAtUtc != null))
+                        && ticket.Pending == null,
             });
 
         timing.Next("counting");
+
         var counts = await eligibility
             .GroupBy(ticket => ticket.Ready)
             .Select(group => new { Ready = group.Key, Count = group.Count() })
             .ToListAsync(ct);
+
         var ready = counts
             .Where(group => group.Ready)
             .Sum(group => group.Count);
+
         var waiting = counts
             .Where(group => !group.Ready)
             .Sum(group => group.Count);
 
         timing.Next("next_ticket");
-        var next = await eligibility
+
+        Ticket? next = await eligibility
             .Where(ticket => ticket.Ready && ticket.Ticket.Number > after)
             .Select(ticket => ticket.Ticket)
             .AsNoTracking()
@@ -483,13 +499,13 @@ public sealed partial class TicketCoordinator(
         if (actor.GuildId == 0 || actor.UserId == 0 || !actor.IsAdministrator)
             throw new BotCommandException("Administrator permission is required to configure tickets.");
 
-        var gate = await locks.ConfigurationAsync(actor.GuildId, ct);
+        IDisposable gate = await locks.ConfigurationAsync(actor.GuildId, ct);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(ct);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
 
-            var config = await db.TicketConfigurations
+            TicketConfiguration? config = await db.TicketConfigurations
                 .SingleOrDefaultAsync(value => value.GuildId == actor.GuildId, ct);
 
             if (config is null)
@@ -528,8 +544,10 @@ public sealed partial class TicketCoordinator(
             reviewSummary.MarkDirty(actor.GuildId);
 
             if (!await automod.RefreshAsync(actor.GuildId, ct))
+
                 throw new BotCommandException(
                     "Settings saved, but the shared ticket/Automod gate remains closed. Retry /config tickets enabled with the intended state.");
+
 
             automod.OpenGuild(actor.GuildId);
 
@@ -545,11 +563,11 @@ public sealed partial class TicketCoordinator(
 
             foreach (var userId in moderators)
             {
-                using var reminderGate = await locks.ModeratorAsync(userId, ct);
+                using IDisposable reminderGate = await locks.ModeratorAsync(userId, ct);
 
                 await db.TicketModerators
                     .Where(moderator => moderator.UserId == userId
-                               && dbTickets.Any(ticket => ticket.GuildId == actor.GuildId && ticket.Id == moderator.ActiveTicketId))
+                                        && dbTickets.Any(ticket => ticket.GuildId == actor.GuildId && ticket.Id == moderator.ActiveTicketId))
                     .ExecuteUpdateAsync(
                         update => update
                             .SetProperty(moderator => moderator.NextDeliveryUtc, (DateTimeOffset?)null)
@@ -567,7 +585,7 @@ public sealed partial class TicketCoordinator(
 
     public async Task RedeliverAsync(TicketActor actor, CancellationToken token)
     {
-        await using var db = await contexts.CreateDbContextAsync(token);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(token);
 
         await EnabledAsync(db, actor.GuildId, token);
         RequireStaff(actor, hidden: false);
@@ -577,7 +595,7 @@ public sealed partial class TicketCoordinator(
 
     internal static async Task<TicketConfiguration> EnabledAsync(BotDbContext db, ulong guildId, CancellationToken token)
     {
-        var config = await db.TicketConfigurations.SingleOrDefaultAsync(value => value.GuildId == guildId, token);
+        TicketConfiguration? config = await db.TicketConfigurations.SingleOrDefaultAsync(value => value.GuildId == guildId, token);
 
         return config is { Enabled: true, DestinationChannelId: not null }
             ? config
@@ -586,9 +604,9 @@ public sealed partial class TicketCoordinator(
 
     internal async Task AcceptScanAsync(TicketConfiguration scannedConfig, TicketAuditScan scan, DateTimeOffset started, CancellationToken token)
     {
-        using var configurationGate = await locks.ConfigurationAsync(scannedConfig.GuildId, token);
-        await using var db = await contexts.CreateDbContextAsync(token);
-        var config = await db.TicketConfigurations.SingleAsync(value => value.GuildId == scannedConfig.GuildId, token);
+        using IDisposable configurationGate = await locks.ConfigurationAsync(scannedConfig.GuildId, token);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(token);
+        TicketConfiguration config = await db.TicketConfigurations.SingleAsync(value => value.GuildId == scannedConfig.GuildId, token);
 
         if (config.CaptureFromUtc != scannedConfig.CaptureFromUtc)
             return;
@@ -607,9 +625,11 @@ public sealed partial class TicketCoordinator(
 
         Dictionary<Guid, ulong> correlations = [];
 
-        foreach (var value in scan.Observations)
-            if (value.OperationId.TryGet(out var correlation))
+        foreach (TicketObservation value in scan.Observations)
+
+            if (value.OperationId.TryGet(out Guid correlation))
                 correlations[correlation] = Math.Max(correlations.GetValueOrDefault(correlation), value.AuditId);
+
 
         IEnumerable<IGrouping<ulong, TicketObservation>> groups = scan.Observations
             .GroupBy(observation => observation.AuditId);
@@ -618,16 +638,14 @@ public sealed partial class TicketCoordinator(
         {
             List<long> existing = [];
 
-            foreach (var observation in group)
+            foreach (TicketObservation observation in group)
                 existing.AddRange(await ObservedTicketIdsAsync(db, observation, token));
 
             using (await locks.TicketsAsync(existing, token))
-            await using (var transaction = await db.Database.BeginTransactionAsync(token))
+            await using (IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(token))
             {
-                foreach (var observation in group)
-                {
+                foreach (TicketObservation observation in group)
                     await RecordAuditAsync(db, observation, correlations, automod.IsEnabled(config.GuildId), ResolveReviewPermissionAsync, token);
-                }
 
                 config.LastAuditId = Math.Max(config.LastAuditId ?? 0, group.Key);
                 await db.SaveChangesAsync(token);
@@ -647,9 +665,9 @@ public sealed partial class TicketCoordinator(
     {
         IQueryable<Ticket> matching = db.Tickets
             .Where(ticket => ticket.GuildId == observation.GuildId
-                       && ticket.SubjectUserId == observation.SubjectUserId
-                       && ticket.Action == observation.Action
-                       && ticket.RoleId == observation.RoleId);
+                             && ticket.SubjectUserId == observation.SubjectUserId
+                             && ticket.Action == observation.Action
+                             && ticket.RoleId == observation.RoleId);
 
         IQueryable<long> latest = matching
             .Where(ticket => ticket.SourceAuditId != null)
@@ -657,27 +675,27 @@ public sealed partial class TicketCoordinator(
             .Select(ticket => ticket.Id)
             .Take(1);
 
-        Guid? operationId = observation.OperationId.TryGet(out var operation) ? operation : (Guid?)null;
+        Guid? operationId = observation.OperationId.TryGet(out Guid operation) ? operation : (Guid?)null;
 
         return await matching
             .Where(ticket => latest.Contains(ticket.Id)
-                       || (operationId != null && ticket.Pending != null && ticket.Pending.Id == operationId)
-                       || (observation.RestoredTicketNumber != null && ticket.Number == observation.RestoredTicketNumber))
+                             || (operationId != null && ticket.Pending != null && ticket.Pending.Id == operationId)
+                             || (observation.RestoredTicketNumber != null && ticket.Number == observation.RestoredTicketNumber))
             .Select(ticket => ticket.Id)
             .ToListAsync(token);
     }
 
     internal async Task RecoverAsync(ulong guildId, long id, bool auditCurrent, CancellationToken token)
     {
-        var gate = await locks.TicketAsync(id, token);
+        IDisposable gate = await locks.TicketAsync(id, token);
 
         try
         {
-            await using var db = await contexts.CreateDbContextAsync(token);
-            var config = await db.TicketConfigurations.SingleAsync(value => value.GuildId == guildId, token);
+            await using BotDbContext db = await contexts.CreateDbContextAsync(token);
+            TicketConfiguration config = await db.TicketConfigurations.SingleAsync(value => value.GuildId == guildId, token);
             auditCurrent = auditCurrent && config.LastAuditScanAtUtc >= config.CaptureFromUtc;
 
-            var ticket = await db.Tickets
+            Ticket ticket = await db.Tickets
                 .SingleAsync(value => value.GuildId == guildId && value.Id == id, token);
 
             switch (ticket.Action)
@@ -703,13 +721,13 @@ public sealed partial class TicketCoordinator(
 
     internal async Task ScheduleTimeoutChecksAsync(ulong guildId, ulong userId, CancellationToken token)
     {
-        await using var db = await contexts.CreateDbContextAsync(token);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(token);
 
         IQueryable<Ticket> tickets = db.Tickets
             .Where(ticket => ticket.GuildId == guildId
-                       && (userId == 0 || ticket.SubjectUserId == userId)
-                       && ticket.Action == TicketAction.Timeout
-                       && ticket.Status == TicketStatus.Active);
+                             && (userId == 0 || ticket.SubjectUserId == userId)
+                             && ticket.Action == TicketAction.Timeout
+                             && ticket.Status == TicketStatus.Active);
 
         List<long> ids = await tickets
             .Select(ticket => ticket.Id)
@@ -717,7 +735,7 @@ public sealed partial class TicketCoordinator(
 
         foreach (var id in ids)
         {
-            using var gate = await locks.TicketAsync(id, token);
+            using IDisposable gate = await locks.TicketAsync(id, token);
 
             await tickets
                 .Where(ticket => ticket.Id == id)
@@ -727,15 +745,15 @@ public sealed partial class TicketCoordinator(
 
     internal async Task SuspendRestrictionsAsync(ulong guildId, CancellationToken token)
     {
-        await using var db = await contexts.CreateDbContextAsync(token);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(token);
 
         IQueryable<Ticket> tickets = db.Tickets
             .Where(ticket => ticket.GuildId == guildId
-                       && (ticket.Action == TicketAction.Ban
-                           || ticket.Action == TicketAction.Timeout
-                           || ticket.Action == TicketAction.Role)
-                       && !ticket.ExpirySuspended
-                       && ticket.Status == TicketStatus.Active);
+                             && (ticket.Action == TicketAction.Ban
+                                 || ticket.Action == TicketAction.Timeout
+                                 || ticket.Action == TicketAction.Role)
+                             && !ticket.ExpirySuspended
+                             && ticket.Status == TicketStatus.Active);
 
         List<long> ids = await tickets
             .Select(ticket => ticket.Id)
@@ -743,7 +761,7 @@ public sealed partial class TicketCoordinator(
 
         foreach (var id in ids)
         {
-            using var gate = await locks.TicketAsync(id, token);
+            using IDisposable gate = await locks.TicketAsync(id, token);
 
             await tickets
                 .Where(ticket => ticket.Id == id)
@@ -758,13 +776,13 @@ public sealed partial class TicketCoordinator(
     internal static void RequireStaff(TicketActor actor, bool hidden)
     {
         var staff = actor.IsAdministrator
-            || actor.CanViewAuditLog
-            || actor.CanTimeoutMembers
-            || actor.CanBanMembers
-            || actor.CanKickMembers
-            || actor.CanMuteMembers
-            || actor.CanDeafenMembers
-            || actor.CanManageRoles;
+                    || actor.CanViewAuditLog
+                    || actor.CanTimeoutMembers
+                    || actor.CanBanMembers
+                    || actor.CanKickMembers
+                    || actor.CanMuteMembers
+                    || actor.CanDeafenMembers
+                    || actor.CanManageRoles;
 
         if (actor.UserId == 0 || actor.GuildId == 0 || !staff || (hidden && actor is { IsAdministrator: false, CanViewAuditLog: false }))
             throw new BotCommandException("Staff access is required; hidden tickets require View Audit Log or Administrator.");
@@ -786,15 +804,16 @@ public sealed partial class TicketCoordinator(
         ulong guildId,
         long number,
         CancellationToken token,
-        [System.Runtime.CompilerServices.CallerMemberName] string operation = "")
+        [System.Runtime.CompilerServices.CallerMemberName]
+        string operation = "")
     {
-        await using var db = await contexts.CreateDbContextAsync(token);
+        await using BotDbContext db = await contexts.CreateDbContextAsync(token);
 
         var id = await db.Tickets
-                .Where(ticket => ticket.GuildId == guildId && ticket.Number == number)
-                .Select(ticket => (long?)ticket.Id)
-                .SingleOrDefaultAsync(token)
-            ?? throw new BotCommandException("No matching ticket in this server.");
+                     .Where(ticket => ticket.GuildId == guildId && ticket.Number == number)
+                     .Select(ticket => (long?)ticket.Id)
+                     .SingleOrDefaultAsync(token)
+                 ?? throw new BotCommandException("No matching ticket in this server.");
 
         return await locks.TicketAsync(id, token, operation);
     }
@@ -804,8 +823,8 @@ public sealed partial class TicketCoordinator(
         if (number <= 0)
             throw new BotCommandException("Supply a positive ticket number.");
 
-        var ticket = await db.Tickets.SingleOrDefaultAsync(value => value.GuildId == actor.GuildId && value.Number == number, token)
-            ?? throw new BotCommandException("No matching ticket in this server.");
+        Ticket ticket = await db.Tickets.SingleOrDefaultAsync(value => value.GuildId == actor.GuildId && value.Number == number, token)
+                        ?? throw new BotCommandException("No matching ticket in this server.");
 
         RequireStaff(actor, ticket.Hidden);
         await EnabledAsync(db, actor.GuildId, token);

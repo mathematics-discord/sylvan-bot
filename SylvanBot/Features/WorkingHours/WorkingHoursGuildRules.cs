@@ -8,7 +8,7 @@ public sealed class WorkingHoursGuildRules(DiscordSocketClient client)
     public static bool IsEligible(WorkingHoursSettings settings, IGuildUser member)
     {
         return settings.EligibleRoles
-           .Any(role => member.RoleIds.Contains(role.RoleId));
+            .Any(role => member.RoleIds.Contains(role.RoleId));
     }
 
     public ICollection<string> ConfigurationProblems(WorkingHoursSettings settings, SocketGuild? guild)
@@ -28,7 +28,7 @@ public sealed class WorkingHoursGuildRules(DiscordSocketClient client)
             return problems;
         }
 
-        foreach (var entry in settings.EligibleRoles)
+        foreach (WorkingHoursEligibleRole entry in settings.EligibleRoles)
         {
             var invalidReference = entry.RoleId == guild.Id || entry.RoleId == settings.PingRoleId || guild.GetRole(entry.RoleId) is null;
 
@@ -39,8 +39,8 @@ public sealed class WorkingHoursGuildRules(DiscordSocketClient client)
         if (settings.PingRoleId is not { } targetId)
             return problems;
 
-        var target = guild.GetRole(targetId);
-        var bot = guild.CurrentUser;
+        SocketRole? target = guild.GetRole(targetId);
+        SocketGuildUser? bot = guild.CurrentUser;
 
         var manageable =
             target is not null

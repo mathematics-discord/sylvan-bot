@@ -8,13 +8,13 @@ public sealed class TicketApprovalValidationTests
     public void Approve_ExpiredTimeoutWithoutComment_ExplainsHowToCompleteIt()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Timeout);
+        Ticket ticket = TicketTests.Create(TicketAction.Timeout);
         ticket.Initialise(string.Empty, seconds: 3600);
         ticket.End(TicketStatus.Expired);
-        var reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
+        TicketActor reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
 
         // Act
-        var exception = Should.Throw<BotCommandException>(() => ticket.Approve(reviewer, ticket.Version));
+        BotCommandException exception = Should.Throw<BotCommandException>(() => ticket.Approve(reviewer, ticket.Version));
 
         // Assert
         exception.Message.ShouldBe("Add a comment using Edit before approving this ticket.");
@@ -25,10 +25,10 @@ public sealed class TicketApprovalValidationTests
     public void Approve_CompletedExpiredTimeout_AcceptsRecord()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Timeout);
+        Ticket ticket = TicketTests.Create(TicketAction.Timeout);
         ticket.Initialise(string.Empty, seconds: 3600);
         ticket.End(TicketStatus.Expired);
-        var reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
+        TicketActor reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
         ticket.SetComment("Reason supplied after the timeout ended", reviewer.UserId);
 
         // Act
@@ -44,14 +44,14 @@ public sealed class TicketApprovalValidationTests
     public void Approve_StaleIncompleteTicket_RequestsFreshView()
     {
         // Arrange
-        var ticket = TicketTests.Create(TicketAction.Timeout);
+        Ticket ticket = TicketTests.Create(TicketAction.Timeout);
         ticket.Initialise(string.Empty, seconds: 3600);
         var version = ticket.Version;
         ticket.End(TicketStatus.Expired);
-        var reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
+        TicketActor reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
 
         // Act
-        var exception = Should.Throw<BotCommandException>(() => ticket.Approve(reviewer, version));
+        BotCommandException exception = Should.Throw<BotCommandException>(() => ticket.Approve(reviewer, version));
 
         // Assert
         exception.Message.ShouldBe("This ticket changed. Reopen it before approving.");
@@ -65,8 +65,8 @@ public sealed class TicketApprovalValidationTests
     public void CompleteStaffReversal_HideAndRestore_DoesNotReactivateRestriction(TicketAction action)
     {
         // Arrange
-        var ticket = TicketTests.Create(action);
-        var reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
+        Ticket ticket = TicketTests.Create(action);
+        TicketActor reviewer = new TicketActor(GuildId: 1, UserId: 4, IsAdministrator: true, CanTimeoutMembers: false);
 
         // Act
         ticket.CompleteStaffReversal(reviewer.UserId, DateTimeOffset.UtcNow);
@@ -80,5 +80,4 @@ public sealed class TicketApprovalValidationTests
         ticket.NeedsTimeoutRenewal(DateTimeOffset.UtcNow).ShouldBeFalse();
         ticket.Pending.ShouldBeNull();
     }
-
 }

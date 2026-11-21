@@ -1,7 +1,28 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using static System.StringComparison;
+
 namespace SylvanBot.Application.Features.Tickets;
 
-using static System.StringComparison;
-using System.ComponentModel.DataAnnotations.Schema;
+public enum TicketAction
+{
+    Note,
+    Kick,
+    Ban,
+    VoiceMute,
+    VoiceDeafen,
+    Role,
+    Timeout,
+}
+
+public enum TicketStatus
+{
+    NotApplicable = -1,
+    Active = 0,
+    Expired = 1,
+    Reverted = 3,
+    Applied = 4,
+    Superseded = 5,
+}
 
 public sealed class Ticket
 {
@@ -73,13 +94,13 @@ public sealed class Ticket
 
     [NotMapped]
     public bool Complete => !string.IsNullOrWhiteSpace(Comment)
-        && (Action != TicketAction.Timeout
-            || (DurationSeconds is > 0 && ExpiresAtUtc is not null));
+                            && (Action != TicketAction.Timeout
+                                || (DurationSeconds is > 0 && ExpiresAtUtc is not null));
 
     public static DateTimeOffset NativeTimeoutExpiry(DateTimeOffset expiry, DateTimeOffset now)
     {
-        var limit = now.AddDays(28).AddMinutes(-1);
-        var target = expiry < limit ? expiry : limit;
+        DateTimeOffset limit = now.AddDays(28).AddMinutes(-1);
+        DateTimeOffset target = expiry < limit ? expiry : limit;
 
         // Discord's returned timestamps have millisecond precision; recovery compares exactly.
         return DateTimeOffset.FromUnixTimeMilliseconds(target.ToUnixTimeMilliseconds());
@@ -92,21 +113,21 @@ public sealed class Ticket
     }
 
     public bool CanCorrect(TicketActor actor) => actor.GuildId == GuildId
-        && actor.UserId != 0
-        && (actor.IsAdministrator
-            || actor.CanViewAuditLog
-            || (actor.UserId == ModeratorUserId
-                && Action switch
-                {
-                    TicketAction.Note => actor.CanTimeoutMembers,
-                    TicketAction.Timeout => actor.CanTimeoutMembers,
-                    TicketAction.Ban => actor.CanBanMembers,
-                    TicketAction.VoiceMute => actor.CanMuteMembers,
-                    TicketAction.VoiceDeafen => actor.CanDeafenMembers,
-                    TicketAction.Kick => actor.CanKickMembers,
-                    TicketAction.Role => actor.CanManageRoles,
-                    _ => false,
-                }));
+                                                 && actor.UserId != 0
+                                                 && (actor.IsAdministrator
+                                                     || actor.CanViewAuditLog
+                                                     || (actor.UserId == ModeratorUserId
+                                                         && Action switch
+                                                         {
+                                                             TicketAction.Note => actor.CanTimeoutMembers,
+                                                             TicketAction.Timeout => actor.CanTimeoutMembers,
+                                                             TicketAction.Ban => actor.CanBanMembers,
+                                                             TicketAction.VoiceMute => actor.CanMuteMembers,
+                                                             TicketAction.VoiceDeafen => actor.CanDeafenMembers,
+                                                             TicketAction.Kick => actor.CanKickMembers,
+                                                             TicketAction.Role => actor.CanManageRoles,
+                                                             _ => false,
+                                                         }));
 
     public void RequireEdit(TicketActor actor, int version)
     {
@@ -154,7 +175,12 @@ public sealed class Ticket
         Record(append ? TicketHistoryAction.AppendedComment : TicketHistoryAction.SetComment, moderatorId);
     }
 
-    public void SetDuration(long? seconds, ulong? moderatorId, DateTimeOffset? observedExpiry = null, bool canReview = false, bool requiresApproval = false)
+    public void SetDuration(
+        long? seconds,
+        ulong? moderatorId,
+        DateTimeOffset? observedExpiry = null,
+        bool canReview = false,
+        bool requiresApproval = false)
     {
         DateTimeOffset? expiry = observedExpiry ?? (seconds is { } finite ? CreatedAtUtc.AddSeconds(finite) : null);
 
@@ -163,8 +189,9 @@ public sealed class Ticket
 
         var durationChanged = DurationSeconds != seconds || ExpiresAtUtc != expiry;
 
-        var needsReview = Status != TicketStatus.Reverted && durationChanged
-            && (requiresApproval || (moderatorId is not null && !canReview));
+        var needsReview = Status != TicketStatus.Reverted
+                          && durationChanged
+                          && (requiresApproval || (moderatorId is not null && !canReview));
 
         if (needsReview)
         {
@@ -192,8 +219,9 @@ public sealed class Ticket
     public void SetHidden(TicketActor actor, int version, bool hidden)
     {
         RequireVisibilityChange(actor, version);
+
         var restrictionUnresolved = Action is not (TicketAction.Note or TicketAction.Kick)
-            && (Status == TicketStatus.Active || Pending is not null);
+                                    && (Status == TicketStatus.Active || Pending is not null);
 
         if (hidden && restrictionUnresolved)
             throw new BotCommandException("Lift the restriction and resolve pending changes before hiding this ticket.");
@@ -250,7 +278,7 @@ public sealed class Ticket
         if (IsApproved || Hidden)
             return false;
 
-        var publication = Publications
+        TicketPublication? publication = Publications
             .SingleOrDefault(reference => reference.Current && !reference.Removed);
 
         if (publication is null || publication.ChannelId != channelId || publication.MessageId != messageId)
@@ -292,7 +320,7 @@ public sealed class Ticket
     public TicketHistoryEntry? Record(TicketHistoryAction action, ulong? moderatorId = null, DateTimeOffset? timestamp = null)
     {
         Version++;
-        var entry = new TicketHistoryEntry(ModificationHistory.Count + 1, action, moderatorId, timestamp ?? DateTimeOffset.UtcNow);
+        TicketHistoryEntry entry = new TicketHistoryEntry(ModificationHistory.Count + 1, action, moderatorId, timestamp ?? DateTimeOffset.UtcNow);
 
         if (!entry.IsModeratorChange)
             return null;
@@ -312,11 +340,12 @@ public sealed class Ticket
     }
 
     public bool NeedsTimeoutRenewal(DateTimeOffset now) => Action == TicketAction.Timeout
-        && Status == TicketStatus.Active
-        && !ExpirySuspended
-        && ExpiresAtUtc > now
-        && (AppliedTimeoutUntilUtc is null
-            || (AppliedTimeoutUntilUtc < ExpiresAtUtc && AppliedTimeoutUntilUtc <= now.AddDays(7)));
+                                                           && Status == TicketStatus.Active
+                                                           && !ExpirySuspended
+                                                           && ExpiresAtUtc > now
+                                                           && (AppliedTimeoutUntilUtc is null
+                                                               || (AppliedTimeoutUntilUtc < ExpiresAtUtc
+                                                                   && AppliedTimeoutUntilUtc <= now.AddDays(7)));
 
     public void ObserveTimeoutWindow(DateTimeOffset? expiry, DateTimeOffset now)
     {
@@ -326,12 +355,17 @@ public sealed class Ticket
 
     public void ConfirmTimeoutChange(DateTimeOffset now, bool canReview = false)
     {
-        var pending = Pending ?? throw new InvalidOperationException("No timeout change is pending.");
+        TicketOperation pending = Pending ?? throw new InvalidOperationException("No timeout change is pending.");
 
         if (pending.Kind != TicketOperationKind.SetTimeoutExpiry || pending.ExpiryUtc is null)
             throw new InvalidOperationException("The pending operation is not a timeout change.");
 
-        SetDuration(Math.Max(1, (long)Math.Ceiling((pending.ExpiryUtc.Value - CreatedAtUtc).TotalSeconds)), pending.RequestedBy, pending.ExpiryUtc.Value, canReview);
+        SetDuration(
+            Math.Max(1, (long)Math.Ceiling((pending.ExpiryUtc.Value - CreatedAtUtc).TotalSeconds)),
+            pending.RequestedBy,
+            pending.ExpiryUtc.Value,
+            canReview);
+
         ObserveTimeoutWindow(pending.NativeExpiryUtc ?? pending.ExpiryUtc.Value, now);
 
         if (pending.ExpiryUtc.Value <= now)
@@ -365,27 +399,4 @@ public sealed class Ticket
         if (Action == TicketAction.Timeout && ExpiresAtUtc is { } timeoutExpiry)
             ObserveTimeoutWindow(timeoutExpiry, CreatedAtUtc);
     }
-}
-
-
-public enum TicketAction
-{
-    Note,
-    Kick,
-    Ban,
-    VoiceMute,
-    VoiceDeafen,
-    Role,
-    Timeout,
-}
-
-
-public enum TicketStatus
-{
-    NotApplicable = -1,
-    Active = 0,
-    Expired = 1,
-    Reverted = 3,
-    Applied = 4,
-    Superseded = 5,
 }

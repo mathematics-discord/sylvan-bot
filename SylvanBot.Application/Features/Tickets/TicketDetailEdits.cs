@@ -4,18 +4,18 @@ namespace SylvanBot.Application.Features.Tickets;
 
 public union TicketCommentEdit(TicketCommentEdit.Keep, TicketCommentEdit.Replace, TicketCommentEdit.Append)
 {
-    public sealed record Keep;
-
-    public sealed record Replace(string Text);
-
-    public sealed record Append(string Text);
-
     public string Apply(string current) => this.Value switch
     {
         Keep => current,
         Replace replacement => replacement.Text,
         Append addition => current.Length == 0 ? addition.Text : current + "\n" + addition.Text,
     };
+
+    public sealed record Keep;
+
+    public sealed record Replace(string Text);
+
+    public sealed record Append(string Text);
 }
 
 public union TicketDurationEdit(TicketDurationEdit.Keep, TicketDurationEdit.Set, TicketDurationEdit.Permanent)

@@ -13,8 +13,8 @@ internal sealed class OperationTiming : IDisposable
     public OperationTiming(ILogger logger, string operation, string stage)
     {
         _logger = logger
-           .ForContext("operation_name", operation)
-           .ForContext("operation_id", Guid.NewGuid());
+            .ForContext("operation_name", operation)
+            .ForContext("operation_id", Guid.NewGuid());
 
         _stage = stage;
     }
@@ -27,15 +27,15 @@ internal sealed class OperationTiming : IDisposable
     }
 
     private void WriteStage() => _logger
-       .ForContext("event_kind", "operation.stage_timing")
-       .Debug("Stage {Stage} elapsed {ElapsedMs} ms", _stage, Stopwatch.GetElapsedTime(_stageStarted).TotalMilliseconds);
+        .ForContext("event_kind", "operation.stage_timing")
+        .Debug("Stage {Stage} elapsed {ElapsedMs} ms", _stage, Stopwatch.GetElapsedTime(_stageStarted).TotalMilliseconds);
 
     public void Dispose()
     {
         WriteStage();
 
         _logger
-           .ForContext("event_kind", "operation.total_timing")
-           .Debug("Operation elapsed {TotalMs} ms", Stopwatch.GetElapsedTime(_started).TotalMilliseconds);
+            .ForContext("event_kind", "operation.total_timing")
+            .Debug("Operation elapsed {TotalMs} ms", Stopwatch.GetElapsedTime(_started).TotalMilliseconds);
     }
 }

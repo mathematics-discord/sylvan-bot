@@ -60,12 +60,13 @@ public sealed partial class ConfigModule
                 return;
             }
 
-            var (option, created) = result.Value;
+            (RoleColourOption option, var created) = result.Value;
 
             var incomplete = await reconciler.ReconcileGuildAsync(
                 guild: Context.Guild,
                 ct: lifetime.ApplicationStopping,
                 new Optional<ImmutableArray<RoleColourOption>>(previous));
+
             var action = created ? "Registered" : "Updated";
 
             await FollowupAsync(
@@ -106,6 +107,7 @@ public sealed partial class ConfigModule
                 guild: Context.Guild,
                 ct: lifetime.ApplicationStopping,
                 new Optional<ImmutableArray<RoleColourOption>>(previous));
+
             await FollowupAsync($"Deleted colour mapping `{result.Value.OptionId}`.{CheckSummary(incomplete)}", ephemeral: true);
         }
 
@@ -137,6 +139,7 @@ public sealed partial class ConfigModule
                 guild: Context.Guild,
                 ct: lifetime.ApplicationStopping,
                 previousMappings: default);
+
             await FollowupAsync($"Role colour check completed.{CheckSummary(incomplete)}", ephemeral: true);
         }
 

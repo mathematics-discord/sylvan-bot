@@ -10,15 +10,16 @@ public sealed class LoggingScopeResolver(DiscordSocketClient discordClient, IDbC
 
     public async Task<IMessageChannel?> GetMemberLogChannelAsync(ulong guildId, CancellationToken ct)
     {
-        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
-        var configuration = await db.LoggingConfigurations
-           .AsNoTracking()
-           .SingleOrDefaultAsync(configuration => configuration.GuildId == guildId, cancellationToken: ct);
+        await using BotDbContext db = await dbContextFactory.CreateDbContextAsync(ct);
+
+        LoggingConfiguration? configuration = await db.LoggingConfigurations
+            .AsNoTracking()
+            .SingleOrDefaultAsync(configuration => configuration.GuildId == guildId, cancellationToken: ct);
 
         if (configuration is not { Enabled: true, MemberLogChannelId: { } channelId })
             return null;
 
-        var channel = discordClient.GetChannel(channelId);
+        SocketChannel channel = discordClient.GetChannel(channelId);
 
         if (channel is IMessageChannel messageChannel && channel is IGuildChannel guildChannel && guildChannel.GuildId == guildId)
             return messageChannel;
@@ -30,13 +31,13 @@ public sealed class LoggingScopeResolver(DiscordSocketClient discordClient, IDbC
 
     public async Task<IMessageChannel?> GetLogChannelAsync(ulong guildId, IChannel sourceChannel, bool forEdits, CancellationToken ct)
     {
-        var configuration = await GetConfigurationAsync(guildId: guildId, sourceChannel: sourceChannel, ct: ct);
+        LoggingConfiguration? configuration = await GetConfigurationAsync(guildId: guildId, sourceChannel: sourceChannel, ct: ct);
         var destinationChannelId = forEdits ? configuration?.EditLogChannelId : configuration?.DeleteLogChannelId;
 
         if (destinationChannelId is null)
             return null;
 
-        var logChannel = discordClient.GetChannel(destinationChannelId.Value) as IMessageChannel;
+        IMessageChannel? logChannel = discordClient.GetChannel(destinationChannelId.Value) as IMessageChannel;
         var belongsToGuild = logChannel is IGuildChannel guildChannel && guildChannel.GuildId == guildId;
 
         if (belongsToGuild)
@@ -55,7 +56,7 @@ public sealed class LoggingScopeResolver(DiscordSocketClient discordClient, IDbC
     public async Task<LoggingConfiguration?> GetConfigurationAsync(ulong guildId, IChannel sourceChannel, CancellationToken ct)
     {
         List<ulong> scopeIds = [sourceChannel.Id];
-        var parentChannel = sourceChannel;
+        IChannel parentChannel = sourceChannel;
 
         if (sourceChannel is SocketThreadChannel threadChannel)
         {
@@ -66,11 +67,11 @@ public sealed class LoggingScopeResolver(DiscordSocketClient discordClient, IDbC
         if (parentChannel is INestedChannel { CategoryId: { } categoryId })
             scopeIds.Add(categoryId);
 
-        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+        await using BotDbContext db = await dbContextFactory.CreateDbContextAsync(ct);
 
-        var configuration = await db.LoggingConfigurations
-           .AsNoTracking()
-           .SingleOrDefaultAsync(configuration => configuration.GuildId == guildId, cancellationToken: ct);
+        LoggingConfiguration? configuration = await db.LoggingConfigurations
+            .AsNoTracking()
+            .SingleOrDefaultAsync(configuration => configuration.GuildId == guildId, cancellationToken: ct);
 
         var enabled =
             configuration is { Enabled: true } && (configuration.EditLogChannelId is not null || configuration.DeleteLogChannelId is not null);
@@ -81,8 +82,8 @@ public sealed class LoggingScopeResolver(DiscordSocketClient discordClient, IDbC
         var outputChannel = scopeIds.Contains(configuration.DeleteLogChannelId ?? 0) || scopeIds.Contains(configuration.EditLogChannelId ?? 0);
 
         var excluded = await db.LoggingExcludedChannels
-           .AsNoTracking()
-           .AnyAsync(channel => channel.GuildId == guildId && scopeIds.Contains(channel.ChannelId), cancellationToken: ct);
+            .AsNoTracking()
+            .AnyAsync(channel => channel.GuildId == guildId && scopeIds.Contains(channel.ChannelId), cancellationToken: ct);
 
         return outputChannel || excluded ? null : configuration;
     }

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Application.Infrastructure.Data;
@@ -16,8 +16,8 @@ public sealed class PostgresMessageCachePersistence(IDbContextFactory<BotDbConte
         CancellationToken ct
     )
     {
-        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
-        var snapshots = ImmutableArray.CreateBuilder<CachedMessageSnapshot>();
+        await using BotDbContext db = await dbContextFactory.CreateDbContextAsync(ct);
+        ImmutableArray<CachedMessageSnapshot>.Builder snapshots = ImmutableArray.CreateBuilder<CachedMessageSnapshot>();
 
         foreach (var guildId in guildIds)
         {
@@ -28,15 +28,15 @@ public sealed class PostgresMessageCachePersistence(IDbContextFactory<BotDbConte
                 var pageAfterId = lastId;
 
                 List<CachedMessage> rows = await db
-                   .CachedMessages.AsNoTracking()
-                   .Where(message =>
-                              message.BotId == botId && message.GuildId == guildId && message.ExpiresAtUtc > now && message.MessageId > pageAfterId
+                    .CachedMessages.AsNoTracking()
+                    .Where(message =>
+                        message.BotId == botId && message.GuildId == guildId && message.ExpiresAtUtc > now && message.MessageId > pageAfterId
                     )
-                   .OrderBy(message => message.MessageId)
-                   .Take(1000)
-                   .ToListAsync(ct);
+                    .OrderBy(message => message.MessageId)
+                    .Take(1000)
+                    .ToListAsync(ct);
 
-                foreach (var row in rows)
+                foreach (CachedMessage row in rows)
                     snapshots.Add(ReadSnapshot(row));
 
                 if (rows.Count < 1000)
@@ -51,7 +51,7 @@ public sealed class PostgresMessageCachePersistence(IDbContextFactory<BotDbConte
 
     public async Task SaveAsync(ulong botId, CachedMessageSnapshot snapshot, CancellationToken ct)
     {
-        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+        await using BotDbContext db = await dbContextFactory.CreateDbContextAsync(ct);
         var json = JsonSerializer.Serialize(snapshot);
 
         await db.Database.ExecuteSqlInterpolatedAsync(
@@ -79,16 +79,16 @@ public sealed class PostgresMessageCachePersistence(IDbContextFactory<BotDbConte
 
     public async Task DeleteAsync(ulong botId, ulong guildId, ulong messageId, CancellationToken ct)
     {
-        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+        await using BotDbContext db = await dbContextFactory.CreateDbContextAsync(ct);
 
         await db
-           .CachedMessages.Where(message => message.BotId == botId && message.GuildId == guildId && message.MessageId == messageId)
-           .ExecuteDeleteAsync(ct);
+            .CachedMessages.Where(message => message.BotId == botId && message.GuildId == guildId && message.MessageId == messageId)
+            .ExecuteDeleteAsync(ct);
     }
 
     public async Task DeleteExpiredAsync(DateTimeOffset now, CancellationToken ct)
     {
-        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+        await using BotDbContext db = await dbContextFactory.CreateDbContextAsync(ct);
 
         await db.CachedMessages.Where(message => message.ExpiresAtUtc <= now).ExecuteDeleteAsync(ct);
     }
@@ -97,7 +97,7 @@ public sealed class PostgresMessageCachePersistence(IDbContextFactory<BotDbConte
     {
         try
         {
-            var snapshot =
+            CachedMessageSnapshot snapshot =
                 JsonSerializer.Deserialize<CachedMessageSnapshot>(json: row.SnapshotJson, options: SnapshotJsonOptions)
                 ?? throw new InvalidDataException("Stored message snapshot is null.");
 
@@ -115,9 +115,11 @@ public sealed class PostgresMessageCachePersistence(IDbContextFactory<BotDbConte
             // JSON nullability enforcement does not cover collection elements.
             IEnumerable<MessageAttachment?> attachments = snapshot.Attachments;
 
-            foreach (var attachment in attachments)
+            foreach (MessageAttachment? attachment in attachments)
+
                 if (attachment is null || string.IsNullOrWhiteSpace(attachment.Url) || attachment.Size < 0)
                     throw new InvalidDataException("Stored attachment metadata is invalid.");
+
 
             return snapshot;
         }

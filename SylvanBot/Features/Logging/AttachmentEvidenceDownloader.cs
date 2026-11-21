@@ -26,7 +26,7 @@ internal static class AttachmentEvidenceDownloader
     {
         try
         {
-            using var response = await httpClient.GetAsync(
+            using HttpResponseMessage response = await httpClient.GetAsync(
                 requestUri: url,
                 completionOption: HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken: ct
@@ -40,7 +40,7 @@ internal static class AttachmentEvidenceDownloader
             if (contentLength > maxBytes)
                 return default;
 
-            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            await using Stream stream = await response.Content.ReadAsStreamAsync(ct);
 
             return await ReadLimitedAsync(stream: stream, maxBytes: maxBytes, ct: ct);
         }
@@ -76,7 +76,7 @@ internal static class AttachmentEvidenceDownloader
         var readBufferBytes = (int)Math.Min(val1: maxReadBufferBytes, Math.Max(val1: 1, val2: bytesRemaining));
         var readBuffer = new byte[readBufferBytes];
 
-        await using var buffer = new MemoryStream(readBufferBytes);
+        await using MemoryStream buffer = new MemoryStream(readBufferBytes);
 
         while (bytesRemaining > 0)
         {

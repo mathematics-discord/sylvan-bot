@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using DiffPlex;
 using DiffPlex.Chunkers;
 using DiffPlex.Model;
@@ -16,10 +16,15 @@ internal static class MessageEditDiffer
 
     public static (string Before, string After) BuildDiff(string before, string after)
     {
-        var diff = Differ.Instance.CreateDiffs(oldText: before, newText: after, ignoreWhiteSpace: false, ignoreCase: false, chunker: TokenChunker);
+        DiffResult diff = Differ.Instance.CreateDiffs(
+            oldText: before,
+            newText: after,
+            ignoreWhiteSpace: false,
+            ignoreCase: false,
+            chunker: TokenChunker);
 
-        var beforeBuilder = new StringBuilder();
-        var afterBuilder = new StringBuilder();
+        StringBuilder beforeBuilder = new StringBuilder();
+        StringBuilder afterBuilder = new StringBuilder();
         AppendDiff(diff: diff, before: beforeBuilder, after: afterBuilder, refineTokens: true);
 
         return (beforeBuilder.ToString(), afterBuilder.ToString());
@@ -29,10 +34,10 @@ internal static class MessageEditDiffer
     {
         var beforePosition = 0;
 
-        foreach (var block in diff.DiffBlocks)
+        foreach (DiffBlock? block in diff.DiffBlocks)
         {
             AppendUnchanged(pieces: diff.PiecesOld, start: beforePosition, end: block.DeleteStartA, before: before, after: after);
-            var characterDiff = refineTokens ? GetCharacterRefinement(tokenDiff: diff, block: block) : null;
+            DiffResult? characterDiff = refineTokens ? GetCharacterRefinement(tokenDiff: diff, block: block) : null;
 
             if (characterDiff is null)
             {
@@ -40,7 +45,9 @@ internal static class MessageEditDiffer
                 AppendChanged(output: after, pieces: diff.PiecesNew, start: block.InsertStartB, count: block.InsertCountB, color: Green);
             }
             else
+
                 AppendDiff(diff: characterDiff, before: before, after: after, refineTokens: false);
+
 
             beforePosition = block.DeleteStartA + block.DeleteCountA;
         }
@@ -58,7 +65,7 @@ internal static class MessageEditDiffer
         var beforeToken = tokenDiff.PiecesOld[block.DeleteStartA];
         var afterToken = tokenDiff.PiecesNew[block.InsertStartB];
 
-        var characterDiff = Differ.Instance.CreateDiffs(
+        DiffResult characterDiff = Differ.Instance.CreateDiffs(
             oldText: beforeToken,
             newText: afterToken,
             ignoreWhiteSpace: false,

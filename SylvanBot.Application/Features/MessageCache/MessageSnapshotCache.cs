@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 
 namespace SylvanBot.Application.Features.MessageCache;
 
@@ -29,12 +29,12 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
             if (_ready)
                 return;
 
-            var now = timeProvider.GetUtcNow();
+            DateTimeOffset now = timeProvider.GetUtcNow();
             ImmutableArray<CachedMessageSnapshot> snapshots = await persistence.LoadAsync(botId: botId, guildIds: guildIds, now: now, ct: ct);
 
             // ReSharper disable once ForeachCanBePartlyConvertedToQueryUsingAnotherGetEnumerator
             // don't
-            foreach (var snapshot in snapshots)
+            foreach (CachedMessageSnapshot snapshot in snapshots)
             {
                 var inScope = guildIds.Contains(snapshot.GuildId) && snapshot.ExpiresAtUtc > timeProvider.GetUtcNow();
 
@@ -59,14 +59,14 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
         {
             EnsureReady();
 
-            var key = (message.GuildId, message.MessageId);
+            (ulong GuildId, ulong MessageId) key = (message.GuildId, message.MessageId);
             var expired = message.CreatedAtUtc.AddHours(24) <= timeProvider.GetUtcNow();
             var alreadyObserved = Read(key) is { HasValue: true } || _deletions.ContainsKey(key);
 
             if (!message.Eligible || expired || alreadyObserved)
                 return;
 
-            var snapshot = new CachedMessageSnapshot
+            CachedMessageSnapshot snapshot = new CachedMessageSnapshot
             {
                 GuildId = message.GuildId,
                 ChannelId = message.ChannelId,
@@ -94,7 +94,7 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
         {
             EnsureReady();
 
-            var key = (message.GuildId, message.MessageId);
+            (ulong GuildId, ulong MessageId) key = (message.GuildId, message.MessageId);
             Optional<CachedMessageSnapshot> before = Read(key);
             var expired = message.CreatedAtUtc.AddHours(24) <= timeProvider.GetUtcNow();
             var deleting = _deletions.ContainsKey(key);
@@ -125,18 +125,18 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
         try
         {
             EnsureReady();
-            var snapshots = ImmutableArray.CreateBuilder<CachedMessageSnapshot>();
+            ImmutableArray<CachedMessageSnapshot>.Builder snapshots = ImmutableArray.CreateBuilder<CachedMessageSnapshot>();
 
             foreach (var messageId in messageIds)
             {
-                var key = (guildId, messageId);
+                (ulong GuildId, ulong MessageId) key = (guildId, messageId);
                 Optional<CachedMessageSnapshot> snapshot = Read(key);
 
-                if (_deletions.TryGetValue(key: key, out var deletion) && deletion.State != DeletionState.AwaitingPublication)
+                if (_deletions.TryGetValue(key: key, out Deletion? deletion) && deletion.State != DeletionState.AwaitingPublication)
                     continue;
 
                 // Freeze even a miss, so a delayed create cannot resurrect a deleted message.
-                var expiresAt = DateTimeOffset.FromUnixTimeMilliseconds((long)(messageId >> 22) + 1420070400000).AddHours(24);
+                DateTimeOffset expiresAt = DateTimeOffset.FromUnixTimeMilliseconds((long)(messageId >> 22) + 1420070400000).AddHours(24);
 
                 if (expiresAt > timeProvider.GetUtcNow())
                     _deletions[key] = new Deletion { ExpiresAtUtc = expiresAt, State = DeletionState.AwaitingPublication };
@@ -162,22 +162,21 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
         {
             EnsureReady();
 
-            foreach (var snapshot in snapshots)
+            foreach (CachedMessageSnapshot snapshot in snapshots)
             {
-                var key = (snapshot.GuildId, snapshot.MessageId);
+                (ulong GuildId, ulong MessageId) key = (snapshot.GuildId, snapshot.MessageId);
                 _deletions[key] = new Deletion { ExpiresAtUtc = snapshot.ExpiresAtUtc, State = DeletionState.AwaitingRemoval };
                 _messages.Remove(key);
             }
 
             // Tombstones are published before deletion I/O: ambiguous DB failures cannot duplicate a log in this process.
-            foreach (var snapshot in snapshots)
+            foreach (CachedMessageSnapshot snapshot in snapshots)
             {
                 await persistence.DeleteAsync(botId: _botId, guildId: snapshot.GuildId, messageId: snapshot.MessageId, ct: ct);
 
                 _deletions[(snapshot.GuildId, snapshot.MessageId)] = new Deletion
                 {
-                    ExpiresAtUtc = snapshot.ExpiresAtUtc,
-                    State = DeletionState.Removed,
+                    ExpiresAtUtc = snapshot.ExpiresAtUtc, State = DeletionState.Removed,
                 };
             }
         }
@@ -194,16 +193,16 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
         try
         {
             return _messages
-               .Values.Where(snapshot => snapshot.ExpiresAtUtc > timeProvider.GetUtcNow())
-               .GroupBy(snapshot => (snapshot.GuildId, snapshot.ChannelId))
-               .Select(group => new CachedChannelStatistics
+                .Values.Where(snapshot => snapshot.ExpiresAtUtc > timeProvider.GetUtcNow())
+                .GroupBy(snapshot => (snapshot.GuildId, snapshot.ChannelId))
+                .Select(group => new CachedChannelStatistics
                 {
                     GuildId = group.Key.GuildId,
                     ChannelId = group.Key.ChannelId,
                     Count = group.Count(),
                     OldestCreatedAtUtc = group.Min(snapshot => snapshot.CreatedAtUtc),
                 })
-               .ToImmutableArray();
+                .ToImmutableArray();
         }
         finally
         {
@@ -217,33 +216,33 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
 
         try
         {
-            var now = timeProvider.GetUtcNow();
+            DateTimeOffset now = timeProvider.GetUtcNow();
 
             ImmutableArray<(ulong GuildId, ulong MessageId)> expired = _messages
-               .Where(pair => pair.Value.ExpiresAtUtc <= now)
-               .Select(pair => pair.Key)
-               .ToImmutableArray();
+                .Where(pair => pair.Value.ExpiresAtUtc <= now)
+                .Select(pair => pair.Key)
+                .ToImmutableArray();
 
-            foreach (var key in expired)
+            foreach ((ulong GuildId, ulong MessageId) key in expired)
                 _messages.Remove(key);
 
             (ulong GuildId, ulong MessageId)[] expiredDeletions = _deletions
-               .Where(pair => pair.Value.ExpiresAtUtc <= now)
-               .Select(pair => pair.Key)
-               .ToArray();
+                .Where(pair => pair.Value.ExpiresAtUtc <= now)
+                .Select(pair => pair.Key)
+                .ToArray();
 
-            foreach (var key in expiredDeletions)
+            foreach ((ulong GuildId, ulong MessageId) key in expiredDeletions)
                 _deletions.Remove(key);
 
             // Global expiry cleanup also removes expired rows left by retired bot identities.
             await persistence.DeleteExpiredAsync(now: now, ct: ct);
 
             ImmutableArray<(ulong GuildId, ulong MessageId)> pendingRemoval = _deletions
-               .Where(pair => pair.Value.State == DeletionState.AwaitingRemoval)
-               .Select(pair => pair.Key)
-               .ToImmutableArray();
+                .Where(pair => pair.Value.State == DeletionState.AwaitingRemoval)
+                .Select(pair => pair.Key)
+                .ToImmutableArray();
 
-            foreach (var key in pendingRemoval)
+            foreach ((ulong GuildId, ulong MessageId) key in pendingRemoval)
             {
                 await persistence.DeleteAsync(botId: _botId, guildId: key.GuildId, messageId: key.MessageId, ct: ct);
                 _deletions[key] = _deletions[key] with { State = DeletionState.Removed };
@@ -289,6 +288,7 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
             || message.Attachments is not { HasValue: true, Value: var attachments }
             || message.EditedAtUtc is not { IsUndefined: false, ValueOrDefault: var timestamp }
         )
+
             return default;
 
         return new Optional<CachedMessageSnapshot>(
@@ -319,7 +319,7 @@ public sealed class MessageSnapshotCache(IMessageCachePersistence persistence, T
     }
 
     private Optional<CachedMessageSnapshot> Read((ulong GuildId, ulong MessageId) key) =>
-        _messages.TryGetValue(key: key, out var snapshot) && snapshot.ExpiresAtUtc > timeProvider.GetUtcNow()
+        _messages.TryGetValue(key: key, out CachedMessageSnapshot? snapshot) && snapshot.ExpiresAtUtc > timeProvider.GetUtcNow()
             ? new Optional<CachedMessageSnapshot>(snapshot)
             : default;
 

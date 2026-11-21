@@ -22,13 +22,15 @@ public sealed partial class ConfigModule
             IChannel? deleteLogChannel = null,
             [Summary("edit-log-channel", "Channel for edit logs.")] [ChannelTypes(ChannelType.Text, ChannelType.News)]
             IChannel? editLogChannel = null,
-            [Summary("member-log-channel", "Channel for joins, leaves, and server nickname changes.")] [ChannelTypes(ChannelType.Text, ChannelType.News)]
+            [Summary("member-log-channel", "Channel for joins, leaves, and server nickname changes.")]
+            [ChannelTypes(ChannelType.Text, ChannelType.News)]
             IChannel? memberLogChannel = null)
         {
             if (!await ValidateTextContextAsync())
                 return;
 
             await DeferAsync(ephemeral: true);
+
             if (memberLogChannel is not null && (memberLogChannel is not IGuildChannel memberChannel || memberChannel.GuildId != Context.Guild.Id))
             {
                 await ModifyOriginalResponseAsync(response => response.Content = "Select a member log channel in this server.");
@@ -36,11 +38,12 @@ public sealed partial class ConfigModule
                 return;
             }
 
-            await using var dbContext = await contextFactory.CreateDbContextAsync();
+            await using BotDbContext dbContext = await contextFactory.CreateDbContextAsync();
 
-            var configuration = await dbContext.LoggingConfigurations
-               .SingleOrDefaultAsync(configuration =>
-                                         configuration.GuildId == Context.Guild.Id);
+            LoggingConfiguration? configuration = await dbContext.LoggingConfigurations
+                .SingleOrDefaultAsync(configuration =>
+                    configuration.GuildId == Context.Guild.Id);
+
             var isNew = configuration is null;
             configuration ??= new LoggingConfiguration { GuildId = Context.Guild.Id };
             var hasUpdates = enabled is not null || deleteLogChannel is not null || editLogChannel is not null || memberLogChannel is not null;
@@ -52,12 +55,13 @@ public sealed partial class ConfigModule
                 var editLogChannelId = editLogChannel?.Id ?? configuration.EditLogChannelId;
                 var memberLogChannelId = memberLogChannel?.Id ?? configuration.MemberLogChannelId;
 
-                var enablingWithoutDestination = updatedEnabled && deleteLogChannelId is null && editLogChannelId is null && memberLogChannelId is null;
+                var enablingWithoutDestination =
+                    updatedEnabled && deleteLogChannelId is null && editLogChannelId is null && memberLogChannelId is null;
 
                 if (enablingWithoutDestination)
                 {
                     await ModifyOriginalResponseAsync(response =>
-                                                          response.Content = "Enable logging only after setting a delete, edit, or member log channel.");
+                        response.Content = "Enable logging only after setting a delete, edit, or member log channel.");
 
                     return;
                 }
@@ -94,12 +98,12 @@ public sealed partial class ConfigModule
                 return;
 
             await DeferAsync(ephemeral: true);
-            var targetChannel = channel ?? Context.Channel;
-            await using var dbContext = await contextFactory.CreateDbContextAsync();
+            IChannel targetChannel = channel ?? Context.Channel;
+            await using BotDbContext dbContext = await contextFactory.CreateDbContextAsync();
 
             var isExcluded = await dbContext.LoggingExcludedChannels
-               .AnyAsync(excluded =>
-                             excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
+                .AnyAsync(excluded =>
+                    excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
 
             if (isExcluded)
             {
@@ -109,12 +113,8 @@ public sealed partial class ConfigModule
             }
 
             dbContext.LoggingExcludedChannels.Add(
-                new LoggingExcludedChannel
-                {
-                    GuildId = Context.Guild.Id,
-                    ChannelId = targetChannel.Id,
-                    ExcludedAtUtc = DateTimeOffset.UtcNow,
-                });
+                new LoggingExcludedChannel { GuildId = Context.Guild.Id, ChannelId = targetChannel.Id, ExcludedAtUtc = DateTimeOffset.UtcNow });
+
             await dbContext.SaveChangesAsync();
 
             await ModifyOriginalResponseAsync(response => response.Content = $"Logging is now excluded in <#{targetChannel.Id}>.");
@@ -138,12 +138,12 @@ public sealed partial class ConfigModule
                 return;
 
             await DeferAsync(ephemeral: true);
-            var targetChannel = channel ?? Context.Channel;
-            await using var dbContext = await contextFactory.CreateDbContextAsync();
+            IChannel targetChannel = channel ?? Context.Channel;
+            await using BotDbContext dbContext = await contextFactory.CreateDbContextAsync();
 
-            var exclusion = await dbContext.LoggingExcludedChannels
-               .SingleOrDefaultAsync(excluded =>
-                                         excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
+            LoggingExcludedChannel? exclusion = await dbContext.LoggingExcludedChannels
+                .SingleOrDefaultAsync(excluded =>
+                    excluded.GuildId == Context.Guild.Id && excluded.ChannelId == targetChannel.Id);
 
             if (exclusion is null)
             {
@@ -165,14 +165,14 @@ public sealed partial class ConfigModule
                 return;
 
             await DeferAsync(ephemeral: true);
-            await using var dbContext = await contextFactory.CreateDbContextAsync();
+            await using BotDbContext dbContext = await contextFactory.CreateDbContextAsync();
 
             var channelIds = await dbContext.LoggingExcludedChannels
-               .AsNoTracking()
-               .Where(exclusion => exclusion.GuildId == Context.Guild.Id)
-               .OrderBy(exclusion => exclusion.ChannelId)
-               .Select(exclusion => exclusion.ChannelId)
-               .ToArrayAsync();
+                .AsNoTracking()
+                .Where(exclusion => exclusion.GuildId == Context.Guild.Id)
+                .OrderBy(exclusion => exclusion.ChannelId)
+                .Select(exclusion => exclusion.ChannelId)
+                .ToArrayAsync();
 
             if (channelIds.Length == 0)
             {
@@ -202,7 +202,7 @@ public sealed partial class ConfigModule
             await ModifyOriginalResponseAsync(response => response.Content = responses[0]);
 
             IEnumerable<string> followups = responses
-               .Skip(1);
+                .Skip(1);
 
             foreach (var followup in followups)
                 await FollowupAsync(text: followup, ephemeral: true);
@@ -216,10 +216,10 @@ public sealed partial class ConfigModule
             var memberLogChannel = configuration.MemberLogChannelId is null ? "unset" : $"<#{configuration.MemberLogChannelId.Value}>";
 
             return "Logging configuration:\n"
-                + $"- Enabled: {configuration.Enabled}\n"
-                + $"- Delete log channel: {deleteLogChannel}\n"
-                + $"- Edit log channel: {editLogChannel}\n"
-                + $"- Member log channel: {memberLogChannel}";
+                   + $"- Enabled: {configuration.Enabled}\n"
+                   + $"- Delete log channel: {deleteLogChannel}\n"
+                   + $"- Edit log channel: {editLogChannel}\n"
+                   + $"- Member log channel: {memberLogChannel}";
         }
 
         private async Task<bool> ValidateTextContextAsync()
