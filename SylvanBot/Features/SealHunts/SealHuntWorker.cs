@@ -158,6 +158,8 @@ public sealed class SealHuntWorker(
             await db.SealHunts
                 .Where(hunt => hunt.GuildId == (long)guild.Id)
                 .ExecuteUpdateAsync(update => update.SetProperty(hunt => hunt.RoleId, (long)role.Id), ct);
+
+            logger.Information("Created Sealed role {RoleId} in guild {GuildId}", role.Id, guild.Id);
         }
 
         var manageable = guild.CurrentUser.GuildPermissions.ManageRoles && role.Position < guild.CurrentUser.Hierarchy;
@@ -189,6 +191,10 @@ public sealed class SealHuntWorker(
         if (reserved == 0)
             return;
 
+        logger.Debug(
+            "Reserved seal hunt in guild {GuildId}, channel {ChannelId}, started at {StartedAt}",
+            guildId, destination.Id, started);
+
         var photo = _photos[Random.Shared.Next(_photos.Length)];
 
         var message = await destination.SendFileAsync(
@@ -207,6 +213,10 @@ public sealed class SealHuntWorker(
                     .SetProperty(hunt => hunt.NextAt, next)
                     .SetProperty(hunt => hunt.MessageId, (long)message.Id),
                 ct);
+
+        logger.Information(
+            "Posted seal hunt {MessageId} in guild {GuildId}, channel {ChannelId}; next hunt at {NextAt}",
+            message.Id, guildId, destination.Id, next);
     }
 
     private static async Task DeleteAtExpiryAsync(IMessage message, DateTimeOffset deadline, CancellationToken ct)
@@ -234,6 +244,10 @@ public sealed class SealHuntWorker(
         RequestOptions options,
         CancellationToken ct)
     {
+        logger.Debug(
+            "Checking seal hunt recovery in guild {GuildId}, channel {ChannelId}, message {MessageId}, expiry {ExpiresAt}",
+            id, channelId, state.MessageId, state.ExpiresAt);
+
         try
         {
             var channel = await client.Rest.GetChannelAsync((ulong)channelId, options) as IMessageChannel;
@@ -261,6 +275,10 @@ public sealed class SealHuntWorker(
                                 .SetProperty(hunt => hunt.MessageId, (long)message.Id),
                             ct);
 
+                    logger.Information(
+                        "Recovered interrupted seal post {MessageId} in guild {GuildId}, channel {ChannelId}",
+                        message.Id, id, channelId);
+
                     return;
                 }
             }
@@ -271,6 +289,9 @@ public sealed class SealHuntWorker(
         }
 
         await ClearMessageAsync(db, id, ct);
+        logger.Debug(
+            "Cleared expired or missing seal post in guild {GuildId}, channel {ChannelId}, message {MessageId}",
+            id, channelId, state.MessageId);
     }
 
     private async Task<IMessage?> FindInterruptedPostAsync(IMessageChannel channel, DateTimeOffset started, RequestOptions options)
@@ -390,6 +411,8 @@ public sealed class SealHuntWorker(
                 .Where(row => row.GuildId == (long)guildId && row.DestinationId == (long)destinationId)
                 .ExecuteDeleteAsync(ct);
 
+            logger.Information("Removed allowed seal destination {DestinationId} in guild {GuildId}", destinationId, guildId);
+
             return;
         }
 
@@ -403,6 +426,8 @@ public sealed class SealHuntWorker(
         {
             // The destination is already allowed.
         }
+
+        logger.Information("Allowed seal destination {DestinationId} in guild {GuildId}", destinationId, guildId);
     }
 
     internal async Task<string> ChooseAsync(
@@ -428,7 +453,12 @@ public sealed class SealHuntWorker(
                       && (state.MessageId is null || state.MessageId == (long)click.Message.Id);
 
         if (!current || state.RoleId is not long roleId || state.ExpiresAt <= click.CreatedAt)
+        {
+            logger.Debug(
+                "Rejected stale seal interaction from user {UserId} in guild {GuildId} for message {MessageId}",
+                userId, guildId, click.Message.Id);
             return "This seal has gone.";
+        }
 
         IQueryable<SealHunt> appearance = db.SealHunts.Where(hunt => hunt.GuildId == guildId && hunt.StartedAt == state.StartedAt);
         IQueryable<SealHunt> open = appearance.Where(hunt => hunt.ExpiresAt == null || hunt.ExpiresAt > click.CreatedAt);
@@ -470,9 +500,18 @@ public sealed class SealHuntWorker(
         var grant = member.AddRoleAsync((ulong)roleId, new RequestOptions { CancelToken = ct, AuditLogReason = "Claimed the seal" });
 
         if (opened == 1)
+            logger.Debug(
+                "Opened seal claim window in guild {GuildId} for message {MessageId} until {ExpiresAt}",
+                guildId, click.Message.Id, deadline);
+
+        if (opened == 1)
             await Task.WhenAll(grant, DeleteAtExpiryAsync(click.Message, deadline, ct));
         else
             await grant;
+
+        logger.Information(
+            "User {UserId} claimed seal {MessageId} and received role {RoleId} in guild {GuildId}",
+            userId, click.Message.Id, roleId, guildId);
 
         return "You claimed him! You are now Sealed.";
     }
