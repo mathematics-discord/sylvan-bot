@@ -29,7 +29,7 @@ public sealed class TicketApprovalTests
     {
         // Arrange
         var ticket = TicketTests.Create(TicketAction.Timeout, canReview: previouslyApproved);
-        var approvedAt = ticket.ApprovedAtUtc;
+        DateTimeOffset? approvedAt = ticket.ApprovedAtUtc;
         var approvedBy = ticket.ApprovedByUserId;
         var timestamp = ticket.CreatedAtUtc.AddMinutes(1);
 
@@ -47,6 +47,7 @@ public sealed class TicketApprovalTests
         repeatedVersion.ShouldBe(reversalVersion);
         ticket.ApprovedAtUtc.ShouldBe(approvedAt);
         ticket.ApprovedByUserId.ShouldBe(approvedBy);
+
         var reversalCount = ticket.ModificationHistory
             .Count(entry => entry.Action == TicketHistoryAction.StaffReverted);
 

@@ -1005,6 +1005,7 @@ dotnet_diagnostic.ma0076.severity = none
 dotnet_diagnostic.ma0015.severity = none
 
 [*.cs]
+MA0051.maximum_lines_per_method = 100
 dotnet_diagnostic.rcs1001.severity = none
 dotnet_diagnostic.rcs1123.severity = none
 dotnet_diagnostic.rcs1261.severity = error
