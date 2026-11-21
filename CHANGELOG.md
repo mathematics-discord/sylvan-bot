@@ -2,6 +2,17 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.3.0 - 2026-11-21
+## Administration
+### Added
+- Administrators can use `/config logs setup member-log-channel` to choose a separate channel for joins, departures, and server nickname changes. Member logging can be enabled without configuring edit or delete logging.
+## Moderation
+### Added
+- <@&1522665207225127034> and above, including <@&1522665074571870419> and <@&1328097118644338779>, can see member joins, departures, and server nickname changes in the configured staff channel. Entries include the member's account username, user ID, server nickname, and an absolute timestamp. Nickname changes show the old and new values, including when a nickname is set or cleared.
+## Internal
+### Changed
+- Updated EF Core, PostgreSQL integration, hosting, test, and analyzer packages.
+- Aligned C# formatting across the solution and configured Rider and analyzers to omit optional braces, including for single statements that span several lines.
 # v1.2.2 - 2026-11-19
 ## Internal
 ### Added
