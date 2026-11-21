@@ -8,6 +8,7 @@ using SylvanBot.Application.Features.Moderation;
 using SylvanBot.Application.Features.RoleColours;
 using SylvanBot.Application.Features.RolePersistence;
 using SylvanBot.Application.Features.RoleReactions;
+using SylvanBot.Application.Features.SealHunts;
 using SylvanBot.Application.Features.SylvanMail;
 using SylvanBot.Application.Features.Tickets;
 using SylvanBot.Application.Features.WorkingHours;
@@ -66,6 +67,13 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
 
     public DbSet<PendingRole> PendingRoles => Set<PendingRole>();
 
+    public DbSet<SealHunt> SealHunts => Set<SealHunt>();
+
+    public DbSet<SealDestination> SealDestinations => Set<SealDestination>();
+
+    [DbFunction("array_append", IsBuiltIn = true)]
+    public static long[] AppendUserId(long[] userIds, long userId) => throw new NotSupportedException();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         configurationBuilder.Properties<ulong>().HaveConversion<long>();
@@ -74,6 +82,18 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<SealHunt>()
+            .HasKey(hunt => hunt.GuildId)
+            .HasName("seal_hunts_pkey");
+
+        modelBuilder.Entity<SealDestination>()
+            .HasKey(destination => new { destination.GuildId, destination.DestinationId })
+            .HasName("seal_destinations_pkey");
+
+        modelBuilder.Entity<SealHunt>()
+            .Property(hunt => hunt.Abandoned)
+            .HasDefaultValue(Array.Empty<long>());
+
         modelBuilder.HasSequence<long>("ticket_numbers");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BotDbContext).Assembly);
     }

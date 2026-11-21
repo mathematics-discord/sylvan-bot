@@ -476,6 +476,65 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.ToTable("RoleReactions", (string)null);
                 });
 
+            modelBuilder.Entity("SylvanBot.Application.Features.SealHunts.SealDestination", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("guild_id");
+
+                    b.Property<long>("DestinationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("destination_id");
+
+                    b.HasKey("GuildId", "DestinationId")
+                        .HasName("seal_destinations_pkey");
+
+                    b.ToTable("seal_destinations");
+                });
+
+            modelBuilder.Entity("SylvanBot.Application.Features.SealHunts.SealHunt", b =>
+                {
+                    b.Property<long>("GuildId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("guild_id");
+
+                    b.PrimitiveCollection<long[]>("Abandoned")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint[]")
+                        .HasDefaultValue(new long[0])
+                        .HasColumnName("abandoned");
+
+                    b.Property<long?>("ChannelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("channel_id");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<long?>("MessageId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("message_id");
+
+                    b.Property<DateTimeOffset>("NextAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_at");
+
+                    b.Property<long?>("RoleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("role_id");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.HasKey("GuildId")
+                        .HasName("seal_hunts_pkey");
+
+                    b.ToTable("seal_hunts");
+                });
+
             modelBuilder.Entity("SylvanBot.Application.Features.SylvanMail.SylvanMailConversation", b =>
                 {
                     b.Property<Guid>("Id")
