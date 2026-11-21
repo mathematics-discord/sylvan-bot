@@ -1,0 +1,4 @@
+component: Internal
+kind: Changed
+body: Updated EF Core, PostgreSQL integration, hosting, test, and analyzer packages.
+time: 2026-11-21T23:26:57Z
