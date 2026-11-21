@@ -8,6 +8,26 @@ public sealed class LoggingScopeResolver(DiscordSocketClient discordClient, IDbC
 {
     private readonly ILogger _logger = logger.ForContext<LoggingScopeResolver>();
 
+    public async Task<IMessageChannel?> GetMemberLogChannelAsync(ulong guildId, CancellationToken ct)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(ct);
+        var configuration = await db.LoggingConfigurations
+           .AsNoTracking()
+           .SingleOrDefaultAsync(configuration => configuration.GuildId == guildId, cancellationToken: ct);
+
+        if (configuration is not { Enabled: true, MemberLogChannelId: { } channelId })
+            return null;
+
+        var channel = discordClient.GetChannel(channelId);
+
+        if (channel is IMessageChannel messageChannel && channel is IGuildChannel guildChannel && guildChannel.GuildId == guildId)
+            return messageChannel;
+
+        _logger.Warning("Member log channel {ChannelId} is unavailable in guild {GuildId}", channelId, guildId);
+
+        return null;
+    }
+
     public async Task<IMessageChannel?> GetLogChannelAsync(ulong guildId, IChannel sourceChannel, bool forEdits, CancellationToken ct)
     {
         var configuration = await GetConfigurationAsync(guildId: guildId, sourceChannel: sourceChannel, ct: ct);

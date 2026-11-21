@@ -13,11 +13,13 @@ namespace SylvanBot.Infrastructure.Migrations
     [DbContext(typeof(BotDbContext))]
     partial class BotDbContextModelSnapshot : ModelSnapshot
     {
+        public override string LastMigrationId => "20261121015532_AddMemberLogging";
+
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "11.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -286,6 +288,10 @@ namespace SylvanBot.Infrastructure.Migrations
                     b.Property<bool>("Enabled")
                         .HasColumnType("boolean")
                         .HasColumnName("enabled");
+
+                    b.Property<long?>("MemberLogChannelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("member_log_channel_id");
 
                     b.Property<TimeSpan>("LegacyEvidenceRetentionPeriod")
                         .HasColumnType("interval")

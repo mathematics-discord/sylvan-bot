@@ -1,4 +1,5 @@
 ﻿using SylvanBot.Application.Features.MessageCache;
+using SylvanBot.Application.Features.Logging;
 
 namespace SylvanBot.Features.Logging;
 
@@ -20,6 +21,17 @@ public sealed class ModerationLogPublisher(
 
     private readonly ILogger _logger = logger.ForContext<ModerationLogPublisher>();
     private readonly LoggingOptions _options = options.Value;
+
+    public async Task PublishMemberAsync(MemberLogEntry entry, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var logChannel = await scope.GetMemberLogChannelAsync(entry.GuildId, ct);
+
+        if (logChannel is null)
+            return;
+
+        await SendLogAsync(logChannel, [], ct, text: MemberLogFormatter.Format(entry));
+    }
 
     public async Task PublishEditAsync(
         ulong guildId,

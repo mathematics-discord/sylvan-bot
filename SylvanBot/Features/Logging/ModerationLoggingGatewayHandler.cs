@@ -1,4 +1,5 @@
 ﻿using System.Threading.Channels;
+using SylvanBot.Application.Features.Logging;
 using SylvanBot.Application.Features.MessageCache;
 using SylvanBot.Features.MessageCache;
 using SylvanBot.Gateway;
@@ -18,13 +19,8 @@ public sealed class ModerationLoggingGatewayHandler(
 {
     private readonly ILogger _logger = logger.ForContext<ModerationLoggingGatewayHandler>();
 
-    private readonly Channel<CacheWork> _work = Channel.CreateBounded<CacheWork>(
-        new BoundedChannelOptions(128)
-        {
-            SingleReader = true,
-            SingleWriter = false,
-            FullMode = BoundedChannelFullMode.Wait,
-        });
+    private readonly Channel<LoggingWork> _work = Channel.CreateBounded<LoggingWork>(
+        new BoundedChannelOptions(128) { SingleReader = true, SingleWriter = false, FullMode = BoundedChannelFullMode.Wait, });
 
     private CancellationToken _stoppingToken;
     private long _failures;
@@ -33,6 +29,9 @@ public sealed class ModerationLoggingGatewayHandler(
 
     public Task InitializeAsync(CancellationToken ct)
     {
+        discordClient.UserJoined += DispatchMemberJoinedAsync;
+        discordClient.UserLeft += DispatchMemberLeftAsync;
+        discordClient.GuildMemberUpdated += DispatchMemberUpdatedAsync;
         discordClient.MessageReceived += DispatchMessageReceivedAsync;
         discordClient.MessageUpdated += DispatchMessageUpdatedAsync;
         discordClient.MessageDeleted += DispatchMessageDeletedAsync;
@@ -43,6 +42,9 @@ public sealed class ModerationLoggingGatewayHandler(
 
     public void Unsubscribe()
     {
+        discordClient.UserJoined -= DispatchMemberJoinedAsync;
+        discordClient.UserLeft -= DispatchMemberLeftAsync;
+        discordClient.GuildMemberUpdated -= DispatchMemberUpdatedAsync;
         discordClient.MessageReceived -= DispatchMessageReceivedAsync;
         discordClient.MessageUpdated -= DispatchMessageUpdatedAsync;
         discordClient.MessageDeleted -= DispatchMessageDeletedAsync;
@@ -74,18 +76,20 @@ public sealed class ModerationLoggingGatewayHandler(
                     Interlocked.Increment(ref _failures);
 
                     _logger.Warning(
-                        "Message handling timed out for guild {GuildId}, channel {ChannelId}",
-                        propertyValue0: work.GuildId,
-                        propertyValue1: work.ChannelId);
+                        "Logging work {WorkKind} timed out for guild {GuildId}, channel {ChannelId}",
+                        work.GetType().Name,
+                        work.GuildId,
+                        work is MessageWork messageWork ? messageWork.ChannelId : null);
                 }
                 catch (Exception exception)
                 {
                     Interlocked.Increment(ref _failures);
 
                     _logger.Warning(
-                        "Message cache handling failed for guild {GuildId}, channel {ChannelId}, message {MessageId}: {ExceptionType}",
+                        "Logging work {WorkKind} failed for guild {GuildId}, channel {ChannelId}, message {MessageId}: {ExceptionType}",
+                        work.GetType().Name,
                         work.GuildId,
-                        work.ChannelId,
+                        work is MessageWork messageWork ? messageWork.ChannelId : (ulong?)null,
                         work switch
                         {
                             ReceivedWork received => received.Message.MessageId,
@@ -100,6 +104,50 @@ public sealed class ModerationLoggingGatewayHandler(
         {
             // Already persisted observations survive shutdown; pending events are transient and are not replayed.
         }
+    }
+
+    private Task DispatchMemberJoinedAsync(SocketGuildUser member)
+    {
+        var receivedAtUtc = DateTimeOffset.UtcNow;
+
+        var entry = new MemberLogEntry(
+            member.Guild.Id,
+            member.Id,
+            member.Username,
+            new Optional<string>(member.Nickname ?? string.Empty),
+            member.JoinedAt ?? receivedAtUtc,
+            MemberLogEvent.Join);
+
+        return QueueAsync(new MemberWork(entry));
+    }
+
+    private Task DispatchMemberLeftAsync(SocketGuild guild, SocketUser user)
+    {
+        var receivedAtUtc = DateTimeOffset.UtcNow;
+
+        Optional<string> nickname = user is SocketGuildUser member && member.Guild.Id == guild.Id
+            ? new Optional<string>(member.Nickname ?? string.Empty)
+            : default;
+
+        var entry = new MemberLogEntry(guild.Id, user.Id, user.Username, nickname, receivedAtUtc, MemberLogEvent.Leave);
+
+        return QueueAsync(new MemberWork(entry));
+    }
+
+    private Task DispatchMemberUpdatedAsync(Cacheable<SocketGuildUser, ulong> before, SocketGuildUser after)
+    {
+        var receivedAtUtc = DateTimeOffset.UtcNow;
+        Optional<string> previousNickname = before.HasValue ? new Optional<string>(before.Value.Nickname ?? string.Empty) : default;
+
+        Optional<MemberLogEntry> change = MemberLogEntry.NicknameChanged(
+            after.Guild.Id,
+            after.Id,
+            after.Username,
+            previousNickname,
+            after.Nickname ?? string.Empty,
+            receivedAtUtc);
+
+        return change.HasValue ? QueueAsync(new MemberWork(change.Value)) : Task.CompletedTask;
     }
 
     private static bool IsQualifyingUserMessage(IMessage message) =>
@@ -199,7 +247,7 @@ public sealed class ModerationLoggingGatewayHandler(
             new DeletionWork(GuildId: channel.GuildId, ChannelId: channelId, DeletedMessageIds: ids, DeletedAt: DateTimeOffset.UtcNow, Bulk: bulk));
     }
 
-    private async Task QueueAsync(CacheWork work)
+    private async Task QueueAsync(LoggingWork work)
     {
         try
         {
@@ -215,10 +263,20 @@ public sealed class ModerationLoggingGatewayHandler(
         }
     }
 
-    private async Task ProcessAsync(CacheWork work, CancellationToken ct)
+    private async Task ProcessAsync(LoggingWork work, CancellationToken ct)
     {
+        if (work is MemberWork member)
+        {
+            await publisher.PublishMemberAsync(member.Entry, ct);
+
+            return;
+        }
+
+        if (work is not MessageWork message)
+            return;
+
         if (
-            discordClient.GetChannel(work.ChannelId) is not IMessageChannel sourceChannel
+            discordClient.GetChannel(message.ChannelId) is not IMessageChannel sourceChannel
             || sourceChannel is not IGuildChannel guildChannel
             || guildChannel.GuildId != work.GuildId)
             return;
@@ -313,12 +371,16 @@ public sealed class ModerationLoggingGatewayHandler(
             await cache.CompleteDeleteAsync(snapshots: snapshots, ct: ct);
     }
 
-    private abstract record CacheWork(ulong GuildId, ulong ChannelId);
+    private abstract record LoggingWork(ulong GuildId);
 
-    private sealed record ReceivedWork(MessageReceived Message) : CacheWork(GuildId: Message.GuildId, ChannelId: Message.ChannelId);
+    private sealed record MemberWork(MemberLogEntry Entry) : LoggingWork(Entry.GuildId);
 
-    private sealed record EditedWork(MessageEdited Message) : CacheWork(GuildId: Message.GuildId, ChannelId: Message.ChannelId);
+    private abstract record MessageWork(ulong GuildId, ulong ChannelId) : LoggingWork(GuildId);
+
+    private sealed record ReceivedWork(MessageReceived Message) : MessageWork(GuildId: Message.GuildId, ChannelId: Message.ChannelId);
+
+    private sealed record EditedWork(MessageEdited Message) : MessageWork(GuildId: Message.GuildId, ChannelId: Message.ChannelId);
 
     private sealed record DeletionWork(ulong GuildId, ulong ChannelId, ImmutableArray<ulong> DeletedMessageIds, DateTimeOffset DeletedAt, bool Bulk)
-        : CacheWork(GuildId: GuildId, ChannelId: ChannelId);
+        : MessageWork(GuildId: GuildId, ChannelId: ChannelId);
 }

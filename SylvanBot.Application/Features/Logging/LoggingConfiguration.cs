@@ -10,6 +10,8 @@ public sealed class LoggingConfiguration
 
     public ulong? EditLogChannelId { get; set; }
 
+    public ulong? MemberLogChannelId { get; set; }
+
     // Inert compatibility value for evidence_retention_period until schema retirement.
     // Only new rows use this initial value; commands leave stored values unchanged.
     public TimeSpan LegacyEvidenceRetentionPeriod { get; set; } = TimeSpan.FromMinutes(15);

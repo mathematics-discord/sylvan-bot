@@ -1,4 +1,4 @@
-using Discord.Rest;
+﻿using Discord.Rest;
 using Microsoft.EntityFrameworkCore;
 using Serilog.Events;
 using SylvanBot.Application.Features.MessageCache;
@@ -70,7 +70,9 @@ public sealed class DiscordBotHostedService : IHostedService
 
             var configuredGuilds = await db
                .LoggingConfigurations.AsNoTracking()
-               .Where(configuration => configuration.Enabled && guildIds.Contains(configuration.GuildId))
+               .Where(configuration => configuration.Enabled
+                    && (configuration.EditLogChannelId != null || configuration.DeleteLogChannelId != null)
+                    && guildIds.Contains(configuration.GuildId))
                .Select(configuration => configuration.GuildId)
                .ToArrayAsync(cancellationToken);
 

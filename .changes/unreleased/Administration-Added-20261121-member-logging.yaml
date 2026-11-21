@@ -1,0 +1,4 @@
+component: Administration
+kind: Added
+body: Administrators can use `/config logs setup member-log-channel` to choose a separate channel for joins, departures, and server nickname changes. Member logging can be enabled without configuring edit or delete logging.
+time: 2026-11-21T23:26:58Z

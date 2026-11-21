@@ -1,0 +1,4 @@
+component: Moderation
+kind: Added
+body: <@&1522665207225127034> and above can see member joins, departures, and server nickname changes in the configured staff channel. Entries include the member's account username, user ID, server nickname, and an absolute timestamp. Nickname changes show the old and new values, including when a nickname is set or cleared.
+time: 2026-11-21T23:26:59Z

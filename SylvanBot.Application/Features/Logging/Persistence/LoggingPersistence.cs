@@ -18,6 +18,8 @@ public sealed class LoggingPersistence : IEntityTypeConfiguration<LoggingConfigu
 
         builder.Property(configuration => configuration.EditLogChannelId).HasColumnName("edit_log_channel_id");
 
+        builder.Property(configuration => configuration.MemberLogChannelId).HasColumnName("member_log_channel_id");
+
         builder.Property(configuration => configuration.LegacyEvidenceRetentionPeriod).HasColumnName("evidence_retention_period").IsRequired();
     }
 
