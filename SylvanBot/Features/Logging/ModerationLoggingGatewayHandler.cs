@@ -32,6 +32,7 @@ public sealed class ModerationLoggingGatewayHandler(
         discordClient.UserJoined += DispatchMemberJoinedAsync;
         discordClient.UserLeft += DispatchMemberLeftAsync;
         discordClient.GuildMemberUpdated += DispatchMemberUpdatedAsync;
+        discordClient.UserUpdated += DispatchUserUpdatedAsync;
         discordClient.MessageReceived += DispatchMessageReceivedAsync;
         discordClient.MessageUpdated += DispatchMessageUpdatedAsync;
         discordClient.MessageDeleted += DispatchMessageDeletedAsync;
@@ -45,6 +46,7 @@ public sealed class ModerationLoggingGatewayHandler(
         discordClient.UserJoined -= DispatchMemberJoinedAsync;
         discordClient.UserLeft -= DispatchMemberLeftAsync;
         discordClient.GuildMemberUpdated -= DispatchMemberUpdatedAsync;
+        discordClient.UserUpdated -= DispatchUserUpdatedAsync;
         discordClient.MessageReceived -= DispatchMessageReceivedAsync;
         discordClient.MessageUpdated -= DispatchMessageUpdatedAsync;
         discordClient.MessageDeleted -= DispatchMessageDeletedAsync;
@@ -139,15 +141,72 @@ public sealed class ModerationLoggingGatewayHandler(
         DateTimeOffset receivedAtUtc = DateTimeOffset.UtcNow;
         Optional<string> previousNickname = before.HasValue ? new Optional<string>(before.Value.Nickname ?? string.Empty) : default;
 
-        Optional<MemberLogEntry> change = MemberLogEntry.NicknameChanged(
+        Optional<MemberLogEntry> change = MemberLogEntry.NameChanged(
             after.Guild.Id,
             after.Id,
             after.Username,
             previousNickname,
             after.Nickname ?? string.Empty,
-            receivedAtUtc);
+            receivedAtUtc,
+            MemberLogEvent.NicknameChange);
 
         return change.HasValue ? QueueAsync(new MemberWork(change.Value)) : Task.CompletedTask;
+    }
+
+    private Task DispatchUserUpdatedAsync(SocketUser before, SocketUser after)
+    {
+        DateTimeOffset receivedAtUtc = DateTimeOffset.UtcNow;
+        var userId = after.Id;
+        var username = after.Username;
+        var previousUsername = before.Username;
+        var previousDisplayName = before.GlobalName ?? string.Empty;
+        var displayName = after.GlobalName ?? string.Empty;
+
+        var namesUnchanged = string.Equals(previousUsername, username, StringComparison.Ordinal)
+                             && string.Equals(previousDisplayName, displayName, StringComparison.Ordinal);
+
+        if (namesUnchanged)
+            return Task.CompletedTask;
+
+        List<MemberLogEntry> changes = [];
+
+        foreach (SocketGuild guild in discordClient.Guilds)
+        {
+            if (guild.GetUser(userId) is null)
+                continue;
+
+            Optional<MemberLogEntry> displayNameChange = MemberLogEntry.NameChanged(
+                guild.Id,
+                userId,
+                username,
+                new Optional<string>(previousDisplayName),
+                displayName,
+                receivedAtUtc,
+                MemberLogEvent.DisplayNameChange);
+
+            Optional<MemberLogEntry> usernameChange = MemberLogEntry.NameChanged(
+                guild.Id,
+                userId,
+                username,
+                new Optional<string>(previousUsername),
+                username,
+                receivedAtUtc,
+                MemberLogEvent.UsernameChange);
+
+            if (displayNameChange.HasValue)
+                changes.Add(displayNameChange.Value);
+
+            if (usernameChange.HasValue)
+                changes.Add(usernameChange.Value);
+        }
+
+        return QueueMemberChangesAsync(changes);
+    }
+
+    private async Task QueueMemberChangesAsync(List<MemberLogEntry> changes)
+    {
+        foreach (MemberLogEntry change in changes)
+            await QueueAsync(new MemberWork(change));
     }
 
     private static bool IsQualifyingUserMessage(IMessage message) =>

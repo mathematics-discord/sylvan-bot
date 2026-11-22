@@ -5,4 +5,6 @@ public enum MemberLogEvent
     Join,
     Leave,
     NicknameChange,
+    DisplayNameChange,
+    UsernameChange,
 }

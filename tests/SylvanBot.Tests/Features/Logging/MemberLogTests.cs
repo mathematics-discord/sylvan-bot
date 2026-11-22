@@ -15,46 +15,97 @@ public sealed class MemberLogTests
     [TestCase("old", "new", true)]
     [TestCase("old", "", true)]
     [TestCase("Old", "old", true)]
-    public void NicknameChange_RequiresKnownDifferentValues(string? before, string after, bool expected)
+    public void NameChange_RequiresKnownDifferentValues(string? before, string after, bool expected)
     {
         Optional<string> previous = before is null ? default : new Optional<string>(before);
-        Optional<MemberLogEntry> change = MemberLogEntry.NicknameChanged(1, 42, "alex", previous, after, EventTime);
 
-        change.HasValue.ShouldBe(expected);
+        foreach (MemberLogEvent kind in new[] { MemberLogEvent.NicknameChange, MemberLogEvent.DisplayNameChange, MemberLogEvent.UsernameChange })
+        {
+            Optional<MemberLogEntry> change = MemberLogEntry.NameChanged(1, 42, "alex", previous, after, EventTime, kind);
+            change.HasValue.ShouldBe(expected);
 
-        if (!expected)
-            return;
+            if (!expected)
+                continue;
 
-        change.Value.PreviousNickname.Value.ShouldBe(before);
-        change.Value.Nickname.Value.ShouldBe(after);
-        change.Value.OccurredAtUtc.ShouldBe(EventTime);
+            change.Value.PreviousName.Value.ShouldBe(before);
+            change.Value.Name.Value.ShouldBe(after);
+            change.Value.Event.ShouldBe(kind);
+            change.Value.Username.ShouldBe("alex");
+            change.Value.GuildId.ShouldBe(1UL);
+            change.Value.OccurredAtUtc.ShouldBe(EventTime);
+        }
     }
 
-    [TestCase(MemberLogEvent.Join, "", "Member join", "unset")]
-    [TestCase(MemberLogEvent.Leave, null, "Member leave", "unavailable")]
-    [TestCase(MemberLogEvent.Leave, "Alex", "Member leave", "\"Alex\"")]
-    public void Format_PreservesIdentityNicknameAvailabilityAndAbsoluteTime(
+    [TestCase(MemberLogEvent.Join, "Alex", "alex", "**Member Join** [20261121T14:07:00] - <@42> (`42`, `alex`)")]
+    [TestCase(MemberLogEvent.Leave, null, "alex", "**Member Leave** [20261121T14:07:00] - <@42> (`42`, `alex`)")]
+    [TestCase(MemberLogEvent.Leave, "Alex", "alex", "**Member Leave** [20261121T14:07:00] - <@42> (`42`, `alex`)")]
+    public void Format_MembershipEvents_UseCompactIdentityAndUtcTime(
         MemberLogEvent kind,
         string? nickname,
-        string label,
-        string expectedNickname)
+        string username,
+        string expectedLine)
     {
         Optional<string> capturedNickname = nickname is null ? default : new Optional<string>(nickname);
-        MemberLogEntry entry = new MemberLogEntry(1, 42, "alex", capturedNickname, EventTime, kind);
+        MemberLogEntry entry = new MemberLogEntry(1, 42, username, capturedNickname, EventTime, kind);
 
-        MemberLogFormatter
-            .Format(entry)
-            .ShouldBe($"{label} | <@42> | ID=42 | username=\"alex\" | nickname={expectedNickname} | 2026-11-21 14:07:00 UTC");
+        MemberLogFormatter.Format(entry).ShouldBe(expectedLine);
     }
 
     [Test]
     public void Format_ClearedNickname_ShowsOldValueAndUnset()
     {
-        MemberLogEntry entry = MemberLogEntry.NicknameChanged(1, 42, "alex", new Optional<string>("Alex"), string.Empty, EventTime).Value;
+        MemberLogEntry entry = MemberLogEntry.NameChanged(
+                1,
+                42,
+                "alex",
+                new Optional<string>("Alex"),
+                string.Empty,
+                EventTime,
+                MemberLogEvent.NicknameChange)
+            .Value;
 
-        MemberLogFormatter
-            .Format(entry)
-            .ShouldBe("Nickname change | <@42> | ID=42 | username=\"alex\" | nickname=\"Alex\" → unset | 2026-11-21 14:07:00 UTC");
+        MemberLogFormatter.Format(entry)
+            .ShouldBe(
+                "**Nickname Change** [20261121T14:07:00] - <@42> (`42`, `alex`): `Alex` \u2192 unset");
+    }
+
+    [TestCase(MemberLogEvent.NicknameChange, "Nickname Change")]
+    [TestCase(MemberLogEvent.DisplayNameChange, "Display Name Change")]
+    [TestCase(MemberLogEvent.UsernameChange, "Username Change")]
+    public void Format_NameChanges_ShowOldAndNewValues(MemberLogEvent kind, string label)
+    {
+        MemberLogEntry entry = MemberLogEntry.NameChanged(
+                1,
+                42,
+                "new.account",
+                new Optional<string>("Old Name"),
+                "New Name",
+                EventTime,
+                kind)
+            .Value;
+
+        MemberLogFormatter.Format(entry)
+            .ShouldBe(
+                $"**{label}** [20261121T14:07:00] - <@42> (`42`, `new.account`): `Old Name` \u2192 `New Name`");
+    }
+
+    [TestCase("", "New Name", "unset \u2192 `New Name`")]
+    [TestCase("Old Name", "", "`Old Name` \u2192 unset")]
+    public void Format_DisplayNameCanBeSetOrCleared(string before, string after, string expectedChange)
+    {
+        MemberLogEntry entry = MemberLogEntry.NameChanged(
+                1,
+                42,
+                "alex",
+                new Optional<string>(before),
+                after,
+                EventTime,
+                MemberLogEvent.DisplayNameChange)
+            .Value;
+
+        MemberLogFormatter.Format(entry)
+            .ShouldBe(
+                $"**Display Name Change** [20261121T14:07:00] - <@42> (`42`, `alex`): {expectedChange}");
     }
 
     [Test]
@@ -62,7 +113,16 @@ public sealed class MemberLogTests
     {
         const string name = "**x**\r\n\t\u2028\u2029\u202e<@123> @everyone `|\\\"";
 
-        MemberLogEntry entry = new MemberLogEntry(1, 42, name, new Optional<string>(name), EventTime, MemberLogEvent.Join);
+        MemberLogEntry entry = MemberLogEntry.NameChanged(
+                1,
+                42,
+                name,
+                new Optional<string>("before"),
+                name,
+                EventTime,
+                MemberLogEvent.DisplayNameChange)
+            .Value;
+
         var line = MemberLogFormatter.Format(entry);
 
         line.ShouldNotContain('\r');
@@ -72,9 +132,9 @@ public sealed class MemberLogTests
         line.ShouldNotContain('\u202e');
         line.ShouldNotContain("<@123>");
         line.ShouldNotContain("@everyone");
-        line.ShouldContain(@"\*\*x\*\*");
         line.ShouldContain(@"\u000d\u000a\u0009\u2028\u2029\u202e");
-        line.ShouldContain("＜＠123＞ ＠everyone \\`\\|\\\\\\\"");
-        line.ShouldContain("<@42> | ID=42");
+        line.ShouldContain("\uff1c\uff20123\uff1e \uff20everyone \\u0060");
+        line.ShouldContain("<@42> (`42`, ");
+        line.Count(character => character == '`').ShouldBe(8);
     }
 }

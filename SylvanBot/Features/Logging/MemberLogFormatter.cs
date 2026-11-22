@@ -12,57 +12,50 @@ public static class MemberLogFormatter
     {
         var label = entry.Event switch
         {
-            MemberLogEvent.Join => "Member join",
-            MemberLogEvent.Leave => "Member leave",
-            MemberLogEvent.NicknameChange => "Nickname change",
+            MemberLogEvent.Join => "Member Join",
+            MemberLogEvent.Leave => "Member Leave",
+            MemberLogEvent.NicknameChange => "Nickname Change",
+            MemberLogEvent.DisplayNameChange => "Display Name Change",
+            MemberLogEvent.UsernameChange => "Username Change",
             _ => throw new ArgumentOutOfRangeException(nameof(entry)),
         };
 
-        var nickname = entry.Event == MemberLogEvent.NicknameChange
-            ? $"{FormatNickname(entry.PreviousNickname)} → {FormatNickname(entry.Nickname)}"
-            : FormatNickname(entry.Nickname);
-
-        return string.Create(
+        var header = string.Create(
             CultureInfo.InvariantCulture,
-            $"{label} | <@{entry.UserId}> | ID={entry.UserId} | username={Quote(entry.Username)} | nickname={nickname} | {
-                entry.OccurredAtUtc.UtcDateTime:yyyy-MM-dd HH:mm:ss} UTC");
+            $"**{label}** [{entry.OccurredAtUtc.UtcDateTime:yyyyMMdd'T'HH:mm:ss}] - <@{entry.UserId}> (`{entry.UserId}`, {Code(entry.Username)})");
+
+        return entry.Event is MemberLogEvent.Join or MemberLogEvent.Leave
+            ? header
+            : $"{header}: {FormatName(entry.PreviousName)} \u2192 {FormatName(entry.Name)}";
     }
 
-    private static string FormatNickname(Optional<string> nickname) =>
-        !nickname.HasValue ? "unavailable" : nickname.Value.Length == 0 ? "unset" : Quote(nickname.Value);
+    private static string FormatName(Optional<string> name) =>
+        !name.HasValue ? "unavailable" : name.Value.Length == 0 ? "unset" : Code(name.Value);
 
-    private static string Quote(string value)
+    private static string Code(string value)
     {
-        StringBuilder result = new StringBuilder("\"");
+        StringBuilder result = new StringBuilder("`");
 
         foreach (var character in value)
         {
             UnicodeCategory category = char.GetUnicodeCategory(character);
 
-            var unsafeControl = char.IsControl(character)
-                                || category is UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator or UnicodeCategory.Format;
+            var unsafeCharacter = char.IsControl(character)
+                                  || character == '`'
+                                  || category is UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator or UnicodeCategory.Format;
 
-            if (unsafeControl)
-
+            if (unsafeCharacter)
                 result
                     .Append("\\u")
                     .Append(((int)character).ToString("x4", CultureInfo.InvariantCulture));
-
             else if (character is '<' or '>' or '@')
-
-                result.Append(character switch { '<' => '＜', '>' => '＞', _ => '＠' });
-
+                result.Append(character switch { '<' => '\uff1c', '>' => '\uff1e', _ => '\uff20' });
             else
-            {
-                if (character is '\\' or '"' or '*' or '_' or '~' or '`' or '|' or '[' or ']' or '(' or ')' or '#')
-                    result.Append('\\');
-
                 result.Append(character);
-            }
         }
 
         return result
-            .Append('"')
+            .Append('`')
             .ToString();
     }
 }

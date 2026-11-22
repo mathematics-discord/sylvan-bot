@@ -22,7 +22,7 @@ public sealed partial class ConfigModule
             IChannel? deleteLogChannel = null,
             [Summary("edit-log-channel", "Channel for edit logs.")] [ChannelTypes(ChannelType.Text, ChannelType.News)]
             IChannel? editLogChannel = null,
-            [Summary("member-log-channel", "Channel for joins, leaves, and server nickname changes.")]
+            [Summary("member-log-channel", "Channel for joins, leaves, and nickname, display name, or username changes.")]
             [ChannelTypes(ChannelType.Text, ChannelType.News)]
             IChannel? memberLogChannel = null)
         {
