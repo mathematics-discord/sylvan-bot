@@ -71,9 +71,6 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
 
     public DbSet<SealDestination> SealDestinations => Set<SealDestination>();
 
-    [DbFunction("array_append", IsBuiltIn = true)]
-    public static long[] AppendUserId(long[] userIds, long userId) => throw new NotSupportedException();
-
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         configurationBuilder.Properties<ulong>().HaveConversion<long>();
@@ -89,10 +86,6 @@ public sealed class BotDbContext(DbContextOptions<BotDbContext> options) : DbCon
         modelBuilder.Entity<SealDestination>()
             .HasKey(destination => new { destination.GuildId, destination.DestinationId })
             .HasName("seal_destinations_pkey");
-
-        modelBuilder.Entity<SealHunt>()
-            .Property(hunt => hunt.Abandoned)
-            .HasDefaultValue(Array.Empty<long>());
 
         modelBuilder.HasSequence<long>("ticket_numbers");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(BotDbContext).Assembly);

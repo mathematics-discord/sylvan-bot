@@ -5,7 +5,7 @@ namespace SylvanBot.Features.Configuration;
 
 public sealed partial class ConfigModule
 {
-    [Group("seal", "Manage additional seal hunt destinations")]
+    [Group("seal", "Manage the seal hunt allow list")]
     [CommandContextType(InteractionContextType.Guild)]
     [RequireContext(ContextType.Guild)]
     [DefaultMemberPermissions(GuildPermission.Administrator)]
@@ -15,10 +15,10 @@ public sealed partial class ConfigModule
         [SlashCommand("allow", "Allow a channel, category, or thread for seal hunts")]
         public Task AllowAsync(IChannel destination) => SetAsync(destination, allow: true);
 
-        [SlashCommand("remove", "Restore a seal hunt destination's default eligibility")]
+        [SlashCommand("remove", "Remove a destination from the seal hunt allow list")]
         public Task RemoveAsync(IChannel destination) => SetAsync(destination, allow: false);
 
-        [SlashCommand("list", "Show this server's extra seal hunt destinations")]
+        [SlashCommand("list", "Show this server's seal hunt allow list")]
         public async Task ListAsync()
         {
             await DeferAsync(ephemeral: true);
@@ -26,7 +26,7 @@ public sealed partial class ConfigModule
 
             if (allowed.Count == 0)
             {
-                await FollowupAsync("There are no additional seal hunt destinations.", ephemeral: true);
+                await FollowupAsync("No destinations are configured. Use `/config seal allow` to enable seal hunts.", ephemeral: true);
                 return;
             }
 

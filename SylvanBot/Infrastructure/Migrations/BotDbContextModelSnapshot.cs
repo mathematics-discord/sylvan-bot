@@ -13,7 +13,7 @@ namespace SylvanBot.Infrastructure.Migrations
     [DbContext(typeof(BotDbContext))]
     partial class BotDbContextModelSnapshot : ModelSnapshot
     {
-        public override string LastMigrationId => "20261121015532_AddMemberLogging";
+        public override string LastMigrationId => "20261125234351_KeepSealRoleConfiguration";
 
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
@@ -504,36 +504,9 @@ namespace SylvanBot.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("guild_id");
 
-                    b.PrimitiveCollection<long[]>("Abandoned")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint[]")
-                        .HasDefaultValue(new long[0])
-                        .HasColumnName("abandoned");
-
-                    b.Property<long?>("ChannelId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("channel_id");
-
-                    b.Property<DateTimeOffset?>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<long?>("MessageId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("message_id");
-
-                    b.Property<DateTimeOffset>("NextAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("next_at");
-
                     b.Property<long?>("RoleId")
                         .HasColumnType("bigint")
                         .HasColumnName("role_id");
-
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("started_at");
 
                     b.HasKey("GuildId")
                         .HasName("seal_hunts_pkey");

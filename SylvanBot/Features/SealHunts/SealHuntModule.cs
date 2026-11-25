@@ -31,15 +31,6 @@ public sealed class SealHuntModule(SealHuntWorker hunts, IHostApplicationLifetim
         return new ComponentBuilderV2(container).Build();
     }
 
-    internal static bool ContainsClaim(IMessage message, string claimId) =>
-        message.Components
-            .OfType<ContainerComponent>()
-            .SelectMany(container => container.Components)
-            .OfType<ActionRowComponent>()
-            .SelectMany(row => row.Components)
-            .OfType<ButtonComponent>()
-            .Any(button => string.Equals(button.CustomId, claimId, StringComparison.Ordinal));
-
     private async Task RespondToSealAsync(string key, bool claim)
     {
         if (Context.Interaction is not SocketMessageComponent click || Context.User is not SocketGuildUser member)

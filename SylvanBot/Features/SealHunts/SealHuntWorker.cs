@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
 using Discord.Net;
@@ -17,12 +17,144 @@ public sealed class SealHuntWorker(
     ILogger logger) : BackgroundService
 {
     private static readonly string AssetDirectory = Path.Combine(AppContext.BaseDirectory, "Features", "SealHunts", "Assets");
+    private readonly ConcurrentDictionary<ulong, GuildHunt> _guilds = new ConcurrentDictionary<ulong, GuildHunt>();
     private readonly SealPhoto[] _photos = ReadAsset<SealPhoto>("photos.json");
     private readonly string[] _replies = ReadAsset<string>("abandon.json");
 
-    private static T[] ReadAsset<T>(string file) =>
-        JsonSerializer.Deserialize<T[]>(File.ReadAllText(Path.Combine(AssetDirectory, file)))
-        ?? throw new InvalidDataException($"Missing seal hunt data in {file}.");
+    internal static DateTimeOffset NextHuntAt(DateTimeOffset posted, double sample)
+    {
+        DateTimeOffset ideal = posted.ToUniversalTime().AddHours(6);
+        DateTimeOffset firstSlot = new DateTimeOffset(ideal.UtcDateTime.Date, TimeSpan.Zero).AddHours(2);
+
+        var slotIndex = Math.Floor(((ideal - firstSlot).TotalHours + 3) / 6);
+        DateTimeOffset slot = firstSlot.AddHours(6 * slotIndex);
+
+        // calculate where the UTC slot window overlaps the allowed interval since last seal hunt
+        DateTimeOffset earliest = (slot > ideal ? slot : ideal).AddHours(-2);
+        DateTimeOffset latest = (slot < ideal ? slot : ideal).AddHours(2);
+        return earliest.AddTicks((long)((latest - earliest).Ticks * sample));
+    }
+
+    internal static TimeSpan SampleClaimWindow(Random random)
+    {
+        double exponent;
+
+        do
+        {
+            var radius = Math.Sqrt(-2 * Math.Log(1 - random.NextDouble()));
+            var normal = radius * Math.Cos(Math.Tau * random.NextDouble());
+            exponent = 3 + (0.5 * normal);
+        } while (exponent is < 2 or > 4);
+
+        return TimeSpan.FromSeconds(Math.Pow(2, exponent));
+    }
+
+    internal async Task<HashSet<long>> GetDestinationsAsync(ulong guildId, CancellationToken ct)
+    {
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+
+        return await db.SealDestinations
+            .Where(destination => destination.GuildId == (long)guildId)
+            .Select(destination => destination.DestinationId)
+            .ToHashSetAsync(ct);
+    }
+
+    internal async Task SetDestinationAsync(ulong guildId, ulong destinationId, bool allow, CancellationToken ct)
+    {
+        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+
+        if (!allow)
+        {
+            await db.SealDestinations
+                .Where(row => row.GuildId == (long)guildId && row.DestinationId == (long)destinationId)
+                .ExecuteDeleteAsync(ct);
+
+            return;
+        }
+
+        db.SealDestinations.Add(new SealDestination { GuildId = (long)guildId, DestinationId = (long)destinationId });
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // The destination is already allowed.
+        }
+    }
+
+    internal async Task<string> ChooseAsync(
+        SocketMessageComponent click,
+        SocketGuildUser member,
+        string key,
+        bool claim,
+        CancellationToken ct)
+    {
+        if (click.Message.Author.Id != client.CurrentUser.Id || !_guilds.TryGetValue(member.Guild.Id, out GuildHunt? hunt))
+            return "This seal has gone.";
+
+        DateTimeOffset? firstDeadline;
+        await hunt.Gate.WaitAsync(ct);
+
+        try
+        {
+            ActiveSeal? seal = hunt.Active;
+
+            if (seal?.Accepts(key, click.Message.Id, click.CreatedAt) != true)
+                return "This seal has gone.";
+
+            if (!claim)
+            {
+                seal.Abandoned.Add(member.Id);
+                return _replies[Random.Shared.Next(_replies.Length)];
+            }
+
+            if (seal.Claimed.Contains(member.Id) || ((IGuildUser)member).RoleIds.Contains(hunt.RoleId))
+                return "You have already claimed him. You may not do so again.";
+
+            if (seal.Abandoned.Contains(member.Id))
+                return "You abandoned this seal. You must live with the consequences.";
+
+            SocketRole? role = member.Guild.GetRole(hunt.RoleId);
+
+            if (role is not null && RoleReactionPolicy.ValidateRolePermissions(member.Guild, role).HasValue)
+                throw new BotCommandException("Sylvan cannot safely grant the Sealed role.");
+
+            await member.AddRoleAsync(hunt.RoleId, new RequestOptions { CancelToken = ct, AuditLogReason = "Claimed the seal" });
+            firstDeadline = seal.RecordClaim(member.Id, DateTimeOffset.UtcNow);
+        }
+        finally
+        {
+            hunt.Gate.Release();
+        }
+
+        if (firstDeadline is not DateTimeOffset deadline)
+            return "You claimed him! You are now Sealed.";
+
+        TimeSpan remaining = deadline - DateTimeOffset.UtcNow;
+
+        if (remaining > TimeSpan.Zero)
+            await Task.Delay(remaining, ct);
+
+        await hunt.Gate.WaitAsync(ct);
+
+        try
+        {
+            if (string.Equals(hunt.Active?.Key, key, StringComparison.Ordinal))
+                await RemovePostAsync(hunt, ct);
+        }
+        catch (HttpException ex)
+        {
+            logger.Warning(ex, "Could not remove expired seal {MessageId}; will retry", click.Message.Id);
+        }
+        finally
+        {
+            hunt.Gate.Release();
+        }
+
+        return "You claimed him! You are now Sealed.";
+    }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -47,326 +179,33 @@ public sealed class SealHuntWorker(
         }
     }
 
-    private async Task TickAsync(SocketGuild guild, CancellationToken ct)
+    private static T[] ReadAsset<T>(string file) =>
+        JsonSerializer.Deserialize<T[]>(File.ReadAllText(Path.Combine(AssetDirectory, file)))
+        ?? throw new InvalidDataException($"Missing seal hunt data in {file}.");
+
+    private static async Task RemovePostAsync(GuildHunt hunt, CancellationToken ct)
     {
-        var id = (long)guild.Id;
-        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
-        SealHunt state = await LoadScheduleAsync(db, id, ct);
-
-        RequestOptions options = new RequestOptions { CancelToken = ct };
-
-        if (state.ChannelId is long previousChannel)
-        {
-            DateTimeOffset now = DateTimeOffset.UtcNow;
-
-            var needsRecovery = state.MessageId is null
-                ? state.StartedAt <= now.AddMinutes(-1)
-                : state.ExpiresAt is { } deadline
-                    ? deadline <= now.AddSeconds(-3)
-                    : state.NextAt <= now;
-
-            if (needsRecovery)
-                await RecoverPostAsync(db, id, previousChannel, state, options, ct);
-
+        if (hunt.Message is null)
             return;
-        }
-
-        if (state.NextAt > DateTimeOffset.UtcNow)
-            return;
-
-        HashSet<long> allowed = await GetDestinationsAsync(guild.Id, ct);
-
-        IMessageChannel[] candidates = guild.Channels
-            .Where(channel => IsEligible(channel, allowed))
-            .OfType<IMessageChannel>()
-            .ToArray();
-
-        if (candidates.Length == 0)
-            return;
-
-        IMessageChannel destination = candidates[Random.Shared.Next(candidates.Length)];
-        await ResolveRoleAsync(db, guild, state.RoleId, options, ct);
-        await RunHuntAsync(db, guild.Id, destination, options, ct);
-    }
-
-    private static async Task<SealHunt> LoadScheduleAsync(BotDbContext db, long id, CancellationToken ct)
-    {
-        IQueryable<SealHunt> schedules = db.SealHunts
-            .AsNoTracking()
-            .Where(hunt => hunt.GuildId == id);
-
-        SealHunt? state = await schedules.SingleOrDefaultAsync(ct);
-
-        if (state is not null)
-            return state;
-
-        SealHunt created = new SealHunt { GuildId = id, NextAt = DateTimeOffset.UtcNow + SampleInterval() };
-        db.SealHunts.Add(created);
 
         try
         {
-            await db.SaveChangesAsync(ct);
-            return created;
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            db.Entry(created).State = EntityState.Detached;
-            return await schedules.SingleAsync(ct);
-        }
-    }
-
-    private async Task ResolveRoleAsync(
-        BotDbContext db,
-        SocketGuild guild,
-        long? savedRoleId,
-        RequestOptions options,
-        CancellationToken ct)
-    {
-        IRole? role = null;
-
-        if (savedRoleId is long roleId)
-        {
-            role = guild.GetRole((ulong)roleId);
-
-            if (role is null)
-            {
-                RestGuild restGuild = await client.Rest.GetGuildAsync(guild.Id, options);
-
-                try
-                {
-                    role = await restGuild.GetRoleAsync((ulong)roleId, options);
-                }
-                catch (HttpException ex) when (ex.DiscordCode == DiscordErrorCode.UnknownRole)
-                {
-                    // Recreate only after Discord confirms the saved role is gone.
-                }
-            }
-        }
-
-        if (role is null)
-        {
-            Emoji? emoji = guild.Features.HasFeature(GuildFeature.RoleIcons) ? new Emoji("🦭") : null;
-
-            role = await guild.CreateRoleAsync(
-                "Sealed",
-                GuildPermissions.None,
-                color: null,
-                isHoisted: false,
-                isMentionable: false,
-                options: options,
-                emoji: emoji);
-
-            await db.SealHunts
-                .Where(hunt => hunt.GuildId == (long)guild.Id)
-                .ExecuteUpdateAsync(update => update.SetProperty(hunt => hunt.RoleId, (long)role.Id), ct);
-
-            logger.Information("Created Sealed role {RoleId} in guild {GuildId}", role.Id, guild.Id);
-        }
-
-        var manageable = guild.CurrentUser.GuildPermissions.ManageRoles && role.Position < guild.CurrentUser.Hierarchy;
-
-        if (!manageable)
-            throw new InvalidOperationException($"Sylvan cannot grant the Sealed role {role.Id}.");
-    }
-
-    private async Task RunHuntAsync(
-        BotDbContext db,
-        ulong guildId,
-        IMessageChannel destination,
-        RequestOptions options,
-        CancellationToken ct)
-    {
-        var id = (long)guildId;
-        DateTimeOffset started = DateTimeOffset.UtcNow;
-        var key = started.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-        // Keep the destination and button key so a restart during the upload can find the post.
-        var reserved = await db.SealHunts
-            .Where(hunt => hunt.GuildId == id && hunt.ChannelId == null && hunt.NextAt <= started)
-            .ExecuteUpdateAsync(
-                update => update
-                    .SetProperty(hunt => hunt.ChannelId, (long)destination.Id)
-                    .SetProperty(hunt => hunt.StartedAt, started),
-                ct);
-
-        if (reserved == 0)
-            return;
-
-        logger.Debug(
-            "Reserved seal hunt in guild {GuildId}, channel {ChannelId}, started at {StartedAt}",
-            guildId,
-            destination.Id,
-            started);
-
-        SealPhoto photo = _photos[Random.Shared.Next(_photos.Length)];
-
-        IUserMessage message = await destination.SendFileAsync(
-            Path.Combine(AssetDirectory, photo.File),
-            options: options,
-            allowedMentions: AllowedMentions.None,
-            components: SealHuntModule.BuildPost(photo, key),
-            flags: MessageFlags.ComponentsV2);
-
-        DateTimeOffset next = message.Timestamp + SampleInterval();
-
-        await db.SealHunts
-            .Where(hunt => hunt.GuildId == id && hunt.StartedAt == started)
-            .ExecuteUpdateAsync(
-                update => update
-                    .SetProperty(hunt => hunt.NextAt, next)
-                    .SetProperty(hunt => hunt.MessageId, (long)message.Id),
-                ct);
-
-        logger.Information(
-            "Posted seal hunt {MessageId} in guild {GuildId}, channel {ChannelId}; next hunt at {NextAt}",
-            message.Id,
-            guildId,
-            destination.Id,
-            next);
-    }
-
-    private static async Task DeleteAtExpiryAsync(IMessage message, DateTimeOffset deadline, CancellationToken ct)
-    {
-        TimeSpan remaining = deadline - DateTimeOffset.UtcNow;
-
-        if (remaining > TimeSpan.Zero)
-            await Task.Delay(remaining, ct);
-
-        try
-        {
-            await message.DeleteAsync(new RequestOptions { CancelToken = ct });
+            await hunt.Message.DeleteAsync(new RequestOptions { CancelToken = ct });
         }
         catch (HttpException ex) when (ex.HttpCode == HttpStatusCode.NotFound)
         {
-            // The post was already removed.
-        }
-    }
-
-    private async Task RecoverPostAsync(
-        BotDbContext db,
-        long id,
-        long channelId,
-        SealHunt state,
-        RequestOptions options,
-        CancellationToken ct)
-    {
-        logger.Debug(
-            "Checking seal hunt recovery in guild {GuildId}, channel {ChannelId}, message {MessageId}, expiry {ExpiresAt}",
-            id,
-            channelId,
-            state.MessageId,
-            state.ExpiresAt);
-
-        try
-        {
-            IMessageChannel? channel = await client.Rest.GetChannelAsync((ulong)channelId, options) as IMessageChannel;
-
-            if (channel is not null && state.MessageId is long messageId)
-            {
-                if (state.ExpiresAt.HasValue)
-
-                    await channel.DeleteMessageAsync((ulong)messageId, options);
-
-                else if (await channel.GetMessageAsync((ulong)messageId, options: options) is not null)
-
-                    return;
-            }
-            else if (channel is not null && state.StartedAt is DateTimeOffset started)
-            {
-                IMessage? message = await FindInterruptedPostAsync(channel, started, options);
-
-                if (message is not null)
-                {
-                    DateTimeOffset next = message.Timestamp + SampleInterval();
-
-                    await db.SealHunts
-                        .Where(hunt => hunt.GuildId == id && hunt.StartedAt == started)
-                        .ExecuteUpdateAsync(
-                            update => update
-                                .SetProperty(hunt => hunt.NextAt, next)
-                                .SetProperty(hunt => hunt.MessageId, (long)message.Id),
-                            ct);
-
-                    logger.Information(
-                        "Recovered interrupted seal post {MessageId} in guild {GuildId}, channel {ChannelId}",
-                        message.Id,
-                        id,
-                        channelId);
-
-                    return;
-                }
-            }
-        }
-        catch (HttpException ex) when (ex.HttpCode == HttpStatusCode.NotFound)
-        {
-            // The seal or its channel was already deleted.
+            // already deleted
         }
 
-        await ClearMessageAsync(db, id, ct);
-
-        logger.Debug(
-            "Cleared expired or missing seal post in guild {GuildId}, channel {ChannelId}, message {MessageId}",
-            id,
-            channelId,
-            state.MessageId);
+        hunt.Message = null;
+        hunt.Active = null;
     }
-
-    private async Task<IMessage?> FindInterruptedPostAsync(IMessageChannel channel, DateTimeOffset started, RequestOptions options)
-    {
-        var claimId = string.Create(CultureInfo.InvariantCulture, $"seal:claim:{started.ToUnixTimeMilliseconds()}");
-        var cursor = SnowflakeUtils.ToSnowflake(started.AddMinutes(-1));
-
-        while (true)
-        {
-            IEnumerable<IMessage> messages = await channel
-                .GetMessagesAsync(cursor, Direction.After, limit: 100, options: options)
-                .FlattenAsync();
-
-            IMessage[] page = messages
-                .OrderBy(message => message.Id)
-                .ToArray();
-
-            foreach (IMessage message in page)
-
-                if (message.Author.Id == client.CurrentUser.Id && SealHuntModule.ContainsClaim(message, claimId))
-                    return message;
-
-
-            if (page.Length < 100 || page[^1].Timestamp > started.AddMinutes(5))
-                return null;
-
-            cursor = page[^1].Id;
-        }
-    }
-
-    private static Task<int> ClearMessageAsync(BotDbContext db, long guildId, CancellationToken ct) =>
-        db.SealHunts
-            .Where(hunt => hunt.GuildId == guildId)
-            .ExecuteUpdateAsync(
-                update => update
-                    .SetProperty(hunt => hunt.ChannelId, (long?)null)
-                    .SetProperty(hunt => hunt.MessageId, (long?)null)
-                    .SetProperty(hunt => hunt.StartedAt, (DateTimeOffset?)null)
-                    .SetProperty(hunt => hunt.ExpiresAt, (DateTimeOffset?)null)
-                    .SetProperty(hunt => hunt.Abandoned, Array.Empty<long>()),
-                ct);
-
-    private static TimeSpan SampleInterval()
-    {
-        var radius = Math.Sqrt(-2 * Math.Log(1 - Random.Shared.NextDouble()));
-        var standardNormal = radius * Math.Cos(Math.Tau * Random.Shared.NextDouble());
-        return IntervalFromStandardNormal(standardNormal);
-    }
-
-    private static TimeSpan IntervalFromStandardNormal(double standardNormal) =>
-        TimeSpan.FromHours(Math.Clamp(7 + Math.Sqrt(6) * standardNormal, 4, 10));
 
     private static bool IsEligible(SocketGuildChannel channel, HashSet<long> allowed)
     {
         if (channel is not IMessageChannel)
             return false;
 
-        SocketGuild guild = channel.Guild;
         SocketGuildChannel parent = channel;
         SocketThreadChannel? thread = channel as SocketThreadChannel;
 
@@ -377,16 +216,6 @@ public sealed class SealHuntWorker(
 
             parent = thread.ParentChannel;
         }
-
-        ChannelPermissions bot = guild.CurrentUser.GetPermissions(parent);
-
-        if (thread is { IsPrivateThread: true, HasJoined: false } && !bot.ManageThreads)
-            return false;
-
-        var canSend = thread is null ? bot.SendMessages : bot.SendMessagesInThreads;
-
-        if (!bot.ViewChannel || !bot.AttachFiles || !canSend)
-            return false;
 
         var categoryId = (parent as INestedChannel)?.CategoryId;
         var publicChat = thread is null && EveryoneCanChat(channel);
@@ -408,145 +237,146 @@ public sealed class SealHuntWorker(
         return everyone.Permissions.Administrator || (effective & needed) == needed;
     }
 
-    internal async Task<HashSet<long>> GetDestinationsAsync(ulong guildId, CancellationToken ct)
+    private async Task TickAsync(SocketGuild guild, CancellationToken ct)
     {
-        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
-
-        return await db.SealDestinations
-            .Where(destination => destination.GuildId == (long)guildId)
-            .Select(destination => destination.DestinationId)
-            .ToHashSetAsync(ct);
-    }
-
-    internal async Task SetDestinationAsync(ulong guildId, ulong destinationId, bool allow, CancellationToken ct)
-    {
-        await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
-
-        if (!allow)
-        {
-            await db.SealDestinations
-                .Where(row => row.GuildId == (long)guildId && row.DestinationId == (long)destinationId)
-                .ExecuteDeleteAsync(ct);
-
-            logger.Information("Removed allowed seal destination {DestinationId} in guild {GuildId}", destinationId, guildId);
-
-            return;
-        }
-
-        db.SealDestinations.Add(new SealDestination { GuildId = (long)guildId, DestinationId = (long)destinationId });
+        GuildHunt hunt = _guilds.GetOrAdd(guild.Id, static _ => new GuildHunt());
+        await hunt.Gate.WaitAsync(ct);
 
         try
         {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
-        {
-            // The destination is already allowed.
-        }
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            var expired = hunt.Active?.ExpiresAt <= now;
 
-        logger.Information("Allowed seal destination {DestinationId} in guild {GuildId}", destinationId, guildId);
+            if (hunt.NextAt > now && !expired)
+                return;
+
+            await RemovePostAsync(hunt, ct);
+
+            if (hunt.NextAt > now)
+                return;
+
+            HashSet<long> allowed = await GetDestinationsAsync(guild.Id, ct);
+
+            IMessageChannel[] candidates = guild.Channels
+                .Where(channel => IsEligible(channel, allowed))
+                .OfType<IMessageChannel>()
+                .ToArray();
+
+            if (candidates.Length == 0)
+                return;
+
+            RequestOptions options = new RequestOptions { CancelToken = ct };
+            var roleId = await ResolveRoleAsync(guild, options, ct);
+
+            IMessageChannel destination = candidates[Random.Shared.Next(candidates.Length)];
+
+            SealPhoto photo = _photos[Random.Shared.Next(_photos.Length)];
+
+            var key = Guid.NewGuid().ToString("N");
+
+            IUserMessage message = await destination.SendFileAsync(
+                Path.Combine(AssetDirectory, photo.File),
+                options: options,
+                allowedMentions: AllowedMentions.None,
+                components: SealHuntModule.BuildPost(photo, key),
+                flags: MessageFlags.ComponentsV2);
+
+            hunt.Active = new ActiveSeal(key, message.Id);
+            hunt.Message = message;
+            hunt.RoleId = roleId;
+            hunt.NextAt = NextHuntAt(message.Timestamp, Random.Shared.NextDouble());
+            logger.Debug("Next seal hunt in guild {GuildId} at {NextAt}", guild.Id, hunt.NextAt);
+        }
+        finally
+        {
+            hunt.Gate.Release();
+        }
     }
 
-    internal async Task<string> ChooseAsync(
-        SocketMessageComponent click,
-        SocketGuildUser member,
-        string key,
-        bool claim,
-        CancellationToken ct)
+    private async Task<ulong> ResolveRoleAsync(SocketGuild guild, RequestOptions options, CancellationToken ct)
     {
-        if (click.Message.Author.Id != client.CurrentUser.Id)
-            return "This seal has gone.";
-
-        var guildId = (long)member.Guild.Id;
-        var userId = (long)member.Id;
-
         await using BotDbContext db = await contexts.CreateDbContextAsync(ct);
+        SealHunt? settings = await db.SealHunts.FindAsync([(long)guild.Id], ct);
+        IRole? role = null;
 
-        SealHunt state = await LoadScheduleAsync(db, guildId, ct);
-        var currentKey = state.StartedAt?.ToUnixTimeMilliseconds().ToString(CultureInfo.InvariantCulture);
-
-        var current = string.Equals(currentKey, key, StringComparison.Ordinal)
-                      && state.ChannelId == (long)click.Channel.Id
-                      && (state.MessageId is null || state.MessageId == (long)click.Message.Id);
-
-        if (!current || state.RoleId is not long roleId || state.ExpiresAt <= click.CreatedAt)
+        if (settings?.RoleId is long roleId)
         {
-            logger.Debug(
-                "Rejected stale seal interaction from user {UserId} in guild {GuildId} for message {MessageId}",
-                userId,
-                guildId,
-                click.Message.Id);
+            role = guild.GetRole((ulong)roleId);
 
-            return "This seal has gone.";
+            if (role is null)
+            {
+                RestGuild restGuild = await client.Rest.GetGuildAsync(guild.Id, options);
+
+                try
+                {
+                    role = await restGuild.GetRoleAsync((ulong)roleId, options);
+                }
+                catch (HttpException ex) when (ex.DiscordCode == DiscordErrorCode.UnknownRole)
+                {
+                    // Recreate only after Discord confirms the saved role is gone.
+                }
+            }
         }
 
-        IQueryable<SealHunt> appearance = db.SealHunts.Where(hunt => hunt.GuildId == guildId && hunt.StartedAt == state.StartedAt);
-        IQueryable<SealHunt> open = appearance.Where(hunt => hunt.ExpiresAt == null || hunt.ExpiresAt > click.CreatedAt);
+        if (role is not null)
+            return role.Id;
 
-        if (!claim)
+        Emoji? emoji = guild.Features.HasFeature(GuildFeature.RoleIcons) ? new Emoji("🦭") : null;
+
+        role = await guild.CreateRoleAsync(
+            "Sealed",
+            GuildPermissions.None,
+            color: null,
+            isHoisted: false,
+            isMentionable: false,
+            options: options,
+            emoji: emoji);
+
+        if (settings is null)
         {
-            var changed = await open.ExecuteUpdateAsync(
-                update => update.SetProperty(
-                    hunt => hunt.Abandoned,
-                    hunt => hunt.Abandoned.Contains(userId) ? hunt.Abandoned : BotDbContext.AppendUserId(hunt.Abandoned, userId)),
-                ct);
-
-            return changed == 0 ? "This seal has gone." : _replies[Random.Shared.Next(_replies.Length)];
+            settings = new SealHunt { GuildId = (long)guild.Id };
+            db.SealHunts.Add(settings);
         }
 
-        if (((IGuildUser)member).RoleIds.Contains((ulong)roleId))
-            return "You have already claimed him. You may not do so again.";
+        settings.RoleId = (long)role.Id;
+        await db.SaveChangesAsync(ct);
 
-        SocketRole? role = member.Guild.GetRole((ulong)roleId);
+        return role.Id;
+    }
 
-        if (role is not null && RoleReactionPolicy.ValidateRole(member.Guild, role).HasValue)
-            throw new BotCommandException("Sylvan cannot safely grant the Sealed role.");
+    internal sealed class ActiveSeal(string key, ulong messageId)
+    {
+        public string Key { get; } = key;
+        public DateTimeOffset? ExpiresAt { get; private set; }
 
-        TimeSpan lifetime = TimeSpan.FromSeconds(Math.Sqrt(2) + Random.Shared.NextDouble() * (Math.PI - Math.Sqrt(2)));
-        DateTimeOffset deadline = click.CreatedAt + lifetime;
+        public HashSet<ulong> Abandoned { get; } = [];
+        public HashSet<ulong> Claimed { get; } = [];
 
-        var opened = await appearance
-            .Where(hunt => hunt.ExpiresAt == null && !hunt.Abandoned.Contains(userId))
-            .ExecuteUpdateAsync(update => update.SetProperty(hunt => hunt.ExpiresAt, deadline), ct);
+        public bool Accepts(string buttonKey, ulong postId, DateTimeOffset clickedAt) => string.Equals(Key, buttonKey, StringComparison.Ordinal)
+                                                                                         && messageId == postId
+                                                                                         && !(ExpiresAt <= clickedAt);
 
-        if (opened == 0)
+        public DateTimeOffset? RecordClaim(ulong userId, DateTimeOffset now)
         {
-            var eligible = await open.Select(hunt => (bool?)!hunt.Abandoned.Contains(userId)).SingleOrDefaultAsync(ct);
+            Claimed.Add(userId);
 
-            if (eligible != true)
-                return eligible is false ? "You abandoned this seal. You must live with the consequences." : "This seal has gone.";
+            if (ExpiresAt.HasValue)
+                return null;
+
+            ExpiresAt = now + SampleClaimWindow(Random.Shared);
+            return ExpiresAt;
         }
-
-        Task grant = member.AddRoleAsync((ulong)roleId, new RequestOptions { CancelToken = ct, AuditLogReason = "Claimed the seal" });
-
-        if (opened == 1)
-
-            logger.Debug(
-                "Opened seal claim window in guild {GuildId} for message {MessageId} until {ExpiresAt}",
-                guildId,
-                click.Message.Id,
-                deadline);
-
-
-        if (opened == 1)
-
-            await Task.WhenAll(grant, DeleteAtExpiryAsync(click.Message, deadline, ct));
-
-        else
-
-            await grant;
-
-
-        logger.Information(
-            "User {UserId} claimed seal {MessageId} and received role {RoleId} in guild {GuildId}",
-            userId,
-            click.Message.Id,
-            roleId,
-            guildId);
-
-        return "You claimed him! You are now Sealed.";
     }
 
     [UsedImplicitly]
     internal sealed record SealPhoto(string File, string Credit, string Source, string Licence, string LicenceUrl);
+
+    private sealed class GuildHunt
+    {
+        public SemaphoreSlim Gate { get; } = new SemaphoreSlim(1, 1);
+        public DateTimeOffset NextAt { get; set; }
+        public ActiveSeal? Active { get; set; }
+        public IUserMessage? Message { get; set; }
+        public ulong RoleId { get; set; }
+    }
 }
