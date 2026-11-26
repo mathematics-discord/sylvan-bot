@@ -2,6 +2,13 @@
 
 Release notes are curated by hand with [Changie](https://changie.dev/).
 
+# v1.3.2 - 2026-11-25
+
+## General
+
+### Changed
+
+- 🦭
 # v1.3.1 - 2026-11-22
 ## Moderation
 ### Changed
