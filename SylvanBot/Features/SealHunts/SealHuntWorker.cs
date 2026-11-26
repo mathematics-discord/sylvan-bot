@@ -228,6 +228,10 @@ public sealed class SealHuntWorker(
 
     private async Task TickAsync(SocketGuild guild, CancellationToken ct)
     {
+        // The initial member download can delay gateway interactions beyond their acknowledgement deadline.
+        if (!guild.HasAllMembers)
+            return;
+
         GuildHunt hunt = _guilds.GetOrAdd(guild.Id, static _ => new GuildHunt());
         await hunt.Gate.WaitAsync(ct);
 

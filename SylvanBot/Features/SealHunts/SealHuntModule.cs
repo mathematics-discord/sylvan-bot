@@ -36,16 +36,13 @@ public sealed class SealHuntModule(SealHuntWorker hunts, IHostApplicationLifetim
         if (Context.Interaction is not SocketMessageComponent click || Context.User is not SocketGuildUser member)
             throw new BotCommandException("Use a button on the seal post.");
 
-        Task<string> reply = hunts.ChooseAsync(click, member, key, claim, lifetime.ApplicationStopping);
+        await click.DeferLoadingAsync(ephemeral: true);
+        var confirmation = await hunts.ChooseAsync(click, member, key, claim, lifetime.ApplicationStopping);
 
-        if (reply.IsCompletedSuccessfully)
+        await ModifyOriginalResponseAsync(message =>
         {
-            await RespondAsync(await reply, ephemeral: true, allowedMentions: AllowedMentions.None);
-            return;
-        }
-
-        await Task.WhenAll(reply, click.DeferLoadingAsync(ephemeral: true));
-        var confirmation = await reply;
-        await ModifyOriginalResponseAsync(message => message.Content = confirmation);
+            message.Content = confirmation;
+            message.AllowedMentions = AllowedMentions.None;
+        });
     }
 }
