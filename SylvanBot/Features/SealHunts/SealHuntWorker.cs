@@ -218,24 +218,13 @@ public sealed class SealHuntWorker(
         }
 
         var categoryId = (parent as INestedChannel)?.CategoryId;
-        var publicChat = thread is null && EveryoneCanChat(channel);
-        return IncludesDestination(allowed, channel.Id, parent.Id, categoryId, publicChat);
+        return IncludesDestination(allowed, channel.Id, parent.Id, categoryId);
     }
 
-    private static bool IncludesDestination(HashSet<long> allowed, ulong channelId, ulong parentId, ulong? categoryId, bool publicChat) =>
-        publicChat
-        || allowed.Contains((long)channelId)
+    internal static bool IncludesDestination(HashSet<long> allowed, ulong channelId, ulong parentId, ulong? categoryId) =>
+        allowed.Contains((long)channelId)
         || allowed.Contains((long)parentId)
         || categoryId is ulong category && allowed.Contains((long)category);
-
-    private static bool EveryoneCanChat(SocketGuildChannel channel)
-    {
-        SocketRole everyone = channel.Guild.EveryoneRole;
-        OverwritePermissions? overwrite = channel.GetPermissionOverwrite(everyone);
-        var effective = (everyone.Permissions.RawValue & ~(overwrite?.DenyValue ?? 0)) | (overwrite?.AllowValue ?? 0);
-        const ulong needed = (ulong)(ChannelPermission.ViewChannel | ChannelPermission.SendMessages);
-        return everyone.Permissions.Administrator || (effective & needed) == needed;
-    }
 
     private async Task TickAsync(SocketGuild guild, CancellationToken ct)
     {
