@@ -8,7 +8,7 @@ using SylvanBot.Application.Common;
 using SylvanBot.Application.Features.Tickets;
 
 [Group("ticket", "Moderator tickets.")]
-[DefaultMemberPermissions(GuildPermission.UseApplicationCommands)]
+[DefaultMemberPermissions(GuildPermission.ModerateMembers)]
 [RequireContext(ContextType.Guild)]
 public sealed class TicketModule(
     TicketCoordinator coordinator,
