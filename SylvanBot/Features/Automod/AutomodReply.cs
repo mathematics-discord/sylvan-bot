@@ -30,7 +30,6 @@ internal static class AutomodReply
                 first = false;
             }
             else
-
                 await interaction.FollowupAsync(text: content, ephemeral: ephemeral, allowedMentions: AllowedMentions.None);
         }
     }

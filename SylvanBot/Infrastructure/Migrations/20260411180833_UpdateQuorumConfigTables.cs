@@ -20,7 +20,7 @@ namespace SylvanBot.Infrastructure.Migrations
                     GuildId = table.Column<decimal>(type: "numeric(20,0)", nullable: false),
                     ScopeType = table.Column<int>(type: "integer", nullable: false),
                     ScopeId = table.Column<decimal>(type: "numeric(20,0)", nullable: false),
-                    QuorumProportion = table.Column<double>(type: "double precision", precision: 6, scale: 4, nullable: false),
+                    QuorumProportion = table.Column<double>(type: "double precision", nullable: false, precision: 6, scale: 4),
                 },
                 constraints: table =>
                 {
@@ -95,7 +95,7 @@ namespace SylvanBot.Infrastructure.Migrations
                     GuildId = table.Column<decimal>(type: "numeric(20,0)", nullable: false),
                     TargetType = table.Column<int>(type: "integer", nullable: false),
                     TargetId = table.Column<decimal>(type: "numeric(20,0)", nullable: false),
-                    QuorumProportion = table.Column<double>(type: "double precision", precision: 6, scale: 4, nullable: false),
+                    QuorumProportion = table.Column<double>(type: "double precision", nullable: false, precision: 6, scale: 4),
                 },
                 constraints: table =>
                 {

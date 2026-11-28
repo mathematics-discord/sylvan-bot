@@ -27,7 +27,7 @@ public sealed class AddQuorumConfigurationTables : Migration
                 guild_id = table.Column<long>(type: "bigint", nullable: false),
                 channel_id = table.Column<long>(type: "bigint", nullable: false),
                 channel_kind = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
-                proportion = table.Column<decimal>(type: "numeric(9,8)", precision: 9, scale: 8, nullable: false),
+                proportion = table.Column<decimal>(type: "numeric(9,8)", nullable: false, precision: 9, scale: 8),
             },
             constraints: table =>
             {

@@ -290,10 +290,10 @@ public sealed class AnnouncementRuntime(DiscordSocketClient client, IDbContextFa
             .Build();
 
         IUserMessage message = await channel.SendMessageAsync(
-            components: components,
-            flags: MessageFlags.ComponentsV2,
+            options: options,
             allowedMentions: AllowedMentions.None,
-            options: options);
+            components: components,
+            flags: MessageFlags.ComponentsV2);
 
         var previousMessageId = settings.MessageId;
         settings.MessageId = message.Id;

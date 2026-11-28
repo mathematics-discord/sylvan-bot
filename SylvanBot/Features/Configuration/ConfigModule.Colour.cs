@@ -27,7 +27,6 @@ public sealed partial class ConfigModule
             if (Context.Guild is null)
             {
                 await RespondAsync(text: ResponseNoGuild, ephemeral: true);
-
                 return;
             }
 
@@ -36,7 +35,7 @@ public sealed partial class ConfigModule
             if (refusal is not null)
                 throw new BotCommandException(refusal);
 
-            await DeferAsync(true);
+            await DeferAsync(ephemeral: true);
 
             ImmutableArray<RoleColourOption> previous = await operations.ListConfiguredOptionsAsync(
                 guildId: Context.Guild.Id,
@@ -51,8 +50,8 @@ public sealed partial class ConfigModule
 
             var incomplete = await reconciler.ReconcileGuildAsync(
                 guild: Context.Guild,
-                ct: lifetime.ApplicationStopping,
-                new Optional<ImmutableArray<RoleColourOption>>(previous));
+                previousMappings: new Optional<ImmutableArray<RoleColourOption>>(previous),
+                ct: lifetime.ApplicationStopping);
 
             var action = created ? "Registered" : "Updated";
 
@@ -68,11 +67,10 @@ public sealed partial class ConfigModule
             if (Context.Guild is null)
             {
                 await RespondAsync(text: ResponseNoGuild, ephemeral: true);
-
                 return;
             }
 
-            await DeferAsync(true);
+            await DeferAsync(ephemeral: true);
 
             ImmutableArray<RoleColourOption> previous = await operations.ListConfiguredOptionsAsync(
                 guildId: Context.Guild.Id,
@@ -85,8 +83,8 @@ public sealed partial class ConfigModule
 
             var incomplete = await reconciler.ReconcileGuildAsync(
                 guild: Context.Guild,
-                ct: lifetime.ApplicationStopping,
-                new Optional<ImmutableArray<RoleColourOption>>(previous));
+                previousMappings: new Optional<ImmutableArray<RoleColourOption>>(previous),
+                ct: lifetime.ApplicationStopping);
 
             await FollowupAsync($"Deleted colour mapping `{option.OptionId}`.{CheckSummary(incomplete)}", ephemeral: true);
         }
@@ -98,11 +96,10 @@ public sealed partial class ConfigModule
             if (Context.Guild is null)
             {
                 await RespondAsync(text: ResponseNoGuild, ephemeral: true);
-
                 return;
             }
 
-            await DeferAsync(true);
+            await DeferAsync(ephemeral: true);
 
             ImmutableArray<RoleColourOption> mappings = await operations.ListConfiguredOptionsAsync(
                 guildId: Context.Guild.Id,
@@ -111,14 +108,13 @@ public sealed partial class ConfigModule
             if (mappings.IsEmpty)
             {
                 await FollowupAsync("No colour mappings are configured.", ephemeral: true);
-
                 return;
             }
 
             var incomplete = await reconciler.ReconcileGuildAsync(
                 guild: Context.Guild,
-                ct: lifetime.ApplicationStopping,
-                previousMappings: default);
+                previousMappings: default,
+                ct: lifetime.ApplicationStopping);
 
             await FollowupAsync($"Role colour check completed.{CheckSummary(incomplete)}", ephemeral: true);
         }

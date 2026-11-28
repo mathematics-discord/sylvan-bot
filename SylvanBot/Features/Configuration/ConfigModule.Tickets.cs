@@ -8,11 +8,10 @@ public sealed partial class ConfigModule
     public async Task TicketsAsync(
         [Summary("enabled", "Enable or disable ticket capture and Automod.")]
         bool? enabled = null,
-        [Summary("channel", "Staff tickets channel.")] [ChannelTypes(ChannelType.Text)]
+        [Summary("channel", "Staff tickets channel."), ChannelTypes(ChannelType.Text)]
         ITextChannel? channel = null,
-        [Summary("reminder-minutes", "DM reminder interval in minutes (default 1440).")] [MinValue(1)] [MaxValue(35791394)]
-        int? reminderMinutes =
-            null,
+        [Summary("reminder-minutes", "DM reminder interval in minutes (default 1440)."), MinValue(1), MaxValue(35791394)]
+        int? reminderMinutes = null,
         [Summary("tracked-role-add", "Create tickets when this role is granted.")]
         IRole? trackedAdd = null,
         [Summary("tracked-role-remove", "Stop creating new tickets for this role.")]

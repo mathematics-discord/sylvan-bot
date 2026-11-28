@@ -1,9 +1,11 @@
-﻿using SylvanBot.Gateway;
+﻿using System.Diagnostics.CodeAnalysis;
+using SylvanBot.Gateway;
 
 namespace SylvanBot.Features.RoleColours;
 
 using DotNext;
 
+[SuppressMessage("Performance", "CA1859:Use concrete types when possible for improved performance")]
 public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, RoleColourReconciler colours, IHostApplicationLifetime lifetime)
     : IDiscordGatewayHandler
 {
@@ -43,16 +45,16 @@ public sealed class RoleColourGatewayHandler(DiscordSocketClient discordClient, 
         await colours.ReconcileUserRolesAsync(
             guild: after.Guild,
             userId: after.Id,
-            ct: lifetime.ApplicationStopping,
             previousRoleIds: previous,
-            previousMappings: default);
+            previousMappings: default,
+            ct: lifetime.ApplicationStopping);
     }
 
     private Task HandleMemberJoinedAsync(SocketGuildUser member) =>
         colours.ReconcileUserRolesAsync(
             guild: member.Guild,
             userId: member.Id,
-            ct: lifetime.ApplicationStopping,
             previousRoleIds: default,
-            previousMappings: default);
+            previousMappings: default,
+            ct: lifetime.ApplicationStopping);
 }

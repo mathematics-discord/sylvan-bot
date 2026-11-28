@@ -22,15 +22,15 @@ namespace SylvanBot.Infrastructure.Migrations
 
             migrationBuilder.CreateTable(
                 name: "quorum_configurations",
-                schema: "public",
                 columns: table => new
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     channel_id = table.Column<long>(type: "bigint", nullable: false),
                     channel_kind = table.Column<string>(type: "character varying(16)", maxLength: 16, nullable: false),
                     guild_id = table.Column<long>(type: "bigint", nullable: false),
-                    proportion = table.Column<decimal>(type: "numeric(9,8)", precision: 9, scale: 8, nullable: false),
+                    proportion = table.Column<decimal>(type: "numeric(9,8)", nullable: false, precision: 9, scale: 8),
                 },
+                schema: "public",
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_quorum_configurations", x => x.id);
@@ -42,21 +42,21 @@ namespace SylvanBot.Infrastructure.Migrations
 
             migrationBuilder.CreateTable(
                 name: "quorum_voter_roles",
-                schema: "public",
                 columns: table => new
                 {
                     quorum_configuration_id = table.Column<Guid>(type: "uuid", nullable: false),
                     role_id = table.Column<long>(type: "bigint", nullable: false),
                 },
+                schema: "public",
                 constraints: table =>
                 {
                     table.PrimaryKey("pk_quorum_voter_roles", x => new { x.quorum_configuration_id, x.role_id });
                     table.ForeignKey(
                         name: "fk_quorum_voter_roles_quorum_configurations",
                         column: x => x.quorum_configuration_id,
-                        principalSchema: "public",
                         principalTable: "quorum_configurations",
                         principalColumn: "id",
+                        principalSchema: "public",
                         onDelete: ReferentialAction.Cascade
                     );
                 }

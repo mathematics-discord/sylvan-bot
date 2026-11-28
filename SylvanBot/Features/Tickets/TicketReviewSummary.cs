@@ -137,10 +137,10 @@ public sealed class TicketReviewSummary(
         if (summary is null)
 
             summary = await channel.SendMessageAsync(
-                components: components,
-                flags: MessageFlags.ComponentsV2,
+                options: options,
                 allowedMentions: AllowedMentions.None,
-                options: options);
+                components: components,
+                flags: MessageFlags.ComponentsV2);
 
         else if (!string.Equals(SummaryText(summary), text, StringComparison.Ordinal))
 

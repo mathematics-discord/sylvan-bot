@@ -85,8 +85,8 @@ public static class Program
                         new JsonFormatter(),
                         Path.Combine(path1: logDirectory, "cache-.jsonl"),
                         restrictedToMinimumLevel: LogEventLevel.Debug,
-                        rollingInterval: RollingInterval.Day,
                         fileSizeLimitBytes: 10 * 1024 * 1024,
+                        rollingInterval: RollingInterval.Day,
                         rollOnFileSizeLimit: true,
                         retainedFileCountLimit: 14
                     )

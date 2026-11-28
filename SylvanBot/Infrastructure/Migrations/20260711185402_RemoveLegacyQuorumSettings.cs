@@ -24,7 +24,7 @@ namespace SylvanBot.Infrastructure.Migrations
                     GuildId = table.Column<long>(type: "bigint", nullable: false),
                     TargetType = table.Column<int>(type: "integer", nullable: false),
                     TargetId = table.Column<long>(type: "bigint", nullable: false),
-                    Proportion = table.Column<double>(type: "double precision", precision: 6, scale: 4, nullable: false),
+                    Proportion = table.Column<double>(type: "double precision", nullable: false, precision: 6, scale: 4),
                 },
                 constraints: table =>
                 {

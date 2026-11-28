@@ -62,9 +62,9 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
     public async Task<bool> ReconcileUserRolesAsync(
         IGuild guild,
         ulong userId,
-        CancellationToken ct,
         Optional<ImmutableArray<ulong>> previousRoleIds,
-        Optional<ImmutableArray<RoleColourOption>> previousMappings)
+        Optional<ImmutableArray<RoleColourOption>> previousMappings,
+        CancellationToken ct)
     {
         SemaphoreSlim gate = _guildGates.GetOrAdd(key: guild.Id, _ => new SemaphoreSlim(initialCount: 1, maxCount: 1));
         await gate.WaitAsync(ct);
@@ -101,8 +101,8 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
     // Old mappings are a temporary snapshot from the admin command, never persisted.
     public async Task<int> ReconcileGuildAsync(
         IGuild guild,
-        CancellationToken ct,
-        Optional<ImmutableArray<RoleColourOption>> previousMappings)
+        Optional<ImmutableArray<RoleColourOption>> previousMappings,
+        CancellationToken ct)
     {
         try
         {
@@ -126,11 +126,8 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
 
             foreach (IGuildUser member in members)
             {
-                var participates = HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: current)
-                    .Any();
-
-                var participated = HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: old)
-                    .Any();
+                var participates = HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: current).Any();
+                var participated = HeldGrants(guildId: guild.Id, roles: member.RoleIds, mappings: old).Any();
 
                 if (!participates && !participated)
                     continue;
@@ -155,7 +152,6 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
         catch (Exception ex)
         {
             _logger.Error(exception: ex, "Role colour guild check incomplete for guild {GuildId}", propertyValue: guild.Id);
-
             return 1;
         }
     }
@@ -200,10 +196,7 @@ public sealed class RoleColourReconciler(IDbContextFactory<BotDbContext> dbConte
         ulong guildId,
         IReadOnlyCollection<ulong> roles,
         ImmutableArray<RoleColourOption> mappings)
-    {
-        return mappings
-            .Where(o => HoldsSource(guildId: guildId, roles: roles, sourceId: o.SourceRoleId));
-    }
+        => mappings.Where(o => HoldsSource(guildId: guildId, roles: roles, sourceId: o.SourceRoleId));
 
     private static async Task RemoveColoursAsync(IGuildUser member, IEnumerable<ulong> colours, RequestOptions request)
     {

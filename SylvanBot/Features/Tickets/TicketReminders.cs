@@ -188,9 +188,9 @@ public sealed class TicketReminders(
             prompt = await channel.SendMessageAsync(
                 $"**{guild.Name}** · Use **Edit** to review or adjust this ticket.",
                 embed: TicketPresentation.Describe(ticket),
-                components: TicketDmModule.Buttons(ticket),
                 options: backoff.Options(channel.Id, token),
-                allowedMentions: AllowedMentions.None);
+                allowedMentions: AllowedMentions.None,
+                components: TicketDmModule.Buttons(ticket));
         }
         catch (Exception exception) when (exception is RateLimitedException || exception is HttpException { HttpCode: TooManyRequests })
         {

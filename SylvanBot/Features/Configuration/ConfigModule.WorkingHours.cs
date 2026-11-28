@@ -32,11 +32,19 @@ public sealed partial class ConfigModule
 
         [SlashCommand("eligible-role", "Add or remove a role that authorises participation")]
         public Task EligibleRoleAsync(WorkingRoleAction action, IRole role) =>
-            UpdateAsync(action == WorkingRoleAction.Add ? WorkingConditionsChange.AddEligible : WorkingConditionsChange.RemoveEligible, role: role);
+            UpdateAsync(
+                action == WorkingRoleAction.Add
+                    ? WorkingConditionsChange.AddEligible
+                    : WorkingConditionsChange.RemoveEligible,
+                role: role);
 
         [SlashCommand("exempt-role", "Add or remove an eligible role's unscheduled exemption")]
         public Task ExemptRoleAsync(WorkingRoleAction action, IRole role) =>
-            UpdateAsync(action == WorkingRoleAction.Add ? WorkingConditionsChange.AddExempt : WorkingConditionsChange.RemoveExempt, role: role);
+            UpdateAsync(
+                action == WorkingRoleAction.Add
+                    ? WorkingConditionsChange.AddExempt
+                    : WorkingConditionsChange.RemoveExempt,
+                role: role);
 
         [SlashCommand("enable", "Enable scheduling once configuration is complete and valid")]
         public Task EnableAsync() => UpdateAsync(WorkingConditionsChange.Enable);
@@ -51,7 +59,6 @@ public sealed partial class ConfigModule
             if (role is not null && role.Guild.Id != Context.Guild.Id)
             {
                 await WorkingHoursReply.SendAsync(interaction: Context.Interaction, "Choose a role from this guild. No settings changed.");
-
                 return;
             }
 

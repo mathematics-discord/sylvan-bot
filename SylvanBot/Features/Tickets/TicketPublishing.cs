@@ -346,8 +346,8 @@ public sealed class TicketPublisher(
             stream,
             $"{ticket.Number}-comment.txt",
             embed: embed,
-            allowedMentions: AllowedMentions.None,
-            options: options);
+            options: options,
+            allowedMentions: AllowedMentions.None);
     }
 
     private async Task UpdateAsync(IMessageChannel channel, ulong messageId, Ticket ticket, CancellationToken token)
