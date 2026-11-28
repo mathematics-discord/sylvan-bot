@@ -45,7 +45,11 @@ public sealed class SylvanMailPersistence
 
         builder.Property(item => item.SourceMessageId).ValueGeneratedNever();
 
-        builder.Property(item => item.State).HasMaxLength(24);
+        builder
+            .Property(item => item.State)
+            .HasConversion<string>()
+            .HasMaxLength(24)
+            .IsRequired();
 
         builder.Property(item => item.Detail).HasMaxLength(500);
 

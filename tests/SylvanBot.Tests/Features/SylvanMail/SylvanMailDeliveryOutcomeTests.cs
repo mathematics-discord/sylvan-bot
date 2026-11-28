@@ -18,7 +18,7 @@ public sealed class SylvanMailDeliveryOutcomeTests
             refusal: refusal);
 
         // Assert
-        outcome.State.ShouldBe("Uncertain");
+        outcome.State.ShouldBe(SylvanMailDeliveryState.Uncertain);
         outcome.Detail.ShouldContain("2 confirmed parts");
     }
 
@@ -36,7 +36,7 @@ public sealed class SylvanMailDeliveryOutcomeTests
             refusal: refusal);
 
         // Assert
-        outcome.State.ShouldBe("Partial");
+        outcome.State.ShouldBe(SylvanMailDeliveryState.Partial);
         outcome.Detail.ShouldContain("Discord refused this part.");
     }
 
@@ -54,7 +54,7 @@ public sealed class SylvanMailDeliveryOutcomeTests
             refusal: refusal);
 
         // Assert
-        outcome.State.ShouldBe("Uncertain");
+        outcome.State.ShouldBe(SylvanMailDeliveryState.Uncertain);
         outcome.Detail.ShouldContain("before any new post");
     }
 
@@ -72,6 +72,46 @@ public sealed class SylvanMailDeliveryOutcomeTests
             refusal: refusal);
 
         // Assert
-        outcome.State.ShouldBe("Unpublished");
+        outcome.State.ShouldBe(SylvanMailDeliveryState.Unpublished);
+    }
+
+    [Test]
+    public void RecoverInterruptedAttempt_Saved_BecomesUnpublished()
+    {
+        SylvanMailOperation operation = new SylvanMailOperation();
+        operation.State.ShouldBe(SylvanMailDeliveryState.Saved);
+
+        var changed = operation.RecoverInterruptedAttempt();
+
+        changed.ShouldBeTrue();
+        operation.State.ShouldBe(SylvanMailDeliveryState.Unpublished);
+        operation.Detail.ShouldBe("Interrupted before delivery started. No automatic resend.");
+    }
+
+    [Test]
+    public void RecoverInterruptedAttempt_Sending_BecomesUncertain()
+    {
+        SylvanMailOperation operation = new SylvanMailOperation();
+        operation.StartSendingPart(ordinal: 0);
+
+        var changed = operation.RecoverInterruptedAttempt();
+
+        changed.ShouldBeTrue();
+        operation.State.ShouldBe(SylvanMailDeliveryState.Uncertain);
+        operation.Detail.ShouldBe("Interrupted delivery: some content may have arrived. No automatic resend.");
+    }
+
+    [Test]
+    public void RecoverInterruptedAttempt_Delivered_KeepsStateAndDetail()
+    {
+        SylvanMailOperation operation = new SylvanMailOperation();
+        operation.MarkDelivered();
+        var detail = operation.Detail;
+
+        var changed = operation.RecoverInterruptedAttempt();
+
+        changed.ShouldBeFalse();
+        operation.State.ShouldBe(SylvanMailDeliveryState.Delivered);
+        operation.Detail.ShouldBe(detail);
     }
 }

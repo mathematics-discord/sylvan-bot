@@ -75,7 +75,9 @@ public sealed class SylvanMailDraftWorkflow(
                 await drafts.ClearReactionsAsync(threadId: threadId, messageId: messageId, ct: ct);
             }
             else
+            {
                 await ProcessDraftAsync(db: db, message: message, action: action, ct: ct);
+            }
         }
         catch (Exception exception) when (observed is { HasValue: true, Value: var message })
         {
@@ -132,22 +134,25 @@ public sealed class SylvanMailDraftWorkflow(
 
         if (observed is { HasValue: true, Value: var message })
             if (action == Cancel)
+            {
                 await discord.ReportAsync(
                     source: message,
                     new Optional<ulong>(threadId),
                     receiptId: default,
                     "Not cancelled: SylvanMail is temporarily busy. Remove and re-add your cancel reaction to try again.",
                     ct: ct);
+            }
             else
+            {
                 await relay.RefuseBusyAsync(message: message, ct: ct);
+            }
     }
 
     private static Task<SylvanMailConversation?> ActiveConversationAsync(BotDbContext db, ulong threadId, CancellationToken ct) =>
         db.SylvanMailConversations
             .AsNoTracking()
             .Where(item => item.ThreadId == threadId && !item.Retired)
-            .Where(item => db.SylvanMailSettings
-                .Any(settings => settings.GuildId == item.GuildId && settings.ForumId == item.ForumId))
+            .Where(item => db.SylvanMailSettings.Any(settings => settings.GuildId == item.GuildId && settings.ForumId == item.ForumId))
             .SingleOrDefaultAsync(ct);
 
     private async Task ProcessDraftAsync(BotDbContext db, SylvanMailMessage message, SylvanMailDraftAction action, CancellationToken ct)
@@ -158,7 +163,7 @@ public sealed class SylvanMailDraftWorkflow(
         if (recorded)
         {
             if (action is SendAnonymous or SendSigned)
-                await relay.RelayLockedAsync(db: db, message: message, ct: ct);
+                await relay.RelayLockedAsync(db, message, ct);
 
             await drafts.SetDraftReadyAsync(threadId: message.SourceChannelId, messageId: message.SourceMessageId, ready: false, ct: ct);
 
@@ -172,7 +177,7 @@ public sealed class SylvanMailDraftWorkflow(
 
         if (action is SendAnonymous or SendSigned)
         {
-            await relay.RelayLockedAsync(db: db, message: message, ct: ct);
+            await relay.RelayLockedAsync(db, message, ct);
             await drafts.SetDraftReadyAsync(threadId: message.SourceChannelId, messageId: message.SourceMessageId, ready: false, ct: ct);
         }
         else
