@@ -1,0 +1,4 @@
+component: Internal
+kind: Changed
+body: Removed Result wrappers from command refusals in role colours, Working Hours, and image-spam configuration. Emoji import retains its diagnostic codes and categories, and message chunking reports invalid chunk sizes directly.
+time: 2026-11-28T00:31:03.3425463Z

@@ -22,9 +22,9 @@ public sealed partial class ConfigModule
         public async Task ShowAsync()
         {
             await DeferAsync(ephemeral: true);
-            Result<string> message = await configuration.ShowAsync(guildId: Context.Guild.Id, ct: lifetime.ApplicationStopping);
+            var message = await configuration.ShowAsync(guildId: Context.Guild.Id, ct: lifetime.ApplicationStopping);
 
-            await WorkingHoursReply.SendAsync(interaction: Context.Interaction, !message.IsSuccessful ? message.Error!.Message : message.Value);
+            await WorkingHoursReply.SendAsync(interaction: Context.Interaction, message);
         }
 
         [SlashCommand("ping-role", "Set the ping role while scheduling is disabled; the old role is left unchanged")]
@@ -55,13 +55,13 @@ public sealed partial class ConfigModule
                 return;
             }
 
-            Result<string> result = await coordinator.UpdateAsync(
+            var result = await coordinator.UpdateAsync(
                 guildId: Context.Guild.Id,
                 change: change,
                 role is null ? default : new Optional<ulong>(role.Id),
                 ct: lifetime.ApplicationStopping);
 
-            await WorkingHoursReply.SendAsync(interaction: Context.Interaction, !result.IsSuccessful ? result.Error!.Message : result.Value);
+            await WorkingHoursReply.SendAsync(interaction: Context.Interaction, result);
         }
     }
 }

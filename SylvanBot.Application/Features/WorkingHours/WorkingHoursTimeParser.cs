@@ -6,34 +6,25 @@ namespace SylvanBot.Application.Features.WorkingHours;
 
 public static partial class WorkingHoursTimeParser
 {
-    public static Result<WorkingHoursWindow> Parse(string start, string end, string? timezone)
+    public static WorkingHoursWindow Parse(string start, string end, string? timezone)
     {
         (string Time, int? OffsetMinutes)? first = ParseEndpoint(start);
         (string Time, int? OffsetMinutes)? last = ParseEndpoint(end);
 
         if (first is null || last is null)
-
-            return new Result<WorkingHoursWindow>(
-                OperationFailureException.Validation(
-                    description: "Use HH:MM:SS[.fraction], with Z or ±HH:MM for fixed offsets. No dates, whitespace, leap seconds or -00:00."));
+            throw new BotCommandException("Use HH:MM:SS[.fraction], with Z or ±HH:MM for fixed offsets. No dates, whitespace, leap seconds or -00:00.");
 
         if (first.Value.OffsetMinutes != last.Value.OffsetMinutes)
-
-            return new Result<WorkingHoursWindow>(
-                OperationFailureException.Validation(description: "Both endpoints must have numerically equal offsets, or both must omit offsets."));
+            throw new BotCommandException("Both endpoints must have numerically equal offsets, or both must omit offsets.");
 
         if (first.Value.OffsetMinutes.HasValue)
         {
             if (timezone is not null)
-
-                return new Result<WorkingHoursWindow>(
-                    OperationFailureException.Validation(description: "Do not combine fixed offsets with a named timezone."));
+                throw new BotCommandException("Do not combine fixed offsets with a named timezone.");
         }
         else if (timezone is null || DateTimeZoneProviders.Tzdb.GetZoneOrNull(timezone) is null)
 
-            return new Result<WorkingHoursWindow>(
-                OperationFailureException.Validation(
-                    description: "Offset-free times require a supported IANA timezone ID (for example Europe/London)."));
+            throw new BotCommandException("Offset-free times require a supported IANA timezone ID (for example Europe/London).");
 
         return new WorkingHoursWindow(start: first.Value.Time, end: last.Value.Time, offsetMinutes: first.Value.OffsetMinutes, zoneId: timezone);
     }

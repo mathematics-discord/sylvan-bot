@@ -57,9 +57,9 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         {
             await FollowupAsync(
                 "You have too many eligible colours for one menu. Contact a server administrator. You can still reset your colour.",
-                components: BuildMenu(ownerUserId: Context.User.Id, []),
                 ephemeral: true
-            );
+,
+                components: BuildMenu(ownerUserId: Context.User.Id, []));
 
             return;
         }
@@ -68,7 +68,7 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
             ? "You do not currently have any colours to select. Use Reset to remove your display colour."
             : "Select a colour to apply it, or use Reset to remove your display colour.";
 
-        await FollowupAsync(text: prompt, components: BuildMenu(ownerUserId: Context.User.Id, eligible: eligible), ephemeral: true);
+        await FollowupAsync(text: prompt, ephemeral: true, components: BuildMenu(ownerUserId: Context.User.Id, eligible: eligible));
     }
 
     [SlashCommand("list", "List configured role colour options.")]
@@ -114,12 +114,9 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         return components.WithButton("Reset", $"{SwapPrefix}:reset:{ownerUserId}", style: ButtonStyle.Danger).Build();
     }
 
-    private static string ResultMessage(Result<Optional<ulong>> result)
+    private static string ResultMessage(Optional<ulong> result)
     {
-        if (!result.IsSuccessful)
-            return result.Error!.Message;
-
-        if (result.Value is { HasValue: true, Value: var colourId })
+        if (result is { HasValue: true, Value: var colourId })
             return $"You are now wearing <@&{colourId}>.";
 
         return "Your display colour has been removed.";
@@ -130,7 +127,11 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
         StringBuilder builder = new StringBuilder("Configured colour options:");
 
         foreach (RoleColourOption option in options)
-            builder.AppendLine().Append($"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
+            builder
+                .AppendLine()
+                .Append(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"`{option.OptionId}`: <@&{option.SourceRoleId}> -> <@&{option.DisplayRoleId}>");
 
         return builder.ToString();
     }
@@ -139,14 +140,21 @@ public sealed class ColourModule(RoleColourReconciler colours, RoleColourOperati
     {
         await DeferAsync(true);
 
-        Result<Optional<ulong>> result = await colours.TrySetUserColourAsync(
-            guild: Context.Guild,
-            userId: Context.User.Id,
-            colourId: selected,
-            ct: CancellationToken.None
-        );
+        try
+        {
+            Optional<ulong> result = await colours.TrySetUserColourAsync(
+                guild: Context.Guild,
+                userId: Context.User.Id,
+                colourId: selected,
+                ct: CancellationToken.None
+            );
 
-        await FollowupAsync(ResultMessage(result), ephemeral: true);
+            await FollowupAsync(ResultMessage(result), ephemeral: true);
+        }
+        catch (BotCommandException refusal)
+        {
+            await FollowupAsync(refusal.Message, ephemeral: true);
+        }
 
         if (Context.Interaction is SocketMessageComponent component)
             await component.ModifyOriginalResponseAsync(message => message.Components = new ComponentBuilder().Build());

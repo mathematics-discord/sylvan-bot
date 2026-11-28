@@ -18,7 +18,7 @@ public sealed class WorkingHoursModule(WorkingHoursSchedules coordinator, IHostA
     {
         await DeferAsync(ephemeral: true);
 
-        Result<string> result = await coordinator.SetScheduleAsync(
+        var result = await coordinator.SetScheduleAsync(
             guildId: Context.Guild.Id,
             memberId: Context.User.Id,
             username: Context.User.Username,
@@ -28,6 +28,6 @@ public sealed class WorkingHoursModule(WorkingHoursSchedules coordinator, IHostA
             timezone: timezone,
             ct: lifetime.ApplicationStopping);
 
-        await WorkingHoursReply.SendAsync(interaction: Context.Interaction, !result.IsSuccessful ? result.Error!.Message : result.Value);
+        await WorkingHoursReply.SendAsync(interaction: Context.Interaction, result);
     }
 }

@@ -8,14 +8,9 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
     private const int MaximumEmojiBytes = 256 * 1024;
     private readonly ILogger _logger = logger.ForContext<DiscordGuildEmojiImporter>();
 
-    public async Task<Result<GuildEmote>> ImportAsync(IGuild guild, IUser moderator, Emote source, CancellationToken ct)
+    public async Task<GuildEmote> ImportAsync(IGuild guild, IUser moderator, Emote source, CancellationToken ct)
     {
-        Result<string> nameResult = EmojiName.Normalize(source.Name);
-
-        if (!nameResult.IsSuccessful)
-            return new Result<GuildEmote>(nameResult.Error!);
-
-        var destinationName = nameResult.Value;
+        var destinationName = EmojiName.Normalize(source.Name);
 
         _logger.Debug(
             "Importing emoji in guild {GuildId} for moderator {ModeratorUserId} ({ModeratorUsername}) from source {SourceEmojiId} "
@@ -29,42 +24,31 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
             source.Animated
         );
 
-        Result<MemoryStream> downloadResult = await DownloadAsync(source: source, ct: ct).ConfigureAwait(false);
-
-        if (!downloadResult.IsSuccessful)
-        {
-            LogFailure(guild: guild, moderator: moderator, source: source, destinationName: destinationName, downloadResult.Error!);
-
-            return new Result<GuildEmote>(downloadResult.Error!);
-        }
-
-        await using MemoryStream imageStream = downloadResult.Value;
-        using Image image = new Image(imageStream);
-
-        RequestOptions options = new RequestOptions
-        {
-            CancelToken = ct, AuditLogReason = $"Emoji yoink by moderator {moderator.Id}; source emoji {source.Id}",
-        };
-
-        Result<GuildEmote> result;
+        GuildEmote created;
 
         try
         {
-            result = await guild.CreateEmoteAsync(name: destinationName, image: image, options: options).ConfigureAwait(false);
+            await using MemoryStream imageStream = await DownloadAsync(source: source, ct: ct).ConfigureAwait(false);
+            using Image image = new Image(imageStream);
+
+            RequestOptions options = new RequestOptions
+            {
+                CancelToken = ct, AuditLogReason = $"Emoji yoink by moderator {moderator.Id}; source emoji {source.Id}",
+            };
+
+            created = await guild.CreateEmoteAsync(name: destinationName, image: image, options: options).ConfigureAwait(false);
         }
         catch (HttpException exception)
         {
-            result = new Result<GuildEmote>(MapDiscordFailure(exception));
+            EmojiImportException error = MapDiscordFailure(exception);
+            LogFailure(guild, moderator, source, destinationName, error);
+            throw error;
         }
-
-        if (!result.IsSuccessful)
+        catch (EmojiImportException error)
         {
-            LogFailure(guild: guild, moderator: moderator, source: source, destinationName: destinationName, result.Error!);
-
-            return new Result<GuildEmote>(result.Error!);
+            LogFailure(guild, moderator, source, destinationName, error);
+            throw;
         }
-
-        GuildEmote created = result.Value;
 
         _logger.Information(
             "Moderator {ModeratorUsername} ({ModeratorUserId}) added emoji {EmojiName} ({CreatedEmojiId}) to guild {GuildId} "
@@ -81,7 +65,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
         return created;
     }
 
-    private static OperationFailureException MapDiscordFailure(HttpException exception)
+    private static EmojiImportException MapDiscordFailure(HttpException exception)
     {
         int? discordCode = exception.DiscordCode is null ? null : (int)exception.DiscordCode;
 
@@ -97,11 +81,12 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
         return EmojiYoinkErrors.ImportFailed;
     }
 
-    private void LogFailure(IGuild guild, IUser moderator, Emote source, string destinationName, Exception error)
+    private void LogFailure(IGuild guild, IUser moderator, Emote source, string destinationName, EmojiImportException error)
     {
         _logger.Warning(
+            error,
             "Emoji import failed in guild {GuildId} for moderator {ModeratorUserId} ({ModeratorUsername}) from source {SourceEmojiId} "
-            + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}; error code={ErrorCode}; category={ErrorCategory}; description={ErrorDescription}",
+            + "named {SourceEmojiName} as {DestinationEmojiName}; animated={IsAnimated}; error code={ErrorCode}; category={ErrorCategory};",
             guild.Id,
             moderator.Id,
             moderator.Username,
@@ -109,13 +94,12 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
             source.Name,
             destinationName,
             source.Animated,
-            (error as OperationFailureException)?.Code,
-            (error as OperationFailureException)?.Category,
-            error.Message
+            error.Code,
+            error.Category
         );
     }
 
-    private async Task<Result<MemoryStream>> DownloadAsync(Emote source, CancellationToken ct)
+    private async Task<MemoryStream> DownloadAsync(Emote source, CancellationToken ct)
     {
         var animatedQuery = source.Animated ? "?animated=true" : string.Empty;
         Uri cdnUri = new Uri($"https://cdn.discordapp.com/emojis/{source.Id}.webp{animatedQuery}");
@@ -128,13 +112,13 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
                 .ConfigureAwait(false);
 
             if (response.StatusCode == HttpStatusCode.NotFound)
-                return new Result<MemoryStream>(EmojiYoinkErrors.SourceUnavailable);
+                throw EmojiYoinkErrors.SourceUnavailable;
 
             if (!response.IsSuccessStatusCode)
-                return new Result<MemoryStream>(EmojiYoinkErrors.DownloadFailed);
+                throw EmojiYoinkErrors.DownloadFailed;
 
             if (response.Content.Headers.ContentLength > MaximumEmojiBytes)
-                return new Result<MemoryStream>(EmojiYoinkErrors.ImageTooLarge);
+                throw EmojiYoinkErrors.ImageTooLarge;
 
             await using Stream responseStream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
             imageStream = new MemoryStream(MaximumEmojiBytes);
@@ -148,7 +132,7 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
                     break;
 
                 if (imageStream.Length + bytesRead > MaximumEmojiBytes)
-                    return new Result<MemoryStream>(EmojiYoinkErrors.ImageTooLarge);
+                    throw EmojiYoinkErrors.ImageTooLarge;
 
                 await imageStream.WriteAsync(buffer.AsMemory(start: 0, length: bytesRead), cancellationToken: ct).ConfigureAwait(false);
             }
@@ -161,20 +145,23 @@ public sealed class DiscordGuildEmojiImporter(HttpClient httpClient, ILogger log
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            return new Result<MemoryStream>(EmojiYoinkErrors.DownloadFailed);
+            throw EmojiYoinkErrors.DownloadFailed;
         }
         catch (HttpRequestException)
         {
-            return new Result<MemoryStream>(EmojiYoinkErrors.DownloadFailed);
+            throw EmojiYoinkErrors.DownloadFailed;
         }
         catch (IOException)
         {
-            return new Result<MemoryStream>(EmojiYoinkErrors.DownloadFailed);
+            throw EmojiYoinkErrors.DownloadFailed;
         }
         finally
         {
+#pragma warning disable MA0042
+            // do NOT fuckin dispose this async GRRRR
             // ReSharper disable once MethodHasAsyncOverload
             imageStream?.Dispose();
+#pragma warning restore MA0042
         }
     }
 }

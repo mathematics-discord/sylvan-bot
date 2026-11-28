@@ -31,14 +31,10 @@ public sealed partial class ConfigModule
                 return;
             }
 
-            Result<ValueTuple> roleValidation = RoleColourReconciler.ValidateMapping(guild: Context.Guild, sourceId: source.Id, colourId: display.Id);
+            var refusal = RoleColourReconciler.MappingProblem(guild: Context.Guild, sourceId: source.Id, colourId: display.Id);
 
-            if (!roleValidation.IsSuccessful)
-            {
-                await RespondAsync(text: roleValidation.Error!.Message, ephemeral: true);
-
-                return;
-            }
+            if (refusal is not null)
+                throw new BotCommandException(refusal);
 
             await DeferAsync(true);
 
@@ -46,21 +42,12 @@ public sealed partial class ConfigModule
                 guildId: Context.Guild.Id,
                 ct: lifetime.ApplicationStopping);
 
-            Result<(RoleColourOption Option, bool Created)> result = await operations.UpsertMappingAsync(
+            (RoleColourOption option, var created) = await operations.UpsertMappingAsync(
                 guildId: Context.Guild.Id,
                 optionId: id,
                 sourceRoleId: source.Id,
                 displayRoleId: display.Id,
                 ct: lifetime.ApplicationStopping);
-
-            if (!result.IsSuccessful)
-            {
-                await FollowupAsync(text: result.Error!.Message, ephemeral: true);
-
-                return;
-            }
-
-            (RoleColourOption option, var created) = result.Value;
 
             var incomplete = await reconciler.ReconcileGuildAsync(
                 guild: Context.Guild,
@@ -91,24 +78,17 @@ public sealed partial class ConfigModule
                 guildId: Context.Guild.Id,
                 ct: lifetime.ApplicationStopping);
 
-            Result<RoleColourOption> result = await operations.DeleteMappingAsync(
+            RoleColourOption option = await operations.DeleteMappingAsync(
                 guildId: Context.Guild.Id,
                 optionId: id,
                 ct: lifetime.ApplicationStopping);
-
-            if (!result.IsSuccessful)
-            {
-                await FollowupAsync(text: result.Error!.Message, ephemeral: true);
-
-                return;
-            }
 
             var incomplete = await reconciler.ReconcileGuildAsync(
                 guild: Context.Guild,
                 ct: lifetime.ApplicationStopping,
                 new Optional<ImmutableArray<RoleColourOption>>(previous));
 
-            await FollowupAsync($"Deleted colour mapping `{result.Value.OptionId}`.{CheckSummary(incomplete)}", ephemeral: true);
+            await FollowupAsync($"Deleted colour mapping `{option.OptionId}`.{CheckSummary(incomplete)}", ephemeral: true);
         }
 
         [SlashCommand("sync", "Reconcile display colour roles for all members who currently have a source colour role.")]

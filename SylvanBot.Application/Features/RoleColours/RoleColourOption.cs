@@ -19,15 +19,13 @@ public sealed class RoleColourOption
 
     public DateTimeOffset UpdatedAtUtc { get; private set; }
 
-    public static Result<RoleColourOption> Create(ulong guildId, ulong sourceRoleId, ulong displayRoleId)
+    public static RoleColourOption Create(ulong guildId, ulong sourceRoleId, ulong displayRoleId)
     {
         if (guildId == 0)
-            return new Result<RoleColourOption>(OperationFailureException.Validation("RoleColourOption.GuildRequired", "Guild is required."));
+            throw new BotCommandException("Guild is required.");
 
         if (sourceRoleId == displayRoleId)
-
-            return new Result<RoleColourOption>(
-                OperationFailureException.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different."));
+            throw new BotCommandException("Source and display role IDs must be different.");
 
         DateTimeOffset now = DateTimeOffset.UtcNow;
 
@@ -41,17 +39,13 @@ public sealed class RoleColourOption
         };
     }
 
-    public Result<ValueTuple> Update(ulong sourceRoleId, ulong displayRoleId)
+    public void Update(ulong sourceRoleId, ulong displayRoleId)
     {
         if (sourceRoleId == displayRoleId)
-
-            return new Result<ValueTuple>(
-                OperationFailureException.Validation("RoleColourOption.RolesMustDiffer", "Source and display role IDs must be different."));
+            throw new BotCommandException("Source and display role IDs must be different.");
 
         SourceRoleId = sourceRoleId;
         DisplayRoleId = displayRoleId;
         UpdatedAtUtc = DateTimeOffset.UtcNow;
-
-        return new Result<ValueTuple>(default(ValueTuple));
     }
 }

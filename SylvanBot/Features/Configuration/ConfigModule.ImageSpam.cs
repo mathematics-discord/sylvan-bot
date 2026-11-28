@@ -23,17 +23,10 @@ public sealed partial class ConfigModule
             return;
         }
 
-        Result<ValueTuple> validationResult = Validate(
+        Validate(
             numberOfChannels: numberOfChannels,
             attachmentCount: attachmentCount,
             burstDuration: burstDuration);
-
-        if (!validationResult.IsSuccessful)
-        {
-            await RespondAsync(text: validationResult.Error!.Message, ephemeral: true);
-
-            return;
-        }
 
         await DeferAsync(ephemeral: true);
         var showCurrent = numberOfChannels is null && attachmentCount is null && burstDuration is null;
@@ -71,17 +64,15 @@ public sealed partial class ConfigModule
         + $"{settings.RequiredAttachmentCount} attachment(s) per message, "
         + $"{settings.Window}s burst duration.";
 
-    private static Result<ValueTuple> Validate(int? numberOfChannels, int? attachmentCount, int? burstDuration)
+    private static void Validate(int? numberOfChannels, int? attachmentCount, int? burstDuration)
     {
         if (numberOfChannels is <= 0)
-            return new Result<ValueTuple>(OperationFailureException.Validation(description: "Number of channels must be greater than zero."));
+            throw new BotCommandException("Number of channels must be greater than zero.");
 
         if (attachmentCount is <= 0)
-            return new Result<ValueTuple>(OperationFailureException.Validation(description: "Attachment count must be greater than zero."));
+            throw new BotCommandException("Attachment count must be greater than zero.");
 
         if (burstDuration is <= 0)
-            return new Result<ValueTuple>(OperationFailureException.Validation(description: "Burst duration must be greater than zero seconds."));
-
-        return new Result<ValueTuple>(default(ValueTuple));
+            throw new BotCommandException("Burst duration must be greater than zero seconds.");
     }
 }

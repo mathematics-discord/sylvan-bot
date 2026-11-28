@@ -8,15 +8,14 @@ public sealed class RoleColourOptionTests
     public void Update_EqualSourceAndDisplay_ReturnsFailureWithoutChangingMapping()
     {
         // Arrange
-        RoleColourOption option = RoleColourOption.Create(1, 10, 20).Value;
+        RoleColourOption option = RoleColourOption.Create(1, 10, 20);
         DateTimeOffset updatedAt = option.UpdatedAtUtc;
 
         // Act
-        Result<ValueTuple> result = option.Update(30, 30);
+        BotCommandException refusal = Should.Throw<BotCommandException>(() => option.Update(30, 30));
 
         // Assert
-        result.IsSuccessful.ShouldBeFalse();
-        result.Error.ShouldBeOfType<OperationFailureException>().Category.ShouldBe(OperationFailureCategory.Validation);
+        refusal.Message.ShouldBe("Source and display role IDs must be different.");
         option.SourceRoleId.ShouldBe(10UL);
         option.DisplayRoleId.ShouldBe(20UL);
         option.UpdatedAtUtc.ShouldBe(updatedAt);

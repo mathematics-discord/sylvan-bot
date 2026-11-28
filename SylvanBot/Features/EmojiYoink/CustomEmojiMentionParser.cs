@@ -9,24 +9,24 @@ public static partial class CustomEmojiMentionParser
     [GeneratedRegex(@"<a?:[^<>\s:]+:[0-9]+>", options: Compiled, matchTimeoutMilliseconds: 500)]
     private static partial Regex MentionPattern { get; }
 
-    public static Result<Emote> ParseStrict(string input)
+    public static Emote ParseStrict(string input)
     {
         var candidate = input.Trim();
 
         return ParseMention(candidate: candidate, error: EmojiYoinkErrors.InvalidCustomEmoji);
     }
 
-    public static Result<Emote> ParseMessage(string content)
+    public static Emote ParseMessage(string content)
     {
         MatchCollection matches = MentionPattern.Matches(content);
 
         if (matches.Count != 1)
-            return new Result<Emote>(EmojiYoinkErrors.InvalidMessageEmoji);
+            throw EmojiYoinkErrors.InvalidMessageEmoji;
 
         return ParseMention(candidate: matches[0].Value, error: EmojiYoinkErrors.InvalidMessageEmoji);
     }
 
-    private static Result<Emote> ParseMention(string candidate, OperationFailureException error)
+    private static Emote ParseMention(string candidate, EmojiImportException error)
     {
         if (
             !Emote.TryParse(text: candidate, out Emote emote)
@@ -34,7 +34,7 @@ public static partial class CustomEmojiMentionParser
             || !string.Equals(a: candidate, emote.ToString(), comparisonType: StringComparison.Ordinal)
         )
 
-            return new Result<Emote>(error);
+            throw error;
 
 
         return emote;

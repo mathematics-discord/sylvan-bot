@@ -82,10 +82,7 @@ public sealed class WorkingHoursWindowTests
     public void Parse_CompleteModes_Accepts(string start, string end, string? zone)
     {
         // Act
-        Result<WorkingHoursWindow> parsed = WorkingHoursTimeParser.Parse(start: start, end: end, timezone: zone);
-
-        // Assert
-        parsed.IsSuccessful.ShouldBeTrue();
+        Should.NotThrow(() => WorkingHoursTimeParser.Parse(start: start, end: end, timezone: zone));
     }
 
     [TestCase("09:00", "17:00:00Z", arg3: null)]
@@ -114,10 +111,7 @@ public sealed class WorkingHoursWindowTests
     public void Parse_InvalidOriginalInput_Rejects(string start, string end, string? zone)
     {
         // Act
-        Result<WorkingHoursWindow> parsed = WorkingHoursTimeParser.Parse(start: start, end: end, timezone: zone);
-
-        // Assert
-        parsed.IsSuccessful.ShouldBeFalse();
+        Should.Throw<BotCommandException>(() => WorkingHoursTimeParser.Parse(start: start, end: end, timezone: zone));
     }
 
     [Test]
@@ -155,7 +149,7 @@ public sealed class WorkingHoursWindowTests
     public void IsActive_LondonTransitions_ResolvesPairedOccurrences(string start, string end, string now, bool expected)
     {
         // Arrange
-        WorkingHoursWindow window = WorkingHoursTimeParser.Parse(start: start, end: end, "Europe/London").Value;
+        WorkingHoursWindow window = WorkingHoursTimeParser.Parse(start: start, end: end, "Europe/London");
 
         // Assert
         window.IsActive(Utc(now)).ShouldBe(expected);
@@ -176,7 +170,7 @@ public sealed class WorkingHoursWindowTests
         active.ShouldBe(expected);
     }
 
-    public static WorkingHoursWindow Window(string start, string end) => WorkingHoursTimeParser.Parse(start: start, end: end, timezone: null).Value;
+    public static WorkingHoursWindow Window(string start, string end) => WorkingHoursTimeParser.Parse(start: start, end: end, timezone: null);
 
     private static DateTimeOffset Utc(string text) => DateTimeOffset.Parse(input: text, formatProvider: CultureInfo.InvariantCulture);
 }

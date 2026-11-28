@@ -12,7 +12,7 @@ internal static class AutomodReply
     {
         // Keep user content literal, encoding backticks so they cannot close a code block.
         var safeText = text.Replace("`", "\\u0060", StringComparison.Ordinal);
-        var chunks = MessageChunker.SplitMessageIntoChunks(safeText, chunkSize: 1980).Value;
+        var chunks = MessageChunker.SplitMessageIntoChunks(safeText, chunkSize: 1980);
         var first = true;
 
         foreach (var chunk in chunks)

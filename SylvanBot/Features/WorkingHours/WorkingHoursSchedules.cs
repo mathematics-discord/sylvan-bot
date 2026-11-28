@@ -14,7 +14,7 @@ public sealed class WorkingHoursSchedules(
     WorkingHoursReconciler reconciler
 )
 {
-    public async Task<Result<string>> SetScheduleAsync(
+    public async Task<string> SetScheduleAsync(
         ulong guildId,
         ulong memberId,
         string username,
@@ -33,50 +33,30 @@ public sealed class WorkingHoursSchedules(
             WorkingHoursSettings? settings = await LoadSettingsAsync(db: db, guildId: guildId, ct: ct);
 
             if (settings is not { Enabled: true })
+                throw new BotCommandException("Working Hours scheduling is disabled for this guild. No preference or role was changed.");
 
-                return new Result<string>(
-                    OperationFailureException.Validation(
-                        description: "Working Hours scheduling is disabled for this guild. No preference or role was changed."));
-
-
-            Result<Optional<WorkingHoursWindow>> validation = ValidateSubmission(
+            Optional<WorkingHoursWindow> window = ValidateSubmission(
                 username: username,
                 enable: enable,
                 start: start,
                 end: end,
                 timezone: timezone);
 
-            if (!validation.IsSuccessful)
-                return new Result<string>(validation.Error!);
-
-            Optional<WorkingHoursWindow> window = validation.Value;
             SocketGuild guild = client.GetGuild(guildId);
 
             if (!rules.IsReady(guild))
-
-                return new Result<string>(
-                    OperationFailureException.Failure(description: "Current guild/member data is unavailable. No preference was changed."));
-
+                throw new BotCommandException("Current guild/member data is unavailable. No preference was changed.");
 
             if (!settings.IsComplete)
-
-                return new Result<string>(
-                    OperationFailureException.Validation(description: "Working Hours configuration is incomplete. No preference was changed."));
-
+                throw new BotCommandException("Working Hours configuration is incomplete. No preference was changed.");
 
             SocketGuildUser? member = guild.GetUser(memberId);
 
             if (member is null)
-
-                return new Result<string>(
-                    OperationFailureException.Failure(description: "Current member data is unavailable. No preference was changed."));
-
+                throw new BotCommandException("Current member data is unavailable. No preference was changed.");
 
             if (!WorkingHoursGuildRules.IsEligible(settings: settings, member: member))
-
-                return new Result<string>(
-                    OperationFailureException.Unauthorized(description: "Only members with a configured eligible staff role may set working hours."));
-
+                throw new BotCommandException("Only members with a configured eligible staff role may set working hours.");
 
             await SaveScheduleAsync(db: db, state: state, guildId: guildId, memberId: memberId, window: window, ct: ct);
 
@@ -99,7 +79,7 @@ public sealed class WorkingHoursSchedules(
         }
     }
 
-    private static Result<Optional<WorkingHoursWindow>> ValidateSubmission(
+    private static Optional<WorkingHoursWindow> ValidateSubmission(
         string username,
         bool enable,
         string? start,
@@ -111,27 +91,18 @@ public sealed class WorkingHoursSchedules(
         if (enable)
         {
             if (start is null || end is null)
+                throw new BotCommandException("Enabling requires both start and end on every submission.");
 
-                return new Result<Optional<WorkingHoursWindow>>(
-                    OperationFailureException.Validation(description: "Enabling requires both start and end on every submission."));
+            WorkingHoursWindow parsed = WorkingHoursTimeParser.Parse(start: start, end: end, timezone: timezone);
 
-
-            Result<WorkingHoursWindow> parsed = WorkingHoursTimeParser.Parse(start: start, end: end, timezone: timezone);
-
-            if (!parsed.IsSuccessful)
-                return new Result<Optional<WorkingHoursWindow>>(parsed.Error!);
-
-            window = new Optional<WorkingHoursWindow>(parsed.Value);
-            var rejection = WorkingHoursResponses.Rejection(window: parsed.Value, username: username);
+            window = new Optional<WorkingHoursWindow>(parsed);
+            var rejection = WorkingHoursResponses.Rejection(window: parsed, username: username);
 
             if (rejection is not null)
-                return new Result<Optional<WorkingHoursWindow>>(OperationFailureException.Validation(description: rejection));
+                throw new BotCommandException(rejection);
         }
         else if (start is not null || end is not null || timezone is not null)
-
-            return new Result<Optional<WorkingHoursWindow>>(
-                OperationFailureException.Validation(description: "Disabling accepts no start, end or timezone options."));
-
+            throw new BotCommandException("Disabling accepts no start, end or timezone options.");
 
         return window;
     }
@@ -165,16 +136,15 @@ public sealed class WorkingHoursSchedules(
                 preference.EnableSchedule(schedule);
             }
             else
-
+            {
                 preference?.DisableSchedule();
-
+            }
 
             await db.SaveChangesAsync(ct);
         }
         catch when (priorLoss)
         {
             state.RestoreLosses([memberId]);
-
             throw;
         }
     }

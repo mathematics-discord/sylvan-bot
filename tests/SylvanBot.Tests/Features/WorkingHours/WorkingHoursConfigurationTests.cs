@@ -28,17 +28,17 @@ public sealed class WorkingHoursConfigurationTests
     {
         // Arrange
         WorkingHoursSettings settings = new WorkingHoursSettings { GuildId = 123 };
-        settings.SetPingRole(10).IsSuccessful.ShouldBeTrue();
-        settings.ChangeEligibleRole(roleId: 20, add: true).IsSuccessful.ShouldBeTrue();
-        settings.ChangeExemptRole(roleId: 20, add: true).IsSuccessful.ShouldBeTrue();
+        settings.SetPingRole(10);
+        settings.ChangeEligibleRole(roleId: 20, add: true);
+        settings.ChangeExemptRole(roleId: 20, add: true);
 
         // Act
-        settings.SetPingRole(20).IsSuccessful.ShouldBeFalse();
-        settings.SetPingRole(123).IsSuccessful.ShouldBeFalse();
-        settings.ChangeEligibleRole(roleId: 10, add: true).IsSuccessful.ShouldBeFalse();
-        settings.ChangeEligibleRole(roleId: 123, add: true).IsSuccessful.ShouldBeFalse();
-        settings.ChangeEligibleRole(roleId: 20, add: false).IsSuccessful.ShouldBeFalse();
-        settings.ChangeExemptRole(roleId: 30, add: true).IsSuccessful.ShouldBeFalse();
+        Should.Throw<BotCommandException>(() => settings.SetPingRole(20));
+        Should.Throw<BotCommandException>(() => settings.SetPingRole(123));
+        Should.Throw<BotCommandException>(() => settings.ChangeEligibleRole(roleId: 10, add: true));
+        Should.Throw<BotCommandException>(() => settings.ChangeEligibleRole(roleId: 123, add: true));
+        Should.Throw<BotCommandException>(() => settings.ChangeEligibleRole(roleId: 20, add: false));
+        Should.Throw<BotCommandException>(() => settings.ChangeExemptRole(roleId: 30, add: true));
 
         // Assert
         settings.PingRoleId.ShouldBe(10UL);
@@ -60,14 +60,14 @@ public sealed class WorkingHoursConfigurationTests
         settings.Enabled = true;
 
         // Act / Assert
-        settings.SetPingRole(11).IsSuccessful.ShouldBeFalse();
-        settings.ChangeEligibleRole(roleId: 20, add: false).IsSuccessful.ShouldBeFalse();
+        Should.Throw<BotCommandException>(() => settings.SetPingRole(11));
+        Should.Throw<BotCommandException>(() => settings.ChangeEligibleRole(roleId: 20, add: false));
         settings.PingRoleId.ShouldBe(10UL);
         settings.EligibleRoles.Count.ShouldBe(1);
 
         settings.Enabled = false;
-        settings.SetPingRole(11).IsSuccessful.ShouldBeTrue();
-        settings.ChangeEligibleRole(roleId: 20, add: false).IsSuccessful.ShouldBeTrue();
+        settings.SetPingRole(11);
+        settings.ChangeEligibleRole(roleId: 20, add: false);
         settings.IsComplete.ShouldBeFalse();
     }
 
@@ -77,7 +77,7 @@ public sealed class WorkingHoursConfigurationTests
         // Arrange
         WorkingHoursSettings settings = new WorkingHoursSettings { Enabled = false };
         WorkingHoursPreference preference = new WorkingHoursPreference(guildId: 123, memberId: 456);
-        preference.EnableSchedule(WorkingHoursTimeParser.Parse("09:00:00Z", "17:00:00Z", timezone: null).Value);
+        preference.EnableSchedule(WorkingHoursTimeParser.Parse("09:00:00Z", "17:00:00Z", timezone: null));
         DateTimeOffset now = new DateTimeOffset(year: 2026, month: 10, day: 28, hour: 18, minute: 0, second: 0, offset: TimeSpan.Zero);
         var active = preference.Window!.IsActive(now);
 
@@ -97,7 +97,7 @@ public sealed class WorkingHoursConfigurationTests
     {
         // Arrange
         WorkingHoursPreference preference = new WorkingHoursPreference(guildId: 123, memberId: 456);
-        preference.EnableSchedule(WorkingHoursTimeParser.Parse("22:00:00.123456789Z", "07:00:00Z", timezone: null).Value);
+        preference.EnableSchedule(WorkingHoursTimeParser.Parse("22:00:00.123456789Z", "07:00:00Z", timezone: null));
 
         // Act
         preference.DisableSchedule();
