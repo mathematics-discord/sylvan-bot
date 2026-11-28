@@ -1,4 +1,4 @@
-﻿using Discord.Net;
+using Discord.Net;
 using Discord.Rest;
 using SylvanBot.Application.Features.Automod;
 using SylvanBot.Features.MessageCache;
@@ -164,7 +164,7 @@ public sealed class AutomodGatewayHandler(
             foreach (var ruleId in result.TimedOutRuleIds)
                 _logger.Warning("Automod regex timed out for guild {GuildId}, message {MessageId}, rule {RuleId}", guildId, message.Id, ruleId);
 
-            if (result.Rule is not { HasValue: true, Value: var rule } || result.Reason is not { HasValue: true, Value: var reason })
+            if (result.Match is not { HasValue: true, Value: (var rule, var reason) })
                 return;
 
             if (rule.Action is not (Delete or Mute or Ban))

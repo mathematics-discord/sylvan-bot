@@ -1,4 +1,4 @@
-﻿using SylvanBot.Application.Features.Automod;
+using SylvanBot.Application.Features.Automod;
 
 namespace SylvanBot.Tests.Features.Automod;
 
@@ -11,7 +11,7 @@ public sealed class AutomodConfigurationTests
         AutomodConfiguration configuration = new AutomodConfiguration([], []);
 
         // Assert
-        configuration.Matcher.Match("hello").Rule.HasValue.ShouldBeFalse();
+        configuration.Matcher.Match("hello").Match.HasValue.ShouldBeFalse();
         configuration.ExemptRoleIds.ShouldBeEmpty();
     }
 
@@ -27,7 +27,7 @@ public sealed class AutomodConfigurationTests
 
         // Assert
         configuration.ExemptRoleIds.SetEquals([1UL, 2UL]).ShouldBeTrue();
-        configuration.Matcher.Match("hello").Rule.HasValue.ShouldBeFalse();
+        configuration.Matcher.Match("hello").Match.HasValue.ShouldBeFalse();
     }
 
     [Test]
@@ -48,7 +48,7 @@ public sealed class AutomodConfigurationTests
 
         // Act
         rules.Clear();
-        AutomodRule match = configuration.Matcher.Match("hello").Rule.Value;
+        AutomodRule match = configuration.Matcher.Match("hello").Match.Value.Rule;
 
         // Assert
         ReferenceEquals(match, rule).ShouldBeFalse();
@@ -89,7 +89,7 @@ public sealed class AutomodConfigurationTests
         AutomodMatchResult result = configuration.Matcher.Match("hello");
 
         // Assert
-        result.Rule.HasValue.ShouldBeFalse();
+        result.Match.HasValue.ShouldBeFalse();
     }
 
     [Test]
@@ -104,7 +104,7 @@ public sealed class AutomodConfigurationTests
         AutomodMatchResult result = configuration.Matcher.Match("first then later");
 
         // Assert
-        result.Rule.Value.Id.ShouldBe(2);
+        result.Match.Value.Rule.Id.ShouldBe(2);
     }
 
     [Test]
@@ -119,8 +119,8 @@ public sealed class AutomodConfigurationTests
         AutomodConfiguration enabled = new AutomodConfiguration(rules, [42UL], []);
 
         // Assert
-        disabled.Matcher.Match("hello").Rule.HasValue.ShouldBeFalse();
-        enabled.Matcher.Match("hello").Rule.Value.Id.ShouldBe(1);
+        disabled.Matcher.Match("hello").Match.HasValue.ShouldBeFalse();
+        enabled.Matcher.Match("hello").Match.Value.Rule.Id.ShouldBe(1);
         enabled.ExemptRoleIds.ShouldContain(42UL);
         rules.Count.ShouldBe(1);
     }

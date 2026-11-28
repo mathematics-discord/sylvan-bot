@@ -1,4 +1,4 @@
-﻿using SylvanBot.Application.Features.Automod;
+using SylvanBot.Application.Features.Automod;
 
 namespace SylvanBot.Tests.Features.Automod;
 
@@ -18,7 +18,7 @@ public sealed class AutomodMatcherTests
         AutomodMatchResult result = matcher.Match(text);
 
         // Assert
-        result.Rule.HasValue.ShouldBe(expected);
+        result.Match.HasValue.ShouldBe(expected);
         result.TimedOutRuleIds.ShouldBeEmpty();
     }
 
@@ -29,8 +29,8 @@ public sealed class AutomodMatcherTests
         AutomodMatcher matcher = new AutomodMatcher([new AutomodRule { Id = 1, Pattern = "a.b" }]);
 
         // Act / Assert
-        matcher.Match("A.B").Rule.HasValue.ShouldBeTrue();
-        matcher.Match("axb").Rule.HasValue.ShouldBeFalse();
+        matcher.Match("A.B").Match.HasValue.ShouldBeTrue();
+        matcher.Match("axb").Match.HasValue.ShouldBeFalse();
     }
 
     [Test]
@@ -48,8 +48,8 @@ public sealed class AutomodMatcherTests
         AutomodMatchResult result = matcher.Match("first, later");
 
         // Assert
-        result.Rule.Value.Id.ShouldBe(4);
-        result.Reason.Value.ShouldStartWith("Automatic action: message matches pattern 4\n");
+        result.Match.Value.Rule.Id.ShouldBe(4);
+        result.Match.Value.Reason.ShouldStartWith("Automatic action: message matches pattern 4\n");
     }
 
     [Test]
@@ -66,7 +66,7 @@ public sealed class AutomodMatcherTests
         AutomodMatchResult result = matcher.Match("ABab");
 
         // Assert
-        result.Rule.Value.Id.ShouldBe(2);
+        result.Match.Value.Rule.Id.ShouldBe(2);
     }
 
     [Test]
@@ -76,9 +76,8 @@ public sealed class AutomodMatcherTests
         AutomodMatcher matcher = new AutomodMatcher([new AutomodRule { Id = 1, Pattern = "hello" }]);
 
         // Act / Assert
-        matcher.Match("goodbye").Rule.HasValue.ShouldBeFalse();
-        matcher.Match("goodbye").Reason.HasValue.ShouldBeFalse();
-        new AutomodMatcher([]).Match("hello").Rule.HasValue.ShouldBeFalse();
+        matcher.Match("goodbye").Match.HasValue.ShouldBeFalse();
+        new AutomodMatcher([]).Match("hello").Match.HasValue.ShouldBeFalse();
     }
 
     [Test]
@@ -91,7 +90,7 @@ public sealed class AutomodMatcherTests
         AutomodMatchResult result = matcher.Match("discord.gg/MC57wTZPaN");
 
         // Assert
-        result.Reason.Value.ShouldBe("Automatic action: message matches pattern 240\n`discord.gg/MC57wTZPaN`");
+        result.Match.Value.Reason.ShouldBe("Automatic action: message matches pattern 240\n`discord.gg/MC57wTZPaN`");
     }
 
     [Test]
@@ -104,7 +103,7 @@ public sealed class AutomodMatcherTests
         AutomodMatchResult result = matcher.Match("before\n\t hello  \r\nafter");
 
         // Assert
-        result.Reason.Value.ShouldBe("Automatic action: message matches pattern 1\n`before hello after`");
+        result.Match.Value.Reason.ShouldBe("Automatic action: message matches pattern 1\n`before hello after`");
     }
 
     [TestCase(0)]
@@ -120,9 +119,9 @@ public sealed class AutomodMatcherTests
         AutomodMatchResult result = matcher.Match(text);
 
         // Assert
-        result.Reason.Value.ShouldContain("hello");
-        result.Reason.Value.ShouldContain("...");
-        result.Reason.Value.Length.ShouldBeLessThanOrEqualTo(440);
+        result.Match.Value.Reason.ShouldContain("hello");
+        result.Match.Value.Reason.ShouldContain("...");
+        result.Match.Value.Reason.Length.ShouldBeLessThanOrEqualTo(440);
     }
 
     [Test]
@@ -135,11 +134,11 @@ public sealed class AutomodMatcherTests
         AutomodMatchResult result = matcher.Match("hello " + new string('`', 380));
 
         // Assert
-        var context = result.Reason.Value.Split('\n')[1];
+        var context = result.Match.Value.Reason.Split('\n')[1];
         context.ShouldStartWith("`` ");
         context.ShouldEndWith(" ``");
         context[2..^2].ShouldNotContain("``");
-        result.Reason.Value.Length.ShouldBeLessThanOrEqualTo(512);
+        result.Match.Value.Reason.Length.ShouldBeLessThanOrEqualTo(512);
     }
 
     [Test]
@@ -158,7 +157,7 @@ public sealed class AutomodMatcherTests
         AutomodMatchResult result = matcher.Match(text);
 
         // Assert
-        result.Rule.Value.Id.ShouldBe(2);
+        result.Match.Value.Rule.Id.ShouldBe(2);
         result.TimedOutRuleIds.ShouldBe(new long[] { 1 });
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 
 namespace SylvanBot.Application.Features.Automod;
@@ -69,11 +69,11 @@ public sealed class AutomodMatcher
             }
         }
 
-        Optional<string> reason = selected.HasValue
-            ? FormatReason(text, selected.Value.Id, earliestPosition, matchLength)
-            : default;
+        Optional<AutomodMatch> winner = selected.HasValue
+            ? new AutomodMatch(selected.Value, FormatReason(text, selected.Value.Id, earliestPosition, matchLength))
+            : default(Optional<AutomodMatch>);
 
-        return new AutomodMatchResult(selected, timedOutRuleIds.ToImmutable(), reason);
+        return new AutomodMatchResult(winner, timedOutRuleIds.ToImmutable());
     }
 
     internal static Regex CreateRegex(string pattern, AutomodMatchType matchType)

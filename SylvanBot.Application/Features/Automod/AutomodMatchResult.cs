@@ -1,5 +1,5 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 
 namespace SylvanBot.Application.Features.Automod;
 
-public sealed record AutomodMatchResult(Optional<AutomodRule> Rule, ImmutableArray<long> TimedOutRuleIds, Optional<string> Reason);
+public sealed record AutomodMatchResult(Optional<AutomodMatch> Match, ImmutableArray<long> TimedOutRuleIds);
