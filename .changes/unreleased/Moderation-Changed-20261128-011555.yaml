@@ -1,4 +1,0 @@
-component: Moderation
-kind: Changed
-body: <@&1328097118644338779> and above must enter a duration each time they add or edit a Mute or Ban rule. Mutes require a positive duration of up to 28 days. For bans, use a positive duration such as `duration:2 days` or enter `duration:permanent` for a permanent ban.
-time: 2026-11-28T01:15:55.4964702Z

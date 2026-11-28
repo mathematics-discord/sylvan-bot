@@ -1,4 +1,0 @@
-component: Moderation
-kind: Fixed
-body: By default, only <@&1522665207225127034> and above see `/ticket` in the command picker.
-time: 2026-11-28T00:05:08.3847352Z
