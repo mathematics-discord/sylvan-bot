@@ -26,6 +26,7 @@ public sealed class AutomodRuleConfiguration : IEntityTypeConfiguration<AutomodR
 
         builder.Property(rule => rule.Id).UseIdentityByDefaultColumn();
         builder.Property(rule => rule.Pattern).IsRequired();
+        builder.Property(rule => rule.Disabled).HasDefaultValue(false);
 
         builder.HasIndex(rule => rule.GuildId);
     }

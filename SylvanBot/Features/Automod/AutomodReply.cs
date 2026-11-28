@@ -1,7 +1,30 @@
 ﻿namespace SylvanBot.Features.Automod;
 
+using System.Globalization;
+using SylvanBot.Application.Features.Automod;
+
 internal static class AutomodReply
 {
+    public static (string Text, bool AttachPattern) FormatRule(AutomodRule rule)
+    {
+        var status = rule.Disabled ? "Disabled" : "Active";
+        var action = AutomodRuleList.DescribeAction(rule);
+        var details = string.Create(CultureInfo.InvariantCulture, $"**Automod rule #{rule.Id}**\n{status} | {rule.MatchType} | {action}");
+        const string opening = "\n```\n";
+        const string closing = "\n```";
+
+        var hasControlCharacters = rule.Pattern
+            .Any(character => character != '\n' && char.IsControl(character));
+
+        var attachPattern = rule.Pattern.Length > 2000 - details.Length - opening.Length - closing.Length
+                            || rule.Pattern.Contains("```", StringComparison.Ordinal)
+                            || hasControlCharacters;
+
+        return attachPattern
+            ? (details + "\nThe full pattern is attached.", true)
+            : (details + opening + rule.Pattern + closing, false);
+    }
+
     public static string WithRefreshStatus(string response, bool refreshed) =>
         refreshed
             ? response

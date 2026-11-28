@@ -13,7 +13,7 @@ namespace SylvanBot.Infrastructure.Migrations
     [DbContext(typeof(BotDbContext))]
     partial class BotDbContextModelSnapshot : ModelSnapshot
     {
-        public override string LastMigrationId => "20261125234351_KeepSealRoleConfiguration";
+        public override string LastMigrationId => "20261128010550_AddAutomodRuleDisabledStatus";
 
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
@@ -229,6 +229,11 @@ namespace SylvanBot.Infrastructure.Migrations
 
                     b.Property<int>("Action")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("Disabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<long?>("DurationSeconds")
                         .HasColumnType("bigint");

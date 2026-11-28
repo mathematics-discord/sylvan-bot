@@ -92,7 +92,7 @@ internal static class AutomodRuleList
         yield return label + (continued ? continuation : string.Empty) + opening + pattern + closing;
     }
 
-    private static string DescribeAction(AutomodRule rule)
+    internal static string DescribeAction(AutomodRule rule)
     {
         if (rule.Action is AutomodAction.Delete or AutomodAction.Note)
             return rule.Action.ToString();

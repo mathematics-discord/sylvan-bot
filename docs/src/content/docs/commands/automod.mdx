@@ -1,13 +1,13 @@
 ---
 title: /automod
-description: Add, remove and list message-matching rules.
+description: Add, edit, disable, show, and list message-matching rules.
 ---
 
 import RoleMention from '../../../components/RoleMention.astro';
 
 Available to <RoleMention id="1328097118644338779" /> and above.
 
-Manage rules inside the server. See [Automod](../../features/automod/) for matching behaviour, actions and limitations.
+Manage rules inside the server. See [Automod](../../features/automod/) for matching behaviour, actions, and limitations.
 
 ## Add rules
 
@@ -15,27 +15,45 @@ Manage rules inside the server. See [Automod](../../features/automod/) for match
 /automod add string:example, another example action:Delete
 /automod add string:example action:Mute duration:30m
 /automod add string:example action:Ban duration:2 days
+/automod add string:example action:Ban duration:permanent
 ```
 
 | Option | Meaning |
 |---|---|
 | `string` | Required. Comma-separated words or phrases; surround regexes with backticks. |
 | `action` | Required. Choose Delete, Note, Mute or Ban. |
-| `duration` | Optional. A positive whole number followed by seconds, minutes, hours, days or weeks; short forms `s`, `m`, `h`, `d`, `w` also work. |
+| `duration` | Required for Mute and Ban. Enter a positive whole number followed by seconds, minutes, hours, days, or weeks. Short forms `s`, `m`, `h`, `d`, and `w` also work. For a permanent ban, enter `permanent`. |
 
-For example, enter ``example, `offer\s+\d+` `` in `string` to create one word rule and one regex rule. Commas inside a backtick-delimited regex belong to that pattern. Triple-backtick code blocks are also accepted. Empty patterns, invalid regexes and patterns matching empty text are rejected; no rules from that request are added.
+For example, enter ``example, `offer\s+\d+` `` in `string` to create one word rule and one regex rule. Commas inside a backtick-delimited regex belong to that pattern. Triple-backtick code blocks are also accepted. If any pattern is empty, uses an invalid regex, or matches empty text, the entire request is rejected.
 
-Mute defaults to 28 days and cannot exceed that. Ban defaults to permanent. Delete and Note ignore `duration`. **Note rules do not execute yet.**
+Mute durations can be at most 28 days. Delete and Note ignore `duration`. **Note rules do not execute yet.**
 
 The private reply lists the new IDs in input order. If the rules were saved but could not be applied immediately, the reply says so.
 
-## Remove a rule
+## Edit a rule
 
 ```text
-/automod remove id:12
+/automod edit id:12 action:Ban duration:2 days
+/automod edit id:13 action:Ban duration:permanent
 ```
 
-Use the required rule ID from the list, not a message or user ID. Only rules in this server can be removed. The private reply confirms removal or explains that the ID was not found.
+Use an active rule ID from this server. Each edit disables the old rule and creates a new ID with the same pattern and match type. Enter a duration for Mute or Ban on every edit. The private reply confirms both IDs and tells you if the change was saved but could not be applied immediately.
+
+## Disable a rule
+
+```text
+/automod disable id:12
+```
+
+`/automod disable` replaces `/automod remove`. Use an active rule ID from this server. Disabling keeps the rule available by ID for ticket review. The private reply confirms the change and tells you if it could not be applied immediately.
+
+## Show a rule
+
+```text
+/automod show id:12
+```
+
+Use a rule ID from the list or a ticket. The private reply shows the rule's status, match type, full pattern, and punishment for that ID, including duration or permanence where applicable. Long patterns and patterns that cannot be displayed in a code block appear in a text attachment.
 
 ## List rules
 
@@ -43,6 +61,6 @@ Use the required rule ID from the list, not a message or user ID. Only rules in 
 /automod list
 ```
 
-The list is public and includes rule IDs, patterns, actions and durations. Use **Prev** and **Next** to change pages. <RoleMention id="1328097118644338779" /> and above can use the controls too. Listing rules does not enable disabled actions.
+The public list shows active rule IDs, spoilered patterns, actions, and durations. Active rules still appear when their action is switched off for the server. Use **Prev** and **Next** to change pages. <RoleMention id="1328097118644338779" /> and above can use the controls too.
 
 <RoleMention id="administrators" /> manage action switches and exempt roles with [/config automod](../automod-admin/).

@@ -1,0 +1,4 @@
+component: Moderation
+kind: Changed
+body: <@&1328097118644338779> and above can use `/automod edit` to change an active rule's punishment. It disables the old rule and creates a replacement with the same pattern and a new ID. The private reply gives both IDs. `/automod disable` replaces `/automod remove` and keeps the rule for ticket review. Use `/automod show id:12` to privately see the full rule for an ID from a ticket or the list. The public list shows active rules only. An edit can change which rule wins when two rules match at the same position.
+time: 2026-11-28T01:15:54.4519458Z

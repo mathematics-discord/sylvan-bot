@@ -4,21 +4,31 @@ namespace SylvanBot.Tests.Features.Automod;
 
 public sealed class AutomodDurationTests
 {
+    private static readonly DateTimeOffset Now = DateTimeOffset.UnixEpoch;
+
     [TestCase(AutomodAction.Delete)]
     [TestCase(AutomodAction.Note)]
     public void ResolveSeconds_NonTimedAction_IgnoresEvenInvalidDuration(AutomodAction action)
     {
         // Act / Assert
-        AutomodDuration.ResolveSeconds(action, new Optional<string>("not a duration")).HasValue.ShouldBeFalse();
-        AutomodDuration.ResolveSeconds(action, default).HasValue.ShouldBeFalse();
+        AutomodDuration.ResolveSeconds(action, new Optional<string>("not a duration"), Now).HasValue.ShouldBeFalse();
+        AutomodDuration.ResolveSeconds(action, default, Now).HasValue.ShouldBeFalse();
     }
 
-    [Test]
-    public void ResolveSeconds_OmittedDuration_PreservesLegacyDefaults()
+    [TestCase(AutomodAction.Mute)]
+    [TestCase(AutomodAction.Ban)]
+    public void ResolveSeconds_OmittedDuration_RejectsInput(AutomodAction action)
     {
         // Act / Assert
-        AutomodDuration.ResolveSeconds(AutomodAction.Mute, default).Value.ShouldBe(2419200);
-        AutomodDuration.ResolveSeconds(AutomodAction.Ban, default).HasValue.ShouldBeFalse();
+        Should.Throw<FormatException>(() => AutomodDuration.ResolveSeconds(action, default, Now));
+    }
+
+    [TestCase("permanent")]
+    [TestCase(" Permanent ")]
+    public void ResolveSeconds_ExplicitPermanentBan_ReturnsNoDuration(string input)
+    {
+        // Act / Assert
+        AutomodDuration.ResolveSeconds(AutomodAction.Ban, new Optional<string>(input), Now).HasValue.ShouldBeFalse();
     }
 
     [TestCase("30m", 1800L)]
@@ -30,7 +40,7 @@ public sealed class AutomodDurationTests
     public void ResolveSeconds_ValidMuteDuration_ReturnsWholeSeconds(string input, long expected)
     {
         // Act
-        Optional<long> duration = AutomodDuration.ResolveSeconds(AutomodAction.Mute, new Optional<string>(input));
+        Optional<long> duration = AutomodDuration.ResolveSeconds(AutomodAction.Mute, new Optional<string>(input), Now);
 
         // Assert
         duration.Value.ShouldBe(expected);
@@ -43,14 +53,16 @@ public sealed class AutomodDurationTests
     [TestCase(AutomodAction.Mute, "29d")]
     [TestCase(AutomodAction.Mute, "2419201s")]
     [TestCase(AutomodAction.Mute, "")]
-    [TestCase(AutomodAction.Ban, "permanent")]
+    [TestCase(AutomodAction.Mute, "permanent")]
+    [TestCase(AutomodAction.Ban, " ")]
     [TestCase(AutomodAction.Ban, "1.5s")]
     [TestCase(AutomodAction.Ban, "10")]
     [TestCase(AutomodAction.Ban, "2 months")]
+    [TestCase(AutomodAction.Ban, "9223372036854775807s")]
     public void ResolveSeconds_InvalidDuration_RejectsInput(AutomodAction action, string input)
     {
         // Act / Assert
-        Should.Throw<FormatException>(() => AutomodDuration.ResolveSeconds(action, new Optional<string>(input)));
+        Should.Throw<FormatException>(() => AutomodDuration.ResolveSeconds(action, new Optional<string>(input), Now));
     }
 
     [TestCase("9223372036854775808s")]
@@ -58,14 +70,14 @@ public sealed class AutomodDurationTests
     public void ResolveSeconds_Overflow_RejectsInput(string input)
     {
         // Act / Assert
-        Should.Throw<OverflowException>(() => AutomodDuration.ResolveSeconds(AutomodAction.Ban, new Optional<string>(input)));
+        Should.Throw<OverflowException>(() => AutomodDuration.ResolveSeconds(AutomodAction.Ban, new Optional<string>(input), Now));
     }
 
     [Test]
     public void ResolveSeconds_BanLongerThanMuteLimit_IsAllowed()
     {
         // Act / Assert
-        AutomodDuration.ResolveSeconds(AutomodAction.Ban, new Optional<string>("365d")).Value.ShouldBe(31536000);
+        AutomodDuration.ResolveSeconds(AutomodAction.Ban, new Optional<string>("365d"), Now).Value.ShouldBe(31536000);
     }
 
     [TestCase(1L)]

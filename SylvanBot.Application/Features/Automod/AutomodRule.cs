@@ -13,4 +13,6 @@ public sealed class AutomodRule
     public AutomodAction Action { get; init; }
 
     public long? DurationSeconds { get; init; }
+
+    public bool Disabled { get; init; }
 }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using SylvanBot.Application.Features.Automod;
 using SylvanBot.Interactions;
@@ -20,7 +21,7 @@ public sealed class AutomodModule(AutomodManagement management, IHostApplication
         string input,
         [Summary("action", "The action for each rule")]
         AutomodAction action,
-        [Summary("duration", "Mute/Ban duration, e.g. 30m or 2 days; default: Mute 28 days, Ban permanent")]
+        [Summary("duration", "Required for Mute (up to 28 days) and Ban. Use e.g. 30m, 2 days, or permanent for Ban.")]
         string? duration = null)
     {
         RequireAuditLogAccess();
@@ -62,23 +63,92 @@ public sealed class AutomodModule(AutomodManagement management, IHostApplication
         await AutomodReply.SendAsync(Context.Interaction, response);
     }
 
-    [SlashCommand("remove", "Remove an automod rule from this guild")]
-    public async Task RemoveAsync([Summary("id", "The rule ID shown by /automod list")] long id)
+    [SlashCommand("edit", "Replace an active automod rule with the same pattern and a new punishment")]
+    public async Task EditAsync(
+        [Summary("id", "The active rule ID shown by /automod list")]
+        long id,
+        [Summary("action", "The action for the replacement rule")]
+        AutomodAction action,
+        [Summary("duration", "Required for Mute (up to 28 days) and Ban. Use e.g. 30m, 2 days, or permanent for Ban.")]
+        string? duration = null)
     {
         RequireAuditLogAccess();
         await DeferAsync(ephemeral: true);
-        (bool Removed, bool RuntimeRefreshed) result = await management.RemoveAsync(Context.Guild.Id, id, lifetime.ApplicationStopping);
+        string response;
 
-        var response = result.Removed
-            ? $"Removed automod rule {id}."
-            : $"No automod rule with ID {id} exists in this guild. Use /automod list to find its rules.";
+        try
+        {
+            (Optional<long> ReplacementId, bool RuntimeRefreshed) result = await management.EditAsync(
+                Context.Guild.Id,
+                id,
+                action,
+                duration is null ? default : new Optional<string>(duration),
+                lifetime.ApplicationStopping);
 
-        response = AutomodReply.WithRefreshStatus(response, result.RuntimeRefreshed);
+            response = result.ReplacementId.HasValue
+                ? AutomodReply.WithRefreshStatus($"Disabled automod rule {id} and added rule {result.ReplacementId.Value}.", result.RuntimeRefreshed)
+                : $"No active automod rule with ID {id} exists in this guild.";
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            response = "No rule edited. Choose Delete, Note, Mute or Ban.";
+        }
+        catch (FormatException ex)
+        {
+            response = "No rule edited. " + ex.Message;
+        }
+        catch (OverflowException)
+        {
+            response = "No rule edited. The duration is too large; choose a shorter duration.";
+        }
 
         await AutomodReply.SendAsync(Context.Interaction, response);
     }
 
-    [SlashCommand("list", "List this guild's automod rules")]
+    [SlashCommand("disable", "Disable an active automod rule and keep it available by ID")]
+    public async Task DisableAsync([Summary("id", "The active rule ID shown by /automod list")] long id)
+    {
+        RequireAuditLogAccess();
+        await DeferAsync(ephemeral: true);
+        (bool Disabled, bool RuntimeRefreshed) result = await management.DisableAsync(Context.Guild.Id, id, lifetime.ApplicationStopping);
+
+        var response = result.Disabled
+            ? AutomodReply.WithRefreshStatus($"Disabled automod rule {id}.", result.RuntimeRefreshed)
+            : $"No active automod rule with ID {id} exists in this guild.";
+
+        if (result is { Disabled: false, RuntimeRefreshed: false })
+            response += " The runtime refresh also failed.";
+
+        await AutomodReply.SendAsync(Context.Interaction, response);
+    }
+
+    [SlashCommand("show", "Privately view an active or disabled automod rule by ID")]
+    public async Task ShowAsync([Summary("id", "The rule ID from /automod list or a ticket")] long id)
+    {
+        RequireAuditLogAccess();
+        await DeferAsync(ephemeral: true);
+        Optional<AutomodRule> rule = await management.FindAsync(Context.Guild.Id, id, lifetime.ApplicationStopping);
+
+        if (!rule.TryGet(out AutomodRule? foundRule))
+        {
+            await AutomodReply.SendAsync(Context.Interaction, $"No automod rule with ID {id} exists in this guild.");
+            return;
+        }
+
+        (var text, var attachPattern) = AutomodReply.FormatRule(foundRule);
+        await using MemoryStream? pattern = attachPattern ? new MemoryStream(Encoding.UTF8.GetBytes(foundRule.Pattern)) : null;
+
+        await ModifyOriginalResponseAsync(properties =>
+        {
+            properties.Content = text;
+            properties.AllowedMentions = AllowedMentions.None;
+
+            if (pattern is not null)
+                properties.Attachments = new[] { new FileAttachment(pattern, "automod-pattern.txt") };
+        });
+    }
+
+    [SlashCommand("list", "List this guild's active automod rules")]
     public async Task ListAsync()
     {
         RequireAuditLogAccess();

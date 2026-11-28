@@ -34,7 +34,7 @@ public static partial class AutomodDuration
     public static bool CoversExpiry(Optional<DateTimeOffset> existingExpiry, DateTimeOffset requestedExpiry) =>
         existingExpiry.HasValue && existingExpiry.Value >= requestedExpiry;
 
-    public static Optional<long> ResolveSeconds(AutomodAction action, Optional<string> duration)
+    public static Optional<long> ResolveSeconds(AutomodAction action, Optional<string> duration, DateTimeOffset now)
     {
         if (action is AutomodAction.Delete or AutomodAction.Note)
             return default;
@@ -42,13 +42,20 @@ public static partial class AutomodDuration
         if (action is not (AutomodAction.Mute or AutomodAction.Ban))
             throw new ArgumentOutOfRangeException(nameof(action));
 
-        if (!duration.HasValue)
-            return action == AutomodAction.Mute ? new Optional<long>(MaximumMuteSeconds) : default;
+        var invalidDuration = action == AutomodAction.Ban
+            ? "Enter permanent or a positive whole-number duration such as 30m or 2 days (s, m, h, d or w)."
+            : "Enter a positive whole-number duration such as 30m or 2 days (s, m, h, d or w).";
+
+        if (!duration.HasValue || string.IsNullOrWhiteSpace(duration.Value))
+            throw new FormatException(invalidDuration);
+
+        if (action == AutomodAction.Ban && string.Equals(duration.Value.Trim(), "permanent", StringComparison.OrdinalIgnoreCase))
+            return default;
 
         Match match = DurationPattern.Match(duration.Value);
 
         if (!match.Success)
-            throw new FormatException("Use a positive whole-number duration such as 30m or 2 days (s, m, h, d or w).");
+            throw new FormatException(invalidDuration);
 
         var amount = long.Parse(match.Groups["amount"].Value, CultureInfo.InvariantCulture);
         var unit = match.Groups["unit"].Value.ToLowerInvariant();
@@ -70,6 +77,11 @@ public static partial class AutomodDuration
 
         if (action == AutomodAction.Mute && seconds > MaximumMuteSeconds)
             throw new FormatException("Mute duration cannot exceed 28 days.");
+
+        var maximumBanSeconds = (DateTimeOffset.MaxValue - now).Ticks / TimeSpan.TicksPerSecond;
+
+        if (action == AutomodAction.Ban && seconds > maximumBanSeconds)
+            throw new FormatException("The ban duration is too large; choose a shorter duration or enter permanent.");
 
         return new Optional<long>(seconds);
     }

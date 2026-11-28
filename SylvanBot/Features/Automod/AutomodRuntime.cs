@@ -140,7 +140,8 @@ public sealed class AutomodRuntime(IDbContextFactory<BotDbContext> contexts, ILo
         await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
 
         IQueryable<AutomodRule> rulesQuery = db.AutomodRules
-            .AsNoTracking();
+            .AsNoTracking()
+            .Where(rule => !rule.Disabled);
 
         IQueryable<AutomodExemptRole> rolesQuery = db.AutomodExemptRoles
             .AsNoTracking();

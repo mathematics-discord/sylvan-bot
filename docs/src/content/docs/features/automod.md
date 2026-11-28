@@ -8,9 +8,9 @@ including in threads; it does not inspect the contents of attachments.
 
 ## How matching works
 
-Plain patterns match whole words or phrases, ignoring case. Backtick-delimited patterns are regexes, also ignoring case. If several enabled rules
-match, the match appearing earliest in the message wins; ties go to the lowest rule ID. Only that rule is selected. The most severe action does not
-take priority.
+Plain patterns match whole words or phrases, ignoring case. Backtick-delimited patterns are regexes, also ignoring case. Among active rules whose
+actions are switched on, the match appearing earliest in the message wins. Ties go to the lowest rule ID. Editing creates a new ID, so it can change
+which rule wins a tie.
 
 | Action | What happens                                                                                   |
 |--------|------------------------------------------------------------------------------------------------|
@@ -27,10 +27,12 @@ too long is skipped for that message; other rules can still match.
 Members holding any configured exempt role are skipped. Staff are not automatically exempt: configure their roles if they should be excluded. If
 required member-role information cannot be obtained, Automod skips enforcement rather than guessing whether an exemption applies.
 
-Use [/automod](../../commands/automod/) to add, remove and list rules. Use [/config automod](../../commands/automod-admin/) to switch actions on or
-off and manage exemptions. Omitting `action` changes the shared ticket-capture and Automod switch; existing restrictions continue to expire and renew
-when it is disabled. Saved changes normally take effect immediately. If a reply reports an unsuccessful refresh, the previous active configuration
-remains in use.
+Use [/automod](../../commands/automod/) to add, edit, disable, show, and list rules. Edits leave the old version disabled with its original pattern and
+punishment. To see which version produced a ticket, use `/automod show` with the ID from the ticket. `/automod list` shows only active versions.
+
+Use [/config automod](../../commands/automod-admin/) to switch actions on or off and manage exemptions. Switching an action on applies it only to active
+rules. Omitting `action` changes the shared ticket-capture and Automod switch. Existing restrictions continue to expire and renew when that switch is
+off. Saved changes normally take effect immediately. If a reply reports an unsuccessful refresh, the previous active configuration remains in use.
 
 ## Ticket review
 
@@ -40,10 +42,12 @@ Bans from the separate image detector are automatically accepted.
 
 ## Timed bans and failures
 
+When adding or editing a Ban rule, enter a duration such as `2 days` for a timed ban or `permanent` for a permanent ban.
+
 Timed bans are recorded across restarts. Sylvan removes a ban when it expires only when it can confirm that it still owns that ban. A later ban or
 unban can supersede it; missing or unreadable audit history can delay removal or require manual review. A ban reaching its nominal expiry is therefore
 not a guarantee that the member has already been unbanned.
 
-Deleting a rule or disabling Ban does not cancel a recorded ban or its expiry handling. Messages received while Sylvan is offline are not replayed for
-moderation. Discord actions can fail independently: a failed deletion does not prevent an attempted timeout or ban. Ask staff to review an unresolved
-outcome.
+Editing or disabling a rule leaves recorded bans and their expiry handling in effect, as does switching off Ban. Messages received while Sylvan is
+offline are not replayed for moderation. Discord actions can fail independently: a failed deletion does not prevent an attempted timeout or ban. Ask
+staff to review an unresolved outcome.
