@@ -1052,7 +1052,7 @@ resharper_csharp_braces_for_lock = not_required
 
 # Single embedded statements omit braces, even when the statement spans several lines.
 resharper_csharp_braces_redundant = true
-resharper_remove_redundant_braces_highlighting = error
+resharper_remove_redundant_braces_highlighting = none
 resharper_enforce_if_statement_braces_highlighting = none
 dotnet_diagnostic.IDE0011.severity = none
 dotnet_diagnostic.rcs1002.severity = error
